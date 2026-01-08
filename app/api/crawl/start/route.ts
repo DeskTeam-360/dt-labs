@@ -2,6 +2,10 @@ import { createClient } from '@/utils/supabase/server'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+// Vercel serverless function configuration
+export const maxDuration = 300 // 5 minutes (max for Pro plan, 10s for Hobby)
+export const runtime = 'nodejs' // Use Node.js runtime for better compatibility
+
 // POST - Create company website and start crawl
 export async function POST(request: Request) {
   try {
@@ -202,12 +206,77 @@ async function startCrawlProcess(
     visitedUrls.add(normalizedUrl)
 
     try {
-      // Fetch page content
-      const response = await fetch(currentUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; WebsiteCrawler/1.0)',
-        },
-      })
+      // Fetch page content with timeout, retry logic, and better error handling
+      let response: Response | null = null
+      let lastError: Error | null = null
+      const maxRetries = 3
+      let retryCount = 0
+      
+      while (retryCount < maxRetries) {
+        try {
+          // Create AbortController for timeout
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 seconds timeout
+
+          response = await fetch(currentUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Connection': 'keep-alive',
+              'Upgrade-Insecure-Requests': '1',
+            },
+            signal: controller.signal,
+            // Add redirect handling
+            redirect: 'follow',
+            // Add cache control for Vercel
+            cache: 'no-store',
+          })
+
+          clearTimeout(timeoutId)
+          lastError = null
+          break // Success, exit retry loop
+        } catch (fetchError: any) {
+          lastError = fetchError
+          retryCount++
+          
+          // If it's the last retry, give up
+          if (retryCount >= maxRetries) {
+            // Handle fetch errors (network errors, CORS, timeout, etc.)
+            failedCount++
+            const errorMessage = fetchError.name === 'AbortError' 
+              ? 'Request timeout after retries' 
+              : fetchError.message || 'Network error after retries'
+            
+            await supabase.from('crawl_pages').insert({
+              crawl_session_id: sessionId,
+              url: currentUrl,
+              depth,
+              status: 'failed',
+              error_message: errorMessage,
+              crawled_at: new Date().toISOString(),
+            })
+
+            await supabase
+              .from('crawl_sessions')
+              .update({
+                failed_pages: failedCount,
+              })
+              .eq('id', sessionId)
+
+            continue
+          }
+          
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
+        }
+      }
+      
+      // If we exhausted retries or response is null, skip this URL
+      if (lastError || !response) {
+        continue
+      }
 
       const contentType = response.headers.get('content-type') || ''
       const httpStatus = response.status
@@ -221,6 +290,7 @@ async function startCrawlProcess(
           status: 'failed',
           http_status_code: httpStatus,
           content_type: contentType,
+          error_message: `HTTP ${httpStatus}: ${response.statusText}`,
           crawled_at: new Date().toISOString(),
         })
 
@@ -236,7 +306,32 @@ async function startCrawlProcess(
         continue
       }
 
-      const html = await response.text()
+      let html: string
+      try {
+        html = await response.text()
+      } catch (textError: any) {
+        // Handle text parsing errors
+        failedCount++
+        await supabase.from('crawl_pages').insert({
+          crawl_session_id: sessionId,
+          url: currentUrl,
+          depth,
+          status: 'failed',
+          http_status_code: httpStatus,
+          content_type: contentType,
+          error_message: `Failed to parse response: ${textError.message}`,
+          crawled_at: new Date().toISOString(),
+        })
+
+        await supabase
+          .from('crawl_sessions')
+          .update({
+            failed_pages: failedCount,
+          })
+          .eq('id', sessionId)
+
+        continue
+      }
       
       // Parse HTML (simplified - in production, use a proper HTML parser like cheerio)
       const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i)
@@ -417,12 +512,15 @@ async function startCrawlProcess(
 
     } catch (error: any) {
       failedCount++
+      const errorMessage = error.message || error.toString() || 'Unknown error'
+      console.error(`Error crawling ${currentUrl}:`, errorMessage, error)
+      
       await supabase.from('crawl_pages').insert({
         crawl_session_id: sessionId,
         url: currentUrl,
         depth,
         status: 'failed',
-        error_message: error.message,
+        error_message: errorMessage,
         crawled_at: new Date().toISOString(),
       })
 
