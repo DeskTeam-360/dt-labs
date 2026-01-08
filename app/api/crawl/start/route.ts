@@ -117,8 +117,9 @@ export async function POST(request: Request) {
 
     // Start crawl process (async - don't wait for it to complete)
     // In production, you might want to use a background job queue like BullMQ or similar
+    console.log(`[API] Starting crawl process for session ${sessionData.id} in background`)
     startCrawlProcess(supabase, sessionData.id, websiteId, max_depth, max_pages).catch((error) => {
-      console.error('Error in crawl process:', error)
+      console.error('[API] Error in crawl process:', error)
       // Update session with error
       supabase
         .from('crawl_sessions')
@@ -128,6 +129,11 @@ export async function POST(request: Request) {
           completed_at: new Date().toISOString(),
         })
         .eq('id', sessionData.id)
+        .then(({ error: updateError }) => {
+          if (updateError) {
+            console.error('[API] Error updating session status:', updateError)
+          }
+        })
     })
 
     return NextResponse.json(
@@ -172,17 +178,26 @@ async function startCrawlProcess(
   maxDepth: number,
   maxPages: number
 ) {
+  // Create a new Supabase client for this async process to ensure it works in Vercel
+  // The original supabase client might not work in background async functions
+  const cookieStore = await cookies()
+  const freshSupabase = createClient(cookieStore)
+  
+  console.log(`[Crawl] Starting process for session ${sessionId}, website ${companyWebsiteId}`)
 
   // Get company website URL
-  const { data: website, error: websiteError } = await supabase
+  const { data: website, error: websiteError } = await freshSupabase
     .from('company_websites')
     .select('url')
     .eq('id', companyWebsiteId)
     .single()
 
   if (websiteError || !website) {
+    console.error('[Crawl] Failed to fetch company website:', websiteError)
     throw new Error('Failed to fetch company website')
   }
+
+  console.log(`[Crawl] Starting from URL: ${website.url}`)
 
   const startUrl = website.url
   const visitedUrls = new Set<string>() // Store normalized URLs
@@ -249,7 +264,7 @@ async function startCrawlProcess(
               ? 'Request timeout after retries' 
               : fetchError.message || 'Network error after retries'
             
-            await supabase.from('crawl_pages').insert({
+            await freshSupabase.from('crawl_pages').insert({
               crawl_session_id: sessionId,
               url: currentUrl,
               depth,
@@ -283,7 +298,7 @@ async function startCrawlProcess(
 
       if (!response.ok || !contentType.includes('text/html')) {
         failedCount++
-        await supabase.from('crawl_pages').insert({
+        await freshSupabase.from('crawl_pages').insert({
           crawl_session_id: sessionId,
           url: currentUrl,
           depth,
@@ -295,7 +310,7 @@ async function startCrawlProcess(
         })
 
         // Update session
-        await supabase
+        await freshSupabase
           .from('crawl_sessions')
           .update({
             crawled_pages: crawledCount,
@@ -312,7 +327,7 @@ async function startCrawlProcess(
       } catch (textError: any) {
         // Handle text parsing errors
         failedCount++
-        await supabase.from('crawl_pages').insert({
+        await freshSupabase.from('crawl_pages').insert({
           crawl_session_id: sessionId,
           url: currentUrl,
           depth,
@@ -323,7 +338,7 @@ async function startCrawlProcess(
           crawled_at: new Date().toISOString(),
         })
 
-        await supabase
+        await freshSupabase
           .from('crawl_sessions')
           .update({
             failed_pages: failedCount,
@@ -480,7 +495,7 @@ async function startCrawlProcess(
       }
 
       // Save crawled page
-      await supabase.from('crawl_pages').insert({
+      const { error: insertError } = await freshSupabase.from('crawl_pages').insert({
         crawl_session_id: sessionId,
         url: currentUrl,
         title,
@@ -495,10 +510,34 @@ async function startCrawlProcess(
         crawled_at: new Date().toISOString(),
       })
 
+      if (insertError) {
+        console.error(`[Crawl] Error inserting page ${currentUrl}:`, insertError)
+        failedCount++
+        await freshSupabase.from('crawl_pages').insert({
+          crawl_session_id: sessionId,
+          url: currentUrl,
+          depth,
+          status: 'failed',
+          error_message: `Database error: ${insertError.message}`,
+          crawled_at: new Date().toISOString(),
+        })
+        
+        await freshSupabase
+          .from('crawl_sessions')
+          .update({
+            failed_pages: failedCount,
+          })
+          .eq('id', sessionId)
+        
+        continue
+      }
+
       crawledCount++
+      console.log(`[Crawl] Saved page ${crawledCount}/${maxPages}: ${currentUrl}`)
+      console.log(`Successfully crawled page ${crawledCount}: ${currentUrl}`)
 
       // Update session progress
-      await supabase
+      const { error: updateError } = await freshSupabase
         .from('crawl_sessions')
         .update({
           crawled_pages: crawledCount,
@@ -506,6 +545,10 @@ async function startCrawlProcess(
           total_pages: crawledCount + failedCount,
         })
         .eq('id', sessionId)
+
+      if (updateError) {
+        console.error(`[Crawl] Error updating session progress:`, updateError)
+      }
 
       // Add a small delay to be respectful to the server
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -534,7 +577,9 @@ async function startCrawlProcess(
   }
 
   // Mark crawl session as completed
-  await supabase
+  console.log(`[Crawl] Completed session ${sessionId}: ${crawledCount} crawled, ${failedCount} failed`)
+  
+  const { error: finalUpdateError } = await freshSupabase
     .from('crawl_sessions')
     .update({
       status: 'completed',
@@ -544,5 +589,12 @@ async function startCrawlProcess(
       failed_pages: failedCount,
     })
     .eq('id', sessionId)
+
+  if (finalUpdateError) {
+    console.error(`[Crawl] Error marking session as completed:`, finalUpdateError)
+    throw finalUpdateError
+  }
+  
+  console.log(`[Crawl] Session ${sessionId} completed successfully`)
 }
 
