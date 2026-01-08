@@ -42,6 +42,20 @@ export async function startCrawlProcess(
   
   console.log(`[Crawl] Starting process for session ${sessionId}, website ${companyWebsiteId}`)
 
+  // Verify session exists before starting
+  const { data: sessionCheck, error: sessionCheckError } = await freshSupabase
+    .from('crawl_sessions')
+    .select('id, status')
+    .eq('id', sessionId)
+    .single()
+
+  if (sessionCheckError || !sessionCheck) {
+    console.error('[Crawl] Session not found or invalid:', sessionCheckError)
+    throw new Error(`Crawl session ${sessionId} not found in database`)
+  }
+
+  console.log(`[Crawl] Session verified: ${sessionId}, status: ${sessionCheck.status}`)
+
   // Get company website URL
   const { data: website, error: websiteError } = await freshSupabase
     .from('company_websites')
@@ -62,6 +76,7 @@ export async function startCrawlProcess(
   
   let crawledCount = 0
   let failedCount = 0
+  let uncrawledCount = 0 // Track uncrawlable pages (non-HTML content)
 
   // Simple crawler implementation
   // In production, you'd want to use a proper web scraping library
@@ -174,15 +189,44 @@ export async function startCrawlProcess(
         }
       }
       
-      // If we exhausted retries or response is null, skip this URL
+      // If we exhausted retries or response is null, save as failed and skip
       if (lastError || !response) {
+        failedCount++
+        const errorMessage = lastError 
+          ? (lastError.message || lastError.toString() || 'Fetch failed after retries')
+          : 'No response received after retries'
+        
+        await freshSupabase.from('crawl_pages').insert({
+          crawl_session_id: sessionId,
+          url: currentUrl,
+          depth,
+          status: 'failed',
+          error_message: errorMessage,
+          crawled_at: new Date().toISOString(),
+        })
+
+        await freshSupabase
+          .from('crawl_sessions')
+          .update({
+            failed_pages: failedCount,
+          })
+          .eq('id', sessionId)
+
         continue
       }
 
       const contentType = response.headers.get('content-type') || ''
       const httpStatus = response.status
+      const finalUrl = response.url // URL final setelah redirect (jika ada)
+      
+      // Detect redirect: jika final URL berbeda dengan current URL, berarti ada redirect
+      const isRedirect = finalUrl !== currentUrl
+      const redirectInfo = isRedirect ? `Redirected from ${currentUrl} to ${finalUrl}` : null
 
-      if (!response.ok || !contentType.includes('text/html')) {
+      // Handle failed responses (bukan redirect yang berhasil)
+      // Jika redirect berhasil (response.ok = true), kita akan process HTML-nya
+      // Jadi kita hanya skip jika response tidak OK dan bukan redirect yang berhasil
+      if (!response.ok) {
         failedCount++
         await freshSupabase.from('crawl_pages').insert({
           crawl_session_id: sessionId,
@@ -191,7 +235,7 @@ export async function startCrawlProcess(
           status: 'failed',
           http_status_code: httpStatus,
           content_type: contentType,
-          error_message: `HTTP ${httpStatus}: ${response.statusText}`,
+          error_message: `HTTP ${httpStatus}: ${response.statusText}${isRedirect ? `. ${redirectInfo}` : ''}`,
           crawled_at: new Date().toISOString(),
         })
 
@@ -201,6 +245,36 @@ export async function startCrawlProcess(
           .update({
             crawled_pages: crawledCount,
             failed_pages: failedCount,
+          })
+          .eq('id', sessionId)
+
+        continue
+      }
+
+      // Handle non-HTML responses (hanya jika bukan redirect)
+      // Jika redirect, kita tetap process meskipun mungkin bukan HTML
+      // Non-HTML content bukan failed, tapi uncrawlable (seperti images, PDFs, dll)
+      if (!contentType.includes('text/html') && !isRedirect) {
+        uncrawledCount++
+        await freshSupabase.from('crawl_pages').insert({
+          crawl_session_id: sessionId,
+          url: currentUrl,
+          depth,
+          status: 'uncrawl-page',
+          http_status_code: httpStatus,
+          content_type: contentType,
+          error_message: `Non-HTML content: ${contentType}`,
+          crawled_at: new Date().toISOString(),
+        })
+
+        // Update session - uncrawl-page tidak dihitung sebagai failed atau crawled
+        await freshSupabase
+          .from('crawl_sessions')
+          .update({
+            crawled_pages: crawledCount,
+            failed_pages: failedCount,
+            uncrawled_pages: uncrawledCount,
+            total_pages: crawledCount + failedCount + uncrawledCount,
           })
           .eq('id', sessionId)
 
@@ -381,6 +455,7 @@ export async function startCrawlProcess(
       }
 
       // Save crawled page
+      // Include redirect information if redirect was detected
       const { error: insertError } = await freshSupabase.from('crawl_pages').insert({
         crawl_session_id: sessionId,
         url: currentUrl,
@@ -393,27 +468,121 @@ export async function startCrawlProcess(
         heading_hierarchy: headingHierarchy,
         meta_tags: metaTags,
         links: links,
+        error_message: isRedirect ? redirectInfo : null, // Store redirect info in error_message field for tracking
         crawled_at: new Date().toISOString(),
       })
 
       if (insertError) {
         console.error(`[Crawl] Error inserting page ${currentUrl}:`, insertError)
         failedCount++
-        await freshSupabase.from('crawl_pages').insert({
-          crawl_session_id: sessionId,
-          url: currentUrl,
-          depth,
-          status: 'failed',
-          error_message: `Database error: ${insertError.message}`,
-          crawled_at: new Date().toISOString(),
-        })
         
-        await freshSupabase
-          .from('crawl_sessions')
-          .update({
-            failed_pages: failedCount,
+        // Try to save failed page with detailed error message
+        const detailedErrorMessage = `Database error: ${insertError.message}${insertError.code ? ` (code: ${insertError.code})` : ''}${insertError.details ? ` - ${insertError.details}` : ''}`
+        
+        try {
+          // Check if error is due to foreign key constraint (session doesn't exist)
+          if (insertError.code === '23503' && insertError.details?.includes('crawl_sessions')) {
+            console.error(`[Crawl] CRITICAL: Session ${sessionId} no longer exists in database. Stopping crawl.`)
+            // Try to mark session as failed before stopping (if it still exists)
+            try {
+              await freshSupabase
+                .from('crawl_sessions')
+                .update({
+                  status: 'failed',
+                  error_message: `Crawl stopped: Session was deleted during crawl process. Last URL: ${currentUrl}`,
+                  completed_at: new Date().toISOString(),
+                })
+                .eq('id', sessionId)
+            } catch (updateError) {
+              // Session might not exist, so this is expected
+              console.error(`[Crawl] Could not update deleted session:`, updateError)
+            }
+            // Stop crawling since session doesn't exist
+            break
+          }
+          
+          // Verify session still exists before trying to insert failed page
+          const { data: sessionVerify } = await freshSupabase
+            .from('crawl_sessions')
+            .select('id')
+            .eq('id', sessionId)
+            .single()
+          
+          if (!sessionVerify) {
+            console.error(`[Crawl] CRITICAL: Session ${sessionId} no longer exists. Cannot save failed page. Stopping crawl.`)
+            break // Stop crawling
+          }
+          
+          const { error: failedInsertError } = await freshSupabase.from('crawl_pages').insert({
+            crawl_session_id: sessionId,
+            url: currentUrl,
+            depth,
+            status: 'failed',
+            error_message: detailedErrorMessage,
+            crawled_at: new Date().toISOString(),
           })
-          .eq('id', sessionId)
+          
+          if (failedInsertError) {
+            // If insert failed page also fails (e.g., foreign key constraint), log it with full details
+            const criticalErrorDetails = {
+              originalError: {
+                message: insertError.message,
+                code: insertError.code,
+                details: insertError.details,
+                hint: insertError.hint,
+              },
+              failedPageInsertError: {
+                message: failedInsertError.message,
+                code: failedInsertError.code,
+                details: failedInsertError.details,
+                hint: failedInsertError.hint,
+              },
+              sessionId,
+              url: currentUrl,
+              depth,
+              timestamp: new Date().toISOString(),
+            }
+            console.error(`[Crawl] CRITICAL: Failed to save failed page record for ${currentUrl}:`, JSON.stringify(criticalErrorDetails, null, 2))
+            
+            // If it's a foreign key error, stop crawling
+            if (failedInsertError.code === '23503' && failedInsertError.details?.includes('crawl_sessions')) {
+              console.error(`[Crawl] CRITICAL: Session ${sessionId} no longer exists. Stopping crawl.`)
+              break
+            }
+            
+            // Try to save error to session error_message as fallback
+            try {
+              await freshSupabase
+                .from('crawl_sessions')
+                .update({
+                  error_message: `CRITICAL: Failed to save failed page for ${currentUrl}. Original error: ${insertError.message}. Failed page insert error: ${failedInsertError.message}`,
+                })
+                .eq('id', sessionId)
+            } catch (updateError) {
+              console.error(`[Crawl] CRITICAL: Also failed to update session error_message:`, updateError)
+            }
+            // Still increment failed count and try to update session
+          }
+        } catch (saveError: any) {
+          console.error(`[Crawl] CRITICAL: Exception while saving failed page for ${currentUrl}:`, {
+            originalError: insertError,
+            saveError,
+            sessionId,
+            url: currentUrl,
+          })
+        }
+        
+        // Try to update session failed count
+        try {
+          await freshSupabase
+            .from('crawl_sessions')
+            .update({
+              failed_pages: failedCount,
+            })
+            .eq('id', sessionId)
+        } catch (updateError) {
+          console.error(`[Crawl] Error updating failed_pages count:`, updateError)
+        }
         
         continue
       }
@@ -427,7 +596,8 @@ export async function startCrawlProcess(
         .update({
           crawled_pages: crawledCount,
           failed_pages: failedCount,
-          total_pages: crawledCount + failedCount,
+          uncrawled_pages: uncrawledCount,
+          total_pages: crawledCount + failedCount + uncrawledCount,
         })
         .eq('id', sessionId)
 
@@ -462,16 +632,17 @@ export async function startCrawlProcess(
   }
 
   // Mark crawl session as completed
-  console.log(`[Crawl] Completed session ${sessionId}: ${crawledCount} crawled, ${failedCount} failed`)
+  console.log(`[Crawl] Completed session ${sessionId}: ${crawledCount} crawled, ${failedCount} failed, ${uncrawledCount} uncrawled`)
   
   const { error: finalUpdateError } = await freshSupabase
     .from('crawl_sessions')
     .update({
       status: 'completed',
       completed_at: new Date().toISOString(),
-      total_pages: crawledCount + failedCount,
+      total_pages: crawledCount + failedCount + uncrawledCount,
       crawled_pages: crawledCount,
       failed_pages: failedCount,
+      uncrawled_pages: uncrawledCount,
     })
     .eq('id', sessionId)
 

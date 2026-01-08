@@ -32,6 +32,7 @@ interface CrawlPageRecord {
   heading_hierarchy: any
   meta_tags: any
   links: string[] | null
+  error_message: string | null
   crawled_at: string | null
   created_at: string
   updated_at: string
@@ -987,6 +988,8 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
         return 'red'
       case 'pending':
         return 'orange'
+      case 'uncrawl-page':
+        return 'geekblue' // Cyan/blue untuk menunjukkan ini bukan error tapi uncrawlable
       default:
         return 'default'
     }
@@ -1004,8 +1007,13 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       title: 'URL',
       dataIndex: 'url',
       key: 'url',
-      render: (url: string) => (
-        <a href={url} target="_blank" rel="noopener noreferrer">
+      render: (url: string, record: CrawlPageRecord) => (
+        <a 
+          href={url} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={record.status === 'failed' ? { color: '#ff4d4f', fontWeight: 500 } : {}}
+        >
           {url}
         </a>
       ),
@@ -1050,6 +1058,23 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       key: 'crawled_at',
       render: (_, record) => record.crawled_at ? <DateDisplay date={record.crawled_at} /> : '-',
     },
+    {
+      title: 'Error Message',
+      dataIndex: 'error_message',
+      key: 'error_message',
+      render: (errorMessage: string | null, record: CrawlPageRecord) => {
+        if (record.status === 'failed' && errorMessage) {
+          return (
+            <Text type="danger" style={{ fontSize: 12 }}>
+              {errorMessage}
+            </Text>
+          )
+        }
+        return '-'
+      },
+      ellipsis: true,
+      width: 250,
+    },
   ]
 
   const tabItems = [
@@ -1078,13 +1103,25 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   percent={getProgress()} 
                   status={crawlSession.status === 'crawling' ? 'active' : crawlSession.status === 'completed' ? 'success' : 'normal'}
                 />
-                <Space>
-                  <Text>Crawled: <strong>{crawlSession.crawled_pages || 0}</strong></Text>
-                  <Text>/</Text>
-                  <Text>Total: <strong>{crawlSession.total_pages || 0}</strong></Text>
-                  {crawlSession.failed_pages > 0 && (
-                    <Tag color="red">Failed: {crawlSession.failed_pages}</Tag>
-                  )}
+                <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                  <Space wrap>
+                    <Tag color="green">
+                      <CheckCircleOutlined /> Crawled: <strong>{crawlSession.crawled_pages || 0}</strong>
+                    </Tag>
+                    {(crawlSession.uncrawled_pages || 0) > 0 && (
+                      <Tag color="geekblue">
+                        Uncrawled: <strong>{crawlSession.uncrawled_pages || 0}</strong>
+                      </Tag>
+                    )}
+                    {(crawlSession.failed_pages || 0) > 0 && (
+                      <Tag color="red">
+                        <CloseCircleOutlined /> Failed: <strong>{crawlSession.failed_pages || 0}</strong>
+                      </Tag>
+                    )}
+                  </Space>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    Total Pages: <strong>{crawlSession.total_pages || 0}</strong>
+                  </Text>
                 </Space>
               </Space>
             </Descriptions.Item>
