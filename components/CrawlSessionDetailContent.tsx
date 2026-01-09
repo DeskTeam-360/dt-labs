@@ -1,6 +1,6 @@
 'use client'
 
-import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Table, Tabs, Progress, message } from 'antd'
+import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Table, Tabs, Progress, message, Select } from 'antd'
 import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, ReloadOutlined, GlobalOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -44,6 +44,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
   const [crawlPages, setCrawlPages] = useState<CrawlPageRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [mainPagePreview, setMainPagePreview] = useState<CrawlPageRecord | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const supabase = createClient()
 
   const getHeadingColor = (level: number) => {
@@ -132,16 +133,16 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       
       if (length < SEO_LENGTHS.title.min) {
         status = 'error'
-        message = `Too short (${length}/${SEO_LENGTHS.title.max} chars). Minimum: ${SEO_LENGTHS.title.min} chars`
+        message = `Too short (${length}/${SEO_LENGTHS.title.max} chars)`
       } else if (length > SEO_LENGTHS.title.max) {
         status = 'error'
-        message = `Too long (${length}/${SEO_LENGTHS.title.max} chars). Maximum: ${SEO_LENGTHS.title.max} chars`
+        message = `Too long (${length}/${SEO_LENGTHS.title.max} chars)`
       } else if (length < SEO_LENGTHS.title.recommended.min) {
         status = 'warning'
-        message = `Below recommended (${length}/${SEO_LENGTHS.title.max} chars). Recommended: ${SEO_LENGTHS.title.recommended.min}-${SEO_LENGTHS.title.recommended.max} chars`
+        message = `Below recommended (${length}/${SEO_LENGTHS.title.max} chars)`
       } else if (length > SEO_LENGTHS.title.recommended.max) {
         status = 'warning'
-        message = `Above recommended (${length}/${SEO_LENGTHS.title.max} chars). Recommended: ${SEO_LENGTHS.title.recommended.min}-${SEO_LENGTHS.title.recommended.max} chars`
+        message = `Above recommended`
       }
 
       analyses.push({
@@ -165,13 +166,13 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       
       if (length < SEO_LENGTHS.description.min) {
         status = 'error'
-        message = `Too short (${length}/${SEO_LENGTHS.description.max} chars). Minimum: ${SEO_LENGTHS.description.min} chars`
+        message = `Too short (${length}/${SEO_LENGTHS.description.max} chars)`
       } else if (length > SEO_LENGTHS.description.max) {
         status = 'error'
-        message = `Too long (${length}/${SEO_LENGTHS.description.max} chars). Maximum: ${SEO_LENGTHS.description.max} chars`
+        message = `Too long (${length}/${SEO_LENGTHS.description.max} chars)`
       } else if (length < SEO_LENGTHS.description.recommended.min) {
         status = 'warning'
-        message = `Below recommended (${length}/${SEO_LENGTHS.description.max} chars). Recommended: ${SEO_LENGTHS.description.recommended.min}-${SEO_LENGTHS.description.recommended.max} chars`
+        message = `Below recommended (${length}/${SEO_LENGTHS.description.max} chars)`
       }
 
       analyses.push({
@@ -195,13 +196,13 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       
       if (length < SEO_LENGTHS.ogTitle.min) {
         status = 'error'
-        message = `Too short (${length}/${SEO_LENGTHS.ogTitle.max} chars). Minimum: ${SEO_LENGTHS.ogTitle.min} chars`
+        message = `Too short (${length}/${SEO_LENGTHS.ogTitle.max} chars)`
       } else if (length > SEO_LENGTHS.ogTitle.max) {
         status = 'error'
-        message = `Too long (${length}/${SEO_LENGTHS.ogTitle.max} chars). Maximum: ${SEO_LENGTHS.ogTitle.max} chars`
+        message = `Too long (${length}/${SEO_LENGTHS.ogTitle.max} chars)`
       } else if (length < SEO_LENGTHS.ogTitle.recommended.min) {
         status = 'warning'
-        message = `Below recommended (${length}/${SEO_LENGTHS.ogTitle.max} chars). Recommended: ${SEO_LENGTHS.ogTitle.recommended.min}-${SEO_LENGTHS.ogTitle.recommended.max} chars`
+        message = `Below recommended (${length}/${SEO_LENGTHS.ogTitle.max} chars)`
       }
 
       analyses.push({
@@ -225,13 +226,13 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       
       if (length < SEO_LENGTHS.ogDescription.min) {
         status = 'error'
-        message = `Too short (${length}/${SEO_LENGTHS.ogDescription.max} chars). Minimum: ${SEO_LENGTHS.ogDescription.min} chars`
+        message = `Too short (${length}/${SEO_LENGTHS.ogDescription.max} chars)`
       } else if (length > SEO_LENGTHS.ogDescription.max) {
         status = 'error'
-        message = `Too long (${length}/${SEO_LENGTHS.ogDescription.max} chars). Maximum: ${SEO_LENGTHS.ogDescription.max} chars`
+        message = `Too long (${length}/${SEO_LENGTHS.ogDescription.max} chars)`
       } else if (length < SEO_LENGTHS.ogDescription.recommended.min) {
         status = 'warning'
-        message = `Below recommended (${length}/${SEO_LENGTHS.ogDescription.max} chars). Recommended: ${SEO_LENGTHS.ogDescription.recommended.min}-${SEO_LENGTHS.ogDescription.recommended.max} chars`
+        message = `Below recommended (${length}/${SEO_LENGTHS.ogDescription.max} chars)`
       }
 
       analyses.push({
@@ -986,6 +987,8 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
         return 'blue'
       case 'failed':
         return 'red'
+      case 'broken-page':
+        return 'orange' // Orange untuk broken pages (HTTP error status codes)
       case 'pending':
         return 'orange'
       case 'uncrawl-page':
@@ -1002,6 +1005,48 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
     return Math.round((crawled / total) * 100)
   }
 
+  // Collect all warnings for a page
+  const getWarnings = (record: CrawlPageRecord): string[] => {
+    const warnings: string[] = []
+
+    // Check SEO length warnings
+    if (record.status === 'completed') {
+      const analyses = analyzeSEOLengths(record)
+      analyses.forEach(analysis => {
+        if (analysis.status === 'warning') {
+          // Simple warning message in English
+          warnings.push(`${analysis.label} does not meet recommendation`)
+        }
+      })
+    }
+
+    // Check heading hierarchy warnings (skipped levels)
+    if (record.heading_hierarchy && typeof record.heading_hierarchy === 'object') {
+      const skippedHeadings = getSkippedHeadingsMap(record.heading_hierarchy)
+      if (skippedHeadings.size > 0) {
+        warnings.push(`Skipped heading levels detected`)
+      }
+    }
+
+    // Check missing required meta tags
+    if (record.meta_tags && typeof record.meta_tags === 'object') {
+      const missingTags = REQUIRED_META_TAGS.filter(tag => !record.meta_tags[tag])
+      if (missingTags.length > 0) {
+        warnings.push(`Missing required meta tags`)
+      }
+    }
+
+    return warnings
+  }
+
+  // Filter crawl pages based on status
+  const filteredCrawlPages = statusFilter === 'all' 
+    ? crawlPages 
+    : crawlPages.filter(page => page.status === statusFilter)
+
+  // Get unique statuses from crawl pages for filter options
+  const availableStatuses: string[] = Array.from(new Set(crawlPages.map(page => page.status))).sort()
+
   const columns: ColumnsType<CrawlPageRecord> = [
     {
       title: 'URL',
@@ -1012,7 +1057,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
           href={url} 
           target="_blank" 
           rel="noopener noreferrer"
-          style={record.status === 'failed' ? { color: '#ff4d4f', fontWeight: 500 } : {}}
+          style={(record.status === 'failed' || record.status === 'broken-page') ? { color: '#ff4d4f', fontWeight: 500 } : {}}
         >
           {url}
         </a>
@@ -1059,21 +1104,34 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       render: (_, record) => record.crawled_at ? <DateDisplay date={record.crawled_at} /> : '-',
     },
     {
-      title: 'Error Message',
-      dataIndex: 'error_message',
-      key: 'error_message',
-      render: (errorMessage: string | null, record: CrawlPageRecord) => {
-        if (record.status === 'failed' && errorMessage) {
-          return (
-            <Text type="danger" style={{ fontSize: 12 }}>
-              {errorMessage}
-            </Text>
-          )
+      title: 'Messages',
+      key: 'messages',
+      render: (_, record: CrawlPageRecord) => {
+        const warnings = getWarnings(record)
+        const errorMessage = (record.status === 'failed' || record.status === 'broken-page') ? record.error_message : null
+        const hasContent = warnings.length > 0 || errorMessage
+
+        if (!hasContent) {
+          return '-'
         }
-        return '-'
+
+        return (
+          <Space direction="vertical" size="small" style={{ width: '100%' }}>
+            {warnings.map((warning, index) => (
+              <Tag key={`warning-${index}`} color="orange" style={{ fontSize: 11, margin: 0, display: 'block' }}>
+                {warning}
+              </Tag>
+            ))}
+            {errorMessage && (
+              <Text type="danger" style={{ fontSize: 12, display: 'block' }}>
+                {errorMessage}
+              </Text>
+            )}
+          </Space>
+        )
       },
       ellipsis: true,
-      width: 250,
+      width: 350,
     },
   ]
 
@@ -1082,8 +1140,8 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       key: 'overview',
       label: 'Overview',
       children: (
-        <Card>
-          <Descriptions bordered column={2}>
+        <>
+          <Descriptions bordered column={1}>
             <Descriptions.Item label="Company">
               {crawlSession.company_websites?.companies?.name || 'N/A'}
             </Descriptions.Item>
@@ -1111,6 +1169,11 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                     {(crawlSession.uncrawled_pages || 0) > 0 && (
                       <Tag color="geekblue">
                         Uncrawled: <strong>{crawlSession.uncrawled_pages || 0}</strong>
+                      </Tag>
+                    )}
+                    {(crawlSession.broken_pages || 0) > 0 && (
+                      <Tag color="orange">
+                        <CloseCircleOutlined /> Broken: <strong>{crawlSession.broken_pages || 0}</strong>
                       </Tag>
                     )}
                     {(crawlSession.failed_pages || 0) > 0 && (
@@ -1153,23 +1216,53 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
               </Descriptions.Item>
             )}
           </Descriptions>
-        </Card>
+        </>
       ),
     },
     {
       key: 'pages',
-      label: `Pages (${crawlPages.length})`,
+      label: `Pages (${statusFilter === 'all' ? crawlPages.length : filteredCrawlPages.length})`,
       children: (
-        <Table
-          columns={columns}
-          dataSource={crawlPages}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            pageSize: 20,
-            showSizeChanger: true,
-            showTotal: (total) => `Total ${total} pages`,
-          }}
+        <div>
+          <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+            <Space>
+              <Text strong>Filter by Status:</Text>
+              <Select
+                value={statusFilter}
+                onChange={setStatusFilter}
+                style={{ width: 200 }}
+                options={[
+                  { label: 'All Status', value: 'all' },
+                  ...availableStatuses.map(status => ({
+                    label: (
+                      <Space>
+                        <Tag color={getStatusColor(status)} style={{ textTransform: 'uppercase', margin: 0 }}>
+                          {status}
+                        </Tag>
+                        <Text type="secondary">
+                          ({crawlPages.filter(p => p.status === status).length})
+                        </Text>
+                      </Space>
+                    ),
+                    value: status,
+                  })),
+                ]}
+              />
+            </Space>
+            <Text type="secondary">
+              Showing {filteredCrawlPages.length} of {crawlPages.length} pages
+            </Text>
+          </Space>
+          <Table
+            columns={columns}
+            dataSource={filteredCrawlPages}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              pageSize: 20,
+              showSizeChanger: true,
+              showTotal: (total) => `Total ${total} pages`,
+            }}
           expandable={{
             expandedRowRender: (record) => (
               <div style={{ padding: '16px' }}>
@@ -1232,13 +1325,14 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
             rowExpandable: (record) => !!(record.description || record.heading_hierarchy || record.meta_tags || record.links?.length),
           }}
         />
+        </div>
       ),
     },
     {
       key: 'share-preview',
       label: 'Share Preview',
       children: (
-        <Card>
+        <>
           {mainPagePreview ? (
             <div>
               <div style={{ marginBottom: 16 }}>
@@ -1253,7 +1347,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
               <Text type="secondary">No page data available yet. Please wait for crawling to complete.</Text>
             </div>
           )}
-        </Card>
+        </>
       ),
     },
   ]

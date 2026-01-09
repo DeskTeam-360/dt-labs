@@ -1,6 +1,6 @@
 'use client'
 
-import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Row, Col, Divider, Tabs, Form, Input, message, Spin, Select, Table, Popconfirm, Switch, Modal } from 'antd'
+import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Row, Col, Divider, Tabs, Form, Input, message, Spin, Select, Table, Popconfirm, Switch, Modal, Progress } from 'antd'
 import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, TeamOutlined, DatabaseOutlined, SaveOutlined, FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, GlobalOutlined, PlayCircleOutlined, EyeOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -484,8 +484,12 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
         return 'blue'
       case 'failed':
         return 'red'
+      case 'broken-page':
+        return 'orange'
       case 'pending':
         return 'orange'
+      case 'uncrawl-page':
+        return 'geekblue'
       default:
         return 'default'
     }
@@ -1036,16 +1040,47 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                   {
                     title: 'Progress',
                     key: 'progress',
-                    render: (_, record) => (
-                      <Space>
-                        <span>Crawled: {record.crawled_pages || 0}</span>
-                        <span>/</span>
-                        <span>Total: {record.total_pages || 0}</span>
-                        {record.failed_pages > 0 && (
-                          <Tag color="red">Failed: {record.failed_pages}</Tag>
-                        )}
-                      </Space>
-                    ),
+                    render: (_, record) => {
+                      const getProgressPercent = () => {
+                        const total = record.total_pages || 0
+                        const crawled = record.crawled_pages || 0
+                        if (total === 0) return 0
+                        return Math.round((crawled / total) * 100)
+                      }
+
+                      return (
+                        <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                          <Progress 
+                            percent={getProgressPercent()} 
+                            status={record.status === 'crawling' ? 'active' : record.status === 'completed' ? 'success' : 'normal'}
+                            size="small"
+                          />
+                          <Space wrap>
+                            <Tag color="green">
+                              <CheckCircleOutlined /> Crawled: <strong>{record.crawled_pages || 0}</strong>
+                            </Tag>
+                            {(record.uncrawled_pages || 0) > 0 && (
+                              <Tag color="geekblue">
+                                Uncrawled: <strong>{record.uncrawled_pages || 0}</strong>
+                              </Tag>
+                            )}
+                            {(record.broken_pages || 0) > 0 && (
+                              <Tag color="orange">
+                                <CloseCircleOutlined /> Broken: <strong>{record.broken_pages || 0}</strong>
+                              </Tag>
+                            )}
+                            {(record.failed_pages || 0) > 0 && (
+                              <Tag color="red">
+                                <CloseCircleOutlined /> Failed: <strong>{record.failed_pages || 0}</strong>
+                              </Tag>
+                            )}
+                          </Space>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Total Pages: <strong>{record.total_pages || 0}</strong>
+                          </Text>
+                        </Space>
+                      )
+                    },
                   },
                   {
                     title: 'Settings',
