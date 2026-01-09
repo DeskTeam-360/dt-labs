@@ -19,6 +19,22 @@ export function normalizeUrl(url: string): string {
   }
 }
 
+// Detect if a page is broken based on HTTP status code
+// Broken pages are typically: 400, 401, 403, 404, 500, 502, 503, 504
+export function isBrokenPage(httpStatus: number): boolean {
+  // Client errors (4xx)
+  if (httpStatus >= 400 && httpStatus < 500) {
+    // Common broken page status codes
+    return [400, 401, 403, 404].includes(httpStatus)
+  }
+  // Server errors (5xx)
+  if (httpStatus >= 500 && httpStatus < 600) {
+    // Common broken page status codes
+    return [500, 502, 503, 504].includes(httpStatus)
+  }
+  return false
+}
+
 // Crawl process function (this should be implemented based on your crawling logic)
 export async function startCrawlProcess(
   supabase: ReturnType<typeof createClient>,
@@ -77,6 +93,7 @@ export async function startCrawlProcess(
   let crawledCount = 0
   let failedCount = 0
   let uncrawledCount = 0 // Track uncrawlable pages (non-HTML content)
+  let brokenCount = 0 // Track broken pages (HTTP error status codes: 400, 401, 403, 404, 500, 502, 503, 504)
 
   // Simple crawler implementation
   // In production, you'd want to use a proper web scraping library
@@ -227,12 +244,20 @@ export async function startCrawlProcess(
       // Jika redirect berhasil (response.ok = true), kita akan process HTML-nya
       // Jadi kita hanya skip jika response tidak OK dan bukan redirect yang berhasil
       if (!response.ok) {
-        failedCount++
+        // Check if this is a broken page (specific HTTP error status codes)
+        const isBroken = isBrokenPage(httpStatus)
+        
+        if (isBroken) {
+          brokenCount++
+        } else {
+          failedCount++
+        }
+        
         await freshSupabase.from('crawl_pages').insert({
           crawl_session_id: sessionId,
           url: currentUrl,
           depth,
-          status: 'failed',
+          status: isBroken ? 'broken-page' : 'failed',
           http_status_code: httpStatus,
           content_type: contentType,
           error_message: `HTTP ${httpStatus}: ${response.statusText}${isRedirect ? `. ${redirectInfo}` : ''}`,
@@ -245,6 +270,7 @@ export async function startCrawlProcess(
           .update({
             crawled_pages: crawledCount,
             failed_pages: failedCount,
+            broken_pages: brokenCount,
           })
           .eq('id', sessionId)
 
@@ -274,6 +300,7 @@ export async function startCrawlProcess(
             crawled_pages: crawledCount,
             failed_pages: failedCount,
             uncrawled_pages: uncrawledCount,
+            broken_pages: brokenCount,
             total_pages: crawledCount + failedCount + uncrawledCount,
           })
           .eq('id', sessionId)
@@ -597,6 +624,7 @@ export async function startCrawlProcess(
           crawled_pages: crawledCount,
           failed_pages: failedCount,
           uncrawled_pages: uncrawledCount,
+          broken_pages: brokenCount,
           total_pages: crawledCount + failedCount + uncrawledCount,
         })
         .eq('id', sessionId)
@@ -632,7 +660,7 @@ export async function startCrawlProcess(
   }
 
   // Mark crawl session as completed
-  console.log(`[Crawl] Completed session ${sessionId}: ${crawledCount} crawled, ${failedCount} failed, ${uncrawledCount} uncrawled`)
+  console.log(`[Crawl] Completed session ${sessionId}: ${crawledCount} crawled, ${failedCount} failed, ${uncrawledCount} uncrawled, ${brokenCount} broken`)
   
   const { error: finalUpdateError } = await freshSupabase
     .from('crawl_sessions')
@@ -643,6 +671,7 @@ export async function startCrawlProcess(
       crawled_pages: crawledCount,
       failed_pages: failedCount,
       uncrawled_pages: uncrawledCount,
+      broken_pages: brokenCount,
     })
     .eq('id', sessionId)
 
