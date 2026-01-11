@@ -1156,36 +1156,35 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
               </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Progress">
-              <Space direction="vertical" style={{ width: '100%' }}>
+              <Space direction="vertical" size="small" style={{ width: '100%' }}>
                 <Progress 
                   percent={getProgress()} 
                   status={crawlSession.status === 'crawling' ? 'active' : crawlSession.status === 'completed' ? 'success' : 'normal'}
+                  size="small"
                 />
-                <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                  <Space wrap>
-                    <Tag color="green">
-                      <CheckCircleOutlined /> Crawled: <strong>{crawlSession.crawled_pages || 0}</strong>
+                <Space wrap>
+                  <Tag color="green">
+                    <CheckCircleOutlined /> Crawled: <strong>{crawlSession.crawled_pages || 0}</strong>
+                  </Tag>
+                  {(crawlSession.uncrawled_pages || 0) > 0 && (
+                    <Tag color="geekblue">
+                      Uncrawled: <strong>{crawlSession.uncrawled_pages || 0}</strong>
                     </Tag>
-                    {(crawlSession.uncrawled_pages || 0) > 0 && (
-                      <Tag color="geekblue">
-                        Uncrawled: <strong>{crawlSession.uncrawled_pages || 0}</strong>
-                      </Tag>
-                    )}
-                    {(crawlSession.broken_pages || 0) > 0 && (
-                      <Tag color="orange">
-                        <CloseCircleOutlined /> Broken: <strong>{crawlSession.broken_pages || 0}</strong>
-                      </Tag>
-                    )}
-                    {(crawlSession.failed_pages || 0) > 0 && (
-                      <Tag color="red">
-                        <CloseCircleOutlined /> Failed: <strong>{crawlSession.failed_pages || 0}</strong>
-                      </Tag>
-                    )}
-                  </Space>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    Total Pages: <strong>{crawlSession.total_pages || 0}</strong>
-                  </Text>
+                  )}
+                  {(crawlSession.broken_pages || 0) > 0 && (
+                    <Tag color="orange">
+                      <CloseCircleOutlined /> Broken: <strong>{crawlSession.broken_pages || 0}</strong>
+                    </Tag>
+                  )}
+                  {(crawlSession.failed_pages || 0) > 0 && (
+                    <Tag color="red">
+                      <CloseCircleOutlined /> Failed: <strong>{crawlSession.failed_pages || 0}</strong>
+                    </Tag>
+                  )}
                 </Space>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Total Pages: <strong>{crawlSession.total_pages || 0}</strong>
+                </Text>
               </Space>
             </Descriptions.Item>
             <Descriptions.Item label="Max Depth">

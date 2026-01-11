@@ -39,42 +39,45 @@ export async function POST(request: Request) {
       )
     }
 
-    // Wait a bit for trigger to create user record
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    // Update user record (trigger already created it with default values)
-    const { error: userError } = await supabase
+    // Insert user record into public.users table
+    // Try insert first (in case trigger didn't fire or was disabled)
+    const { error: insertError } = await supabase
       .from('users')
-      .update({
+      .insert({
+        id: authData.user.id,
+        email,
         full_name,
         role: role || 'user',
         status: status || 'active',
       })
-      .eq('id', authData.user.id)
 
-    // If update fails, try insert (in case trigger didn't fire)
-    if (userError && userError.code === 'PGRST116') {
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id,
-          email,
-          full_name,
-          role: role || 'user',
-          status: status || 'active',
-        })
+    // If insert fails because record already exists (from trigger), update it instead
+    if (insertError) {
+      // Check if error is due to duplicate (record already exists from trigger)
+      if (insertError.code === '23505' || insertError.message.includes('duplicate') || insertError.message.includes('already exists')) {
+        // Record already exists (trigger created it), just update it
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            full_name,
+            role: role || 'user',
+            status: status || 'active',
+          })
+          .eq('id', authData.user.id)
 
-      if (insertError) {
+        if (updateError) {
+          return NextResponse.json(
+            { error: updateError.message },
+            { status: 400 }
+          )
+        }
+      } else {
+        // Different error, return it
         return NextResponse.json(
           { error: insertError.message },
           { status: 400 }
         )
       }
-    } else if (userError) {
-      return NextResponse.json(
-        { error: userError.message },
-        { status: 400 }
-      )
     }
 
     return NextResponse.json({ success: true, data: authData.user })
