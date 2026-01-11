@@ -58,6 +58,27 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
     return acc
   }, {})
 
+  const handleCrawlDelete = async (crawlSessionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('crawl_sessions')
+        .delete()
+        .eq('id', crawlSessionId)
+
+        // if (error) throw error
+
+    message.success('Crawl session deleted successfully')
+    fetchCrawlSessions()
+    }
+    
+    catch (error: any) {
+      message.error('Failed to delete crawl session')
+      console.error('Error deleting crawl session:', error)
+    } finally {
+      setLoadingCrawlSessions(false)
+    }
+  }
+
   useEffect(() => {
     fetchDataTemplates()
     fetchContentTemplates()
@@ -69,6 +90,11 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
       fetchCrawlSessions()
     }
   }, [websites])
+
+  // Create map of last crawl session per website
+  const getLastCrawlSession = (websiteId: string) => {
+    return crawlSessions.find(session => session.company_website_id === websiteId)
+  }
 
   // Re-initialize form when dataTemplates are loaded and company_datas are available
   useEffect(() => {
@@ -350,6 +376,9 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
     websiteForm.resetFields()
     websiteForm.setFieldsValue({
       is_primary: false,
+      url: '',
+      title: '',
+      description: '',
     })
     setWebsiteModalVisible(true)
   }
@@ -367,15 +396,24 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
 
   const handleWebsiteSubmit = async (values: any) => {
     try {
+      // Ensure is_primary is a proper boolean value
+      const isPrimary = Boolean(values.is_primary === true || values.is_primary === 'true' || values.is_primary === 1)
+
       if (editingWebsite) {
         // Update existing website
-        // If setting as primary, unset other primary websites
-        if (values.is_primary) {
-          await supabase
+        // If setting as primary, unset other primary websites (excluding the current one)
+        if (isPrimary) {
+          const { error: unsetError } = await supabase
             .from('company_websites')
             .update({ is_primary: false })
             .eq('company_id', companyData.id)
             .eq('is_primary', true)
+            .neq('id', editingWebsite.id)
+
+          if (unsetError) {
+            console.error('Error unsetting other primary websites:', unsetError)
+            throw unsetError
+          }
         }
 
         const { error } = await supabase
@@ -384,22 +422,30 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
             url: values.url,
             title: values.title || null,
             description: values.description || null,
-            is_primary: values.is_primary || false,
+            is_primary: isPrimary,
           })
           .eq('id', editingWebsite.id)
 
-        if (error) throw error
+        if (error) {
+          console.error('Error updating website:', error)
+          throw error
+        }
 
         message.success('Website updated successfully')
       } else {
         // Create new website
         // If setting as primary, unset other primary websites
-        if (values.is_primary) {
-          await supabase
+        if (isPrimary) {
+          const { error: unsetError } = await supabase
             .from('company_websites')
             .update({ is_primary: false })
             .eq('company_id', companyData.id)
             .eq('is_primary', true)
+
+          if (unsetError) {
+            console.error('Error unsetting other primary websites:', unsetError)
+            throw unsetError
+          }
         }
 
         const { error } = await supabase
@@ -409,19 +455,24 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
             url: values.url,
             title: values.title || null,
             description: values.description || null,
-            is_primary: values.is_primary || false,
+            is_primary: isPrimary,
           })
 
-        if (error) throw error
+        if (error) {
+          console.error('Error creating website:', error)
+          throw error
+        }
 
         message.success('Website created successfully')
       }
 
       setWebsiteModalVisible(false)
       websiteForm.resetFields()
+      setEditingWebsite(null)
       fetchWebsites()
     } catch (error: any) {
       message.error(error.message || 'Failed to save website')
+      console.error('Error saving website:', error)
     }
   }
 
@@ -504,26 +555,64 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
       console.log('Company ID:', companyData.id)
       console.log('Data templates:', dataTemplates)
       
-      // Prepare data for API - only include data with non-empty values
-      const datas = dataTemplates
+      // Create map of existing values for comparison
+      const existingDatasMapForComparison = (companyData.company_datas || []).reduce((acc: any, item: any) => {
+        const templateId = item.data_template_id || item.company_data_templates?.id
+        const value = item.value || ''
+        if (templateId) {
+          acc[templateId] = value
+        }
+        return acc
+      }, {})
+      
+      // Prepare data for API - only include data that has changed
+      const changedDatas = dataTemplates
         .map((template) => {
-          const value = values[`template_${template.id}`]
-          // Only include if value is not null, undefined, or empty string (after trim)
-          if (value && typeof value === 'string' && value.trim() !== '') {
+          const currentValue = values[`template_${template.id}`] || ''
+          const trimmedValue = typeof currentValue === 'string' ? currentValue.trim() : String(currentValue)
+          const existingValue = existingDatasMapForComparison[template.id] || ''
+          const trimmedExistingValue = typeof existingValue === 'string' ? existingValue.trim() : String(existingValue)
+          
+          // Only include if value has actually changed
+          if (trimmedValue !== trimmedExistingValue) {
             return {
               data_template_id: template.id,
-              value: value.trim(),
+              value: trimmedValue,
             }
           }
           return null
         })
-        .filter((item) => item !== null) // Remove null entries
+        .filter((item) => item !== null) // Remove null entries (unchanged fields)
 
-      console.log('Datas to save:', datas)
+      console.log('Changed datas:', changedDatas)
+      console.log('Existing datas map:', existingDatasMapForComparison)
 
-      // If no data to save, show message
-      if (datas.length === 0) {
-        message.warning('No data to save. Please fill in at least one field.')
+      // If no data changed, show message and don't save
+      if (changedDatas.length === 0) {
+        message.info('No changes detected. Nothing to save.')
+        setSaving(false)
+        return
+      }
+
+      // For fields that changed, filter to only save meaningful changes:
+      // - If new value is not empty, save it (new field or update)
+      // - If new value is empty but existing had a value, save empty to clear it
+      // - Skip if both are empty (empty to empty change - no point saving)
+      const datasToSave = changedDatas.filter((item) => {
+        const newValue = (item.value || '').trim()
+        const existingValue = (existingDatasMapForComparison[item.data_template_id] || '').trim()
+        
+        // Save if new value is not empty (adding new field or updating existing), 
+        // OR if existing had a value but new is empty (clearing existing value)
+        const hasNewValue = newValue !== ''
+        const wasClearingValue = existingValue !== '' && newValue === ''
+        
+        return hasNewValue || wasClearingValue
+      })
+      
+      // If no meaningful changes after filtering, show message and don't save
+      if (datasToSave.length === 0) {
+        message.info('No valid changes to save.')
         setSaving(false)
         return
       }
@@ -538,7 +627,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ datas }),
+        body: JSON.stringify({ datas: datasToSave }),
       })
 
       const result = await response.json()
@@ -547,7 +636,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
         throw new Error(result.error || 'Failed to save company data')
       }
 
-      message.success(`${datas.length} data field(s) saved successfully`)
+      message.success(`${datasToSave.length} data field(s) saved successfully`)
       
       // Refresh the page to show updated data
       router.refresh()
@@ -564,10 +653,14 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
       key: 'info',
       label: 'Company Information',
       children: (
+        <>
         <Row gutter={[24, 24]}>
-          <Col xs={24} lg={12}>
-            <Card title="Basic Information" size="small">
-              <Descriptions column={1} bordered>
+          <Col xs={24} lg={24}>
+            {/* <Card title="Basic Information" size="small"> */}
+            <Text strong style={{ fontSize: 18, textTransform: 'uppercase' }}>Basic Information</Text>
+            <br />
+            <Descriptions column={1} bordered style={{ marginTop: 16 }}>
+              {/* <Descriptions.Title>Basic Information</Descriptions.Title> */}
                 <Descriptions.Item label="Company Name">
                   <Text strong>{companyData.name}</Text>
                 </Descriptions.Item>
@@ -589,13 +682,6 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                     {companyData.id}
                   </Text>
                 </Descriptions.Item>
-              </Descriptions>
-            </Card>
-          </Col>
-
-          <Col xs={24} lg={12}>
-            <Card title="Activity" size="small">
-              <Descriptions column={1} bordered>
                 <Descriptions.Item label="Created At">
                   <Space>
                     <CalendarOutlined />
@@ -609,9 +695,44 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                   </Space>
                 </Descriptions.Item>
               </Descriptions>
-            </Card>
+            {/* </Card> */}
           </Col>
+
+        
         </Row>
+        <br />
+        <div>
+          {Object.keys(groupedDatas).length > 0 ? (
+            Object.entries(groupedDatas).map(([group, items]: [string, any]) => (
+              <>
+              <Text strong style={{ fontSize: 18, textTransform: 'uppercase' }}>{group}</Text>
+              
+                <Descriptions bordered column={1} style={{ marginTop: 16 }}>
+                  {items.map((item: any, index: number) => (
+                    <Descriptions.Item
+                      key={index}
+                      label={item.company_data_templates?.title || 'Data'}
+                    >
+                      <Space direction="vertical" size="small">
+                        <Text>{item.value || 'N/A'}</Text>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          Updated: <DateDisplay date={item.updated_at} />
+                        </Text>
+                      </Space>
+                    </Descriptions.Item>
+                  ))}
+                </Descriptions>
+                <br />
+                </>
+              // </Card>
+            ))
+          ) : (
+            // <Card>
+              <Text type="secondary">No data available for this company</Text>
+            // </Card>
+          )}
+        </div>
+        </>
       ),
     },
     {
@@ -622,7 +743,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
         </span>
       ),
       children: (
-        <Card>
+        <>
           {companyData.company_users && companyData.company_users.length > 0 ? (
             <Descriptions bordered column={1}>
               {companyData.company_users.map((cu: any, index: number) => (
@@ -644,7 +765,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
           ) : (
             <Text type="secondary">No users assigned to this company</Text>
           )}
-        </Card>
+        </>
       ),
     },
     {
@@ -663,7 +784,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
           ) : (
             <Form form={form} layout="vertical">
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                <Card>
+                {/* <Card> */}
                   <Space>
                     <Button
                       type="primary"
@@ -676,7 +797,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                     </Button>
                     <Text type="secondary">Save all company data templates</Text>
                   </Space>
-                </Card>
+                {/* </Card> */}
 
                 {dataTemplates.length > 0 ? (
                   (() => {
@@ -727,48 +848,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
         </div>
       ),
     },
-    {
-      key: 'data-view',
-      label: (
-        <span>
-          <DatabaseOutlined /> Data View ({companyData.company_datas?.length || 0})
-        </span>
-      ),
-      children: (
-        <div>
-          {Object.keys(groupedDatas).length > 0 ? (
-            Object.entries(groupedDatas).map(([group, items]: [string, any]) => (
-              <Card
-                key={group}
-                title={group}
-                style={{ marginBottom: 16 }}
-                size="small"
-              >
-                <Descriptions bordered column={1}>
-                  {items.map((item: any, index: number) => (
-                    <Descriptions.Item
-                      key={index}
-                      label={item.company_data_templates?.title || 'Data'}
-                    >
-                      <Space direction="vertical" size="small">
-                        <Text>{item.value || 'N/A'}</Text>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          Updated: <DateDisplay date={item.updated_at} />
-                        </Text>
-                      </Space>
-                    </Descriptions.Item>
-                  ))}
-                </Descriptions>
-              </Card>
-            ))
-          ) : (
-            <Card>
-              <Text type="secondary">No data available for this company</Text>
-            </Card>
-          )}
-        </div>
-      ),
-    },
+    
     {
       key: 'generate',
       label: (
@@ -779,7 +859,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
       children: (
         <div>
           <Form form={generateForm} layout="vertical">
-            <Card style={{ marginBottom: 16 }}>
+            {/* <Card style={{ marginBottom: 16 }}> */}
               <Form.Item
                 label="Content Template"
                 name="content_template_id"
@@ -810,7 +890,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                   ))}
                 </Select>
               </Form.Item>
-            </Card>
+            {/* </Card> */}
 
             {generatedContent && (
               <Card title="Generated Content">
@@ -881,7 +961,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
       ),
       children: (
         <div>
-          <Card>
+          {/* <Card> */}
             <Space style={{ marginBottom: 16 }}>
               <Button
                 type="primary"
@@ -902,6 +982,17 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                 rowKey="id"
                 columns={[
                   {
+                    title: 'Primary',
+                    dataIndex: 'is_primary',
+                    key: 'is_primary',
+                    render: (isPrimary: boolean) => (
+                      <Tag color={isPrimary ? 'blue' : 'default'}>
+                        {isPrimary ? 'Primary' : '-'}
+                      </Tag>
+                    ),
+                    // width: 100,
+                  },
+                  {
                     title: 'URL',
                     dataIndex: 'url',
                     key: 'url',
@@ -918,49 +1009,51 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                     key: 'title',
                     render: (title: string | null) => title || '-',
                   },
-                  {
-                    title: 'Primary',
-                    dataIndex: 'is_primary',
-                    key: 'is_primary',
-                    render: (isPrimary: boolean) => (
-                      <Tag color={isPrimary ? 'blue' : 'default'}>
-                        {isPrimary ? 'Primary' : '-'}
-                      </Tag>
-                    ),
-                    width: 100,
-                  },
+                  
                   {
                     title: 'Created At',
                     key: 'created_at',
                     render: (_, record) => <DateDisplay date={record.created_at} />,
-                    width: 180,
+                    // width: 180,
                   },
                   {
                     title: 'Actions',
                     key: 'actions',
-                    width: 150,
-                    render: (_, record) => (
-                      <Space>
-                        <Button
-                          type="link"
-                          icon={<EditOutlined />}
-                          onClick={() => handleWebsiteEdit(record)}
-                        >
-                          Edit
-                        </Button>
-                        <Popconfirm
-                          title="Delete website"
-                          description="Are you sure you want to delete this website?"
-                          onConfirm={() => handleWebsiteDelete(record.id)}
-                          okText="Yes"
-                          cancelText="No"
-                        >
-                          <Button type="link" danger icon={<DeleteOutlined />}>
-                            Delete
+                    // width: 200,
+                    render: (_, record) => {
+                      const lastCrawlSession = getLastCrawlSession(record.id)
+                      return (
+                        <Space>
+                          {lastCrawlSession && (
+                            <Button
+                              type="link"
+                              icon={<EyeOutlined />}
+                              onClick={() => router.push(`/crawl-sessions/${lastCrawlSession.id}`)}
+                            >
+                              Last Crawl
+                            </Button>
+                          )}
+                          <Button
+                            type="link"
+                            icon={<EditOutlined />}
+                            onClick={() => handleWebsiteEdit(record)}
+                          >
+                            Edit
                           </Button>
-                        </Popconfirm>
-                      </Space>
-                    ),
+                          <Popconfirm
+                            title="Delete website"
+                            description="Are you sure you want to delete this website?"
+                            onConfirm={() => handleWebsiteDelete(record.id)}
+                            okText="Yes"
+                            cancelText="No"
+                          >
+                            <Button type="link" danger icon={<DeleteOutlined />}>
+                              Delete
+                            </Button>
+                          </Popconfirm>
+                        </Space>
+                      )
+                    },
                   },
                 ]}
                 pagination={false}
@@ -980,7 +1073,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                 </Space>
               </Card>
             )}
-          </Card>
+          {/* </Card> */}
         </div>
       ),
     },
@@ -993,7 +1086,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
       ),
       children: (
         <div>
-          <Card>
+          {/* <Card> */}
             <Space style={{ marginBottom: 16 }}>
               <Button
                 type="primary"
@@ -1035,7 +1128,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                         {status}
                       </Tag>
                     ),
-                    width: 120,
+                    // width: 120,
                   },
                   {
                     title: 'Progress',
@@ -1097,13 +1190,14 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                     title: 'Started At',
                     key: 'started_at',
                     render: (_, record) => record.started_at ? <DateDisplay date={record.started_at} /> : '-',
-                    width: 180,
+                    // width: 180,
                   },
                   {
                     title: 'Actions',
                     key: 'actions',
-                    width: 100,
+                    // width: 100,
                     render: (_, record) => (
+                     <>
                       <Button
                         type="link"
                         icon={<EyeOutlined />}
@@ -1111,6 +1205,15 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                       >
                         View
                       </Button>
+                      <Button
+                        type="link"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => handleCrawlDelete(record.id)}
+                      >
+                        Delete
+                      </Button>
+                      </>
                     ),
                   },
                 ]}
@@ -1137,7 +1240,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                 </Space>
               </Card>
             )}
-          </Card>
+          {/* </Card> */}
         </div>
       ),
     },
@@ -1252,18 +1355,13 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                       label={<Text strong>Primary Website</Text>}
                       name="is_primary"
                       valuePropName="checked"
+                      initialValue={false}
                       tooltip="Set this as the primary website. Only one website can be primary."
                     >
-                      <div>
-                        <Switch 
-                          checkedChildren="Yes" 
-                          unCheckedChildren="No"
-                          style={{ marginRight: 8 }}
-                        />
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          Mark as primary
-                        </Text>
-                      </div>
+                      <Switch 
+                        checkedChildren="Yes" 
+                        unCheckedChildren="No"
+                      />
                     </Form.Item>
                   </Col>
                 </Row>

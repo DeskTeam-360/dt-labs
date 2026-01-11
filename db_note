@@ -1,42 +1,42 @@
-company_websites
-id
-company_id
-url
+TABEL: teams
+
+id (PK)
+name
+type
+created_by (FK -> users.id)
+created_at
+
+TABEL: team_members
+
+id (PK)
+team_id (FK -> teams.id)
+user_id (FK -> users.id)
+role (optional: member/manager)
+joined_at
+
+TABEL: todos
+
+id (PK)
 title
 description
-is_primary
+created_by (FK -> users.id)
+due_date (optional)
+status (pending / in_progress / completed / archived)
+visibility (private / team / specific_users)
+team_id (nullable, FK -> teams.id)
 created_at
 updated_at
 
-crawl_sessions
-id
-company_website_id
-status
-total_pages
-crawled_pages
-failed_pages
-error_message
-max_depth
-max_pages
-started_at
-completed_at
-created_at
-updated_at
+TABEL: todo_assignees
 
+id (PK)
+todo_id (FK -> todos.id)
+user_id (FK -> users.id)
 
-crawl_pages
-id
-crawl_session_id
-url
-title
-description
-depth
-status
-http_status_code
-content_type
-heading_hierarchy
-meta_tags
-links
-crawled_at
-created_at
-updated_at
+Catatan:
+
+Private todo: tidak butuh data di todo_assignees
+
+Team todo: bisa assign otomatis semua team members atau tidak
+
+Specific user: simpan user yang punya akses di sini

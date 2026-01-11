@@ -14,6 +14,7 @@ import {
   DatabaseOutlined,
   FormOutlined,
   GlobalOutlined,
+  CheckSquareOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
@@ -68,6 +69,16 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       label: 'Companies',
     },
     {
+      key: '/todos',
+      icon: <CheckSquareOutlined />,
+      label: 'Todos',
+    },
+    {
+      key: '/teams',
+      icon: <TeamOutlined />,
+      label: 'Teams',
+    },
+    {
       key: 'templates',
       icon: <FormOutlined />,
       label: 'Templates',
@@ -89,11 +100,11 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       icon: <GlobalOutlined />,
       label: 'Crawling',
     },
-    {
-      key: '/settings',
-      icon: <SettingOutlined />,
-      label: 'Settings',
-    },
+    // {
+    //   key: '/settings',
+    //   icon: <SettingOutlined />,
+    //   label: 'Settings',
+    // },
   ]
 
   const accountMenuItems = [
@@ -151,7 +162,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <DashboardOutlined style={{ fontSize: 24, color: '#667eea' }} />
             <Text strong style={{ color: '#fff', fontSize: 16 }}>
-              Admin Panel
+              {process.env.NEXT_PUBLIC_APP_NAME}
             </Text>
           </div>
         )}

@@ -1,7 +1,7 @@
 'use client'
 
-import { Layout, Table, Button, Space, Typography, Card, Tag, Modal, Form, Input, Select, InputNumber, message, Popconfirm } from 'antd'
-import { PlusOutlined, EyeOutlined, DeleteOutlined, ReloadOutlined, PlayCircleOutlined } from '@ant-design/icons'
+import { Layout, Table, Button, Space, Typography, Card, Tag, Modal, Form, Input, Select, InputNumber, message, Popconfirm, Progress, Spin } from 'antd'
+import { PlusOutlined, EyeOutlined, DeleteOutlined, ReloadOutlined, PlayCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, GlobalOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
@@ -12,7 +12,7 @@ import { startCrawl } from '@/app/actions/crawl'
 import type { ColumnsType } from 'antd/es/table'
 
 const { Content } = Layout
-const { Title } = Typography
+const { Title, Text } = Typography
 const { Option } = Select
 const { TextArea } = Input
 
@@ -27,6 +27,8 @@ interface CrawlSessionRecord {
   total_pages: number
   crawled_pages: number
   failed_pages: number
+  uncrawled_pages: number
+  broken_pages: number
   error_message: string | null
   max_depth: number
   max_pages: number
@@ -212,8 +214,12 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
         return 'blue'
       case 'failed':
         return 'red'
+      case 'broken-page':
+        return 'orange'
       case 'pending':
         return 'orange'
+      case 'uncrawl-page':
+        return 'geekblue'
       default:
         return 'default'
     }
@@ -226,13 +232,14 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
       render: (_, record) => record.company_websites?.companies?.name || 'N/A',
     },
     {
-      title: 'Website URL',
-      key: 'url',
+      title: 'Website',
+      key: 'website',
       render: (_, record) => (
         <a href={record.company_websites?.url} target="_blank" rel="noopener noreferrer">
           {record.company_websites?.url}
         </a>
       ),
+      ellipsis: true,
     },
     {
       title: 'Status',
@@ -243,20 +250,52 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
           {status}
         </Tag>
       ),
+      width: 120,
     },
     {
       title: 'Progress',
       key: 'progress',
-      render: (_, record) => (
-        <Space>
-          <span>Crawled: {record.crawled_pages || 0}</span>
-          <span>/</span>
-          <span>Total: {record.total_pages || 0}</span>
-          {record.failed_pages > 0 && (
-            <Tag color="red">Failed: {record.failed_pages}</Tag>
-          )}
-        </Space>
-      ),
+      render: (_, record) => {
+        const getProgressPercent = () => {
+          const total = record.total_pages || 0
+          const crawled = record.crawled_pages || 0
+          if (total === 0) return 0
+          return Math.round((crawled / total) * 100)
+        }
+
+        return (
+          <Space direction="vertical" size="small" style={{ width: '100%' }}>
+            <Progress 
+              percent={getProgressPercent()} 
+              status={record.status === 'crawling' ? 'active' : record.status === 'completed' ? 'success' : 'normal'}
+              size="small"
+            />
+            <Space wrap>
+              <Tag color="green">
+                <CheckCircleOutlined /> Crawled: <strong>{record.crawled_pages || 0}</strong>
+              </Tag>
+              {(record.uncrawled_pages || 0) > 0 && (
+                <Tag color="geekblue">
+                  Uncrawled: <strong>{record.uncrawled_pages || 0}</strong>
+                </Tag>
+              )}
+              {(record.broken_pages || 0) > 0 && (
+                <Tag color="orange">
+                  <CloseCircleOutlined /> Broken: <strong>{record.broken_pages || 0}</strong>
+                </Tag>
+              )}
+              {(record.failed_pages || 0) > 0 && (
+                <Tag color="red">
+                  <CloseCircleOutlined /> Failed: <strong>{record.failed_pages || 0}</strong>
+                </Tag>
+              )}
+            </Space>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Total Pages: <strong>{record.total_pages || 0}</strong>
+            </Text>
+          </Space>
+        )
+      },
     },
     {
       title: 'Settings',
@@ -273,36 +312,20 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
       title: 'Started At',
       key: 'started_at',
       render: (_, record) => record.started_at ? <DateDisplay date={record.started_at} /> : '-',
-    },
-    {
-      title: 'Completed At',
-      key: 'completed_at',
-      render: (_, record) => record.completed_at ? <DateDisplay date={record.completed_at} /> : '-',
+      width: 180,
     },
     {
       title: 'Actions',
       key: 'actions',
+      width: 100,
       render: (_, record) => (
-        <Space>
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => router.push(`/crawl-sessions/${record.id}`)}
-          >
-            View
-          </Button>
-          <Popconfirm
-            title="Delete crawl session"
-            description="Are you sure you want to delete this crawl session?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              Delete
-            </Button>
-          </Popconfirm>
-        </Space>
+        <Button
+          type="link"
+          icon={<EyeOutlined />}
+          onClick={() => router.push(`/crawl-sessions/${record.id}`)}
+        >
+          View
+        </Button>
       ),
     },
   ]
@@ -314,28 +337,46 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
       <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
         <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
           <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <Title level={2} style={{ margin: 0 }}>Crawl Sessions</Title>
+            <Space style={{ marginBottom: 16 }}>
               <Button
                 type="primary"
-                icon={<PlusOutlined />}
+                icon={<PlayCircleOutlined />}
                 onClick={handleCreate}
+                size="large"
               >
                 Start New Crawl
               </Button>
-            </div>
+              <Text type="secondary">Manage crawl sessions</Text>
+            </Space>
 
-            <Table
-              columns={columns}
-              dataSource={crawlSessions}
-              rowKey="id"
-              loading={loading}
-              pagination={{
-                pageSize: 10,
-                showSizeChanger: true,
-                showTotal: (total) => `Total ${total} crawl sessions`,
-              }}
-            />
+            {loading ? (
+              <Spin tip="Loading crawl sessions..." />
+            ) : crawlSessions.length > 0 ? (
+              <Table
+                columns={columns}
+                dataSource={crawlSessions}
+                rowKey="id"
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `Total ${total} crawl sessions`,
+                }}
+              />
+            ) : (
+              <Card>
+                <Space direction="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>
+                  <GlobalOutlined style={{ fontSize: 48, color: '#bfbfbf' }} />
+                  <Text type="secondary">No crawl sessions yet</Text>
+                  <Button
+                    type="primary"
+                    icon={<PlayCircleOutlined />}
+                    onClick={handleCreate}
+                  >
+                    Start First Crawl
+                  </Button>
+                </Space>
+              </Card>
+            )}
           </Card>
 
           <Modal
