@@ -1,7 +1,7 @@
 'use client'
 
 import { Layout, Card, Row, Col, Typography, Statistic, Space } from 'antd'
-import { DashboardOutlined, FileTextOutlined, TeamOutlined, SettingOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, FileTextOutlined, TeamOutlined, FolderOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 import { User } from '@supabase/supabase-js'
 import AdminSidebar from './AdminSidebar'
@@ -11,9 +11,15 @@ const { Title, Text } = Typography
 
 interface DashboardContentProps {
   user: User
+  stats: {
+    totalUsers: number
+    totalTeams: number
+    completedTodos: number
+    totalTodos: number
+  }
 }
 
-export default function DashboardContent({ user }: DashboardContentProps) {
+export default function DashboardContent({ user, stats }: DashboardContentProps) {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
@@ -34,7 +40,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
             <Card>
               <Statistic
                 title="Total Users"
-                value={1128}
+                value={stats.totalUsers}
                 prefix={<TeamOutlined />}
                 valueStyle={{ color: '#3f8600' }}
               />
@@ -43,9 +49,9 @@ export default function DashboardContent({ user }: DashboardContentProps) {
           <Col xs={24} sm={12} lg={6}>
             <Card>
               <Statistic
-                title="Total Documents"
-                value={93}
-                prefix={<FileTextOutlined />}
+                title="Total Teams"
+                value={stats.totalTeams}
+                prefix={<FolderOutlined />}
                 valueStyle={{ color: '#1890ff' }}
               />
             </Card>
@@ -53,19 +59,19 @@ export default function DashboardContent({ user }: DashboardContentProps) {
           <Col xs={24} sm={12} lg={6}>
             <Card>
               <Statistic
-                title="Activities"
-                value={1128}
-                prefix={<DashboardOutlined />}
-                valueStyle={{ color: '#cf1322' }}
+                title="Completed Todos"
+                value={stats.completedTodos}
+                prefix={<CheckCircleOutlined />}
+                valueStyle={{ color: '#52c41a' }}
               />
             </Card>
           </Col>
           <Col xs={24} sm={12} lg={6}>
             <Card>
               <Statistic
-                title="Settings"
-                value={9}
-                prefix={<SettingOutlined />}
+                title="Total Todos"
+                value={stats.totalTodos}
+                prefix={<FileTextOutlined />}
                 valueStyle={{ color: '#722ed1' }}
               />
             </Card>

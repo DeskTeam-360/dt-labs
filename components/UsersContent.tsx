@@ -1,6 +1,6 @@
 'use client'
 
-import { Layout, Table, Button, Space, Typography, Card, Tag, Avatar, Modal, Form, Input, Select, message, Popconfirm, Tooltip, Upload } from 'antd'
+import { Layout, Table, Button, Space, Typography, Card, Tag, Avatar, Modal, Form, Input, Select, message, Popconfirm, Tooltip, Upload, Switch, InputNumber } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, UploadOutlined, EyeOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -15,6 +15,7 @@ import type { ColumnsType } from 'antd/es/table'
 const { Content } = Layout
 const { Title } = Typography
 const { Option } = Select
+const { TextArea } = Input
 
 interface UsersContentProps {
   user: User
@@ -29,6 +30,16 @@ interface UserRecord {
   avatar_url: string | null
   created_at: string
   last_login_at: string | null
+  last_active_at: string | null
+  phone: string | null
+  department: string | null
+  position: string | null
+  bio: string | null
+  timezone: string | null
+  locale: string | null
+  permissions: any
+  is_email_verified: boolean | null
+  metadata: any
 }
 
 export default function UsersContent({ user: currentUser }: UsersContentProps) {
@@ -72,6 +83,9 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     form.setFieldsValue({
       role: 'user',
       status: 'active',
+      timezone: 'UTC',
+      locale: 'en',
+      is_email_verified: false,
     })
     setModalVisible(true)
   }
@@ -84,6 +98,15 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       full_name: record.full_name || '',
       role: record.role,
       status: record.status,
+      phone: record.phone || '',
+      department: record.department || '',
+      position: record.position || '',
+      bio: record.bio || '',
+      timezone: record.timezone || 'UTC',
+      locale: record.locale || 'en',
+      is_email_verified: record.is_email_verified || false,
+      permissions: record.permissions ? JSON.stringify(record.permissions, null, 2) : '',
+      metadata: record.metadata ? JSON.stringify(record.metadata, null, 2) : '',
     })
     setModalVisible(true)
   }
@@ -131,17 +154,50 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
 
   const handleSubmit = async (values: any) => {
     try {
+      // Parse JSON fields
+      let permissions = null
+      let metadata = null
+      
+      if (values.permissions) {
+        try {
+          permissions = JSON.parse(values.permissions)
+        } catch (e) {
+          message.error('Invalid JSON format for permissions')
+          return
+        }
+      }
+      
+      if (values.metadata) {
+        try {
+          metadata = JSON.parse(values.metadata)
+        } catch (e) {
+          message.error('Invalid JSON format for metadata')
+          return
+        }
+      }
+
       if (editingUser) {
         // Update existing user
+        const updateData: any = {
+          full_name: values.full_name,
+          role: values.role,
+          status: values.status,
+          avatar_url: avatarUrl,
+          phone: values.phone || null,
+          department: values.department || null,
+          position: values.position || null,
+          bio: values.bio || null,
+          timezone: values.timezone || 'UTC',
+          locale: values.locale || 'en',
+          is_email_verified: values.is_email_verified || false,
+          permissions: permissions,
+          metadata: metadata,
+          updated_at: new Date().toISOString(),
+        }
+
         const { error } = await supabase
           .from('users')
-          .update({
-            full_name: values.full_name,
-            role: values.role,
-            status: values.status,
-            avatar_url: avatarUrl,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updateData)
           .eq('id', editingUser.id)
 
         if (error) throw error
@@ -174,12 +230,27 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
         if (result.error) {
           message.error(result.error)
         } else {
-          // Upload avatar if provided
-          if (avatarUrl && result.data) {
-            // Avatar already uploaded, just update the record
+          // Update additional fields after creation
+          const updateData: any = {
+            phone: values.phone || null,
+            department: values.department || null,
+            position: values.position || null,
+            bio: values.bio || null,
+            timezone: values.timezone || 'UTC',
+            locale: values.locale || 'en',
+            is_email_verified: values.is_email_verified || false,
+            permissions: permissions,
+            metadata: metadata,
+          }
+
+          if (avatarUrl) {
+            updateData.avatar_url = avatarUrl
+          }
+
+          if (result.data) {
             await supabase
               .from('users')
-              .update({ avatar_url: avatarUrl })
+              .update(updateData)
               .eq('id', result.data.id)
           }
 
@@ -238,10 +309,28 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       },
     },
     {
+      title: 'Department',
+      dataIndex: 'department',
+      key: 'department',
+      render: (dept: string | null) => dept || 'N/A',
+    },
+    {
+      title: 'Position',
+      dataIndex: 'position',
+      key: 'position',
+      render: (pos: string | null) => pos || 'N/A',
+    },
+    {
       title: 'Last Login',
       dataIndex: 'last_login_at',
       key: 'last_login_at',
       render: (date: string | null) => date ? <DateDisplay date={date} /> : 'Never',
+    },
+    {
+      title: 'Last Active',
+      dataIndex: 'last_active_at',
+      key: 'last_active_at',
+      render: (date: string | null) => date ? <DateDisplay date={date} /> : 'N/A',
     },
     {
       title: 'Created At',
@@ -331,7 +420,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               setAvatarUrl(null)
             }}
             footer={null}
-            width={600}
+            width={800}
+            style={{ top: 20 }}
           >
             <Form
               form={form}
@@ -436,6 +526,94 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                   <Option value="suspended">Suspended</Option>
                   <Option value="pending">Pending</Option>
                 </Select>
+              </Form.Item>
+
+              <Form.Item
+                name="phone"
+                label="Phone"
+              >
+                <Input placeholder="Phone Number" />
+              </Form.Item>
+
+              <Form.Item
+                name="department"
+                label="Department"
+              >
+                <Input placeholder="Department" />
+              </Form.Item>
+
+              <Form.Item
+                name="position"
+                label="Position"
+              >
+                <Input placeholder="Position/Job Title" />
+              </Form.Item>
+
+              <Form.Item
+                name="bio"
+                label="Bio"
+              >
+                <TextArea rows={3} placeholder="Bio/Description" />
+              </Form.Item>
+
+              <Form.Item
+                name="timezone"
+                label="Timezone"
+              >
+                <Select placeholder="Select Timezone" showSearch>
+                  <Option value="UTC">UTC</Option>
+                  <Option value="America/New_York">America/New_York (EST)</Option>
+                  <Option value="America/Chicago">America/Chicago (CST)</Option>
+                  <Option value="America/Denver">America/Denver (MST)</Option>
+                  <Option value="America/Los_Angeles">America/Los_Angeles (PST)</Option>
+                  <Option value="Europe/London">Europe/London (GMT)</Option>
+                  <Option value="Europe/Paris">Europe/Paris (CET)</Option>
+                  <Option value="Asia/Tokyo">Asia/Tokyo (JST)</Option>
+                  <Option value="Asia/Shanghai">Asia/Shanghai (CST)</Option>
+                  <Option value="Asia/Jakarta">Asia/Jakarta (WIB)</Option>
+                  <Option value="Asia/Singapore">Asia/Singapore (SGT)</Option>
+                </Select>
+              </Form.Item>
+
+              <Form.Item
+                name="locale"
+                label="Locale"
+              >
+                <Select placeholder="Select Locale">
+                  <Option value="en">English (en)</Option>
+                  <Option value="id">Indonesian (id)</Option>
+                  <Option value="es">Spanish (es)</Option>
+                  <Option value="fr">French (fr)</Option>
+                  <Option value="de">German (de)</Option>
+                  <Option value="ja">Japanese (ja)</Option>
+                  <Option value="zh">Chinese (zh)</Option>
+                </Select>
+              </Form.Item>
+
+              {editingUser && (
+                <Form.Item
+                  name="is_email_verified"
+                  label="Email Verified"
+                  valuePropName="checked"
+                >
+                  <Switch />
+                </Form.Item>
+              )}
+
+              <Form.Item
+                name="permissions"
+                label="Permissions (JSON)"
+                tooltip="Enter permissions as JSON object, e.g. {'read': true, 'write': false}"
+              >
+                <TextArea rows={4} placeholder='{"read": true, "write": false}' />
+              </Form.Item>
+
+              <Form.Item
+                name="metadata"
+                label="Metadata (JSON)"
+                tooltip="Enter additional metadata as JSON object"
+              >
+                <TextArea rows={4} placeholder='{"key": "value"}' />
               </Form.Item>
 
               <Form.Item>

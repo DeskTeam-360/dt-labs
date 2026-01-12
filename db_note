@@ -1,20 +1,50 @@
-todo_checklist
-id (PK)
-todo_id (FK -> todos.id)
-title
-is_completed
-order_index
+todo_time_tracker
 
-todo_comments
 id (PK)
 todo_id (FK -> todos.id)
 user_id (FK -> users.id)
-comment
+start_time (datetime)
+stop_time (datetime, nullable)
+duration_seconds (int, nullable)
 created_at
 
 
-todo_attributs
-id (PK)
-todo_id (FK -> todos.id)
-meta_key
-meta_value
+Penjelasan:
+
+Time tracking disimpan per session
+
+start_time dicatat saat user mulai bekerja
+
+stop_time dicatat saat user menekan STOP
+
+duration_seconds diisi otomatis saat STOP (stop_time - start_time)
+
+LOGIKA TIME TRACKER
+
+Saat user klik START:
+
+system membuat 1 record baru di todo_time_tracker
+
+stop_time masih NULL
+
+Saat user klik STOP:
+
+system update record tersebut:
+
+isi stop_time
+
+hitung duration_seconds
+
+Satu todo dapat memiliki banyak sesi waktu oleh banyak user.
+
+Untuk total waktu per todo:
+SUM(duration_seconds) WHERE todo_id = x
+
+Untuk total waktu per user:
+SUM(duration_seconds) WHERE user_id = x
+
+Untuk mencegah conflict:
+
+System harus cek apakah user punya session time tracker yang masih open (stop_time NULL).
+
+Jika ada, user tidak boleh start yang baru sebelum stop.

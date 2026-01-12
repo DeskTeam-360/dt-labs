@@ -80,6 +80,9 @@ interface TodoRecord {
   creator_name?: string
   team_name?: string
   assignees?: Array<{ id: string; user_id: string; user_name?: string }>
+  checklist_items?: Array<any>
+  checklist_completed?: number
+  checklist_total?: number
 }
 
 interface Team {
@@ -151,25 +154,30 @@ function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (tod
               router.push(`/todos/${todo.id}`)
             }}
           >
-            {todo.title}
+            {todo.title} 
           </Text>
           <Space>
             <Tooltip title="View Details">
               <Button
-                type="text"
+                // type="text"
+                color="blue"
+                type="primary"
+                variant="outlined"
                 icon={<EyeOutlined />}
-                size="small"
+                size="large"
                 onClick={(e) => {
                   e.stopPropagation()
                   router.push(`/todos/${todo.id}`)
                 }}
               />
             </Tooltip>
+            
             <Tooltip title="Edit">
               <Button
-                type="text"
+                // type="primary"
+                color="green"
                 icon={<EditOutlined />}
-                size="small"
+                size="large"
                 onClick={(e) => {
                   e.stopPropagation()
                   onEdit(todo)
@@ -187,10 +195,11 @@ function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (tod
               cancelText="No"
             >
               <Button
-                type="text"
+                // type="text"
                 danger
+                size="large"
                 icon={<DeleteOutlined />}
-                size="small"
+                // size="small"
                 onClick={(e) => e.stopPropagation()}
               />
             </Popconfirm>
@@ -208,6 +217,13 @@ function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (tod
               : todo.description}
           </Text>
         )}
+
+        {Number(todo.checklist_total) > 0 ? (
+          <Tag color="green" style={{ fontSize: 11, marginBottom: 8 }}>
+            Checklist: {todo.checklist_completed}/{todo.checklist_total}
+          </Tag>
+        ) : null}
+
 
         <Space direction="vertical" size={4} style={{ width: '100%' }}>
           {todo.visibility!=='team' && (
@@ -229,6 +245,7 @@ function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (tod
             </Avatar.Group>
           </div>
         )}
+
 
         {todo.due_date && (
           <div style={{ marginTop: 8 }}>
@@ -392,6 +409,14 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
             `)
             .eq('todo_id', todo.id)
 
+          const { data: checklistData } = await supabase
+            .from('todo_checklist')
+            .select('*')
+            .eq('todo_id', todo.id)
+
+          const completedCount = (checklistData || []).filter((item: any) => item.is_completed).length
+          const totalCount = checklistData?.length || 0
+
           return {
             ...todo,
             creator_name: todo.creator?.full_name || todo.creator?.email || 'Unknown',
@@ -401,6 +426,9 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
               user_id: assignee.user_id,
               user_name: assignee.user?.full_name || assignee.user?.email || 'Unknown',
             })),
+            checklist_items: checklistData || [],
+            checklist_completed: completedCount,
+            checklist_total: totalCount,
           }
         })
       )

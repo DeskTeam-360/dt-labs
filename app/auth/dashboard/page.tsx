@@ -14,6 +14,45 @@ export default async function DashboardPage() {
     return null // Layout akan handle redirect
   }
 
-  return <DashboardContent user={user} />
+  // Fetch statistics
+  const [usersResult, teamsResult, completedTodosResult, totalTodosResult] = await Promise.all([
+    // Total Users
+    supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true }),
+    
+    // Total Teams
+    supabase
+      .from('teams')
+      .select('*', { count: 'exact', head: true }),
+    
+    // Total Completed Todos
+    supabase
+      .from('todos')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'completed'),
+    
+    // Total Todos
+    supabase
+      .from('todos')
+      .select('*', { count: 'exact', head: true }),
+  ])
+
+  const usersCount = usersResult.count || 0
+  const teamsCount = teamsResult.count || 0
+  const completedTodosCount = completedTodosResult.count || 0
+  const totalTodosCount = totalTodosResult.count || 0
+
+  return (
+    <DashboardContent
+      user={user}
+      stats={{
+        totalUsers: usersCount,
+        totalTeams: teamsCount,
+        completedTodos: completedTodosCount,
+        totalTodos: totalTodosCount,
+      }}
+    />
+  )
 }
 
