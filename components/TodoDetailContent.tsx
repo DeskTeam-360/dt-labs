@@ -95,7 +95,9 @@ export default function TodoDetailContent({
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(initialChecklistItems)
   const [comments, setComments] = useState<Comment[]>(initialComments)
   const [attributes, setAttributes] = useState<Attribute[]>(initialAttributes)
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
   const [newChecklistTitle, setNewChecklistTitle] = useState('')
   const [newComment, setNewComment] = useState('')
   const [editingAttribute, setEditingAttribute] = useState<string | null>(null)
@@ -104,6 +106,36 @@ export default function TodoDetailContent({
   const [form] = Form.useForm()
 
   const supabase = createClient()
+
+  // Fetch team members if todo has a team
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      if (todoData.visibility === 'team' && todoData.team_id) {
+        setLoadingTeamMembers(true)
+        try {
+          const { data, error } = await supabase
+            .from('team_members')
+            .select(`
+              *,
+              user:users!team_members_user_id_fkey(id, full_name, email)
+            `)
+            .eq('team_id', todoData.team_id)
+
+          if (error) throw error
+          setTeamMembers(data || [])
+        } catch (error: any) {
+          console.error('Failed to fetch team members:', error)
+        } finally {
+          setLoadingTeamMembers(false)
+        }
+      } else {
+        setTeamMembers([])
+      }
+    }
+
+    fetchTeamMembers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todoData.team_id, todoData.visibility])
 
   const getStatusColor = (status: string) => {
     const colorMap: Record<string, string> = {
@@ -417,25 +449,50 @@ export default function TodoDetailContent({
               </Col>
 
               <Col xs={24} lg={12}>
-                <Card title="Assignees" size="small">
+                <Card title="Assignees" size="small" loading={loadingTeamMembers}>
                   {todoData.visibility === 'private' ? (
                     <Empty description="No Assignees this private todo" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                  ) : todoData.assignees && todoData.assignees.length > 0 ? (
-                    <List
-                      dataSource={todoData.assignees}
-                      renderItem={(assignee: any) => (
-                        <List.Item>
-                          <Space>
-                            <Avatar icon={<UserOutlined />} />
-                            <Text>
-                              {assignee.user?.full_name || assignee.user?.email || 'Unknown'}
-                            </Text>
-                          </Space>
-                        </List.Item>
-                      )}
-                    />
+                  ) : todoData.visibility === 'team' && todoData.team_id ? (
+                    teamMembers.length > 0 ? (
+                      <List
+                        dataSource={teamMembers}
+                        renderItem={(member: any) => (
+                          <List.Item>
+                            <Space>
+                              <Avatar icon={<UserOutlined />} />
+                              <Text>
+                                {member.user?.full_name || member.user?.email || 'Unknown'}
+                              </Text>
+                              {member.role && (
+                                <Tag color={member.role === 'manager' ? 'blue' : 'default'} style={{ fontSize: 11 }}>
+                                  {member.role}
+                                </Tag>
+                              )}
+                            </Space>
+                          </List.Item>
+                        )}
+                      />
+                    ) : (
+                      <Empty description="No team members" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                    )
                   ) : (
-                    <Empty description="No assignees" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                    todoData.assignees && todoData.assignees.length > 0 ? (
+                      <List
+                        dataSource={todoData.assignees}
+                        renderItem={(assignee: any) => (
+                          <List.Item>
+                            <Space>
+                              <Avatar icon={<UserOutlined />} />
+                              <Text>
+                                {assignee.user?.full_name || assignee.user?.email || 'Unknown'}
+                              </Text>
+                            </Space>
+                          </List.Item>
+                        )}
+                      />
+                    ) : (
+                      <Empty description="No assignees" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                    )
                   )}
                 </Card>
               </Col>
