@@ -1,42 +1,20 @@
-TABEL: teams
-
+todo_checklist
 id (PK)
-name
-type
-created_by (FK -> users.id)
-created_at
-
-TABEL: team_members
-
-id (PK)
-team_id (FK -> teams.id)
-user_id (FK -> users.id)
-role (optional: member/manager)
-joined_at
-
-TABEL: todos
-
-id (PK)
+todo_id (FK -> todos.id)
 title
-description
-created_by (FK -> users.id)
-due_date (optional)
-status (pending / in_progress / completed / archived)
-visibility (private / team / specific_users)
-team_id (nullable, FK -> teams.id)
-created_at
-updated_at
+is_completed
+order_index
 
-TABEL: todo_assignees
-
+todo_comments
 id (PK)
 todo_id (FK -> todos.id)
 user_id (FK -> users.id)
+comment
+created_at
 
-Catatan:
 
-Private todo: tidak butuh data di todo_assignees
-
-Team todo: bisa assign otomatis semua team members atau tidak
-
-Specific user: simpan user yang punya akses di sini
+todo_attributs
+id (PK)
+todo_id (FK -> todos.id)
+meta_key
+meta_value

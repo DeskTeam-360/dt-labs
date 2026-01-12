@@ -30,8 +30,10 @@ import {
   StopOutlined,
   UserOutlined,
   DragOutlined,
+  EyeOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
@@ -99,6 +101,7 @@ const statusColumns = [
 
 // Kanban Card Component
 function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (todo: TodoRecord) => void; onDelete: (id: string) => void }) {
+  const router = useRouter()
   const {
     attributes,
     listeners,
@@ -140,10 +143,28 @@ function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (tod
         {...listeners}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-          <Text strong style={{ fontSize: 14, flex: 1 }}>
+          <Text 
+            strong 
+            style={{ fontSize: 14, flex: 1, cursor: 'pointer' }}
+            onClick={(e) => {
+              e.stopPropagation()
+              router.push(`/todos/${todo.id}`)
+            }}
+          >
             {todo.title}
           </Text>
           <Space>
+            <Tooltip title="View Details">
+              <Button
+                type="text"
+                icon={<EyeOutlined />}
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  router.push(`/todos/${todo.id}`)
+                }}
+              />
+            </Tooltip>
             <Tooltip title="Edit">
               <Button
                 type="text"
