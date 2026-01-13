@@ -15,6 +15,7 @@ import {
   FormOutlined,
   GlobalOutlined,
   CheckSquareOutlined,
+  PictureOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
@@ -72,6 +73,11 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       key: '/todos',
       icon: <CheckSquareOutlined />,
       label: 'Todos',
+    },
+    {
+      key: '/screenshots',
+      icon: <PictureOutlined />,
+      label: 'Screenshots',
     },
     {
       key: '/teams',

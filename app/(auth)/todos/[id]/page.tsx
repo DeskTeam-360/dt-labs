@@ -65,6 +65,14 @@ export default async function TodoDetailPage({
     .eq('todo_id', id)
     .order('meta_key', { ascending: true })
 
+  // Fetch screenshots linked to this todo
+  const { data: screenshots } = await supabase
+    .from('screenshots')
+    .select('*')
+    .eq('todo_id', id)
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: false })
+
   return (
     <TodoDetailContent
       user={currentUser}
@@ -72,6 +80,7 @@ export default async function TodoDetailPage({
       checklistItems={checklistItems || []}
       comments={comments || []}
       attributes={attributes || []}
+      screenshots={screenshots || []}
     />
   )
 }
