@@ -1,7 +1,7 @@
 'use client'
 
-import { Layout, Card, Form, Input, Button, Typography, message, Avatar, Space, Upload, Select, Row, Col } from 'antd'
-import { UserOutlined, MailOutlined, UploadOutlined, PhoneOutlined, BankOutlined, IdcardOutlined, GlobalOutlined, TranslationOutlined } from '@ant-design/icons'
+import { Layout, Card, Form, Input, Button, Typography, message, Avatar, Space, Upload, Select, Row, Col, Divider, Tag, Popconfirm } from 'antd'
+import { UserOutlined, MailOutlined, UploadOutlined, PhoneOutlined, BankOutlined, IdcardOutlined, GlobalOutlined, TranslationOutlined, KeyOutlined, CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/client'
@@ -18,6 +18,16 @@ interface ProfileContentProps {
   userData?: any
 }
 
+interface ApiToken {
+  id: string
+  token: string
+  name: string
+  last_used_at: string | null
+  expires_at: string | null
+  is_active: boolean
+  created_at: string
+}
+
 export default function ProfileContent({ user, userData }: ProfileContentProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -25,6 +35,10 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(userData?.avatar_url || user.user_metadata?.avatar_url || null)
   const [form] = Form.useForm()
   const supabase = createClient()
+  const [tokens, setTokens] = useState<ApiToken[]>([])
+  const [loadingTokens, setLoadingTokens] = useState(false)
+  const [generatingToken, setGeneratingToken] = useState(false)
+  const [newToken, setNewToken] = useState<string | null>(null)
 
   useEffect(() => {
     if (userData) {
@@ -41,6 +55,79 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
       setAvatarUrl(userData.avatar_url || user.user_metadata?.avatar_url || null)
     }
   }, [userData, form, user])
+
+  // Fetch API tokens
+  const fetchTokens = async () => {
+    setLoadingTokens(true)
+    try {
+      const { data, error } = await supabase
+        .from('api_tokens')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setTokens(data || [])
+    } catch (error: any) {
+      message.error(error.message || 'Failed to fetch tokens')
+    } finally {
+      setLoadingTokens(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchTokens()
+  }, [user.id])
+
+  // Generate new token
+  const handleGenerateToken = async () => {
+    setGeneratingToken(true)
+    try {
+      const response = await fetch('/api/auth/token/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Chrome Extension' }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to generate token')
+      }
+
+      setNewToken(result.token)
+      message.success('Token generated successfully! Copy it now - it won\'t be shown again.')
+      fetchTokens()
+    } catch (error: any) {
+      message.error(error.message || 'Failed to generate token')
+    } finally {
+      setGeneratingToken(false)
+    }
+  }
+
+  // Delete token
+  const handleDeleteToken = async (tokenId: string) => {
+    try {
+      const { error } = await supabase
+        .from('api_tokens')
+        .delete()
+        .eq('id', tokenId)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      message.success('Token deleted successfully')
+      fetchTokens()
+    } catch (error: any) {
+      message.error(error.message || 'Failed to delete token')
+    }
+  }
+
+  // Copy token to clipboard
+  const handleCopyToken = (token: string) => {
+    navigator.clipboard.writeText(token)
+    message.success('Token copied to clipboard!')
+  }
 
   const handleAvatarUpload = async (file: File) => {
     setUploading(true)
@@ -325,6 +412,118 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
                 </Button>
               </Form.Item>
             </Form>
+          </Card>
+
+          <Card style={{ marginTop: 24 }}>
+            <Title level={3}>
+              <KeyOutlined /> API Tokens for Chrome Extension
+            </Title>
+            <Text type="secondary">
+              Generate API tokens to use with the Chrome Extension. Tokens expire after 30 days.
+            </Text>
+
+            {newToken && (
+              <Card
+                type="inner"
+                style={{ marginTop: 16, marginBottom: 16, background: '#f6ffed', borderColor: '#b7eb8f' }}
+              >
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Text strong>New Token Generated!</Text>
+                  <Text code style={{ fontSize: 12, wordBreak: 'break-all', display: 'block' }}>
+                    {newToken}
+                  </Text>
+                  <Button
+                    icon={<CopyOutlined />}
+                    onClick={() => handleCopyToken(newToken)}
+                    size="small"
+                  >
+                    Copy Token
+                  </Button>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+                    ⚠️ Save this token now. You won't be able to see it again!
+                  </Text>
+                </Space>
+              </Card>
+            )}
+
+            <div style={{ marginTop: 16, marginBottom: 16 }}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={handleGenerateToken}
+                loading={generatingToken}
+              >
+                Generate New Token
+              </Button>
+            </div>
+
+            <Divider />
+
+            <div>
+              <Text strong>Your Tokens:</Text>
+              {loadingTokens ? (
+                <div style={{ padding: '20px 0', textAlign: 'center' }}>
+                  <Text type="secondary">Loading...</Text>
+                </div>
+              ) : tokens.length === 0 ? (
+                <div style={{ padding: '20px 0', textAlign: 'center' }}>
+                  <Text type="secondary">No tokens yet. Generate one to get started.</Text>
+                </div>
+              ) : (
+                <div style={{ marginTop: 16 }}>
+                  {tokens.map((token) => (
+                    <Card
+                      key={token.id}
+                      size="small"
+                      style={{ marginBottom: 8 }}
+                      actions={[
+                        <Popconfirm
+                          title="Delete this token?"
+                          description="This action cannot be undone."
+                          onConfirm={() => handleDeleteToken(token.id)}
+                          okText="Yes"
+                          cancelText="No"
+                        >
+                          <Button
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
+                            size="small"
+                          >
+                            Delete
+                          </Button>
+                        </Popconfirm>,
+                      ]}
+                    >
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        <div>
+                          <Text strong>{token.name}</Text>
+                          {token.is_active ? (
+                            <Tag color="green" style={{ marginLeft: 8 }}>Active</Tag>
+                          ) : (
+                            <Tag color="red" style={{ marginLeft: 8 }}>Inactive</Tag>
+                          )}
+                        </div>
+                        <Text code style={{ fontSize: 11, wordBreak: 'break-all' }}>
+                          {token.token.substring(0, 20)}...
+                        </Text>
+                        <div>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Created: {new Date(token.created_at).toLocaleDateString()}
+                            {token.last_used_at && (
+                              <> • Last used: {new Date(token.last_used_at).toLocaleDateString()}</>
+                            )}
+                            {token.expires_at && (
+                              <> • Expires: {new Date(token.expires_at).toLocaleDateString()}</>
+                            )}
+                          </Text>
+                        </div>
+                      </Space>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </Card>
         </Content>
       </Layout>

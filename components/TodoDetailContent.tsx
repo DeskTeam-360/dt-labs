@@ -37,6 +37,8 @@ import {
     FileTextOutlined,
     PlayCircleOutlined,
     StopOutlined,
+    LinkOutlined,
+    CopyOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -51,12 +53,27 @@ const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
 const { Option } = Select
 
+interface Screenshot {
+    id: string
+    file_name: string
+    file_path: string
+    file_url: string
+    file_size: number
+    mime_type: string
+    todo_id: string | null
+    title: string | null
+    description: string | null
+    created_at: string
+    updated_at: string
+}
+
 interface TodoDetailContentProps {
     user: User
     todoData: any
     checklistItems: any[]
     comments: any[]
     attributes: any[]
+    screenshots?: Screenshot[]
 }
 
 interface ChecklistItem {
@@ -96,6 +113,7 @@ export default function TodoDetailContent({
     checklistItems: initialChecklistItems,
     comments: initialComments,
     attributes: initialAttributes,
+    screenshots: initialScreenshots = [],
 }: TodoDetailContentProps) {
     const router = useRouter()
     const [collapsed, setCollapsed] = useState(false)
@@ -1313,6 +1331,67 @@ export default function TodoDetailContent({
 
                                         </Space>
                                         // </Card>
+                                    ),
+                                },
+                                {
+                                    key: 'screenshots',
+                                    label: `Screenshots (${initialScreenshots.length})`,
+                                    children: (
+                                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                                            {initialScreenshots.length > 0 ? (
+                                                <Row gutter={[16, 16]}>
+                                                    {initialScreenshots.map((screenshot) => (
+                                                        <Col xs={24} sm={12} md={8} lg={6} key={screenshot.id}>
+                                                            <Card
+                                                                hoverable
+                                                                cover={
+                                                                    <div style={{ height: 150, overflow: 'hidden', background: '#f5f5f5' }}>
+                                                                        <img
+                                                                            src={screenshot.file_url}
+                                                                            alt={screenshot.title || screenshot.file_name}
+                                                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                        />
+                                                                    </div>
+                                                                }
+                                                                actions={[
+                                                                    <Button
+                                                                        type="text"
+                                                                        icon={<LinkOutlined />}
+                                                                        onClick={() => window.open(screenshot.file_url, '_blank')}
+                                                                    />,
+                                                                    <Button
+                                                                        type="text"
+                                                                        icon={<CopyOutlined />}
+                                                                        onClick={() => {
+                                                                            navigator.clipboard.writeText(screenshot.file_url)
+                                                                            message.success('URL copied!')
+                                                                        }}
+                                                                    />,
+                                                                ]}
+                                                            >
+                                                                <Card.Meta
+                                                                    title={
+                                                                        <Text ellipsis style={{ fontSize: 12 }}>
+                                                                            {screenshot.title || screenshot.file_name}
+                                                                        </Text>
+                                                                    }
+                                                                    description={
+                                                                        <Text type="secondary" style={{ fontSize: 11 }}>
+                                                                            {dayjs(screenshot.created_at).format('YYYY-MM-DD HH:mm')}
+                                                                        </Text>
+                                                                    }
+                                                                />
+                                                            </Card>
+                                                        </Col>
+                                                    ))}
+                                                </Row>
+                                            ) : (
+                                                <Empty 
+                                                    description="No screenshots linked to this todo" 
+                                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                                />
+                                            )}
+                                        </Space>
                                     ),
                                 },
                             ]}
