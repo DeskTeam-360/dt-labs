@@ -22,9 +22,9 @@ export default async function TodoDetailPage({
   // Await params since it's a Promise in Next.js 15+
   const { id } = await params
 
-  // Fetch todo data with related information
+  // Fetch ticket data with related information
   const { data: todoData, error: todoError } = await supabase
-    .from('todos')
+    .from('tickets')
     .select(`
       *,
       creator:users!todos_created_by_fkey(id, full_name, email),
@@ -34,18 +34,20 @@ export default async function TodoDetailPage({
         user:users!todo_assignees_user_id_fkey(id, full_name, email)
       )
     `)
-    .eq('id', id)
+    .eq('id', parseInt(id))
     .single()
 
   if (todoError || !todoData) {
     redirect('/todos')
   }
 
+  const ticketId = parseInt(id)
+
   // Fetch checklist items
   const { data: checklistItems } = await supabase
     .from('todo_checklist')
     .select('*')
-    .eq('todo_id', id)
+    .eq('todo_id', ticketId)
     .order('order_index', { ascending: true })
 
   // Fetch comments with user info
@@ -55,21 +57,21 @@ export default async function TodoDetailPage({
       *,
       user:users!todo_comments_user_id_fkey(id, full_name, email)
     `)
-    .eq('todo_id', id)
+    .eq('todo_id', ticketId)
     .order('created_at', { ascending: true })
 
   // Fetch attributes
   const { data: attributes } = await supabase
     .from('todo_attributs')
     .select('*')
-    .eq('todo_id', id)
+    .eq('todo_id', ticketId)
     .order('meta_key', { ascending: true })
 
-  // Fetch screenshots linked to this todo
+  // Fetch screenshots linked to this ticket
   const { data: screenshots } = await supabase
     .from('screenshots')
     .select('*')
-    .eq('todo_id', id)
+    .eq('todo_id', ticketId)
     .eq('user_id', currentUser.id)
     .order('created_at', { ascending: false })
 

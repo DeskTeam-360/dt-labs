@@ -67,7 +67,7 @@ interface TodosContentProps {
 }
 
 interface TodoRecord {
-  id: string
+  id: number
   title: string
   description: string | null
   created_by: string
@@ -103,7 +103,7 @@ const statusColumns = [
 ]
 
 // Kanban Card Component
-function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (todo: TodoRecord) => void; onDelete: (id: string) => void }) {
+function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (todo: TodoRecord) => void; onDelete: (id: number) => void }) {
   const router = useRouter()
   const {
     attributes,
@@ -289,7 +289,7 @@ function KanbanColumn({
   column: { id: string; title: string; color: string }
   todos: TodoRecord[]
   onEdit: (todo: TodoRecord) => void
-  onDelete: (id: string) => void
+  onDelete: (id: number) => void
 }) {
   // Filter todos by status
   let columnTodos = todos.filter((todo) => todo.status === column.id)
@@ -374,7 +374,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
   const [teams, setTeams] = useState<Team[]>([])
   const [users, setUsers] = useState<UserRecord[]>([])
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useState<number | null>(null)
   const supabase = createClient()
 
   const sensors = useSensors(
@@ -389,7 +389,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
     setLoading(true)
     try {
       const { data: todosData, error: todosError } = await supabase
-        .from('todos')
+        .from('tickets')
         .select(`
           *,
           creator:users!todos_created_by_fkey(id, full_name, email),
@@ -476,7 +476,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
   }, [])
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string)
+    setActiveId(event.active.id as number)
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -508,7 +508,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
 
     try {
       const { error } = await supabase
-        .from('todos')
+        .from('tickets')
         .update({ status: newStatus })
         .eq('id', todoId)
 
@@ -547,7 +547,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
     setModalVisible(true)
   }
 
-  const handleDelete = async (todoId: string) => {
+  const handleDelete = async (todoId: number) => {
     try {
       const { error: assigneesError } = await supabase
         .from('todo_assignees')
@@ -557,7 +557,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
       if (assigneesError) throw assigneesError
 
       const { error } = await supabase
-        .from('todos')
+        .from('tickets')
         .delete()
         .eq('id', todoId)
 
@@ -593,7 +593,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
 
       if (editingTodo) {
         const { error } = await supabase
-          .from('todos')
+          .from('tickets')
           .update(todoData)
           .eq('id', editingTodo.id)
 
@@ -627,7 +627,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
         message.success('Todo updated successfully')
       } else {
         const { data: newTodo, error } = await supabase
-          .from('todos')
+          .from('tickets')
           .insert({
             ...todoData,
             created_by: currentUser.id,

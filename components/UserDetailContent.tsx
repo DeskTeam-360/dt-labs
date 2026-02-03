@@ -57,7 +57,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
         .from('todo_time_tracker')
         .select(`
           *,
-          todo:todos!todo_time_tracker_todo_id_fkey(id, title, description)
+          todo:tickets!todo_time_tracker_todo_id_fkey(id, title, description)
         `)
         .eq('user_id', userData.id)
 
@@ -94,7 +94,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
         .from('todo_time_tracker')
         .select(`
           *,
-          todo:todos!todo_time_tracker_todo_id_fkey(id, title, description)
+          todo:tickets!todo_time_tracker_todo_id_fkey(id, title, description)
         `)
         .eq('user_id', userData.id)
         .order('created_at', { ascending: false })

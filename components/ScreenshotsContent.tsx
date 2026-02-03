@@ -20,21 +20,21 @@ interface Screenshot {
   file_url: string
   file_size: number
   mime_type: string
-  todo_id: string | null
+  todo_id: number | null
   title: string | null
   description: string | null
   tags: string[] | null
   created_at: string
   updated_at: string
-  todos?: {
-    id: string
+  tickets?: {
+    id: number
     title: string
     status: string
   } | null
 }
 
 interface Todo {
-  id: string
+  id: number
   title: string
   status: string
   due_date: string | null
@@ -50,7 +50,7 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
   const [collapsed, setCollapsed] = useState(false)
   const [screenshots, setScreenshots] = useState<Screenshot[]>(initialScreenshots)
   const [filteredScreenshots, setFilteredScreenshots] = useState<Screenshot[]>(initialScreenshots)
-  const [selectedTodo, setSelectedTodo] = useState<string | null>(null)
+  const [selectedTodo, setSelectedTodo] = useState<number | null>(null)
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null])
   const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null)
   const [modalVisible, setModalVisible] = useState(false)
@@ -245,9 +245,9 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
                             <Text ellipsis style={{ fontSize: 12 }}>
                               {screenshot.title || screenshot.file_name}
                             </Text>
-                            {screenshot.todos && (
+                            {screenshot.tickets && (
                               <Tag color="blue" style={{ marginTop: 4, display: 'block' }}>
-                                {screenshot.todos.title}
+                                {screenshot.tickets.title}
                               </Tag>
                             )}
                           </div>

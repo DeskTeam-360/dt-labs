@@ -14,12 +14,12 @@ export default async function ScreenshotsPage() {
     return null
   }
 
-  // Fetch screenshots with todo info
+  // Fetch screenshots with ticket info
   const { data: screenshots, error } = await supabase
     .from('screenshots')
     .select(`
       *,
-      todos (
+      tickets:tickets (
         id,
         title,
         status
@@ -28,9 +28,9 @@ export default async function ScreenshotsPage() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-  // Fetch todos for integration
+  // Fetch tickets for integration
   const { data: todos } = await supabase
-    .from('todos')
+    .from('tickets')
     .select('id, title, status, due_date')
     .order('created_at', { ascending: false })
     .limit(100)

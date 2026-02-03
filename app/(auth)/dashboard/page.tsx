@@ -26,15 +26,15 @@ export default async function DashboardPage() {
       .from('teams')
       .select('*', { count: 'exact', head: true }),
     
-    // Total Completed Todos
+    // Total Completed Tickets
     supabase
-      .from('todos')
+      .from('tickets')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'completed'),
     
-    // Total Todos
+    // Total Tickets
     supabase
-      .from('todos')
+      .from('tickets')
       .select('*', { count: 'exact', head: true }),
   ])
 

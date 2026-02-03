@@ -125,10 +125,10 @@ export async function POST(request: Request) {
         .replace(/^-|-$/g, '')
     }
 
-    // Get todo title if todo_id exists
+    // Get ticket title if todo_id exists
     if (todoId) {
       const { data: todoData } = await supabase
-        .from('todos')
+        .from('tickets')
         .select('title')
         .eq('id', todoId)
         .single()
@@ -263,12 +263,12 @@ export async function GET(request: Request) {
     const offset = parseInt(searchParams.get('offset') || '0')
     const todoId = searchParams.get('todo_id')
 
-    // Get screenshots from database (with todo integration)
+    // Get screenshots from database (with ticket integration)
     let query = adminSupabase
       .from('screenshots')
       .select(`
         *,
-        todos (
+        tickets:tickets (
           id,
           title,
           status
@@ -278,7 +278,7 @@ export async function GET(request: Request) {
 
     // Filter by todo_id if provided
     if (todoId) {
-      query = query.eq('todo_id', todoId)
+      query = query.eq('todo_id', parseInt(todoId))
     }
 
     const { data: screenshots, error: dbError } = await query

@@ -60,7 +60,7 @@ interface Screenshot {
     file_url: string
     file_size: number
     mime_type: string
-    todo_id: string | null
+    todo_id: number | null
     title: string | null
     description: string | null
     created_at: string
@@ -78,7 +78,7 @@ interface TodoDetailContentProps {
 
 interface ChecklistItem {
     id: string
-    todo_id: string
+    todo_id: number
     title: string
     is_completed: boolean
     order_index: number
@@ -87,7 +87,7 @@ interface ChecklistItem {
 
 interface Comment {
     id: string
-    todo_id: string
+    todo_id: number
     user_id: string
     comment: string
     created_at: string
@@ -100,7 +100,7 @@ interface Comment {
 
 interface Attribute {
     id: string
-    todo_id: string
+    todo_id: number
     meta_key: string
     meta_value: string | null
     created_at: string
@@ -643,7 +643,7 @@ export default function TodoDetailContent({
         setLoading(true)
         try {
             const { error } = await supabase
-                .from('todos')
+                .from('tickets')
                 .update({
                     description: descriptionValue.trim() || null,
                     updated_at: new Date().toISOString(),
@@ -706,7 +706,7 @@ export default function TodoDetailContent({
             }
 
             const { error } = await supabase
-                .from('todos')
+                .from('tickets')
                 .update(updateData)
                 .eq('id', todoData.id)
 
