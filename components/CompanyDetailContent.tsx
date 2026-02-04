@@ -1,7 +1,7 @@
 'use client'
 
 import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Row, Col, Divider, Tabs, Form, Input, message, Spin, Select, Table, Popconfirm, Switch, Modal, Progress } from 'antd'
-import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, TeamOutlined, DatabaseOutlined, SaveOutlined, FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, GlobalOutlined, PlayCircleOutlined, EyeOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, TeamOutlined, DatabaseOutlined, SaveOutlined, FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, GlobalOutlined, PlayCircleOutlined, EyeOutlined, ReadOutlined, CloudUploadOutlined, HistoryOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
@@ -31,6 +31,9 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
   const [loadingContentTemplates, setLoadingContentTemplates] = useState(false)
   const [selectedContentTemplate, setSelectedContentTemplate] = useState<string | null>(null)
   const [generatedContent, setGeneratedContent] = useState<string>('')
+  const [usedFieldsInGenerated, setUsedFieldsInGenerated] = useState<string[]>([])
+  const [usedSourceIdsFromCompanyDatas, setUsedSourceIdsFromCompanyDatas] = useState<string[]>([])
+  const [savingToKb, setSavingToKb] = useState(false)
   const [websites, setWebsites] = useState<any[]>([])
   const [loadingWebsites, setLoadingWebsites] = useState(false)
   const [websiteModalVisible, setWebsiteModalVisible] = useState(false)
@@ -40,6 +43,25 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
   const [loadingCrawlSessions, setLoadingCrawlSessions] = useState(false)
   const [crawlModalVisible, setCrawlModalVisible] = useState(false)
   const [crawlForm] = Form.useForm()
+  const [knowledgeBases, setKnowledgeBases] = useState<any[]>([])
+  const [loadingKnowledgeBases, setLoadingKnowledgeBases] = useState(false)
+  const [kbPreviewVisible, setKbPreviewVisible] = useState(false)
+  const [kbPreviewContent, setKbPreviewContent] = useState('')
+  const [kbPreviewTitle, setKbPreviewTitle] = useState('')
+  const [embeddingLoadingId, setEmbeddingLoadingId] = useState<string | null>(null)
+  const [aiSystemTemplates, setAiSystemTemplates] = useState<{ id: string; title: string }[]>([])
+  const [loadingAiSystemTemplates, setLoadingAiSystemTemplates] = useState(false)
+  const [ragTemplateId, setRagTemplateId] = useState<string | null>(null)
+  const [ragPrompt, setRagPrompt] = useState('')
+  const [ragLoading, setRagLoading] = useState(false)
+  const [ragResult, setRagResult] = useState<Record<string, unknown> | null>(null)
+  const [ragErrorFull, setRagErrorFull] = useState<string>('')
+  const [generationHistory, setGenerationHistory] = useState<any[]>([])
+  const [loadingGenerationHistory, setLoadingGenerationHistory] = useState(false)
+  const [historyPreviewVisible, setHistoryPreviewVisible] = useState(false)
+  const [historyPreviewContent, setHistoryPreviewContent] = useState('')
+  const [historyPreviewPrompt, setHistoryPreviewPrompt] = useState('')
+  const [generationHistoryError, setGenerationHistoryError] = useState<string>('')
   const supabase = createClient()
 
   // Group company datas by template group
@@ -79,11 +101,96 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
     }
   }
 
+  const fetchKnowledgeBases = async () => {
+    if (!companyData?.id) return
+    setLoadingKnowledgeBases(true)
+    try {
+      const { data: kbData, error } = await supabase
+        .from('company_knowledge_bases')
+        .select('*')
+        .eq('company_id', companyData.id)
+        .order('updated_at', { ascending: false })
+
+      if (error) throw error
+
+      const list = kbData || []
+      const templateIds = [...new Set(list.map((r: any) => r.content_template_id).filter(Boolean))] as string[]
+      let templateMap: Record<string, { id: string; title: string; fields: string[] | null }> = {}
+
+      if (templateIds.length > 0) {
+        const { data: templates } = await supabase
+          .from('company_content_templates')
+          .select('id, title, fields')
+          .in('id', templateIds)
+        if (templates) {
+          templateMap = templates.reduce(
+            (acc, t) => ({ ...acc, [t.id]: { id: t.id, title: t.title, fields: t.fields || null } }),
+            {}
+          )
+        }
+      }
+
+      setKnowledgeBases(
+        list.map((row: any) => ({
+          ...row,
+          company_content_templates: row.content_template_id ? templateMap[row.content_template_id] ?? null : null,
+        }))
+      )
+    } catch (error: any) {
+      message.error('Failed to load knowledge base')
+    } finally {
+      setLoadingKnowledgeBases(false)
+    }
+  }
+
+  const fetchAiSystemTemplates = async () => {
+    setLoadingAiSystemTemplates(true)
+    try {
+      const { data, error } = await supabase
+        .from('company_ai_system_template')
+        .select('id, title')
+        .order('title', { ascending: true })
+      if (error) throw error
+      setAiSystemTemplates(data ?? [])
+    } catch (error: any) {
+      message.error('Failed to load AI system templates')
+    } finally {
+      setLoadingAiSystemTemplates(false)
+    }
+  }
+
+  const fetchGenerationHistory = async () => {
+    if (!companyData?.id) return
+    setLoadingGenerationHistory(true)
+    setGenerationHistoryError('')
+    try {
+      const { data, error } = await supabase
+        .from('company_content_generation_history')
+        .select('id, prompt, content, created_at')
+        .eq('company_id', companyData.id)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      if (error) {
+        setGenerationHistoryError(error.message || JSON.stringify(error))
+        throw error
+      }
+      setGenerationHistory(data ?? [])
+    } catch (error: any) {
+      message.error('Failed to load generation history')
+    } finally {
+      setLoadingGenerationHistory(false)
+    }
+  }
+
   useEffect(() => {
     fetchDataTemplates()
     fetchContentTemplates()
+    fetchAiSystemTemplates()
     fetchWebsites()
-  }, [])
+    fetchKnowledgeBases()
+    fetchGenerationHistory()
+  }, [companyData?.id])
 
   useEffect(() => {
     if (websites.length > 0) {
@@ -279,6 +386,8 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
   const generateContent = () => {
     if (!selectedContentTemplate) {
       setGeneratedContent('')
+      setUsedFieldsInGenerated([])
+      setUsedSourceIdsFromCompanyDatas([])
       return
     }
 
@@ -286,16 +395,17 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
     const contentTemplate = contentTemplates.find((t) => t.id === selectedContentTemplate)
     if (!contentTemplate || !contentTemplate.content) {
       setGeneratedContent('')
+      setUsedFieldsInGenerated([])
+      setUsedSourceIdsFromCompanyDatas([])
       return
     }
 
     // Create multiple maps for different lookup methods
-    // 1. Map by template ID (existing data)
     const dataMapById: { [key: string]: string } = {}
-    // 2. Map by template title (normalized - lowercase, no spaces)
     const dataMapByTitle: { [key: string]: string } = {}
-    // 3. Map by template ID to title (for reverse lookup)
     const templateIdToTitle: { [key: string]: string } = {}
+    // templateId -> company_datas.id (for source_ids)
+    const dataTemplateIdToCompanyDataId: { [key: string]: string } = {}
 
     // Build template ID to title map first
     dataTemplates.forEach((template: any) => {
@@ -304,17 +414,17 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
       }
     })
 
-    // Build data maps from company_datas
+    // Build data maps from company_datas (and map templateId -> company_datas.id)
     if (companyData.company_datas) {
       companyData.company_datas.forEach((item: any) => {
         const templateId = item.data_template_id || item.company_data_templates?.id
         const value = item.value || ''
-        
-        if (templateId) {
-          // Map by ID
+        const companyDataId = item.id
+
+        if (templateId && companyDataId) {
           dataMapById[templateId] = value
-          
-          // Map by title (normalized)
+          dataTemplateIdToCompanyDataId[templateId] = companyDataId
+
           const template = dataTemplates.find((t: any) => t.id === templateId)
           if (template && template.title) {
             const normalizedTitle = template.title.toLowerCase().replace(/\s+/g, '')
@@ -331,39 +441,205 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
     // Replace placeholders {{template-id}} or {{template-title}} with actual values
     let generated = contentTemplate.content
     const placeholderRegex = /\{\{([^}]+)\}\}/g
-    
+    const usedPlaceholders: string[] = []
+
     generated = generated.replace(placeholderRegex, (match: string, placeholder: string) => {
-      const normalizedPlaceholder = placeholder.trim().toLowerCase().replace(/\s+/g, '')
-      
+      const key = placeholder.trim()
+      if (key && !usedPlaceholders.includes(key)) {
+        usedPlaceholders.push(key)
+      }
+      const normalizedPlaceholder = key.toLowerCase().replace(/\s+/g, '')
+
       // Try to find value by:
       // 1. Exact ID match (original format - e.g., {{uuid-123}})
-      let value = dataMapById[placeholder.trim()]
-      
+      let value = dataMapById[key]
+
       // 2. If not found, try normalized title match (e.g., {{company}})
       if (!value && normalizedPlaceholder) {
         value = dataMapByTitle[normalizedPlaceholder]
       }
-      
+
       // 3. If still not found, try to find template by title and get its ID
       if (!value) {
         const matchingTemplate = dataTemplates.find((t: any) => {
           const normalizedTemplateTitle = (t.title || '').toLowerCase().replace(/\s+/g, '')
           return normalizedTemplateTitle === normalizedPlaceholder
         })
-        
+
         if (matchingTemplate && matchingTemplate.id) {
           value = dataMapById[matchingTemplate.id]
         }
       }
-      
+
       // Return value if found, otherwise return original placeholder
       return value !== undefined && value !== null && value !== '' ? value : match
     })
 
-    console.log('Generate Content - Original:', contentTemplate.content)
-    console.log('Generate Content - Generated:', generated)
+    // Resolve used placeholders to company_datas IDs for source_ids
+    const sourceIds: string[] = []
+    const seenIds = new Set<string>()
+    usedPlaceholders.forEach((key) => {
+      const normalizedPlaceholder = key.toLowerCase().replace(/\s+/g, '')
+      let templateId: string | undefined
+      if (dataMapById[key]) {
+        templateId = key
+      } else if (dataMapByTitle[normalizedPlaceholder]) {
+        const matchingTemplate = dataTemplates.find((t: any) => {
+          const norm = (t.title || '').toLowerCase().replace(/\s+/g, '')
+          return norm === normalizedPlaceholder
+        })
+        templateId = matchingTemplate?.id
+      }
+      const companyDataId = templateId ? dataTemplateIdToCompanyDataId[templateId] : undefined
+      if (companyDataId && !seenIds.has(companyDataId)) {
+        seenIds.add(companyDataId)
+        sourceIds.push(companyDataId)
+      }
+    })
 
     setGeneratedContent(generated)
+    setUsedFieldsInGenerated(usedPlaceholders)
+    setUsedSourceIdsFromCompanyDatas(sourceIds)
+  }
+
+  const handleSaveToKnowledgeBase = async () => {
+    if (!generatedContent || !companyData?.id || !selectedContentTemplate) {
+      message.warning('Generate content first and select a template')
+      return
+    }
+    setSavingToKb(true)
+    try {
+      const contentTemplate = contentTemplates.find((t) => t.id === selectedContentTemplate)
+      const templateType = contentTemplate?.type ?? contentTemplate?.type ?? 'generated'
+
+      const payload = {
+        company_id: companyData.id,
+        type: templateType,
+        content: generatedContent,
+        content_template_id: selectedContentTemplate,
+        // used_fields: usedFieldsInGenerated.length > 0 ? usedFieldsInGenerated : null,
+        source_ids: usedSourceIdsFromCompanyDatas.length > 0 ? usedSourceIdsFromCompanyDatas : null,
+        is_updated: false,
+      }
+
+      const { error } = await supabase
+        .from('company_knowledge_bases')
+        .upsert(payload, {
+          onConflict: 'company_id,content_template_id',
+        })
+
+      if (error) throw error
+      message.success('Saved to Knowledge Base')
+      fetchKnowledgeBases()
+    } catch (error: any) {
+      message.error(error?.message ?? 'Failed to save to Knowledge Base')
+    } finally {
+      setSavingToKb(false)
+    }
+  }
+
+  const handleKbPreview = (record: any) => {
+    setKbPreviewTitle(record.company_content_templates?.title || record.type || 'Content')
+    setKbPreviewContent(record.content || '')
+    setKbPreviewVisible(true)
+  }
+
+  const handleDeleteKb = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('company_knowledge_bases')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+      message.success('Removed from Knowledge Base')
+      fetchKnowledgeBases()
+    } catch (error: any) {
+      message.error(error?.message ?? 'Failed to delete')
+    }
+  }
+
+  const handleAddToOpenAI = async (record: any) => {
+    if (!record.content?.trim()) {
+      message.warning('No content to embed')
+      return
+    }
+    setEmbeddingLoadingId(record.id)
+    try {
+      const res = await fetch(`/api/knowledge-bases/${record.id}/embed`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        message.error(data?.error ?? 'Failed to add to OpenAI')
+        return
+      }
+      message.success('Embedding saved to OpenAI / Knowledge Base')
+      fetchKnowledgeBases()
+    } catch (error: any) {
+      message.error(error?.message ?? 'Failed to add to OpenAI')
+    } finally {
+      setEmbeddingLoadingId(null)
+    }
+  }
+
+  const handleGenerateFromKb = async () => {
+    if (!ragTemplateId) {
+      message.warning('Select an AI System Template')
+      return
+    }
+    if (!companyData?.id) return
+    setRagLoading(true)
+    setRagResult(null)
+    setRagErrorFull('')
+    try {
+      const res = await fetch(`/api/companies/${companyData.id}/generate-content`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template_id: ragTemplateId, prompt: ragPrompt.trim() || undefined }),
+      })
+      const rawText = await res.text()
+      let data: Record<string, unknown> = {}
+      try {
+        data = rawText ? JSON.parse(rawText) : {}
+      } catch {
+        data = { _raw: rawText }
+      }
+      if (!res.ok) {
+        const fullError = [
+          `HTTP ${res.status} ${res.statusText}`,
+          `URL: ${res.url}`,
+          '',
+          'Response body:',
+          typeof data === 'object' && data !== null
+            ? JSON.stringify(data, null, 2)
+            : String(rawText),
+        ].join('\n')
+        setRagErrorFull(fullError)
+        message.error(data?.error ? String(data.error) : `Failed to generate content (${res.status})`)
+        return
+      }
+      const result =
+        data?.result !== undefined && data?.result !== null && typeof data.result === 'object'
+          ? (data.result as Record<string, unknown>)
+          : null
+      setRagResult(result)
+      if (result) {
+        message.success('Content generated successfully')
+        if (data?.historyError) {
+          message.warning('History not saved: ' + (data.historyError as string))
+        }
+        fetchGenerationHistory()
+      }
+    } catch (error: any) {
+      const fullError = [
+        'Exception:',
+        error?.message ?? String(error),
+        error?.stack ? `\nStack:\n${error.stack}` : '',
+      ].join('\n')
+      setRagErrorFull(fullError)
+      message.error(error?.message ?? 'Failed to generate content')
+    } finally {
+      setRagLoading(false)
+    }
   }
 
   const handleContentTemplateChange = (templateId: string) => {
@@ -907,7 +1183,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                   dangerouslySetInnerHTML={{ __html: generatedContent }}
                 />
                 <Divider />
-                <Space>
+                <Space wrap>
                   <Button
                     type="primary"
                     onClick={() => {
@@ -931,7 +1207,22 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                   >
                     Download HTML
                   </Button>
+                  <Button
+                    type="primary"
+                    icon={<SaveOutlined />}
+                    onClick={handleSaveToKnowledgeBase}
+                    loading={savingToKb}
+                  >
+                    Save to Knowledge Base
+                  </Button>
                 </Space>
+                {usedFieldsInGenerated.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Fields used in this content: {usedFieldsInGenerated.join(', ')}
+                    </Text>
+                  </div>
+                )}
               </Card>
             )}
 
@@ -949,6 +1240,297 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
               </Card>
             )}
           </Form>
+        </div>
+      ),
+    },
+    {
+      key: 'knowledge-base',
+      label: (
+        <span>
+          <ReadOutlined /> Knowledge Base ({knowledgeBases.length})
+        </span>
+      ),
+      children: (
+        <div>
+          <Card title="Generate content from knowledge base" style={{ marginBottom: 24 }}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+              Select an AI System Template (system instructions). The system will search the knowledge base and generate content.
+            </Text>
+            <Select
+              placeholder="Select AI System Template"
+              value={ragTemplateId}
+              onChange={setRagTemplateId}
+              style={{ width: '100%', marginBottom: 12 }}
+              loading={loadingAiSystemTemplates}
+              allowClear
+            >
+              {aiSystemTemplates.map((t) => (
+                <Option key={t.id} value={t.id}>
+                  {t.title}
+                </Option>
+              ))}
+            </Select>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 6 }}>Additional prompt (optional):</Text>
+            <TextArea
+              value={ragPrompt}
+              onChange={(e) => setRagPrompt(e.target.value)}
+              placeholder="e.g. Create company introduction text from the available content"
+              rows={2}
+              style={{ marginBottom: 12 }}
+            />
+            <Button type="primary" loading={ragLoading} onClick={handleGenerateFromKb} icon={<PlayCircleOutlined />}>
+              Generate content
+            </Button>
+            {ragErrorFull ? (
+              <div style={{ marginTop: 16 }}>
+                <Text strong type="danger">Error (full):</Text>
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: 12,
+                    background: '#fff2f0',
+                    border: '1px solid #ffccc7',
+                    borderRadius: 8,
+                    whiteSpace: 'pre-wrap',
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    maxHeight: 400,
+                    overflow: 'auto',
+                  }}
+                >
+                  {ragErrorFull}
+                </div>
+              </div>
+            ) : null}
+            {ragResult ? (
+              <div style={{ marginTop: 16 }}>
+                <Text strong>Result (JSON):</Text>
+                <pre
+                  style={{
+                    marginTop: 8,
+                    padding: 12,
+                    background: '#fafafa',
+                    border: '1px solid #e8e8e8',
+                    borderRadius: 8,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    maxHeight: 400,
+                    overflow: 'auto',
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                  }}
+                >
+                  {JSON.stringify(ragResult, null, 2)}
+                </pre>
+              </div>
+            ) : null}
+          </Card>
+          <Card title={<span><HistoryOutlined /> Generation history</span>} style={{ marginBottom: 24 }}>
+            {generationHistoryError ? (
+              <div style={{ marginBottom: 12 }}>
+                <Text type="danger" strong>Error loading history:</Text>
+                <div
+                  style={{
+                    marginTop: 6,
+                    padding: 10,
+                    background: '#fff2f0',
+                    border: '1px solid #ffccc7',
+                    borderRadius: 8,
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {generationHistoryError}
+                </div>
+                <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+                  If the error mentions &quot;relation does not exist&quot; or missing table, run the migrations in Supabase: <code>create_company_content_generation_history_table.sql</code> and <code>fix_company_content_generation_history_created_by.sql</code>.
+                </Text>
+              </div>
+            ) : null}
+            {loadingGenerationHistory ? (
+              <Spin />
+            ) : generationHistory.length === 0 && !generationHistoryError ? (
+              <Text type="secondary">No history yet. Results from knowledge base generation will be saved here.</Text>
+            ) : generationHistory.length > 0 ? (
+              <Table
+                dataSource={generationHistory}
+                rowKey="id"
+                size="small"
+                pagination={{ pageSize: 10 }}
+                columns={[
+                  {
+                    title: 'Prompt',
+                    dataIndex: 'prompt',
+                    key: 'prompt',
+                    ellipsis: true,
+                    render: (p: string) => (
+                      <Text ellipsis style={{ maxWidth: 280 }}>
+                        {p || '—'}
+                      </Text>
+                    ),
+                  },
+                  {
+                    title: 'Content',
+                    dataIndex: 'content',
+                    key: 'content',
+                    ellipsis: true,
+                    render: (c: string) => {
+                      if (!c) return '—'
+                      try {
+                        const parsed = JSON.parse(c)
+                        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                          const keys = Object.keys(parsed)
+                          const preview = keys.length ? `{ ${keys.slice(0, 4).join(', ')}${keys.length > 4 ? '…' : ''} }` : '{}'
+                          return (
+                            <Text ellipsis style={{ maxWidth: 220 }} title={preview}>
+                              {preview}
+                            </Text>
+                          )
+                        }
+                      } catch {
+                        /* not JSON */
+                      }
+                      const plain = c.replace(/<[^>]*>/g, '').trim()
+                      return (
+                        <Text ellipsis style={{ maxWidth: 220 }}>
+                          {plain.slice(0, 50)}{plain.length > 50 ? '…' : ''}
+                        </Text>
+                      )
+                    },
+                  },
+                  {
+                    title: 'Date',
+                    dataIndex: 'created_at',
+                    key: 'created_at',
+                    width: 160,
+                    render: (d: string) => <DateDisplay date={d} />,
+                  },
+                  {
+                    title: '',
+                    key: 'actions',
+                    width: 80,
+                    render: (_: unknown, record: any) => (
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<EyeOutlined />}
+                        onClick={() => {
+                          setHistoryPreviewPrompt(record.prompt ?? '')
+                          setHistoryPreviewContent(record.content ?? '')
+                          setHistoryPreviewVisible(true)
+                        }}
+                      >
+                        Preview
+                      </Button>
+                    ),
+                  },
+                ]}
+              />
+            ) : null}
+          </Card>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            Content saved from Generate Content for this company. One row per content template.
+          </Text>
+          {loadingKnowledgeBases ? (
+            <Spin />
+          ) : knowledgeBases.length === 0 ? (
+            <Card>
+              <Text type="secondary">No knowledge base entries yet. Use Generate Content and click Save to Knowledge Base.</Text>
+            </Card>
+          ) : (
+            <Table
+              dataSource={knowledgeBases}
+              rowKey="id"
+              columns={[
+                {
+                  title: 'Type',
+                  dataIndex: 'type',
+                  key: 'type',
+                  render: (t: string | null) => t || '—',
+                },
+                {
+                  title: 'Template',
+                  key: 'template',
+                  render: (_, record) => record.company_content_templates?.title ?? '—',
+                },
+                {
+                  title: 'Content',
+                  dataIndex: 'content',
+                  key: 'content',
+                  ellipsis: true,
+                  render: (c: string | null) => (
+                    <Text ellipsis style={{ maxWidth: 200 }}>
+                      {c ? (c.replace(/<[^>]*>/g, '').slice(0, 80) + (c.length > 80 ? '...' : '')) : '—'}
+                    </Text>
+                  ),
+                },
+                {
+                  title: 'Fields',
+                  key: 'fields',
+                  render: (_: unknown, record: any) => {
+                    const arr = record.company_content_templates?.fields ?? record.used_fields ?? null
+                    return arr?.length ? (
+                      <Space size={[4, 4]} wrap>
+                        {arr.slice(0, 5).map((f: string, i: number) => (
+                          <Tag key={i}>{f}</Tag>
+                        ))}
+                        {arr.length > 5 && <Tag>+{arr.length - 5}</Tag>}
+                      </Space>
+                    ) : (
+                      '—'
+                    )
+                  },
+                },
+                {
+                  title: 'Updated',
+                  dataIndex: 'is_updated',
+                  key: 'is_updated',
+                  render: (v: boolean) => (v ? <Tag color="blue">Yes</Tag> : <Tag>No</Tag>),
+                },
+                {
+                  title: 'Updated at',
+                  dataIndex: 'updated_at',
+                  key: 'updated_at',
+                  render: (d: string) => <DateDisplay date={d} />,
+                },
+                {
+                  title: 'Actions',
+                  key: 'actions',
+                  render: (_, record) => (
+                    <Space>
+                      <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleKbPreview(record)}>
+                        Preview
+                      </Button>
+                      {!record.is_updated && (
+                        <Button
+                          type="link"
+                          size="small"
+                          icon={<CloudUploadOutlined />}
+                          loading={embeddingLoadingId === record.id}
+                          onClick={() => handleAddToOpenAI(record)}
+                        >
+                          Add to OpenAI
+                        </Button>
+                      )}
+                      
+                      <Popconfirm
+                        title="Remove from Knowledge Base?"
+                        onConfirm={() => handleDeleteKb(record.id)}
+                        okText="Yes"
+                        cancelText="No"
+                      >
+                        <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+                          Delete
+                        </Button>
+                      </Popconfirm>
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+          )}
         </div>
       ),
     },
@@ -1472,6 +2054,81 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                   </Space>
                 </Form.Item>
               </Form>
+            </Modal>
+
+            {/* Knowledge Base Preview Modal */}
+            <Modal
+              title={kbPreviewTitle}
+              open={kbPreviewVisible}
+              onCancel={() => setKbPreviewVisible(false)}
+              footer={[<Button key="close" onClick={() => setKbPreviewVisible(false)}>Close</Button>]}
+              width={800}
+            >
+              <div
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  maxHeight: '60vh',
+                  overflowY: 'auto',
+                }}
+                dangerouslySetInnerHTML={{ __html: kbPreviewContent }}
+              />
+            </Modal>
+
+            {/* Generation History Preview Modal */}
+            <Modal
+              title="Generation history"
+              open={historyPreviewVisible}
+              onCancel={() => setHistoryPreviewVisible(false)}
+              footer={[<Button key="close" onClick={() => setHistoryPreviewVisible(false)}>Close</Button>]}
+              width={800}
+            >
+              {historyPreviewPrompt ? (
+                <div style={{ marginBottom: 12 }}>
+                  <Text strong>Prompt:</Text>
+                  <div style={{ marginTop: 4, padding: 8, background: '#f5f5f5', borderRadius: 4 }}>{historyPreviewPrompt}</div>
+                </div>
+              ) : null}
+              <Text strong>Content:</Text>
+              <div
+                style={{
+                  marginTop: 8,
+                  maxHeight: '50vh',
+                  overflowY: 'auto',
+                  padding: 12,
+                  background: '#fafafa',
+                  borderRadius: 8,
+                  border: '1px solid #e8e8e8',
+                }}
+              >
+                {(() => {
+                  try {
+                    const parsed = JSON.parse(historyPreviewContent || '')
+                    if (typeof parsed === 'object' && parsed !== null) {
+                      return (
+                        <pre
+                          style={{
+                            margin: 0,
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                          }}
+                        >
+                          {JSON.stringify(parsed, null, 2)}
+                        </pre>
+                      )
+                    }
+                  } catch {
+                    /* not JSON */
+                  }
+                  return (
+                    <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {historyPreviewContent || '—'}
+                    </div>
+                  )
+                })()}
+              </div>
             </Modal>
           </Card>
         </Content>

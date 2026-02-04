@@ -63,12 +63,14 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { title, content, description } = body
+    const { title, content, description, type, fields } = body
 
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (title !== undefined) updateData.title = title
     if (content !== undefined) updateData.content = content
     if (description !== undefined) updateData.description = description
+    if (type !== undefined) updateData.type = type || null
+    if (fields !== undefined) updateData.fields = Array.isArray(fields) && fields.length ? fields : null
 
     const { data, error } = await supabase
       .from('company_content_templates')

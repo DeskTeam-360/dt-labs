@@ -16,10 +16,9 @@ import {
   Popconfirm,
   Tooltip,
   Avatar,
-  Row,
-  Col,
   Empty,
   Badge,
+  Spin,
 } from 'antd'
 import {
   PlusOutlined,
@@ -96,10 +95,27 @@ interface UserRecord {
   email: string
 }
 
-const statusColumns = [
+interface TodoStatusRecord {
+  id: number
+  slug: string
+  title: string
+  color: string
+  show_in_kanban: boolean
+  sort_order: number
+}
+
+// Fallback when DB has no todo_statuses
+const DEFAULT_KANBAN_COLUMNS = [
   { id: 'to_do', title: 'To Do', color: '#faad14' },
   { id: 'in_progress', title: 'In Progress', color: '#1890ff' },
   { id: 'completed', title: 'Completed', color: '#52c41a' },
+]
+const DEFAULT_ALL_STATUSES = [
+  { slug: 'to_do', title: 'To Do' },
+  { slug: 'in_progress', title: 'In Progress' },
+  { slug: 'completed', title: 'Completed' },
+  { slug: 'cancel', title: 'Cancel' },
+  { slug: 'archived', title: 'Archived' },
 ]
 
 // Kanban Card Component
@@ -206,17 +222,20 @@ function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (tod
           </Space>
         </div>
 
-        {todo.description && todo.description.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>
+            Description
+          </Text>
           <Text
             type="secondary"
-            ellipsis={{ tooltip: todo.description.length > 100 ? todo.description : false }}
-            style={{ display: 'block', marginBottom: 8, fontSize: 12 }}
+            ellipsis={{ tooltip: todo.description && todo.description.length > 100 ? todo.description : false }}
+            style={{ display: 'block', fontSize: 12 }}
           >
-            {todo.description.length > 100
-              ? `${todo.description.slice(0, 100)}...`
-              : todo.description}
+            {todo.description && todo.description.trim().length > 0
+              ? (todo.description.length > 100 ? `${todo.description.slice(0, 100)}...` : todo.description)
+              : '—'}
           </Text>
-        )}
+        </div>
 
         {Number(todo.checklist_total) > 0 ? (
           <Tag color="green" style={{ fontSize: 11, marginBottom: 8 }}>
@@ -310,7 +329,7 @@ function KanbanColumn({
   })
 
   return (
-    <Col xs={24} sm={12} lg={24/3} style={{ marginBottom: 16 }}>
+    <div style={{ minWidth: 320, flexShrink: 0, marginRight: 16 }}>
       <Card
         style={{
           height: 'calc(100vh - 200px)',
@@ -333,7 +352,6 @@ function KanbanColumn({
         <div
           ref={setNodeRef}
           style={{
-            // position: 'absolute',
             top: 0,
             left: 0,
             right: 0,
@@ -341,7 +359,6 @@ function KanbanColumn({
             minHeight: '100%',
             padding: 16,
             overflow: 'auto',
-            // backgroundColor: 'rgba(255, 0, 0, 0.1)',
           }}
         >
           <SortableContext items={columnTodos.map((t) => t.id)} strategy={verticalListSortingStrategy}>
@@ -354,13 +371,12 @@ function KanbanColumn({
                 {columnTodos.map((todo) => (
                   <KanbanCard key={todo.id} todo={todo} onEdit={onEdit} onDelete={onDelete} />
                 ))}
-                {/* <div style={{ minHeight: 200 }}></div> */}
               </>
             )}
           </SortableContext>
         </div>
       </Card>
-    </Col>
+    </div>
   )
 }
 
@@ -375,6 +391,8 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
   const [users, setUsers] = useState<UserRecord[]>([])
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
   const [activeId, setActiveId] = useState<number | null>(null)
+  const [statusColumns, setStatusColumns] = useState<{ id: string; title: string; color: string }[]>(DEFAULT_KANBAN_COLUMNS)
+  const [allStatuses, setAllStatuses] = useState<{ slug: string; title: string }[]>(DEFAULT_ALL_STATUSES)
   const supabase = createClient()
 
   const sensors = useSensors(
@@ -469,10 +487,31 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
     }
   }
 
+  const fetchStatuses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('todo_statuses')
+        .select('id, slug, title, color, show_in_kanban, sort_order')
+        .order('sort_order', { ascending: true })
+
+      if (error) throw error
+      const list = (data || []) as TodoStatusRecord[]
+      if (list.length > 0) {
+        setStatusColumns(
+          list.filter((s) => s.show_in_kanban).map((s) => ({ id: s.slug, title: s.title, color: s.color }))
+        )
+        setAllStatuses(list.map((s) => ({ slug: s.slug, title: s.title })))
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch todo statuses, using defaults:', error)
+    }
+  }
+
   useEffect(() => {
     fetchTodos()
     fetchTeams()
     fetchUsers()
+    fetchStatuses()
   }, [])
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -486,20 +525,20 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
 
     if (!over) return
 
-    const todoId = active.id as string
+    const todoId = active.id as number
     var newStatus = over.id as string
 
-    // Check if status is valid
-    if (!['to_do', 'in_progress', 'completed', 'cancel', 'archived'].includes(newStatus)) {
-      // return
-      const todo = todos.find((t) => t.id === newStatus)
+
+       // Only allow drop on kanban columns (statuses with show_in_kanban)
+    if (!statusColumns.some((c) => c.id === newStatus)) {
+      const todo = todos.find((t) => t.id === Number(newStatus))
       if (todo) {
         newStatus = todo?.status as string
       }else{
-        return;
+        return
       }
+      
     }
-
 
     // Optimistic update
     setTodos((prevTodos) =>
@@ -527,7 +566,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
     setSelectedAssignees([])
     form.resetFields()
     form.setFieldsValue({
-      status: 'to_do',
+      status: allStatuses[0]?.slug ?? 'to_do',
       visibility: 'private',
     })
     setModalVisible(true)
@@ -680,13 +719,27 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
               </Button>
             </div>
 
+            {loading ? (
+              <div style={{ padding: 48, textAlign: 'center' }}>
+                <Spin size="large" tip="Loading tasks..." />
+              </div>
+            ) : (
             <DndContext
               sensors={sensors}
               collisionDetection={closestCorners}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >
-              <Row gutter={[16, 16]}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'nowrap',
+                  overflowX: 'auto',
+                  overflowY: 'hidden',
+                  paddingBottom: 8,
+                  margin: -4,
+                }}
+              >
                 {statusColumns.map((column) => (
                   <KanbanColumn
                     key={column.id}
@@ -696,7 +749,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
                     onDelete={handleDelete}
                   />
                 ))}
-              </Row>
+              </div>
 
               <DragOverlay>
                 {activeTodo ? (
@@ -713,6 +766,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
                 ) : null}
               </DragOverlay>
             </DndContext>
+            )}
           </Card>
 
           <Modal
@@ -741,11 +795,11 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
 
               <Form.Item name="status" label="Status" rules={[{ required: true }]}>
                 <Select>
-                  <Option value="to_do">To Do</Option>
-                  <Option value="in_progress">In Progress</Option>
-                  <Option value="completed">Completed</Option>
-                  <Option value="cancel">Cancel</Option>
-                  <Option value="archived">Archived</Option>
+                  {allStatuses.map((s) => (
+                    <Option key={s.slug} value={s.slug}>
+                      {s.title}
+                    </Option>
+                  ))}
                 </Select>
               </Form.Item>
 
