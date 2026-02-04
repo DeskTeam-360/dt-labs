@@ -16,6 +16,7 @@ import {
   GlobalOutlined,
   CheckSquareOutlined,
   PictureOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
@@ -39,7 +40,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
 
   // Set open keys after mount to avoid hydration mismatch
   useEffect(() => {
-    if (pathname && (pathname.startsWith('/company-data-templates') || pathname.startsWith('/company-content-templates'))) {
+    if (pathname && (pathname.startsWith('/company-data-templates') || pathname.startsWith('/company-content-templates') || pathname.startsWith('/company-ai-system-templates'))) {
       setOpenKeys(['templates'])
     }
   }, [pathname])
@@ -75,6 +76,11 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       label: 'Todos',
     },
     {
+      key: '/todo-statuses',
+      icon: <SettingOutlined />,
+      label: 'Todo Statuses',
+    },
+    {
       key: '/screenshots',
       icon: <PictureOutlined />,
       label: 'Screenshots',
@@ -98,6 +104,11 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           key: '/company-content-templates',
           icon: <FileTextOutlined />,
           label: 'Content Templates',
+        },
+        {
+          key: '/company-ai-system-templates',
+          icon: <RobotOutlined />,
+          label: 'AI System Templates',
         },
       ],
     },

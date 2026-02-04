@@ -51,19 +51,23 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { title, content, description } = body
+    const { title, content, description, type, fields } = body
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
     }
 
+    const insertData: Record<string, unknown> = {
+      title,
+      content: content || null,
+      description: description || null,
+    }
+    if (type !== undefined) insertData.type = type || null
+    if (Array.isArray(fields)) insertData.fields = fields.length ? fields : null
+
     const { data, error } = await supabase
       .from('company_content_templates')
-      .insert({
-        title,
-        content: content || null,
-        description: description || null,
-      })
+      .insert(insertData)
       .select()
       .single()
 

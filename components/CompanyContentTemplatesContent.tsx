@@ -11,6 +11,8 @@ import {
   message,
   Popconfirm,
   Tooltip,
+  Spin,
+  Tag,
 } from 'antd'
 import {
   PlusOutlined,
@@ -39,6 +41,8 @@ interface ContentTemplateRecord {
   title: string
   content: string | null
   description: string | null
+  type: string | null
+  fields: string[] | null
   created_at: string
   updated_at: string
 }
@@ -47,6 +51,7 @@ export default function CompanyContentTemplatesContent({
   user: currentUser,
 }: CompanyContentTemplatesContentProps) {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [templates, setTemplates] = useState<ContentTemplateRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -54,6 +59,10 @@ export default function CompanyContentTemplatesContent({
   const [previewContent, setPreviewContent] = useState<string>('')
   const [previewTitle, setPreviewTitle] = useState<string>('')
   const supabase = createClient()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const fetchTemplates = async () => {
     setLoading(true)
@@ -125,6 +134,27 @@ export default function CompanyContentTemplatesContent({
       ),
     },
     {
+      title: 'Type',
+      dataIndex: 'type',
+      key: 'type',
+      render: (type: string | null) => (type ? <Text>{type}</Text> : '—'),
+    },
+    {
+      title: 'Fields',
+      dataIndex: 'fields',
+      key: 'fields',
+      render: (fields: string[] | null) =>
+        fields?.length ? (
+          <Space size={[4, 4]} wrap>
+            {fields.map((f, i) => (
+              <Tag key={i}>{f}</Tag>
+            ))}
+          </Space>
+        ) : (
+          '—'
+        ),
+    },
+    {
       title: 'Content Preview',
       key: 'content_preview',
       render: (_, record) => (
@@ -182,6 +212,17 @@ export default function CompanyContentTemplatesContent({
       ),
     },
   ]
+
+  // Avoid hydration mismatch: render same placeholder on server and initial client, then full UI after mount
+  if (!mounted) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f2f5' }}>
+        <Spin size="large" tip="Loading...">
+          <div style={{ padding: 50, background: 'transparent' }} />
+        </Spin>
+      </div>
+    )
+  }
 
   return (
     <Layout style={{ minHeight: '100vh' }}>

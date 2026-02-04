@@ -32,6 +32,8 @@ interface ContentTemplateFormProps {
     title: string
     content: string | null
     description: string | null
+    fields?: string[] | null
+    type?: string | null
   }
 }
 
@@ -70,6 +72,7 @@ export default function ContentTemplateForm({
         title: template.title,
         content: template.content || '',
         description: template.description || '',
+        type: template.type || '',
       })
       const initialContent = template.content || ''
       console.log('[useEffect template] Setting contentValue to:', initialContent)
@@ -281,16 +284,25 @@ export default function ContentTemplateForm({
     return acc
   }, {} as Record<string, DataTemplate[]>)
 
+  // Extract field names from content placeholders {{field_name}}
+  const extractFieldsFromContent = (text: string | null): string[] => {
+    if (!text || typeof text !== 'string') return []
+    const matches = text.matchAll(/\{\{([^}]+)\}\}/g)
+    const seen = new Set<string>()
+    for (const m of matches) {
+      const key = (m[1] || '').trim()
+      if (key && !seen.has(key)) seen.add(key)
+    }
+    return [...seen]
+  }
+
   const handleSubmit = async (values: any) => {
-    console.log('[handleSubmit] Form values:', values)
-    console.log('[handleSubmit] contentValue state:', contentValue)
-    console.log('[handleSubmit] form.getFieldValue("content"):', form.getFieldValue('content'))
-    
     setLoading(true)
     try {
       const submitContent = contentValue || null
-      console.log('[handleSubmit] Submitting with content:', submitContent)
-      
+      const fieldsArr = extractFieldsFromContent(submitContent)
+      const typeVal = values.type ? String(values.type).trim() || null : null
+
       if (isEditMode && template) {
         // Update existing template
         const { error } = await supabase
@@ -299,6 +311,8 @@ export default function ContentTemplateForm({
             title: values.title,
             content: submitContent,
             description: values.description || null,
+            type: typeVal,
+            fields: fieldsArr.length > 0 ? fieldsArr : null,
           })
           .eq('id', template.id)
 
@@ -314,6 +328,8 @@ export default function ContentTemplateForm({
             title: values.title,
             content: submitContent,
             description: values.description || null,
+            type: typeVal,
+            fields: fieldsArr.length > 0 ? fieldsArr : null,
           })
 
         if (error) throw error
@@ -388,6 +404,10 @@ export default function ContentTemplateForm({
                 <Input placeholder="Template Description" size="large" />
               </Form.Item>
 
+              <Form.Item name="type" label="Type" extra="Optional: e.g. email, blog">
+                <Input placeholder="Template type" size="large" />
+              </Form.Item>
+
               <Row>
                 <Col span={12}>
                   <Form.Item label="Content">
@@ -406,8 +426,13 @@ export default function ContentTemplateForm({
                   }}
                     />
                     <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-                      Click on data template chips to insert them at cursor position.
+                      Click on data template chips to insert them at cursor position. Fields are auto-detected from placeholders like {`{{about_us_content}}`}.
                     </Text>
+                    {contentValue && extractFieldsFromContent(contentValue).length > 0 && (
+                      <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 12 }}>
+                        Fields to save: {extractFieldsFromContent(contentValue).join(', ')}
+                      </Text>
+                    )}
                   </Form.Item>
                 </Col>
                 <Col span={12} style={{ paddingLeft: 16 }}>

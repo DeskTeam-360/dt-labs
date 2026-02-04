@@ -116,14 +116,14 @@ export default function LoginPage() {
           </Form.Item>
         </Form>
 
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <Text type="secondary">
+        {/* <div style={{ textAlign: 'center', marginTop: 16 }}> */}
+          {/* <Text type="secondary">
             Don't have an account?{' '}
             <a href="/register" style={{ fontWeight: 500 }}>
               Sign up now
             </a>
-          </Text>
-        </div>
+          </Text> */}
+        {/* </div> */}
       </Card>
     </div>
   )

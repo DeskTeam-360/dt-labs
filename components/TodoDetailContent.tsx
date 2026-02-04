@@ -141,8 +141,38 @@ export default function TodoDetailContent({
     const [timeTrackerSessions, setTimeTrackerSessions] = useState<any[]>([])
     const [totalTimeSeconds, setTotalTimeSeconds] = useState<number>(0)
     const [currentTime, setCurrentTime] = useState<number>(0)
+    const [statusesFromDb, setStatusesFromDb] = useState<{ slug: string; title: string; color: string }[]>([])
 
     const supabase = createClient()
+
+    // Default status labels/colors when DB has no todo_statuses
+    const DEFAULT_STATUS_MAP: Record<string, { title: string; color: string }> = {
+        to_do: { title: 'To Do', color: 'default' },
+        in_progress: { title: 'In Progress', color: 'processing' },
+        completed: { title: 'Completed', color: 'success' },
+        cancel: { title: 'Cancel', color: 'error' },
+        archived: { title: 'Archived', color: 'default' },
+    }
+    const allStatusesForSelect = statusesFromDb.length > 0
+        ? statusesFromDb
+        : Object.entries(DEFAULT_STATUS_MAP).map(([slug, { title, color }]) => ({ slug, title, color }))
+
+    useEffect(() => {
+        const fetchStatuses = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('todo_statuses')
+                    .select('slug, title, color')
+                    .order('sort_order', { ascending: true })
+                if (!error && data?.length) {
+                    setStatusesFromDb(data as { slug: string; title: string; color: string }[])
+                }
+            } catch {
+                // use DEFAULT_STATUS_MAP via allStatusesForSelect
+            }
+        }
+        fetchStatuses()
+    }, [])
 
     // Fetch team members if todo has a team
     useEffect(() => {
@@ -367,25 +397,15 @@ export default function TodoDetailContent({
     }
 
     const getStatusColor = (status: string) => {
-        const colorMap: Record<string, string> = {
-            to_do: 'default',
-            in_progress: 'processing',
-            completed: 'success',
-            cancel: 'error',
-            archived: 'default',
-        }
-        return colorMap[status] || 'default'
+        const fromDb = statusesFromDb.find((s) => s.slug === status)
+        if (fromDb?.color) return fromDb.color
+        return DEFAULT_STATUS_MAP[status]?.color || 'default'
     }
 
     const getStatusLabel = (status: string) => {
-        const labelMap: Record<string, string> = {
-            to_do: 'To Do',
-            in_progress: 'In Progress',
-            completed: 'Completed',
-            cancel: 'Cancel',
-            archived: 'Archived',
-        }
-        return labelMap[status] || status
+        const fromDb = statusesFromDb.find((s) => s.slug === status)
+        if (fromDb?.title) return fromDb.title
+        return DEFAULT_STATUS_MAP[status]?.title || status
     }
 
     const getVisibilityColor = (visibility: string) => {
@@ -1424,11 +1444,11 @@ export default function TodoDetailContent({
 
                             <Form.Item name="status" label="Status" rules={[{ required: true }]}>
                                 <Select>
-                                    <Option value="to_do">To Do</Option>
-                                    <Option value="in_progress">In Progress</Option>
-                                    <Option value="completed">Completed</Option>
-                                    <Option value="cancel">Cancel</Option>
-                                    <Option value="archived">Archived</Option>
+                                    {allStatusesForSelect.map((s) => (
+                                        <Option key={s.slug} value={s.slug}>
+                                            {s.title}
+                                        </Option>
+                                    ))}
                                 </Select>
                             </Form.Item>
 

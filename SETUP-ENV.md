@@ -29,6 +29,14 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
 # Optional: Site URL
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# --- OpenAI API (untuk embeddings / RAG / AI features) ---
+# Dapatkan di https://platform.openai.com/api-keys
+OPENAI_API_KEY=sk-your_openai_api_key_here
+# Optional: model untuk embeddings (default: text-embedding-3-small)
+# OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+# Optional: model untuk generate konten dari knowledge base / RAG (default: gpt-4o-mini)
+# OPENAI_CHAT_MODEL=gpt-4o-mini
 ```
 
 ### 4. Cara Mendapatkan Service Role Key
@@ -71,6 +79,28 @@ npm run dev
 ✅ `NEXT_PUBLIC_SUPABASE_URL` - Project URL  
 ✅ `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` - Anon/Public key  
 ✅ `SUPABASE_SERVICE_ROLE_KEY` - Service role key (untuk admin operations)  
+✅ `OPENAI_API_KEY` - OpenAI API key (untuk embeddings, RAG, knowledge base)  
+
+---
+
+## OpenAI API (untuk Knowledge Base / Embeddings)
+
+Agar fitur yang memakai OpenAI (misalnya embeddings untuk `company_knowledge_bases`) bisa jalan:
+
+1. Buka **OpenAI Platform**: https://platform.openai.com/api-keys  
+2. Login / daftar akun OpenAI.  
+3. Klik **Create new secret key**, beri nama (mis. "My App"), copy key (format `sk-...`).  
+4. Tambah di `.env.local`:
+   ```env
+   OPENAI_API_KEY=sk-your_key_here
+   ```
+5. **Jangan** pakai prefix `NEXT_PUBLIC_` — key ini hanya dipakai di server (API routes / server actions), jangan expose ke browser.
+
+⚠️ **PENTING**:  
+- Jangan commit `OPENAI_API_KEY` ke git.  
+- Di production, set env ini di dashboard hosting (Vercel, dll.).  
+
+---
 
 ## Catatan
 

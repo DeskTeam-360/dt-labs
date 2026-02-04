@@ -1336,7 +1336,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
             <div>
               <div style={{ marginBottom: 16 }}>
                 <Text strong style={{ fontSize: 16 }}>
-                  Preview untuk: <a href={mainPagePreview.url} target="_blank" rel="noopener noreferrer">{mainPagePreview.url}</a>
+                  Preview for: <a href={mainPagePreview.url} target="_blank" rel="noopener noreferrer">{mainPagePreview.url}</a>
                 </Text>
               </div>
               {renderSocialPreviews(mainPagePreview)}
