@@ -8,6 +8,15 @@ import { User } from '@supabase/supabase-js'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
 import { createClient } from '@/utils/supabase/client'
+import {
+  TabInfo,
+  TabUsers,
+  TabDataForm,
+  TabGenerate,
+  TabKnowledgeBase,
+  TabWebsites,
+  TabCrawling,
+} from './CompanyDetail'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -803,25 +812,6 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
     }
   }
 
-  const getCrawlStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'green'
-      case 'crawling':
-        return 'blue'
-      case 'failed':
-        return 'red'
-      case 'broken-page':
-        return 'orange'
-      case 'pending':
-        return 'orange'
-      case 'uncrawl-page':
-        return 'geekblue'
-      default:
-        return 'default'
-    }
-  }
-
   const handleSaveAll = async () => {
     setSaving(true)
     try {
@@ -924,92 +914,17 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
     }
   }
 
+  const handleHistoryPreview = (record: any) => {
+    setHistoryPreviewPrompt(record.prompt ?? '')
+    setHistoryPreviewContent(record.content ?? '')
+    setHistoryPreviewVisible(true)
+  }
+
   const tabItems = [
     {
       key: 'info',
       label: 'Company Information',
-      children: (
-        <>
-        <Row gutter={[24, 24]}>
-          <Col xs={24} lg={24}>
-            {/* <Card title="Basic Information" size="small"> */}
-            <Text strong style={{ fontSize: 18, textTransform: 'uppercase' }}>Basic Information</Text>
-            <br />
-            <Descriptions column={1} bordered style={{ marginTop: 16 }}>
-              {/* <Descriptions.Title>Basic Information</Descriptions.Title> */}
-                <Descriptions.Item label="Company Name">
-                  <Text strong>{companyData.name}</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="Status">
-                  <Tag color={companyData.is_active ? 'green' : 'default'} style={{ fontSize: 14, padding: '4px 12px' }}>
-                    {companyData.is_active ? (
-                      <>
-                        <CheckCircleOutlined /> ACTIVE
-                      </>
-                    ) : (
-                      <>
-                        <CloseCircleOutlined /> INACTIVE
-                      </>
-                    )}
-                  </Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="Company ID">
-                  <Text code style={{ fontSize: 12 }}>
-                    {companyData.id}
-                  </Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="Created At">
-                  <Space>
-                    <CalendarOutlined />
-                    <DateDisplay date={companyData.created_at} format="detailed" />
-                  </Space>
-                </Descriptions.Item>
-                <Descriptions.Item label="Last Updated">
-                  <Space>
-                    <ClockCircleOutlined />
-                    <DateDisplay date={companyData.updated_at} format="detailed" />
-                  </Space>
-                </Descriptions.Item>
-              </Descriptions>
-            {/* </Card> */}
-          </Col>
-
-        
-        </Row>
-        <br />
-        <div>
-          {Object.keys(groupedDatas).length > 0 ? (
-            Object.entries(groupedDatas).map(([group, items]: [string, any]) => (
-              <>
-              <Text strong style={{ fontSize: 18, textTransform: 'uppercase' }}>{group}</Text>
-              
-                <Descriptions bordered column={1} style={{ marginTop: 16 }}>
-                  {items.map((item: any, index: number) => (
-                    <Descriptions.Item
-                      key={index}
-                      label={item.company_data_templates?.title || 'Data'}
-                    >
-                      <Space direction="vertical" size="small">
-                        <Text>{item.value || 'N/A'}</Text>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          Updated: <DateDisplay date={item.updated_at} />
-                        </Text>
-                      </Space>
-                    </Descriptions.Item>
-                  ))}
-                </Descriptions>
-                <br />
-                </>
-              // </Card>
-            ))
-          ) : (
-            // <Card>
-              <Text type="secondary">No data available for this company</Text>
-            // </Card>
-          )}
-        </div>
-        </>
-      ),
+      children: <TabInfo companyData={companyData} groupedDatas={groupedDatas} />,
     },
     {
       key: 'users',
@@ -1018,31 +933,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
           <TeamOutlined /> Users ({companyData.company_users?.length || 0})
         </span>
       ),
-      children: (
-        <>
-          {companyData.company_users && companyData.company_users.length > 0 ? (
-            <Descriptions bordered column={1}>
-              {companyData.company_users.map((cu: any, index: number) => (
-                <Descriptions.Item
-                  key={index}
-                  label={cu.users?.full_name || cu.users?.email || 'User'}
-                >
-                  <Space direction="vertical" size="small">
-                    <Text>
-                      <strong>Email:</strong> {cu.users?.email || 'N/A'}
-                    </Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      Added: <DateDisplay date={cu.created_at} />
-                    </Text>
-                  </Space>
-                </Descriptions.Item>
-              ))}
-            </Descriptions>
-          ) : (
-            <Text type="secondary">No users assigned to this company</Text>
-          )}
-        </>
-      ),
+      children: <TabUsers companyData={companyData} />,
     },
     {
       key: 'data-form',
@@ -1052,79 +943,15 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
         </span>
       ),
       children: (
-        <div>
-          {loadingTemplates ? (
-            <Card>
-              <Spin tip="Loading data templates..." />
-            </Card>
-          ) : (
-            <Form form={form} layout="vertical">
-              <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                {/* <Card> */}
-                  <Space>
-                    <Button
-                      type="primary"
-                      icon={<SaveOutlined />}
-                      onClick={handleSaveAll}
-                      loading={saving}
-                      size="large"
-                    >
-                      Save All
-                    </Button>
-                    <Text type="secondary">Save all company data templates</Text>
-                  </Space>
-                {/* </Card> */}
-
-                {dataTemplates.length > 0 ? (
-                  (() => {
-                    // Group templates by group
-                    const groupedTemplates = dataTemplates.reduce((acc: any, template: any) => {
-                      const group = template.group || 'Other'
-                      if (!acc[group]) {
-                        acc[group] = []
-                      }
-                      acc[group].push(template)
-                      return acc
-                    }, {})
-
-                    return Object.entries(groupedTemplates).map(([group, templates]: [string, any]) => (
-                      <Card
-                        key={group}
-                        title={group}
-                        style={{ marginBottom: 16 }}
-                      >
-                        <Row gutter={[16, 16]}>
-                          {templates.map((template: any) => (
-                            <Col xs={24} sm={12} key={template.id}>
-                              <Form.Item
-                                label={template.title}
-                                name={`template_${template.id}`}
-                                tooltip={template.id}
-                              >
-                                <TextArea
-                                  rows={3}
-                                  placeholder={`Enter ${template.title.toLowerCase()}...`}
-                                  showCount
-                                />
-                              </Form.Item>
-                            </Col>
-                          ))}
-                        </Row>
-                      </Card>
-                    ))
-                  })()
-                ) : (
-                  <Card>
-                    <Text type="secondary">No active data templates available</Text>
-                  </Card>
-                )}
-              </Space>
-            </Form>
-          )}
-        </div>
+        <TabDataForm
+          form={form}
+          dataTemplates={dataTemplates}
+          loadingTemplates={loadingTemplates}
+          saving={saving}
+          onSaveAll={handleSaveAll}
+        />
       ),
     },
-    
     {
       key: 'generate',
       label: (
@@ -1133,114 +960,17 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
         </span>
       ),
       children: (
-        <div>
-          <Form form={generateForm} layout="vertical">
-            {/* <Card style={{ marginBottom: 16 }}> */}
-              <Form.Item
-                label="Content Template"
-                name="content_template_id"
-                rules={[{ required: true, message: 'Please select a content template' }]}
-              >
-                <Select
-                  placeholder="Select a content template"
-                  size="large"
-                  loading={loadingContentTemplates}
-                  onChange={handleContentTemplateChange}
-                  showSearch
-                  filterOption={(input, option) =>
-                    String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                  }
-                >
-                  {contentTemplates.map((template) => (
-                    <Option key={template.id} value={template.id} label={template.title}>
-                      <Space>
-                        <FileTextOutlined />
-                        <Text strong>{template.title}</Text>
-                        {template.description && (
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            - {template.description}
-                          </Text>
-                        )}
-                      </Space>
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            {/* </Card> */}
-
-            {generatedContent && (
-              <Card title="Generated Content">
-                <div
-                  style={{
-                    padding: 16,
-                    background: '#f5f5f5',
-                    borderRadius: 4,
-                    whiteSpace: 'pre-wrap',
-                    minHeight: 200,
-                    maxHeight: 600,
-                    overflow: 'auto',
-                  }}
-                  dangerouslySetInnerHTML={{ __html: generatedContent }}
-                />
-                <Divider />
-                <Space wrap>
-                  <Button
-                    type="primary"
-                    onClick={() => {
-                      navigator.clipboard.writeText(generatedContent.replace(/<[^>]*>/g, ''))
-                      message.success('Content copied to clipboard')
-                    }}
-                  >
-                    Copy Text
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const blob = new Blob([generatedContent], { type: 'text/html' })
-                      const url = URL.createObjectURL(blob)
-                      const a = document.createElement('a')
-                      a.href = url
-                      a.download = `generated-content-${Date.now()}.html`
-                      a.click()
-                      URL.revokeObjectURL(url)
-                      message.success('Content downloaded')
-                    }}
-                  >
-                    Download HTML
-                  </Button>
-                  <Button
-                    type="primary"
-                    icon={<SaveOutlined />}
-                    onClick={handleSaveToKnowledgeBase}
-                    loading={savingToKb}
-                  >
-                    Save to Knowledge Base
-                  </Button>
-                </Space>
-                {usedFieldsInGenerated.length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      Fields used in this content: {usedFieldsInGenerated.join(', ')}
-                    </Text>
-                  </div>
-                )}
-              </Card>
-            )}
-
-            {selectedContentTemplate && !generatedContent && (
-              <Card>
-                <Text type="secondary">
-                  No data available for this template, or template is empty.
-                </Text>
-              </Card>
-            )}
-
-            {!selectedContentTemplate && (
-              <Card>
-                <Text type="secondary">Please select a content template to generate content.</Text>
-              </Card>
-            )}
-          </Form>
-        </div>
+        <TabGenerate
+          generateForm={generateForm}
+          contentTemplates={contentTemplates}
+          loadingContentTemplates={loadingContentTemplates}
+          selectedContentTemplate={selectedContentTemplate}
+          generatedContent={generatedContent}
+          usedFieldsInGenerated={usedFieldsInGenerated}
+          savingToKb={savingToKb}
+          onContentTemplateChange={handleContentTemplateChange}
+          onSaveToKnowledgeBase={handleSaveToKnowledgeBase}
+        />
       ),
     },
     {
@@ -1251,287 +981,28 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
         </span>
       ),
       children: (
-        <div>
-          <Card title="Generate content from knowledge base" style={{ marginBottom: 24 }}>
-            <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-              Select an AI System Template (system instructions). The system will search the knowledge base and generate content.
-            </Text>
-            <Select
-              placeholder="Select AI System Template"
-              value={ragTemplateId}
-              onChange={setRagTemplateId}
-              style={{ width: '100%', marginBottom: 12 }}
-              loading={loadingAiSystemTemplates}
-              allowClear
-            >
-              {aiSystemTemplates.map((t) => (
-                <Option key={t.id} value={t.id}>
-                  {t.title}
-                </Option>
-              ))}
-            </Select>
-            <Text type="secondary" style={{ display: 'block', marginBottom: 6 }}>Additional prompt (optional):</Text>
-            <TextArea
-              value={ragPrompt}
-              onChange={(e) => setRagPrompt(e.target.value)}
-              placeholder="e.g. Create company introduction text from the available content"
-              rows={2}
-              style={{ marginBottom: 12 }}
-            />
-            <Button type="primary" loading={ragLoading} onClick={handleGenerateFromKb} icon={<PlayCircleOutlined />}>
-              Generate content
-            </Button>
-            {ragErrorFull ? (
-              <div style={{ marginTop: 16 }}>
-                <Text strong type="danger">Error (full):</Text>
-                <div
-                  style={{
-                    marginTop: 8,
-                    padding: 12,
-                    background: '#fff2f0',
-                    border: '1px solid #ffccc7',
-                    borderRadius: 8,
-                    whiteSpace: 'pre-wrap',
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                    maxHeight: 400,
-                    overflow: 'auto',
-                  }}
-                >
-                  {ragErrorFull}
-                </div>
-              </div>
-            ) : null}
-            {ragResult ? (
-              <div style={{ marginTop: 16 }}>
-                <Text strong>Result (JSON):</Text>
-                <pre
-                  style={{
-                    marginTop: 8,
-                    padding: 12,
-                    background: '#fafafa',
-                    border: '1px solid #e8e8e8',
-                    borderRadius: 8,
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    maxHeight: 400,
-                    overflow: 'auto',
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                  }}
-                >
-                  {JSON.stringify(ragResult, null, 2)}
-                </pre>
-              </div>
-            ) : null}
-          </Card>
-          <Card title={<span><HistoryOutlined /> Generation history</span>} style={{ marginBottom: 24 }}>
-            {generationHistoryError ? (
-              <div style={{ marginBottom: 12 }}>
-                <Text type="danger" strong>Error loading history:</Text>
-                <div
-                  style={{
-                    marginTop: 6,
-                    padding: 10,
-                    background: '#fff2f0',
-                    border: '1px solid #ffccc7',
-                    borderRadius: 8,
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {generationHistoryError}
-                </div>
-                <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-                  If the error mentions &quot;relation does not exist&quot; or missing table, run the migrations in Supabase: <code>create_company_content_generation_history_table.sql</code> and <code>fix_company_content_generation_history_created_by.sql</code>.
-                </Text>
-              </div>
-            ) : null}
-            {loadingGenerationHistory ? (
-              <Spin />
-            ) : generationHistory.length === 0 && !generationHistoryError ? (
-              <Text type="secondary">No history yet. Results from knowledge base generation will be saved here.</Text>
-            ) : generationHistory.length > 0 ? (
-              <Table
-                dataSource={generationHistory}
-                rowKey="id"
-                size="small"
-                pagination={{ pageSize: 10 }}
-                columns={[
-                  {
-                    title: 'Prompt',
-                    dataIndex: 'prompt',
-                    key: 'prompt',
-                    ellipsis: true,
-                    render: (p: string) => (
-                      <Text ellipsis style={{ maxWidth: 280 }}>
-                        {p || '—'}
-                      </Text>
-                    ),
-                  },
-                  {
-                    title: 'Content',
-                    dataIndex: 'content',
-                    key: 'content',
-                    ellipsis: true,
-                    render: (c: string) => {
-                      if (!c) return '—'
-                      try {
-                        const parsed = JSON.parse(c)
-                        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-                          const keys = Object.keys(parsed)
-                          const preview = keys.length ? `{ ${keys.slice(0, 4).join(', ')}${keys.length > 4 ? '…' : ''} }` : '{}'
-                          return (
-                            <Text ellipsis style={{ maxWidth: 220 }} title={preview}>
-                              {preview}
-                            </Text>
-                          )
-                        }
-                      } catch {
-                        /* not JSON */
-                      }
-                      const plain = c.replace(/<[^>]*>/g, '').trim()
-                      return (
-                        <Text ellipsis style={{ maxWidth: 220 }}>
-                          {plain.slice(0, 50)}{plain.length > 50 ? '…' : ''}
-                        </Text>
-                      )
-                    },
-                  },
-                  {
-                    title: 'Date',
-                    dataIndex: 'created_at',
-                    key: 'created_at',
-                    width: 160,
-                    render: (d: string) => <DateDisplay date={d} />,
-                  },
-                  {
-                    title: '',
-                    key: 'actions',
-                    width: 80,
-                    render: (_: unknown, record: any) => (
-                      <Button
-                        type="link"
-                        size="small"
-                        icon={<EyeOutlined />}
-                        onClick={() => {
-                          setHistoryPreviewPrompt(record.prompt ?? '')
-                          setHistoryPreviewContent(record.content ?? '')
-                          setHistoryPreviewVisible(true)
-                        }}
-                      >
-                        Preview
-                      </Button>
-                    ),
-                  },
-                ]}
-              />
-            ) : null}
-          </Card>
-          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-            Content saved from Generate Content for this company. One row per content template.
-          </Text>
-          {loadingKnowledgeBases ? (
-            <Spin />
-          ) : knowledgeBases.length === 0 ? (
-            <Card>
-              <Text type="secondary">No knowledge base entries yet. Use Generate Content and click Save to Knowledge Base.</Text>
-            </Card>
-          ) : (
-            <Table
-              dataSource={knowledgeBases}
-              rowKey="id"
-              columns={[
-                {
-                  title: 'Type',
-                  dataIndex: 'type',
-                  key: 'type',
-                  render: (t: string | null) => t || '—',
-                },
-                {
-                  title: 'Template',
-                  key: 'template',
-                  render: (_, record) => record.company_content_templates?.title ?? '—',
-                },
-                {
-                  title: 'Content',
-                  dataIndex: 'content',
-                  key: 'content',
-                  ellipsis: true,
-                  render: (c: string | null) => (
-                    <Text ellipsis style={{ maxWidth: 200 }}>
-                      {c ? (c.replace(/<[^>]*>/g, '').slice(0, 80) + (c.length > 80 ? '...' : '')) : '—'}
-                    </Text>
-                  ),
-                },
-                {
-                  title: 'Fields',
-                  key: 'fields',
-                  render: (_: unknown, record: any) => {
-                    const arr = record.company_content_templates?.fields ?? record.used_fields ?? null
-                    return arr?.length ? (
-                      <Space size={[4, 4]} wrap>
-                        {arr.slice(0, 5).map((f: string, i: number) => (
-                          <Tag key={i}>{f}</Tag>
-                        ))}
-                        {arr.length > 5 && <Tag>+{arr.length - 5}</Tag>}
-                      </Space>
-                    ) : (
-                      '—'
-                    )
-                  },
-                },
-                {
-                  title: 'Updated',
-                  dataIndex: 'is_updated',
-                  key: 'is_updated',
-                  render: (v: boolean) => (v ? <Tag color="blue">Yes</Tag> : <Tag>No</Tag>),
-                },
-                {
-                  title: 'Updated at',
-                  dataIndex: 'updated_at',
-                  key: 'updated_at',
-                  render: (d: string) => <DateDisplay date={d} />,
-                },
-                {
-                  title: 'Actions',
-                  key: 'actions',
-                  render: (_, record) => (
-                    <Space>
-                      <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleKbPreview(record)}>
-                        Preview
-                      </Button>
-                      {!record.is_updated && (
-                        <Button
-                          type="link"
-                          size="small"
-                          icon={<CloudUploadOutlined />}
-                          loading={embeddingLoadingId === record.id}
-                          onClick={() => handleAddToOpenAI(record)}
-                        >
-                          Add to OpenAI
-                        </Button>
-                      )}
-                      
-                      <Popconfirm
-                        title="Remove from Knowledge Base?"
-                        onConfirm={() => handleDeleteKb(record.id)}
-                        okText="Yes"
-                        cancelText="No"
-                      >
-                        <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-                          Delete
-                        </Button>
-                      </Popconfirm>
-                    </Space>
-                  ),
-                },
-              ]}
-            />
-          )}
-        </div>
+        <TabKnowledgeBase
+          aiSystemTemplates={aiSystemTemplates}
+          loadingAiSystemTemplates={loadingAiSystemTemplates}
+          ragTemplateId={ragTemplateId}
+          setRagTemplateId={setRagTemplateId}
+          ragPrompt={ragPrompt}
+          setRagPrompt={setRagPrompt}
+          ragLoading={ragLoading}
+          ragResult={ragResult}
+          ragErrorFull={ragErrorFull}
+          onGenerate={handleGenerateFromKb}
+          generationHistory={generationHistory}
+          loadingGenerationHistory={loadingGenerationHistory}
+          generationHistoryError={generationHistoryError}
+          onHistoryPreview={handleHistoryPreview}
+          knowledgeBases={knowledgeBases}
+          loadingKnowledgeBases={loadingKnowledgeBases}
+          onKbPreview={handleKbPreview}
+          embeddingLoadingId={embeddingLoadingId}
+          onAddToOpenAI={handleAddToOpenAI}
+          onDeleteKb={handleDeleteKb}
+        />
       ),
     },
     {
@@ -1542,121 +1013,14 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
         </span>
       ),
       children: (
-        <div>
-          {/* <Card> */}
-            <Space style={{ marginBottom: 16 }}>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleWebsiteCreate}
-                size="large"
-              >
-                Add Website
-              </Button>
-              <Text type="secondary">Manage company websites</Text>
-            </Space>
-
-            {loadingWebsites ? (
-              <Spin tip="Loading websites..." />
-            ) : websites.length > 0 ? (
-              <Table
-                dataSource={websites}
-                rowKey="id"
-                columns={[
-                  {
-                    title: 'Primary',
-                    dataIndex: 'is_primary',
-                    key: 'is_primary',
-                    render: (isPrimary: boolean) => (
-                      <Tag color={isPrimary ? 'blue' : 'default'}>
-                        {isPrimary ? 'Primary' : '-'}
-                      </Tag>
-                    ),
-                    // width: 100,
-                  },
-                  {
-                    title: 'URL',
-                    dataIndex: 'url',
-                    key: 'url',
-                    render: (url: string) => (
-                      <a href={url} target="_blank" rel="noopener noreferrer">
-                        {url}
-                      </a>
-                    ),
-                    ellipsis: true,
-                  },
-                  {
-                    title: 'Title',
-                    dataIndex: 'title',
-                    key: 'title',
-                    render: (title: string | null) => title || '-',
-                  },
-                  
-                  {
-                    title: 'Created At',
-                    key: 'created_at',
-                    render: (_, record) => <DateDisplay date={record.created_at} />,
-                    // width: 180,
-                  },
-                  {
-                    title: 'Actions',
-                    key: 'actions',
-                    // width: 200,
-                    render: (_, record) => {
-                      const lastCrawlSession = getLastCrawlSession(record.id)
-                      return (
-                        <Space>
-                          {lastCrawlSession && (
-                            <Button
-                              type="link"
-                              icon={<EyeOutlined />}
-                              onClick={() => router.push(`/crawl-sessions/${lastCrawlSession.id}`)}
-                            >
-                              Last Crawl
-                            </Button>
-                          )}
-                          <Button
-                            type="link"
-                            icon={<EditOutlined />}
-                            onClick={() => handleWebsiteEdit(record)}
-                          >
-                            Edit
-                          </Button>
-                          <Popconfirm
-                            title="Delete website"
-                            description="Are you sure you want to delete this website?"
-                            onConfirm={() => handleWebsiteDelete(record.id)}
-                            okText="Yes"
-                            cancelText="No"
-                          >
-                            <Button type="link" danger icon={<DeleteOutlined />}>
-                              Delete
-                            </Button>
-                          </Popconfirm>
-                        </Space>
-                      )
-                    },
-                  },
-                ]}
-                pagination={false}
-              />
-            ) : (
-              <Card>
-                <Space direction="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>
-                  <GlobalOutlined style={{ fontSize: 48, color: '#bfbfbf' }} />
-                  <Text type="secondary">No websites added yet</Text>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={handleWebsiteCreate}
-                  >
-                    Add First Website
-                  </Button>
-                </Space>
-              </Card>
-            )}
-          {/* </Card> */}
-        </div>
+        <TabWebsites
+          websites={websites}
+          loadingWebsites={loadingWebsites}
+          getLastCrawlSession={getLastCrawlSession}
+          onAddWebsite={handleWebsiteCreate}
+          onEditWebsite={handleWebsiteEdit}
+          onDeleteWebsite={handleWebsiteDelete}
+        />
       ),
     },
     {
@@ -1667,163 +1031,14 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
         </span>
       ),
       children: (
-        <div>
-          {/* <Card> */}
-            <Space style={{ marginBottom: 16 }}>
-              <Button
-                type="primary"
-                icon={<PlayCircleOutlined />}
-                onClick={handleStartCrawl}
-                disabled={websites.length === 0}
-                size="large"
-              >
-                Start New Crawl
-              </Button>
-              {websites.length === 0 && (
-                <Text type="secondary">Please add a website first</Text>
-              )}
-            </Space>
-
-            {loadingCrawlSessions ? (
-              <Spin tip="Loading crawl sessions..." />
-            ) : crawlSessions.length > 0 ? (
-              <Table
-                dataSource={crawlSessions}
-                rowKey="id"
-                columns={[
-                  {
-                    title: 'Website',
-                    key: 'website',
-                    render: (_, record) => (
-                      <a href={record.company_websites?.url} target="_blank" rel="noopener noreferrer">
-                        {record.company_websites?.url}
-                      </a>
-                    ),
-                    ellipsis: true,
-                  },
-                  {
-                    title: 'Status',
-                    dataIndex: 'status',
-                    key: 'status',
-                    render: (status: string) => (
-                      <Tag color={getCrawlStatusColor(status)} style={{ textTransform: 'uppercase' }}>
-                        {status}
-                      </Tag>
-                    ),
-                    // width: 120,
-                  },
-                  {
-                    title: 'Progress',
-                    key: 'progress',
-                    render: (_, record) => {
-                      const getProgressPercent = () => {
-                        const total = record.total_pages || 0
-                        const crawled = record.crawled_pages || 0
-                        if (total === 0) return 0
-                        return Math.round((crawled / total) * 100)
-                      }
-
-                      return (
-                        <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                          <Progress 
-                            percent={getProgressPercent()} 
-                            status={record.status === 'crawling' ? 'active' : record.status === 'completed' ? 'success' : 'normal'}
-                            size="small"
-                          />
-                          <Space wrap>
-                            <Tag color="green">
-                              <CheckCircleOutlined /> Crawled: <strong>{record.crawled_pages || 0}</strong>
-                            </Tag>
-                            {(record.uncrawled_pages || 0) > 0 && (
-                              <Tag color="geekblue">
-                                Uncrawled: <strong>{record.uncrawled_pages || 0}</strong>
-                              </Tag>
-                            )}
-                            {(record.broken_pages || 0) > 0 && (
-                              <Tag color="orange">
-                                <CloseCircleOutlined /> Broken: <strong>{record.broken_pages || 0}</strong>
-                              </Tag>
-                            )}
-                            {(record.failed_pages || 0) > 0 && (
-                              <Tag color="red">
-                                <CloseCircleOutlined /> Failed: <strong>{record.failed_pages || 0}</strong>
-                              </Tag>
-                            )}
-                          </Space>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            Total Pages: <strong>{record.total_pages || 0}</strong>
-                          </Text>
-                        </Space>
-                      )
-                    },
-                  },
-                  {
-                    title: 'Settings',
-                    key: 'settings',
-                    render: (_, record) => (
-                      <Space>
-                        <span>Max Depth: {record.max_depth}</span>
-                        <span>|</span>
-                        <span>Max Pages: {record.max_pages}</span>
-                      </Space>
-                    ),
-                  },
-                  {
-                    title: 'Started At',
-                    key: 'started_at',
-                    render: (_, record) => record.started_at ? <DateDisplay date={record.started_at} /> : '-',
-                    // width: 180,
-                  },
-                  {
-                    title: 'Actions',
-                    key: 'actions',
-                    // width: 100,
-                    render: (_, record) => (
-                     <>
-                      <Button
-                        type="link"
-                        icon={<EyeOutlined />}
-                        onClick={() => router.push(`/crawl-sessions/${record.id}`)}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        type="link"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => handleCrawlDelete(record.id)}
-                      >
-                        Delete
-                      </Button>
-                      </>
-                    ),
-                  },
-                ]}
-                pagination={{
-                  pageSize: 10,
-                  showSizeChanger: true,
-                  showTotal: (total) => `Total ${total} crawl sessions`,
-                }}
-              />
-            ) : (
-              <Card>
-                <Space direction="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>
-                  <GlobalOutlined style={{ fontSize: 48, color: '#bfbfbf' }} />
-                  <Text type="secondary">No crawl sessions yet</Text>
-                  {websites.length > 0 && (
-                    <Button
-                      type="primary"
-                      icon={<PlayCircleOutlined />}
-                      onClick={handleStartCrawl}
-                    >
-                      Start First Crawl
-                    </Button>
-                  )}
-                </Space>
-              </Card>
-            )}
-          {/* </Card> */}
-        </div>
+        <TabCrawling
+          crawlSessions={crawlSessions}
+          loadingCrawlSessions={loadingCrawlSessions}
+          websites={websites}
+          websitesLength={websites.length}
+          onStartCrawl={handleStartCrawl}
+          onCrawlDelete={handleCrawlDelete}
+        />
       ),
     },
   ]

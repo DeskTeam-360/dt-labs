@@ -3,7 +3,6 @@
 import {
     Layout,
     Card,
-    Descriptions,
     Tag,
     Typography,
     Button,
@@ -12,14 +11,8 @@ import {
     Col,
     Divider,
     Input,
-    List,
-    Checkbox,
-    Avatar,
     Form,
     message,
-    Popconfirm,
-    Empty,
-    Table,
     Modal,
     Select,
     DatePicker,
@@ -32,13 +25,6 @@ import {
     UserOutlined,
     PlusOutlined,
     EditOutlined,
-    DeleteOutlined,
-    CommentOutlined,
-    FileTextOutlined,
-    PlayCircleOutlined,
-    StopOutlined,
-    LinkOutlined,
-    CopyOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -46,10 +32,11 @@ import { User } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
+import { TabGeneral, TabAssignees, TabScreenshots } from './TodoDetail'
 import dayjs from 'dayjs'
 
 const { Content } = Layout
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 const { TextArea } = Input
 const { Option } = Select
 
@@ -74,6 +61,7 @@ interface TodoDetailContentProps {
     comments: any[]
     attributes: any[]
     screenshots?: Screenshot[]
+    tags?: Array<{ id: string; name: string; slug: string; color?: string }>
 }
 
 interface ChecklistItem {
@@ -114,6 +102,7 @@ export default function TodoDetailContent({
     comments: initialComments,
     attributes: initialAttributes,
     screenshots: initialScreenshots = [],
+    tags: initialTags = [],
 }: TodoDetailContentProps) {
     const router = useRouter()
     const [collapsed, setCollapsed] = useState(false)
@@ -136,6 +125,10 @@ export default function TodoDetailContent({
     const [teams, setTeams] = useState<any[]>([])
     const [users, setUsers] = useState<any[]>([])
     const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+    const [ticketTypes, setTicketTypes] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
+    const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([])
+    const [allTags, setAllTags] = useState<Array<{ id: string; name: string; slug: string }>>([])
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initialTags.map((t) => t.id))
     const [form] = Form.useForm()
     const [activeTimeTracker, setActiveTimeTracker] = useState<any>(null)
     const [timeTrackerSessions, setTimeTrackerSessions] = useState<any[]>([])
@@ -241,8 +234,44 @@ export default function TodoDetailContent({
             }
         }
 
+        const fetchTicketTypes = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('ticket_types')
+                    .select('id, title, slug, color')
+                    .order('sort_order', { ascending: true })
+                if (!error) setTicketTypes((data || []) as Array<{ id: number; title: string; slug: string; color: string }>)
+            } catch {
+                // ignore
+            }
+        }
+        const fetchCompanies = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('companies')
+                    .select('id, name')
+                    .order('name', { ascending: true })
+                if (!error) setCompanies(data || [])
+            } catch {
+                // ignore
+            }
+        }
+        const fetchTags = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('tags')
+                    .select('id, name, slug')
+                    .order('name', { ascending: true })
+                if (!error) setAllTags((data || []) as Array<{ id: string; name: string; slug: string }>)
+            } catch {
+                // ignore
+            }
+        }
         fetchTeams()
         fetchUsers()
+        fetchTicketTypes()
+        fetchCompanies()
+        fetchTags()
         fetchTimeTrackerSessions()
         checkActiveTimeTracker()
     }, [])
@@ -691,12 +720,15 @@ export default function TodoDetailContent({
     // Edit Todo functions
     const handleEditTodo = () => {
         setSelectedAssignees(todoData.assignees?.map((a: any) => a.user_id) || [])
+        setSelectedTagIds(initialTags.map((t) => t.id))
         form.setFieldsValue({
             title: todoData.title,
             description: todoData.description || '',
             status: todoData.status,
             visibility: todoData.visibility,
             team_id: todoData.team_id,
+            type_id: todoData.type_id ?? undefined,
+            company_id: todoData.company_id ?? undefined,
             due_date: todoData.due_date ? dayjs(todoData.due_date) : null,
         })
         setEditModalVisible(true)
@@ -721,6 +753,8 @@ export default function TodoDetailContent({
                 status: values.status,
                 visibility: values.visibility,
                 team_id: values.team_id || null,
+                type_id: values.type_id ?? null,
+                company_id: values.company_id ?? null,
                 due_date: values.due_date ? values.due_date.toISOString() : null,
                 updated_at: new Date().toISOString(),
             }
@@ -758,6 +792,13 @@ export default function TodoDetailContent({
                     .eq('todo_id', todoData.id)
             }
 
+            await supabase.from('ticket_tags').delete().eq('ticket_id', todoData.id)
+            if (selectedTagIds.length > 0) {
+                await supabase.from('ticket_tags').insert(
+                    selectedTagIds.map((tagId) => ({ ticket_id: todoData.id, tag_id: tagId }))
+                )
+            }
+
             message.success('Todo updated successfully')
             setEditModalVisible(false)
 
@@ -781,7 +822,7 @@ export default function TodoDetailContent({
                 <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
                     <Card>
                         <Space style={{ marginBottom: 24 }}>
-                            <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/todos')}>
+                            <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/tickets')}>
                                 Back to Todos
                             </Button>
                         </Space>
@@ -792,10 +833,29 @@ export default function TodoDetailContent({
                                     <Title level={2} style={{ marginBottom: 8 }}>
                                         {todoData.title}
                                     </Title>
-                                    <Space size="middle">
+                                    <Space size="middle" wrap>
                                         <Tag color={getStatusColor(todoData.status)} style={{ fontSize: 14, padding: '4px 12px' }}>
                                             {getStatusLabel(todoData.status)}
                                         </Tag>
+                                        {todoData.type && (
+                                            <Tag color={todoData.type.color} style={{ fontSize: 14, padding: '4px 12px' }}>
+                                                {todoData.type.title}
+                                            </Tag>
+                                        )}
+                                        {todoData.company && (
+                                            <Tag
+                                                color={todoData.company.color ? undefined : 'cyan'}
+                                                style={{
+                                                  fontSize: 14,
+                                                  padding: '4px 12px',
+                                                  ...(todoData.company.color
+                                                    ? { backgroundColor: todoData.company.color, borderColor: todoData.company.color, color: '#fff' }
+                                                    : {}),
+                                                }}
+                                            >
+                                                {todoData.company.name}
+                                            </Tag>
+                                        )}
                                         <Tag color={getVisibilityColor(todoData.visibility)} style={{ fontSize: 14, padding: '4px 12px' }}>
                                             {todoData.visibility?.toUpperCase()}
                                         </Tag>
@@ -804,6 +864,22 @@ export default function TodoDetailContent({
                                                 Team: {todoData.team.name}
                                             </Tag>
                                         )}
+                                        {initialTags.length > 0 &&
+                                            initialTags.map((t) => (
+                                                <Tag
+                                                    key={t.id}
+                                                    color={t.color ? undefined : 'default'}
+                                                    style={{
+                                                        fontSize: 14,
+                                                        padding: '4px 12px',
+                                                        ...(t.color
+                                                            ? { backgroundColor: t.color, borderColor: t.color, color: '#fff' }
+                                                            : {}),
+                                                    }}
+                                                >
+                                                    {t.name}
+                                                </Tag>
+                                            ))}
                                     </Space>
                                 </div>
                                 <Button
@@ -825,594 +901,78 @@ export default function TodoDetailContent({
                                     key: 'general',
                                     label: 'General Info',
                                     children: (
-                                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                                            <Row gutter={[24, 24]}>
-                                                <Col xs={24}>
-                                                    {/* <Card title="Basic Information" size="small"> */}
-                                                    <Descriptions column={1} bordered>
-                                                        <Descriptions.Item label="Status">
-                                                            <Tag color={getStatusColor(todoData.status)} style={{ fontSize: 14, padding: '4px 12px' }}>
-                                                                {getStatusLabel(todoData.status)}
-                                                            </Tag>
-                                                        </Descriptions.Item>
-                                                        <Descriptions.Item label="Description">
-                                                            <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                                                                {todoData.description || (
-                                                                    <Text type="secondary" italic>No description. Click Edit to add a note.</Text>
-                                                                )}
-                                                            </Paragraph>
-                                                        </Descriptions.Item>
-                                                        <Descriptions.Item label="Created By">
-                                                            <Space>
-                                                                <UserOutlined />
-                                                                <Text>
-                                                                    {todoData.creator?.full_name || todoData.creator?.email || 'Unknown'}
-                                                                </Text>
-                                                            </Space>
-                                                        </Descriptions.Item>
-                                                        <Descriptions.Item label="Due Date">
-                                                            {todoData.due_date ? (
-                                                                <Space>
-                                                                    <ClockCircleOutlined />
-                                                                    <DateDisplay date={todoData.due_date} />
-                                                                </Space>
-                                                            ) : (
-                                                                <Text type="secondary">No due date</Text>
-                                                            )}
-                                                        </Descriptions.Item>
-                                                        <Descriptions.Item label="Created At">
-                                                            <Space>
-                                                                <ClockCircleOutlined />
-                                                                <DateDisplay date={todoData.created_at} />
-                                                            </Space>
-                                                        </Descriptions.Item>
-                                                        <Descriptions.Item label="Updated At">
-                                                            <Space>
-                                                                <ClockCircleOutlined />
-                                                                <DateDisplay date={todoData.updated_at} />
-                                                            </Space>
-                                                        </Descriptions.Item>
-                                                        <Descriptions.Item label="Total Time Tracked">
-                                                            <Space>
-                                                                <ClockCircleOutlined />
-                                                                <Text strong>{formatTime(totalTimeSeconds + (activeTimeTracker ? currentTime : 0))}</Text>
-                                                            </Space>
-                                                        </Descriptions.Item>
-                                                    </Descriptions>
-                                                </Col>
-                                            </Row>
-
-                                            <Row gutter={[24, 24]}>
-                                                <Col xs={24}>
-                                                    <Card
-                                                        title={
-                                                            <Space>
-                                                                <ClockCircleOutlined />
-                                                                <Text strong>Time Tracker</Text>
-                                                            </Space>
-                                                        }
-                                                        size="small"
-                                                    >
-                                                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                                                            <Space>
-                                                                {activeTimeTracker ? (
-                                                                    <>
-                                                                        <Button
-                                                                            type="primary"
-                                                                            danger
-                                                                            icon={<StopOutlined />}
-                                                                            onClick={handleStopTimeTracker}
-                                                                            loading={loading}
-                                                                        >
-                                                                            Stop
-                                                                        </Button>
-                                                                        <Text strong style={{ fontSize: 18 }}>
-                                                                            {formatTime(currentTime)}
-                                                                        </Text>
-                                                                        <Text type="secondary">(running)</Text>
-                                                                    </>
-                                                                ) : (
-                                                                    <Button
-                                                                        type="primary"
-                                                                        icon={<PlayCircleOutlined />}
-                                                                        onClick={handleStartTimeTracker}
-                                                                        loading={loading}
-                                                                    >
-                                                                        Start Timer
-                                                                    </Button>
-                                                                )}
-                                                            </Space>
-
-                                                            {timeTrackerSessions.length > 0 ? (
-                                                                <List
-                                                                    dataSource={timeTrackerSessions}
-                                                                    renderItem={(session: any) => (
-                                                                        <List.Item>
-                                                                            <List.Item.Meta
-                                                                                avatar={<Avatar icon={<UserOutlined />} />}
-                                                                                title={
-                                                                                    <Space>
-                                                                                        <Text strong>
-                                                                                            {session.user?.full_name || session.user?.email || 'Unknown'}
-                                                                                        </Text>
-                                                                                        {!session.stop_time && (
-                                                                                            <Tag color="processing">Active</Tag>
-                                                                                        )}
-                                                                                    </Space>
-                                                                                }
-                                                                                description={
-                                                                                    <Space direction="vertical" size={4}>
-                                                                                        <Text type="secondary" style={{ fontSize: 12 }}>
-                                                                                            Started: <DateDisplay date={session.start_time} />
-                                                                                        </Text>
-                                                                                        {session.stop_time && (
-                                                                                            <>
-                                                                                                <Text type="secondary" style={{ fontSize: 12 }}>
-                                                                                                    Stopped: <DateDisplay date={session.stop_time} />
-                                                                                                </Text>
-                                                                                                <Text strong>
-                                                                                                    Duration: {formatTime(session.duration_seconds || 0)}
-                                                                                                </Text>
-                                                                                            </>
-                                                                                        )}
-                                                                                    </Space>
-                                                                                }
-                                                                            />
-                                                                        </List.Item>
-                                                                    )}
-                                                                />
-                                                            ) : (
-                                                                <Empty description="No time tracking sessions" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                                                            )}
-                                                        </Space>
-                                                    </Card>
-                                                </Col>
-                                            </Row>
-
-                                            <Row gutter={[24, 24]}>
-                                                <Col xs={24}>
-                                                    <Card
-                                                        title={
-                                                            <Space>
-                                                                <CheckCircleOutlined />
-                                                                <Text strong>Checklist</Text>
-                                                                {totalChecklistCount > 0 && (
-                                                                    <Text type="secondary">
-                                                                        ({completedChecklistCount}/{totalChecklistCount})
-                                                                    </Text>
-                                                                )}
-                                                            </Space>
-                                                        }
-                                                        size="small"
-                                                    >
-                                                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                                                            {checklistItems.length > 0 ? (
-                                                                <List
-                                                                    dataSource={checklistItems}
-                                                                    renderItem={(item) => (
-                                                                        <List.Item
-                                                                            style={{
-                                                                                padding: '8px 0',
-                                                                                textDecoration: item.is_completed ? 'line-through' : 'none',
-                                                                                opacity: item.is_completed ? 0.6 : 1,
-                                                                            }}
-                                                                        >
-                                                                            <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                                                                                <Checkbox
-                                                                                    checked={item.is_completed}
-                                                                                    onChange={() => handleToggleChecklistItem(item.id, item.is_completed)}
-                                                                                >
-                                                                                    <Text>{item.title}</Text>
-                                                                                </Checkbox>
-                                                                                <Popconfirm
-                                                                                    title="Delete checklist item"
-                                                                                    description="Are you sure?"
-                                                                                    onConfirm={() => handleDeleteChecklistItem(item.id)}
-                                                                                    okText="Yes"
-                                                                                    cancelText="No"
-                                                                                >
-                                                                                    <Button
-                                                                                        danger
-                                                                                        icon={<DeleteOutlined />}
-                                                                                        size="middle"
-                                                                                    />
-                                                                                </Popconfirm>
-                                                                            </Space>
-                                                                        </List.Item>
-                                                                    )}
-                                                                />
-                                                            ) : (
-                                                                <Empty description="No checklist items" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                                                            )}
-                                                            <Space.Compact style={{ width: '100%' }}>
-                                                                <Input
-                                                                    placeholder="Add checklist item..."
-                                                                    value={newChecklistTitle}
-                                                                    onChange={(e) => setNewChecklistTitle(e.target.value)}
-                                                                    onPressEnter={handleAddChecklistItem}
-                                                                />
-                                                                <Button
-                                                                    type="primary"
-                                                                    icon={<PlusOutlined />}
-                                                                    onClick={handleAddChecklistItem}
-                                                                    loading={loading}
-                                                                >
-                                                                    Add
-                                                                </Button>
-                                                            </Space.Compact>
-                                                        </Space>
-                                                    </Card>
-                                                </Col>
-                                            </Row>
-
-                                            <Row gutter={[24, 24]}>
-                                                <Col xs={24}>
-                                                    <Card
-                                                        title={
-                                                            <Space>
-                                                                <CommentOutlined />
-                                                                <Text strong>Comments ({comments.length})</Text>
-                                                            </Space>
-                                                        }
-                                                        size="small"
-                                                    >
-                                                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                                                            {comments.length > 0 ? (
-                                                                <List
-                                                                    dataSource={comments}
-                                                                    renderItem={(comment) => (
-                                                                        <List.Item>
-                                                                            <List.Item.Meta
-                                                                                avatar={<Avatar icon={<UserOutlined />} />}
-                                                                                title={
-                                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                                                                        <Space>
-                                                                                            <Text strong>
-                                                                                                {comment.user?.full_name || comment.user?.email || 'Unknown'}
-                                                                                            </Text>
-                                                                                            <Text type="secondary" style={{ fontSize: 12 }}>
-                                                                                                <DateDisplay date={comment.created_at} />
-                                                                                            </Text>
-                                                                                        </Space>
-                                                                                        {comment.user_id === currentUser.id && !editingComment && (
-                                                                                            <Space>
-                                                                                                <Button
-                                                                                                    // type="text"
-                                                                                                    icon={<EditOutlined />}
-                                                                                                    size="middle"
-                                                                                                    onClick={() => {
-                                                                                                        setEditingComment(comment.id)
-                                                                                                        setEditingCommentValue(comment.comment)
-                                                                                                    }}
-                                                                                                >
-                                                                                                </Button>
-                                                                                                {canDeleteComment(comment.created_at) && (
-                                                                                                    <Popconfirm
-                                                                                                        title="Delete comment"
-                                                                                                        description="Are you sure?"
-                                                                                                        onConfirm={() => handleDeleteComment(comment.id)}
-                                                                                                        okText="Yes"
-                                                                                                        cancelText="No"
-                                                                                                    >
-                                                                                                        <Button
-                                                                                                            // type="text"
-                                                                                                            danger
-                                                                                                            icon={<DeleteOutlined />}
-                                                                                                            size="middle"
-                                                                                                        />
-                                                                                                    </Popconfirm>
-                                                                                                )}
-                                                                                            </Space>
-                                                                                        )}
-                                                                                    </div>
-                                                                                }
-                                                                                description={
-                                                                                    <Space direction="vertical" style={{ width: '100%' }} size="small">
-                                                                                        {editingComment === comment.id ? (
-                                                                                            <Space direction="vertical" style={{ width: '100%' }} size="small">
-                                                                                                <TextArea
-                                                                                                    value={editingCommentValue}
-                                                                                                    onChange={(e) => setEditingCommentValue(e.target.value)}
-                                                                                                    rows={3}
-                                                                                                    style={{ resize: 'none' }}
-                                                                                                />
-                                                                                                <Space>
-                                                                                                    <Button
-                                                                                                        type="primary"
-                                                                                                        size="small"
-                                                                                                        onClick={() => handleUpdateComment(comment.id)}
-                                                                                                        loading={loading}
-                                                                                                    >
-                                                                                                        Save
-                                                                                                    </Button>
-                                                                                                    <Button
-                                                                                                        size="small"
-                                                                                                        onClick={() => {
-                                                                                                            setEditingComment(null)
-                                                                                                            setEditingCommentValue('')
-                                                                                                        }}
-                                                                                                    >
-                                                                                                        Cancel
-                                                                                                    </Button>
-                                                                                                </Space>
-                                                                                            </Space>
-                                                                                        ) : (
-                                                                                            <Paragraph style={{ margin: 0 }}>{comment.comment}</Paragraph>
-                                                                                        )}
-                                                                                    </Space>
-                                                                                }
-                                                                            />
-                                                                        </List.Item>
-                                                                    )}
-                                                                />
-                                                            ) : (
-                                                                <Empty description="No comments" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                                                            )}
-                                                            <Space.Compact style={{ width: '100%' }}>
-                                                                <TextArea
-                                                                    placeholder="Add a comment..."
-                                                                    value={newComment}
-                                                                    onChange={(e) => setNewComment(e.target.value)}
-                                                                    rows={3}
-                                                                    style={{ resize: 'none' }}
-                                                                />
-                                                            </Space.Compact>
-                                                            <Button
-                                                                type="primary"
-                                                                icon={<PlusOutlined />}
-                                                                onClick={handleAddComment}
-                                                                loading={loading}
-                                                            >
-                                                                Add Comment
-                                                            </Button>
-                                                        </Space>
-                                                    </Card>
-                                                </Col>
-                                            </Row>
-                                        </Space>
+                                        <TabGeneral
+                                            todoData={todoData}
+                                            getStatusColor={getStatusColor}
+                                            getStatusLabel={getStatusLabel}
+                                            totalTimeSeconds={totalTimeSeconds}
+                                            activeTimeTracker={activeTimeTracker}
+                                            currentTime={currentTime}
+                                            formatTime={formatTime}
+                                            checklistItems={checklistItems}
+                                            totalChecklistCount={totalChecklistCount}
+                                            completedChecklistCount={completedChecklistCount}
+                                            newChecklistTitle={newChecklistTitle}
+                                            onNewChecklistTitleChange={setNewChecklistTitle}
+                                            onAddChecklistItem={handleAddChecklistItem}
+                                            onToggleChecklistItem={handleToggleChecklistItem}
+                                            onDeleteChecklistItem={handleDeleteChecklistItem}
+                                            comments={comments}
+                                            currentUserId={currentUser.id}
+                                            editingComment={editingComment}
+                                            editingCommentValue={editingCommentValue}
+                                            onEditComment={(id, value) => {
+                                                setEditingComment(id)
+                                                setEditingCommentValue(value)
+                                            }}
+                                            onEditingCommentValueChange={setEditingCommentValue}
+                                            onSaveEditComment={handleUpdateComment}
+                                            onCancelEditComment={() => {
+                                                setEditingComment(null)
+                                                setEditingCommentValue('')
+                                            }}
+                                            onDeleteComment={handleDeleteComment}
+                                            canDeleteComment={canDeleteComment}
+                                            newComment={newComment}
+                                            onNewCommentChange={setNewComment}
+                                            onAddComment={handleAddComment}
+                                            attributes={attributes}
+                                            newAttributeKey={newAttributeKey}
+                                            newAttributeValue={newAttributeValue}
+                                            onNewAttributeKeyChange={setNewAttributeKey}
+                                            onNewAttributeValueChange={setNewAttributeValue}
+                                            onAddAttribute={handleAddAttribute}
+                                            editingAttribute={editingAttribute}
+                                            onEditingAttributeChange={setEditingAttribute}
+                                            onUpdateAttribute={handleUpdateAttribute}
+                                            onDeleteAttribute={handleDeleteAttribute}
+                                            attributesLoading={loading}
+                                        />
                                     ),
                                 },
                                 {
                                     key: 'assignees',
                                     label: 'Assignees',
                                     children: (
-                                        <Card title="Assignees" size="small" loading={loadingTeamMembers}>
-                                            {todoData.visibility === 'private' ? (
-                                                <Empty description="No Assignees this private todo" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                                            ) : todoData.visibility === 'team' && todoData.team_id ? (
-                                                teamMembers.length > 0 ? (
-                                                    <List
-                                                        dataSource={teamMembers}
-                                                        renderItem={(member: any) => (
-                                                            <List.Item>
-                                                                <Space>
-                                                                    <Avatar icon={<UserOutlined />} />
-                                                                    <Text>
-                                                                        {member.user?.full_name || member.user?.email || 'Unknown'}
-                                                                    </Text>
-                                                                    {member.role && (
-                                                                        <Tag color={member.role === 'manager' ? 'blue' : 'default'} style={{ fontSize: 11 }}>
-                                                                            {member.role}
-                                                                        </Tag>
-                                                                    )}
-                                                                </Space>
-                                                            </List.Item>
-                                                        )}
-                                                    />
-                                                ) : (
-                                                    <Empty description="No team members" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                                                )
-                                            ) : (
-                                                todoData.assignees && todoData.assignees.length > 0 ? (
-                                                    <List
-                                                        dataSource={todoData.assignees}
-                                                        renderItem={(assignee: any) => (
-                                                            <List.Item>
-                                                                <Space>
-                                                                    <Avatar icon={<UserOutlined />} />
-                                                                    <Text>
-                                                                        {assignee.user?.full_name || assignee.user?.email || 'Unknown'}
-                                                                    </Text>
-                                                                </Space>
-                                                            </List.Item>
-                                                        )}
-                                                    />
-                                                ) : (
-                                                    <Empty description="No assignees" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                                                )
-                                            )}
-                                        </Card>
-                                    ),
-                                },
-                                {
-                                    key: 'attributes',
-                                    label: 'Additional Information',
-                                    children: (
-                                        // <Card
-                                        //   title={
-                                        //     <Space>
-                                        //       <FileTextOutlined />
-                                        //       <Text strong>Attributes ({attributes.length})</Text>
-                                        //     </Space>
-                                        //   }
-                                        //   size="small"
-                                        // >
-
-
-                                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                                            <Row gutter={[16, 16]} align="bottom">
-                                                <Col xs={24} sm={10}>
-                                                    <div>
-                                                        <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                                                            Key <Text type="danger">*</Text>
-                                                        </Text>
-                                                        <Input
-                                                            placeholder="Key"
-                                                            value={newAttributeKey}
-                                                            onChange={(e) => setNewAttributeKey(e.target.value)}
-                                                            onPressEnter={handleAddAttribute}
-                                                        />
-                                                    </div>
-                                                </Col>
-                                                <Col xs={24} sm={10}>
-                                                    <div>
-                                                        <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                                                            Value <Text type="danger">*</Text>
-                                                        </Text>
-                                                        <Input
-                                                            placeholder="Value"
-                                                            value={newAttributeValue}
-                                                            onChange={(e) => setNewAttributeValue(e.target.value)}
-                                                            onPressEnter={handleAddAttribute}
-                                                        />
-                                                    </div>
-                                                </Col>
-                                                <Col xs={24} sm={4}>
-                                                    <Button
-                                                        type="primary"
-                                                        icon={<PlusOutlined />}
-                                                        onClick={handleAddAttribute}
-                                                        loading={loading}
-                                                        block
-                                                        style={{ height: 32 }}
-                                                    >
-                                                        Add
-                                                    </Button>
-                                                </Col>
-                                            </Row>
-
-                                            {attributes.length > 0 ? (
-                                                <Descriptions column={1} bordered style={{ marginTop: 16 }}>
-                                                    {attributes.map((attr) => (
-                                                        <Descriptions.Item
-                                                            key={attr.id}
-                                                            label={
-                                                                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                                                                    <Text strong>{attr.meta_key}</Text>
-                                                                    <Space>
-                                                                        {editingAttribute === attr.id ? (
-                                                                            <Button
-                                                                                type="text"
-                                                                                size="small"
-                                                                                onClick={() => setEditingAttribute(null)}
-                                                                            >
-                                                                                Cancel
-                                                                            </Button>
-                                                                        ) : (
-                                                                            <>
-                                                                                <Button
-                                                                                    color="green"
-                                                                                    icon={<EditOutlined />}
-                                                                                    size="middle"
-                                                                                    onClick={() => setEditingAttribute(attr.id)}
-                                                                                />
-                                                                                <Popconfirm
-                                                                                    title="Delete attribute"
-                                                                                    description="Are you sure?"
-                                                                                    onConfirm={() => handleDeleteAttribute(attr.id)}
-                                                                                    okText="Yes"
-                                                                                    cancelText="No"
-                                                                                >
-                                                                                   <Button
-                                                                                        danger
-                                                                                        icon={<DeleteOutlined />}
-                                                                                        size="middle"
-                                                                                    />
-                                                                                </Popconfirm>
-                                                                            </>
-                                                                        )}
-                                                                    </Space>
-                                                                </Space>
-                                                            }
-                                                        >
-                                                            {editingAttribute === attr.id ? (
-                                                                <Space.Compact style={{ width: '100%' }}>
-                                                                    <Input
-                                                                        defaultValue={attr.meta_value || ''}
-                                                                        onPressEnter={(e) => {
-                                                                            handleUpdateAttribute(attr.id, e.currentTarget.value)
-                                                                        }}
-                                                                        onBlur={(e) => {
-                                                                            handleUpdateAttribute(attr.id, e.target.value)
-                                                                        }}
-                                                                        autoFocus
-                                                                        style={{ width: '100%' }}
-                                                                    />
-                                                                </Space.Compact>
-                                                            ) : (
-                                                                <Text>{attr.meta_value || <Text type="secondary">(empty)</Text>}</Text>
-                                                            )}
-                                                        </Descriptions.Item>
-                                                    ))}
-                                                </Descriptions>
-                                            ) : (
-                                                <Empty description="No attributes" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                                            )}
-
-                                        </Space>
-                                        // </Card>
+                                        <TabAssignees
+                                            todoData={todoData}
+                                            teamMembers={teamMembers}
+                                            loading={loadingTeamMembers}
+                                            totalTimeSeconds={totalTimeSeconds}
+                                            activeTimeTracker={activeTimeTracker}
+                                            currentTime={currentTime}
+                                            formatTime={formatTime}
+                                            timeTrackerSessions={timeTrackerSessions}
+                                            timeTrackerLoading={loading}
+                                            onStartTimeTracker={handleStartTimeTracker}
+                                            onStopTimeTracker={handleStopTimeTracker}
+                                        />
                                     ),
                                 },
                                 {
                                     key: 'screenshots',
                                     label: `Screenshots (${initialScreenshots.length})`,
-                                    children: (
-                                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                                            {initialScreenshots.length > 0 ? (
-                                                <Row gutter={[16, 16]}>
-                                                    {initialScreenshots.map((screenshot) => (
-                                                        <Col xs={24} sm={12} md={8} lg={6} key={screenshot.id}>
-                                                            <Card
-                                                                hoverable
-                                                                cover={
-                                                                    <div style={{ height: 150, overflow: 'hidden', background: '#f5f5f5' }}>
-                                                                        <img
-                                                                            src={screenshot.file_url}
-                                                                            alt={screenshot.title || screenshot.file_name}
-                                                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                                        />
-                                                                    </div>
-                                                                }
-                                                                actions={[
-                                                                    <Button
-                                                                        type="text"
-                                                                        icon={<LinkOutlined />}
-                                                                        onClick={() => window.open(screenshot.file_url, '_blank')}
-                                                                    />,
-                                                                    <Button
-                                                                        type="text"
-                                                                        icon={<CopyOutlined />}
-                                                                        onClick={() => {
-                                                                            navigator.clipboard.writeText(screenshot.file_url)
-                                                                            message.success('URL copied!')
-                                                                        }}
-                                                                    />,
-                                                                ]}
-                                                            >
-                                                                <Card.Meta
-                                                                    title={
-                                                                        <Text ellipsis style={{ fontSize: 12 }}>
-                                                                            {screenshot.title || screenshot.file_name}
-                                                                        </Text>
-                                                                    }
-                                                                    description={
-                                                                        <Text type="secondary" style={{ fontSize: 11 }}>
-                                                                            {dayjs(screenshot.created_at).format('YYYY-MM-DD HH:mm')}
-                                                                        </Text>
-                                                                    }
-                                                                />
-                                                            </Card>
-                                                        </Col>
-                                                    ))}
-                                                </Row>
-                                            ) : (
-                                                <Empty 
-                                                    description="No screenshots linked to this todo" 
-                                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                                />
-                                            )}
-                                        </Space>
-                                    ),
+                                    children: <TabScreenshots screenshots={initialScreenshots} />,
                                 },
                             ]}
                         />
@@ -1425,6 +985,7 @@ export default function TodoDetailContent({
                             setEditModalVisible(false)
                             form.resetFields()
                             setSelectedAssignees([])
+                            setSelectedTagIds(initialTags.map((t) => t.id))
                         }}
                         footer={null}
                         width={700}
@@ -1447,6 +1008,54 @@ export default function TodoDetailContent({
                                     {allStatusesForSelect.map((s) => (
                                         <Option key={s.slug} value={s.slug}>
                                             {s.title}
+                                        </Option>
+                                    ))}
+                                </Select>
+                            </Form.Item>
+
+                            <Form.Item name="type_id" label="Type">
+                                <Select placeholder="Select type" allowClear>
+                                    {ticketTypes.map((t) => (
+                                        <Option key={t.id} value={t.id}>
+                                            <Space>
+                                                <span
+                                                    style={{
+                                                        display: 'inline-block',
+                                                        width: 12,
+                                                        height: 12,
+                                                        borderRadius: 2,
+                                                        backgroundColor: t.color,
+                                                    }}
+                                                />
+                                                {t.title}
+                                            </Space>
+                                        </Option>
+                                    ))}
+                                </Select>
+                            </Form.Item>
+
+                            <Form.Item name="company_id" label="Company">
+                                <Select placeholder="Select company" allowClear>
+                                    {companies.map((c) => (
+                                        <Option key={c.id} value={c.id}>
+                                            {c.name}
+                                        </Option>
+                                    ))}
+                                </Select>
+                            </Form.Item>
+
+                            <Form.Item label="Tags">
+                                <Select
+                                    mode="multiple"
+                                    placeholder="Select tags"
+                                    value={selectedTagIds}
+                                    onChange={setSelectedTagIds}
+                                    optionLabelProp="label"
+                                    allowClear
+                                >
+                                    {allTags.map((t) => (
+                                        <Option key={t.id} value={t.id} label={t.name}>
+                                            {t.name}
                                         </Option>
                                     ))}
                                 </Select>
@@ -1546,6 +1155,7 @@ export default function TodoDetailContent({
                                             setEditModalVisible(false)
                                             form.resetFields()
                                             setSelectedAssignees([])
+                                            setSelectedTagIds(initialTags.map((t) => t.id))
                                         }}
                                     >
                                         Cancel

@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import TodoStatusesContent from '@/components/TodoStatusesContent'
 
-export default async function TodoStatusesPage() {
+export default async function TicketStatusesPage() {
   const cookieStore = await cookies()
   const supabase = createClient(cookieStore)
 

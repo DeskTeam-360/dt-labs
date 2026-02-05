@@ -21,8 +21,44 @@ interface CompanyRecord {
   id: string
   name: string
   is_active: boolean
+  color: string
   created_at: string
   updated_at: string
+}
+
+function ColorPickerWithInput({
+  value,
+  onChange,
+  ...rest
+}: {
+  value?: string
+  onChange?: (v: string) => void
+} & React.ComponentProps<typeof Input>) {
+  const hex = value && /^#[0-9A-Fa-f]{6}$/.test(value) ? value : '#000000'
+  return (
+    <Space align="center" style={{ width: '100%' }}>
+      <input
+        type="color"
+        value={hex}
+        onChange={(e) => onChange?.(e.target.value)}
+        style={{
+          width: 40,
+          height: 32,
+          padding: 2,
+          cursor: 'pointer',
+          border: '1px solid #d9d9d9',
+          borderRadius: 6,
+        }}
+      />
+      <Input
+        value={value || ''}
+        onChange={(e) => onChange?.(e.target.value)}
+        placeholder="#000000"
+        style={{ width: 120 }}
+        {...rest}
+      />
+    </Space>
+  )
 }
 
 export default function CompaniesContent({ user: currentUser }: CompaniesContentProps) {
@@ -62,6 +98,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
     form.resetFields()
     form.setFieldsValue({
       is_active: true,
+      color: '#000000',
     })
     setModalVisible(true)
   }
@@ -71,6 +108,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
     form.setFieldsValue({
       name: record.name,
       is_active: record.is_active,
+      color: record.color || '#000000',
     })
     setModalVisible(true)
   }
@@ -100,6 +138,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
           .update({
             name: values.name,
             is_active: values.is_active,
+            color: values.color || '#000000',
           })
           .eq('id', editingCompany.id)
 
@@ -116,6 +155,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
           .insert({
             name: values.name,
             is_active: values.is_active,
+            color: values.color || '#000000',
           })
 
         if (error) throw error
@@ -145,6 +185,26 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
         <Tag color={is_active ? 'green' : 'default'}>
           {is_active ? 'ACTIVE' : 'INACTIVE'}
         </Tag>
+      ),
+    },
+    {
+      title: 'Color',
+      dataIndex: 'color',
+      key: 'color',
+      width: 120,
+      render: (color: string) => (
+        <Space>
+          <div
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 4,
+              backgroundColor: color || '#000000',
+              border: '1px solid #d9d9d9',
+            }}
+          />
+          <Typography.Text type="secondary">{color || '#000000'}</Typography.Text>
+        </Space>
       ),
     },
     {
@@ -255,6 +315,10 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 valuePropName="checked"
               >
                 <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+              </Form.Item>
+
+              <Form.Item name="color" label="Color (hex)" initialValue="#000000">
+                <ColorPickerWithInput />
               </Form.Item>
 
               <Form.Item>

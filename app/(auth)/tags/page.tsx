@@ -1,9 +1,9 @@
 import { createClient } from '@/utils/supabase/server'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import TodosContent from '@/components/TodosContent'
+import TagsContent from '@/components/TagsContent'
 
-export default async function TodosPage() {
+export default async function TagsPage() {
   const cookieStore = await cookies()
   const supabase = createClient(cookieStore)
 
@@ -15,5 +15,5 @@ export default async function TodosPage() {
     redirect('/login')
   }
 
-  return <TodosContent user={user} />
+  return <TagsContent user={user} />
 }
