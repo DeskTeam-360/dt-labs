@@ -10,8 +10,6 @@ import {
   Modal,
   Form,
   Input,
-  InputNumber,
-  Switch,
   message,
   Popconfirm,
 } from 'antd'
@@ -25,23 +23,21 @@ import type { ColumnsType } from 'antd/es/table'
 const { Content } = Layout
 const { Title } = Typography
 
-interface TodoStatusesContentProps {
+interface TagsContentProps {
   user: User
 }
 
-interface TodoStatusRecord {
-  id: number
+interface TagRecord {
+  id: string
+  name: string
   slug: string
-  title: string
   color: string
-  show_in_kanban: boolean
-  sort_order: number
   created_at: string
   updated_at: string
 }
 
-function slugFromTitle(title: string): string {
-  return title
+function slugFromName(name: string): string {
+  return name
     .toLowerCase()
     .trim()
     .replace(/\s+/g, '_')
@@ -56,7 +52,7 @@ function ColorPickerWithInput({
   value?: string
   onChange?: (v: string) => void
 } & React.ComponentProps<typeof Input>) {
-  const hex = value && /^#[0-9A-Fa-f]{6}$/.test(value) ? value : '#1890ff'
+  const hex = value && /^#[0-9A-Fa-f]{6}$/.test(value) ? value : '#000000'
   return (
     <Space align="center" style={{ width: '100%' }}>
       <input
@@ -75,7 +71,7 @@ function ColorPickerWithInput({
       <Input
         value={value || ''}
         onChange={(e) => onChange?.(e.target.value)}
-        placeholder="#1890ff"
+        placeholder="#000000"
         style={{ width: 120 }}
         {...rest}
       />
@@ -83,122 +79,104 @@ function ColorPickerWithInput({
   )
 }
 
-export default function TodoStatusesContent({ user: currentUser }: TodoStatusesContentProps) {
+export default function TagsContent({ user: currentUser }: TagsContentProps) {
   const [collapsed, setCollapsed] = useState(false)
-  const [statuses, setStatuses] = useState<TodoStatusRecord[]>([])
+  const [tags, setTags] = useState<TagRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
-  const [editingStatus, setEditingStatus] = useState<TodoStatusRecord | null>(null)
+  const [editingTag, setEditingTag] = useState<TagRecord | null>(null)
   const [form] = Form.useForm()
   const supabase = createClient()
 
-  const fetchStatuses = async () => {
+  const fetchTags = async () => {
     setLoading(true)
     try {
       const { data, error } = await supabase
-        .from('todo_statuses')
+        .from('tags')
         .select('*')
-        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true })
 
       if (error) throw error
-      setStatuses((data || []) as TodoStatusRecord[])
+      setTags((data || []) as TagRecord[])
     } catch (error: any) {
-      message.error(error.message || 'Failed to fetch statuses')
+      message.error(error.message || 'Failed to fetch tags')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchStatuses()
+    fetchTags()
   }, [])
 
   const handleCreate = () => {
-    setEditingStatus(null)
+    setEditingTag(null)
     form.resetFields()
-    form.setFieldsValue({
-      show_in_kanban: true,
-      sort_order: (statuses.length > 0 ? Math.max(...statuses.map((s) => s.sort_order)) : 0) + 1,
-    })
+    form.setFieldsValue({ color: '#000000' })
     setModalVisible(true)
   }
 
-  const handleEdit = (record: TodoStatusRecord) => {
-    setEditingStatus(record)
+  const handleEdit = (record: TagRecord) => {
+    setEditingTag(record)
     form.setFieldsValue({
-      title: record.title,
+      name: record.name,
       slug: record.slug,
-      color: record.color,
-      show_in_kanban: record.show_in_kanban,
-      sort_order: record.sort_order,
+      color: record.color || '#000000',
     })
     setModalVisible(true)
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from('todo_statuses').delete().eq('id', id)
-
+      const { error } = await supabase.from('tags').delete().eq('id', id)
       if (error) throw error
-      message.success('Status deleted')
-      fetchStatuses()
+      message.success('Tag deleted')
+      fetchTags()
     } catch (error: any) {
-      message.error(error.message || 'Failed to delete status')
+      message.error(error.message || 'Failed to delete tag')
     }
   }
 
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const title = e.target.value
-    if (!editingStatus && title) {
-      form.setFieldValue('slug', slugFromTitle(title))
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const name = e.target.value
+    if (!editingTag && name) {
+      form.setFieldValue('slug', slugFromName(name))
     }
   }
 
   const handleSubmit = async (values: any) => {
     try {
       const payload = {
-        title: values.title.trim(),
+        name: values.name.trim(),
         slug: values.slug.trim().toLowerCase().replace(/\s+/g, '_'),
-        color: values.color || '#8c8c8c',
-        show_in_kanban: !!values.show_in_kanban,
-        sort_order: Number(values.sort_order) ?? 0,
+        color: values.color || '#000000',
       }
 
-      if (editingStatus) {
+      if (editingTag) {
         const { error } = await supabase
-          .from('todo_statuses')
+          .from('tags')
           .update(payload)
-          .eq('id', editingStatus.id)
-
+          .eq('id', editingTag.id)
         if (error) throw error
-        message.success('Status updated')
+        message.success('Tag updated')
       } else {
-        const { error } = await supabase.from('todo_statuses').insert(payload)
-
+        const { error } = await supabase.from('tags').insert(payload)
         if (error) throw error
-        message.success('Status created')
+        message.success('Tag created')
       }
-
       setModalVisible(false)
       form.resetFields()
-      fetchStatuses()
+      fetchTags()
     } catch (error: any) {
-      message.error(error.message || 'Failed to save status')
+      message.error(error.message || 'Failed to save tag')
     }
   }
 
-  const columns: ColumnsType<TodoStatusRecord> = [
+  const columns: ColumnsType<TagRecord> = [
     {
-      title: 'Order',
-      dataIndex: 'sort_order',
-      key: 'sort_order',
-      width: 80,
-      sorter: (a, b) => a.sort_order - b.sort_order,
-    },
-    {
-      title: 'Title',
-      dataIndex: 'title',
-      key: 'title',
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
     },
     {
       title: 'Slug',
@@ -222,20 +200,13 @@ export default function TodoStatusesContent({ user: currentUser }: TodoStatusesC
               width: 24,
               height: 24,
               borderRadius: 4,
-              backgroundColor: color,
+              backgroundColor: color || '#000000',
               border: '1px solid #d9d9d9',
             }}
           />
-          <Typography.Text type="secondary">{color}</Typography.Text>
+          <Typography.Text type="secondary">{color || '#000000'}</Typography.Text>
         </Space>
       ),
-    },
-    {
-      title: 'Show in Kanban',
-      dataIndex: 'show_in_kanban',
-      key: 'show_in_kanban',
-      width: 120,
-      render: (v: boolean) => (v ? 'Yes' : 'No'),
     },
     {
       title: 'Actions',
@@ -247,8 +218,8 @@ export default function TodoStatusesContent({ user: currentUser }: TodoStatusesC
             Edit
           </Button>
           <Popconfirm
-            title="Delete this status?"
-            description="Tickets using this status will keep the value; consider reassigning them first."
+            title="Delete this tag?"
+            description="It will be removed from all tickets."
             onConfirm={() => handleDelete(record.id)}
             okText="Delete"
             okButtonProps={{ danger: true }}
@@ -270,23 +241,23 @@ export default function TodoStatusesContent({ user: currentUser }: TodoStatusesC
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <Title level={4} style={{ margin: 0 }}>
-                Ticket Statuses
+                Tags
               </Title>
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                Add Status
+                Add Tag
               </Button>
             </div>
             <Table
               rowKey="id"
               loading={loading}
               columns={columns}
-              dataSource={statuses}
+              dataSource={tags}
               pagination={false}
             />
           </Card>
 
           <Modal
-            title={editingStatus ? 'Edit Status' : 'Add Status'}
+            title={editingTag ? 'Edit Tag' : 'Add Tag'}
             open={modalVisible}
             onCancel={() => {
               setModalVisible(false)
@@ -297,35 +268,29 @@ export default function TodoStatusesContent({ user: currentUser }: TodoStatusesC
           >
             <Form form={form} layout="vertical" onFinish={handleSubmit}>
               <Form.Item
-                name="title"
-                label="Title"
+                name="name"
+                label="Name"
                 rules={[{ required: true, message: 'Required' }]}
               >
-                <Input placeholder="e.g. In Progress" onChange={handleTitleChange} />
+                <Input placeholder="e.g. urgent" onChange={handleNameChange} />
               </Form.Item>
               <Form.Item
                 name="slug"
-                label="Slug (unique, used in DB)"
+                label="Slug (unique)"
                 rules={[
                   { required: true, message: 'Required' },
                   { pattern: /^[a-z0-9_]+$/, message: 'Only lowercase letters, numbers, underscore' },
                 ]}
               >
-                <Input placeholder="e.g. in_progress" disabled={!!editingStatus} />
+                <Input placeholder="e.g. urgent" disabled={!!editingTag} />
               </Form.Item>
-              <Form.Item name="color" label="Color (hex)" initialValue="#1890ff">
+              <Form.Item name="color" label="Color (hex)" initialValue="#000000">
                 <ColorPickerWithInput />
-              </Form.Item>
-              <Form.Item name="show_in_kanban" label="Show in Kanban" valuePropName="checked">
-                <Switch />
-              </Form.Item>
-              <Form.Item name="sort_order" label="Sort order" rules={[{ required: true }]}>
-                <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
               <Form.Item>
                 <Space>
                   <Button type="primary" htmlType="submit">
-                    {editingStatus ? 'Update' : 'Create'}
+                    {editingTag ? 'Update' : 'Create'}
                   </Button>
                   <Button onClick={() => setModalVisible(false)}>Cancel</Button>
                 </Space>

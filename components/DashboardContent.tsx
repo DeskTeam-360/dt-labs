@@ -59,7 +59,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
           <Col xs={24} sm={12} lg={6}>
             <Card>
               <Statistic
-                title="Completed Todos"
+                title="Completed Tickets"
                 value={stats.completedTodos}
                 prefix={<CheckCircleOutlined />}
                 valueStyle={{ color: '#52c41a' }}
@@ -69,7 +69,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
           <Col xs={24} sm={12} lg={6}>
             <Card>
               <Statistic
-                title="Total Todos"
+                title="Total Tickets"
                 value={stats.totalTodos}
                 prefix={<FileTextOutlined />}
                 valueStyle={{ color: '#722ed1' }}

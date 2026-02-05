@@ -17,6 +17,8 @@ import {
   CheckSquareOutlined,
   PictureOutlined,
   RobotOutlined,
+  TagOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
@@ -40,8 +42,12 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
 
   // Set open keys after mount to avoid hydration mismatch
   useEffect(() => {
-    if (pathname && (pathname.startsWith('/company-data-templates') || pathname.startsWith('/company-content-templates') || pathname.startsWith('/company-ai-system-templates'))) {
-      setOpenKeys(['templates'])
+    if (pathname) {
+      if (pathname.startsWith('/company-data-templates') || pathname.startsWith('/company-content-templates') || pathname.startsWith('/company-ai-system-templates')) {
+        setOpenKeys(['templates'])
+      } else if (pathname.startsWith('/ticket-statuses') || pathname.startsWith('/ticket-types') || pathname.startsWith('/tags')) {
+        setOpenKeys(['ticket-attributes'])
+      }
     }
   }, [pathname])
 
@@ -71,14 +77,31 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       label: 'Companies',
     },
     {
-      key: '/todos',
+      key: '/tickets',
       icon: <CheckSquareOutlined />,
-      label: 'Todos',
+      label: 'Tickets',
     },
     {
-      key: '/todo-statuses',
+      key: 'ticket-attributes',
       icon: <SettingOutlined />,
-      label: 'Todo Statuses',
+      label: 'Ticket Attributes',
+      children: [
+        {
+          key: '/ticket-statuses',
+          icon: <SettingOutlined />,
+          label: 'Ticket Statuses',
+        },
+        {
+          key: '/ticket-types',
+          icon: <AppstoreOutlined />,
+          label: 'Ticket Types',
+        },
+        {
+          key: '/tags',
+          icon: <TagOutlined />,
+          label: 'Tags',
+        },
+      ],
     },
     {
       key: '/screenshots',

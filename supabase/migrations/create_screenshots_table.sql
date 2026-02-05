@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS screenshots (
   file_size BIGINT,
   mime_type VARCHAR(100),
   
-  -- Integration with projects/todos
+  -- Integration with projects/tickets
   todo_id UUID REFERENCES todos(id) ON DELETE SET NULL,
   project_id UUID, -- Can be added if you have projects table
   

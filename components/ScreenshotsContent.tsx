@@ -95,7 +95,7 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
         s.id === screenshotId ? { ...s, todo_id: todoId } : s
       ))
 
-      message.success('Screenshot linked to todo successfully')
+      message.success('Screenshot linked to ticket successfully')
     } catch (error: any) {
       message.error(error.message || 'Failed to link screenshot')
     } finally {
@@ -163,7 +163,7 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
                   <Text strong style={{ display: 'block', marginBottom: 8 }}>Filter by Todo:</Text>
                   <Select
                     style={{ width: '100%' }}
-                    placeholder="All todos"
+                    placeholder="All tickets"
                     allowClear
                     value={selectedTodo}
                     onChange={setSelectedTodo}
@@ -292,7 +292,7 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
                 <Text strong>Link to Todo:</Text>
                 <Select
                   style={{ width: '100%', marginTop: 8 }}
-                  placeholder="Select a todo"
+                  placeholder="Select a ticket"
                   value={selectedScreenshot.todo_id}
                   onChange={(todoId) => handleLinkToTodo(selectedScreenshot.id, todoId)}
                 >

@@ -13,12 +13,13 @@ import {
   Select,
   DatePicker,
   message,
-  Popconfirm,
   Tooltip,
   Avatar,
   Empty,
   Badge,
   Spin,
+  Dropdown,
+  Flex,
 } from 'antd'
 import {
   PlusOutlined,
@@ -30,6 +31,8 @@ import {
   UserOutlined,
   DragOutlined,
   EyeOutlined,
+  MoreOutlined,
+  FilterOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -74,10 +77,15 @@ interface TodoRecord {
   status: 'to_do' | 'in_progress' | 'completed' | 'cancel' | 'archived'
   visibility: 'private' | 'team' | 'specific_users'
   team_id: string | null
+  type_id: number | null
+  company_id: string | null
   created_at: string
   updated_at: string
   creator_name?: string
   team_name?: string
+  type?: { id: number; title: string; slug: string; color: string } | null
+  company?: { id: string; name: string; color?: string } | null
+  tags?: Array<{ id: string; name: string; slug: string; color?: string }>
   assignees?: Array<{ id: string; user_id: string; user_name?: string }>
   checklist_items?: Array<any>
   checklist_completed?: number
@@ -157,70 +165,99 @@ function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (tod
           marginBottom: 12,
           cursor: 'grab',
           boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+          maxWidth: '300px',
+          width: '100%',
         }}
-        bodyStyle={{ padding: 12 }}
         {...listeners}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+        <Flex justify="space-between" align="center">
           <Text 
             strong 
             style={{ fontSize: 14, flex: 1, cursor: 'pointer' }}
             onClick={(e) => {
               e.stopPropagation()
-              router.push(`/todos/${todo.id}`)
+              router.push(`/tickets/${todo.id}`)
             }}
           >
             {todo.title} 
           </Text>
-          <Space>
-            <Tooltip title="View Details">
-              <Button
-                // type="text"
-                color="blue"
-                type="primary"
-                variant="outlined"
-                icon={<EyeOutlined />}
-                size="large"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  router.push(`/todos/${todo.id}`)
-                }}
-              />
-            </Tooltip>
-            
-            <Tooltip title="Edit">
-              <Button
-                // type="primary"
-                color="green"
-                icon={<EditOutlined />}
-                size="large"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onEdit(todo)
-                }}
-              />
-            </Tooltip>
-            <Popconfirm
-              title="Delete Todo"
-              description="Are you sure?"
-              onConfirm={(e) => {
-                e?.stopPropagation()
-                onDelete(todo.id)
-              }}
-              okText="Yes"
-              cancelText="No"
+          <Dropdown
+            menu={{
+              items: [
+                // {
+                //   key: 'view',
+                //   label: 'View Details',
+                //   icon: <EyeOutlined />,
+                //   onClick: () => router.push(`/tickets/${todo.id}`),
+                // },
+                {
+                  key: 'edit',
+                  label: 'Edit',
+                  icon: <EditOutlined />,
+                  onClick: () => onEdit(todo),
+                },
+                {
+                  key: 'delete',
+                  label: 'Delete',
+                  icon: <DeleteOutlined />,
+                  danger: true,
+                  onClick: () => {
+                    Modal.confirm({
+                      title: 'Delete Ticket',
+                      content: 'Are you sure?',
+                      okText: 'Yes',
+                      cancelText: 'No',
+                      onOk: () => onDelete(todo.id),
+                    })
+                  },
+                },
+              ],
+            }}
+            trigger={['click']}
+          >
+            <Button
+              type="text"
+              size="large"
+              icon={<MoreOutlined />}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </Dropdown>
+        </Flex>
+
+        <Flex gap={5} wrap="wrap" style={{ maxWidth: '100%', marginBottom: 8 }}>
+          {todo.visibility!=='team' && (
+          <Tag color={getVisibilityColor(todo.visibility)} style={{ fontSize: 11 }}>
+              {todo.visibility === 'specific_users' ? 'Specific Users' : todo.visibility.toUpperCase()}
+            </Tag>
+          )}
+          {todo.team_name && <Tag color="blue" style={{ fontSize: 11 }}>Team {todo.team_name}</Tag>}
+          {todo.type && (
+            <Tag color={todo.type.color} style={{ fontSize: 11 }}>
+              {todo.type.title}
+            </Tag>
+          )}
+          {todo.company && (
+            <Tag
+              color={todo.company.color ? undefined : 'cyan'}
+              style={{ fontSize: 11, ...(todo.company.color ? { backgroundColor: todo.company.color, borderColor: todo.company.color, color: '#fff' } : {}) }}
             >
-              <Button
-                // type="text"
-                danger
-                size="large"
-                icon={<DeleteOutlined />}
-                // size="small"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </Popconfirm>
-          </Space>
-        </div>
+              {todo.company.name}
+            </Tag>
+          )}
+          {todo.tags && todo.tags.length > 0 && (
+            <Flex gap={4} wrap="wrap">
+              {todo.tags.map((t) => (
+                <Tag
+                  key={t.id}
+                  color={t.color ? undefined : 'default'}
+                  style={{ fontSize: 11, ...(t.color ? { backgroundColor: t.color, borderColor: t.color, color: '#fff' } : {}) }}
+                >
+                  {t.name}
+                </Tag>
+              ))}
+            </Flex>
+          )}
+        </Flex>
 
         <div style={{ marginBottom: 8 }}>
           <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>
@@ -244,14 +281,7 @@ function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (tod
         ) : null}
 
 
-        <Space direction="vertical" size={4} style={{ width: '100%' }}>
-          {todo.visibility!=='team' && (
-          <Tag color={getVisibilityColor(todo.visibility)} style={{ fontSize: 11 }}>
-              {todo.visibility === 'specific_users' ? 'Specific Users' : todo.visibility.toUpperCase()}
-            </Tag>
-          )}
-          {todo.team_name && <Tag color="blue" style={{ fontSize: 11 }}>Team {todo.team_name}</Tag>}
-        </Space>
+        
 
         {todo.assignees && todo.assignees.length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -313,16 +343,16 @@ function KanbanColumn({
   // Filter todos by status
   let columnTodos = todos.filter((todo) => todo.status === column.id)
   
-  // For completed column, only show todos completed within last 7 days
-  if (column.id === 'completed') {
-    const sevenDaysAgo = dayjs().subtract(7, 'days')
-    columnTodos = columnTodos.filter((todo) => {
-      // Check if todo was updated to completed within last 7 days
-      // We'll use updated_at to determine when it was completed
-      const updatedDate = dayjs(todo.updated_at)
-      return updatedDate.isAfter(sevenDaysAgo)
-    })
-  }
+  // // For completed column, only show todos completed within last 7 days
+  // if (column.id === 'completed') {
+  //   const sevenDaysAgo = dayjs().subtract(7, 'days')
+  //   columnTodos = columnTodos.filter((todo) => {
+  //     // Check if todo was updated to completed within last 7 days
+  //     // We'll use updated_at to determine when it was completed
+  //     const updatedDate = dayjs(todo.updated_at)
+  //     return updatedDate.isAfter(sevenDaysAgo)
+  //   })
+  // }
   
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -390,10 +420,45 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
   const [teams, setTeams] = useState<Team[]>([])
   const [users, setUsers] = useState<UserRecord[]>([])
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [ticketTypes, setTicketTypes] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string; color?: string }>>([])
+  const [allTags, setAllTags] = useState<Array<{ id: string; name: string; slug: string; color?: string }>>([])
   const [activeId, setActiveId] = useState<number | null>(null)
   const [statusColumns, setStatusColumns] = useState<{ id: string; title: string; color: string }[]>(DEFAULT_KANBAN_COLUMNS)
   const [allStatuses, setAllStatuses] = useState<{ slug: string; title: string }[]>(DEFAULT_ALL_STATUSES)
+  const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined)
+  const [filterTypeId, setFilterTypeId] = useState<number | undefined>(undefined)
+  const [filterCompanyId, setFilterCompanyId] = useState<string | undefined>(undefined)
+  const [filterTagIds, setFilterTagIds] = useState<string[]>([])
+  const [filterSearch, setFilterSearch] = useState('')
   const supabase = createClient()
+
+  const filteredTodos = useMemo(() => {
+    return todos.filter((todo) => {
+      if (filterStatus != null && filterStatus !== '') {
+        if (todo.status !== filterStatus) return false
+      }
+      if (filterTypeId != null) {
+        if (todo.type_id !== filterTypeId) return false
+      }
+      if (filterCompanyId != null && filterCompanyId !== '') {
+        if (todo.company_id !== filterCompanyId) return false
+      }
+      if (filterTagIds.length > 0) {
+        const todoTagIds = (todo.tags || []).map((t) => t.id)
+        const hasMatch = filterTagIds.some((tagId) => todoTagIds.includes(tagId))
+        if (!hasMatch) return false
+      }
+      if (filterSearch.trim()) {
+        const q = filterSearch.trim().toLowerCase()
+        const matchTitle = todo.title?.toLowerCase().includes(q)
+        const matchDesc = todo.description?.toLowerCase().includes(q)
+        if (!matchTitle && !matchDesc) return false
+      }
+      return true
+    })
+  }, [todos, filterStatus, filterTypeId, filterCompanyId, filterTagIds, filterSearch])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -411,11 +476,27 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
         .select(`
           *,
           creator:users!todos_created_by_fkey(id, full_name, email),
-          team:teams(id, name)
+          team:teams(id, name),
+          type:ticket_types(id, title, slug, color),
+          company:companies(id, name)
         `)
         .order('created_at', { ascending: false })
 
       if (todosError) throw todosError
+
+      const ticketIds = (todosData || []).map((t: any) => t.id)
+      const { data: ticketTagsData } = ticketIds.length > 0
+        ? await supabase
+            .from('ticket_tags')
+            .select('ticket_id, tag_id, tags(id, name, slug, color)')
+            .in('ticket_id', ticketIds)
+        : { data: [] }
+      const tagsByTicketId: Record<number, Array<{ id: string; name: string; slug: string; color?: string }>> = {}
+      ;(ticketTagsData || []).forEach((row: any) => {
+        if (!row.tags) return
+        if (!tagsByTicketId[row.ticket_id]) tagsByTicketId[row.ticket_id] = []
+        tagsByTicketId[row.ticket_id].push(row.tags)
+      })
 
       const todosWithAssignees = await Promise.all(
         (todosData || []).map(async (todo: any) => {
@@ -439,6 +520,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
             ...todo,
             creator_name: todo.creator?.full_name || todo.creator?.email || 'Unknown',
             team_name: todo.team?.name || null,
+            tags: tagsByTicketId[todo.id] || [],
             assignees: (assigneesData || []).map((assignee: any) => ({
               id: assignee.id,
               user_id: assignee.user_id,
@@ -453,7 +535,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
 
       setTodos(todosWithAssignees as TodoRecord[])
     } catch (error: any) {
-      message.error(error.message || 'Failed to fetch todos')
+      message.error(error.message || 'Failed to fetch tickets')
     } finally {
       setLoading(false)
     }
@@ -487,6 +569,45 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
     }
   }
 
+  const fetchTicketTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ticket_types')
+        .select('id, title, slug, color')
+        .order('sort_order', { ascending: true })
+      if (error) throw error
+      setTicketTypes((data || []) as Array<{ id: number; title: string; slug: string; color: string }>)
+    } catch (e) {
+      console.error('Failed to fetch ticket types', e)
+    }
+  }
+
+  const fetchCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, color')
+        .order('name', { ascending: true })
+      if (error) throw error
+      setCompanies(data || [])
+    } catch (e) {
+      console.error('Failed to fetch companies', e)
+    }
+  }
+
+  const fetchTags = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tags')
+        .select('id, name, slug, color')
+        .order('name', { ascending: true })
+      if (error) throw error
+      setAllTags((data || []) as Array<{ id: string; name: string; slug: string; color?: string }>)
+    } catch (e) {
+      console.error('Failed to fetch tags', e)
+    }
+  }
+
   const fetchStatuses = async () => {
     try {
       const { data, error } = await supabase
@@ -512,6 +633,9 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
     fetchTeams()
     fetchUsers()
     fetchStatuses()
+    fetchTicketTypes()
+    fetchCompanies()
+    fetchTags()
   }, [])
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -553,9 +677,9 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
 
       if (error) throw error
 
-      message.success('Todo status updated successfully')
+      message.success('Ticket status updated successfully')
     } catch (error: any) {
-      message.error(error.message || 'Failed to update todo status')
+      message.error(error.message || 'Failed to update ticket status')
       // Revert optimistic update
       fetchTodos()
     }
@@ -564,6 +688,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
   const handleCreate = () => {
     setEditingTodo(null)
     setSelectedAssignees([])
+    setSelectedTagIds([])
     form.resetFields()
     form.setFieldsValue({
       status: allStatuses[0]?.slug ?? 'to_do',
@@ -575,12 +700,15 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
   const handleEdit = (record: TodoRecord) => {
     setEditingTodo(record)
     setSelectedAssignees(record.assignees?.map((a) => a.user_id) || [])
+    setSelectedTagIds(record.tags?.map((t) => t.id) || [])
     form.setFieldsValue({
       title: record.title,
       description: record.description || '',
       status: record.status,
       visibility: record.visibility,
       team_id: record.team_id,
+      type_id: record.type_id ?? undefined,
+      company_id: record.company_id ?? undefined,
       due_date: record.due_date ? dayjs(record.due_date) : null,
     })
     setModalVisible(true)
@@ -602,10 +730,10 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
 
       if (error) throw error
 
-      message.success('Todo deleted successfully')
+      message.success('Ticket deleted successfully')
       fetchTodos()
     } catch (error: any) {
-      message.error(error.message || 'Failed to delete todo')
+      message.error(error.message || 'Failed to delete ticket')
     }
   }
 
@@ -627,6 +755,8 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
         status: values.status,
         visibility: values.visibility,
         team_id: values.team_id || null,
+        type_id: values.type_id ?? null,
+        company_id: values.company_id ?? null,
         due_date: values.due_date ? values.due_date.toISOString() : null,
       }
 
@@ -663,7 +793,14 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
             .eq('todo_id', editingTodo.id)
         }
 
-        message.success('Todo updated successfully')
+        await supabase.from('ticket_tags').delete().eq('ticket_id', editingTodo.id)
+        if (selectedTagIds.length > 0) {
+          await supabase.from('ticket_tags').insert(
+            selectedTagIds.map((tagId) => ({ ticket_id: editingTodo.id, tag_id: tagId }))
+          )
+        }
+
+        message.success('Ticket updated successfully')
       } else {
         const { data: newTodo, error } = await supabase
           .from('tickets')
@@ -689,19 +826,40 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
           if (assigneesError) throw assigneesError
         }
 
-        message.success('Todo created successfully')
+        if (selectedTagIds.length > 0) {
+          await supabase.from('ticket_tags').insert(
+            selectedTagIds.map((tagId) => ({ ticket_id: newTodo.id, tag_id: tagId }))
+          )
+        }
+
+        message.success('Ticket created successfully')
       }
 
       setModalVisible(false)
       form.resetFields()
       setSelectedAssignees([])
+      setSelectedTagIds([])
       fetchTodos()
     } catch (error: any) {
       message.error(error.message || 'Failed to save todo')
     }
   }
 
-  const activeTodo = activeId ? todos.find((t) => t.id === activeId) : null
+  const activeTodo = activeId ? filteredTodos.find((t) => t.id === activeId) : null
+  const hasActiveFilters =
+    filterStatus != null ||
+    filterTypeId != null ||
+    filterCompanyId != null ||
+    filterTagIds.length > 0 ||
+    filterSearch.trim() !== ''
+
+  const clearFilters = () => {
+    setFilterStatus(undefined)
+    setFilterTypeId(undefined)
+    setFilterCompanyId(undefined)
+    setFilterTagIds([])
+    setFilterSearch('')
+  }
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -712,12 +870,101 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <Title level={2} style={{ margin: 0 }}>
-                My Tasks
+                My Tickets
               </Title>
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate} loading={loading}>
-                Add Todo
+                Add Ticket
               </Button>
             </div>
+
+            <Flex gap="middle" wrap="wrap" align="center" style={{ marginBottom: 16 }}>
+              <Space wrap align="center">
+                <FilterOutlined style={{ color: '#8c8c8c' }} />
+                {/* <Select
+                  placeholder="Status"
+                  allowClear
+                  style={{ minWidth: 140 }}
+                  value={filterStatus}
+                  onChange={setFilterStatus}
+                >
+                  {allStatuses.map((s) => (
+                    <Option key={s.slug} value={s.slug}>
+                      {s.title}
+                    </Option>
+                  ))}
+                </Select> */}
+                <Select
+                  placeholder="Type"
+                  allowClear
+                  style={{ minWidth: 140 }}
+                  value={filterTypeId}
+                  onChange={setFilterTypeId}
+                >
+                  {ticketTypes.map((t) => (
+                    <Option key={t.id} value={t.id}>
+                      <Space>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            width: 10,
+                            height: 10,
+                            borderRadius: 2,
+                            backgroundColor: t.color,
+                          }}
+                        />
+                        {t.title}
+                      </Space>
+                    </Option>
+                  ))}
+                </Select>
+                <Select
+                  placeholder="Company"
+                  allowClear
+                  style={{ minWidth: 160 }}
+                  value={filterCompanyId}
+                  onChange={setFilterCompanyId}
+                >
+                  {companies.map((c) => (
+                    <Option key={c.id} value={c.id}>
+                      {c.name}
+                    </Option>
+                  ))}
+                </Select>
+                <Select
+                  mode="multiple"
+                  placeholder="Tags"
+                  allowClear
+                  style={{ minWidth: 180 }}
+                  value={filterTagIds}
+                  onChange={setFilterTagIds}
+                  optionLabelProp="label"
+                  maxTagCount="responsive"
+                >
+                  {allTags.map((t) => (
+                    <Option key={t.id} value={t.id} label={t.name}>
+                      {t.name}
+                    </Option>
+                  ))}
+                </Select>
+                <Input
+                  placeholder="Search title or description..."
+                  allowClear
+                  value={filterSearch}
+                  onChange={(e) => setFilterSearch(e.target.value)}
+                  style={{ minWidth: 220 }}
+                />
+                {hasActiveFilters && (
+                  <Button type="link" size="small" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                )}
+              </Space>
+              {hasActiveFilters && (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Showing {filteredTodos.length} of {todos.length} tickets
+                </Text>
+              )}
+            </Flex>
 
             {loading ? (
               <div style={{ padding: 48, textAlign: 'center' }}>
@@ -744,7 +991,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
                   <KanbanColumn
                     key={column.id}
                     column={column}
-                    todos={todos}
+                    todos={filteredTodos}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                   />
@@ -770,12 +1017,13 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
           </Card>
 
           <Modal
-            title={editingTodo ? 'Edit Todo' : 'Create Todo'}
+            title={editingTodo ? 'Edit Ticket' : 'Create Ticket'}
             open={modalVisible}
             onCancel={() => {
               setModalVisible(false)
               form.resetFields()
               setSelectedAssignees([])
+              setSelectedTagIds([])
             }}
             footer={null}
             width={700}
@@ -784,13 +1032,13 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
               <Form.Item
                 name="title"
                 label="Title"
-                rules={[{ required: true, message: 'Please enter todo title!' }]}
+                rules={[{ required: true, message: 'Please enter ticket title!' }]}
               >
-                <Input placeholder="Todo Title" />
+                <Input placeholder="Ticket Title" />
               </Form.Item>
 
               <Form.Item name="description" label="Description">
-                <TextArea rows={4} placeholder="Todo Description" />
+                <TextArea rows={4} placeholder="Ticket Description" />
               </Form.Item>
 
               <Form.Item name="status" label="Status" rules={[{ required: true }]}>
@@ -798,6 +1046,54 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
                   {allStatuses.map((s) => (
                     <Option key={s.slug} value={s.slug}>
                       {s.title}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+
+              <Form.Item name="type_id" label="Type">
+                <Select placeholder="Select type" allowClear>
+                  {ticketTypes.map((t) => (
+                    <Option key={t.id} value={t.id}>
+                      <Space>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            width: 12,
+                            height: 12,
+                            borderRadius: 2,
+                            backgroundColor: t.color,
+                          }}
+                        />
+                        {t.title}
+                      </Space>
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+
+              <Form.Item name="company_id" label="Company">
+                <Select placeholder="Select company" allowClear>
+                  {companies.map((c) => (
+                    <Option key={c.id} value={c.id}>
+                      {c.name}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+
+              <Form.Item label="Tags">
+                <Select
+                  mode="multiple"
+                  placeholder="Select tags"
+                  value={selectedTagIds}
+                  onChange={setSelectedTagIds}
+                  optionLabelProp="label"
+                  allowClear
+                >
+                  {allTags.map((t) => (
+                    <Option key={t.id} value={t.id} label={t.name}>
+                      {t.name}
                     </Option>
                   ))}
                 </Select>
@@ -897,6 +1193,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
                       setModalVisible(false)
                       form.resetFields()
                       setSelectedAssignees([])
+                      setSelectedTagIds([])
                     }}
                   >
                     Cancel

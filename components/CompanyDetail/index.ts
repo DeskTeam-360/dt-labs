@@ -1,0 +1,7 @@
+export { default as TabInfo } from './TabInfo'
+export { default as TabUsers } from './TabUsers'
+export { default as TabDataForm } from './TabDataForm'
+export { default as TabGenerate } from './TabGenerate'
+export { default as TabKnowledgeBase } from './TabKnowledgeBase'
+export { default as TabWebsites } from './TabWebsites'
+export { default as TabCrawling } from './TabCrawling'

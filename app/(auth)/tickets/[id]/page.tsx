@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import TodoDetailContent from '@/components/TodoDetailContent'
 
-export default async function TodoDetailPage({
+export default async function TicketDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -19,16 +19,16 @@ export default async function TodoDetailPage({
     redirect('/login')
   }
 
-  // Await params since it's a Promise in Next.js 15+
   const { id } = await params
 
-  // Fetch ticket data with related information
   const { data: todoData, error: todoError } = await supabase
     .from('tickets')
     .select(`
       *,
       creator:users!todos_created_by_fkey(id, full_name, email),
       team:teams(id, name),
+      type:ticket_types(id, title, slug, color),
+      company:companies(id, name, color),
       assignees:todo_assignees(
         id,
         user:users!todo_assignees_user_id_fkey(id, full_name, email)
@@ -38,19 +38,17 @@ export default async function TodoDetailPage({
     .single()
 
   if (todoError || !todoData) {
-    redirect('/todos')
+    redirect('/tickets')
   }
 
   const ticketId = parseInt(id)
 
-  // Fetch checklist items
   const { data: checklistItems } = await supabase
     .from('todo_checklist')
     .select('*')
     .eq('todo_id', ticketId)
     .order('order_index', { ascending: true })
 
-  // Fetch comments with user info
   const { data: comments } = await supabase
     .from('todo_comments')
     .select(`
@@ -60,20 +58,27 @@ export default async function TodoDetailPage({
     .eq('todo_id', ticketId)
     .order('created_at', { ascending: true })
 
-  // Fetch attributes
   const { data: attributes } = await supabase
     .from('todo_attributs')
     .select('*')
     .eq('todo_id', ticketId)
     .order('meta_key', { ascending: true })
 
-  // Fetch screenshots linked to this ticket
   const { data: screenshots } = await supabase
     .from('screenshots')
     .select('*')
     .eq('todo_id', ticketId)
     .eq('user_id', currentUser.id)
     .order('created_at', { ascending: false })
+
+  const { data: ticketTags } = await supabase
+    .from('ticket_tags')
+    .select('tag_id, tags(id, name, slug, color)')
+    .eq('ticket_id', ticketId)
+
+  const tags = (ticketTags || [])
+    .map((row: any) => row.tags)
+    .filter(Boolean)
 
   return (
     <TodoDetailContent
@@ -83,6 +88,7 @@ export default async function TodoDetailPage({
       comments={comments || []}
       attributes={attributes || []}
       screenshots={screenshots || []}
+      tags={tags}
     />
   )
 }
