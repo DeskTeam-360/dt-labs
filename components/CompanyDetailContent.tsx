@@ -1,6 +1,6 @@
 'use client'
 
-import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Row, Col, Divider, Tabs, Form, Input, message, Spin, Select, Table, Popconfirm, Switch, Modal, Progress } from 'antd'
+import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Row, Col, Divider, Tabs, Form, Input, message, Spin, Select, Table, Popconfirm, Switch, Modal, Progress, Flex } from 'antd'
 import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, TeamOutlined, DatabaseOutlined, SaveOutlined, FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, GlobalOutlined, PlayCircleOutlined, EyeOutlined, ReadOutlined, CloudUploadOutlined, HistoryOutlined, CheckSquareOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -23,6 +23,32 @@ const { Content } = Layout
 const { Title, Text } = Typography
 const { TextArea } = Input
 const { Option } = Select
+
+function ColorPickerInput({
+  value,
+  onChange,
+}: {
+  value?: string
+  onChange?: (v: string) => void
+}) {
+  const hex = value || '#000000'
+  return (
+    <Space align="center">
+      <Input
+        type="color"
+        value={hex}
+        onChange={(e) => onChange?.(e.target.value)}
+        style={{ width: 48, height: 32, padding: 2, cursor: 'pointer' }}
+      />
+      <Input
+        value={hex}
+        onChange={(e) => onChange?.(e.target.value)}
+        placeholder="#000000"
+        style={{ width: 120 }}
+      />
+    </Space>
+  )
+}
 
 interface CompanyDetailContentProps {
   user: User
@@ -72,6 +98,9 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
   const [historyPreviewContent, setHistoryPreviewContent] = useState('')
   const [historyPreviewPrompt, setHistoryPreviewPrompt] = useState('')
   const [generationHistoryError, setGenerationHistoryError] = useState<string>('')
+  const [companyEditModalOpen, setCompanyEditModalOpen] = useState(false)
+  const [companyEditLoading, setCompanyEditLoading] = useState(false)
+  const [companyEditForm] = Form.useForm()
   const supabase = createClient()
 
   // Group company datas by template group
@@ -89,6 +118,43 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
     acc[item.data_template_id] = item.value || ''
     return acc
   }, {})
+
+  const openEditCompanyModal = () => {
+    companyEditForm.setFieldsValue({
+      name: companyData.name,
+      is_active: companyData.is_active ?? true,
+      color: companyData.color || '#000000',
+    })
+    setCompanyEditModalOpen(true)
+  }
+
+  const handleSaveCompany = async () => {
+    try {
+      const values = await companyEditForm.validateFields()
+      const name = (values.name ?? '').trim()
+      if (!name) {
+        message.warning('Company name is required')
+        return
+      }
+      const color = (values.color || '#000000').trim() || '#000000'
+      setCompanyEditLoading(true)
+      const { error } = await supabase
+        .from('companies')
+        .update({ name, is_active: !!values.is_active, color })
+        .eq('id', companyData.id)
+      if (error) throw error
+      message.success('Company updated')
+      setCompanyEditModalOpen(false)
+      router.refresh()
+    } catch (e: unknown) {
+      const err = e as { message?: string }
+      if (err?.message && !String(err.message).includes('validateFields')) {
+        message.error(err?.message || 'Failed to update company')
+      }
+    } finally {
+      setCompanyEditLoading(false)
+    }
+  }
 
   const handleCrawlDelete = async (crawlSessionId: string) => {
     try {
@@ -1067,18 +1133,54 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
               >
                 Back to Companies
               </Button>
+              <Button icon={<EditOutlined />} onClick={openEditCompanyModal}>
+                Edit company
+              </Button>
             </Space>
 
-            <div style={{ marginBottom: 32 }}>
+            <Flex justify="space-between" align="center" style={{ marginBottom: 32 }}>
               <Title level={2} style={{ marginBottom: 8 }}>
                 {companyData.name}
               </Title>
               <Space size="middle">
+                <Tag
+                  style={{
+                    fontSize: 14,
+                    padding: '4px 12px',
+                    backgroundColor: companyData.color || '#000000',
+                    borderColor: companyData.color || '#000000',
+                    color: '#fff',
+                  }}
+                >
+                  Signature Color
+                </Tag>
                 <Tag color={companyData.is_active ? 'green' : 'default'} style={{ fontSize: 14, padding: '4px 12px' }}>
                   {companyData.is_active ? 'ACTIVE' : 'INACTIVE'}
                 </Tag>
               </Space>
-            </div>
+            </Flex>
+
+            <Modal
+              title="Edit company"
+              open={companyEditModalOpen}
+              onOk={handleSaveCompany}
+              onCancel={() => setCompanyEditModalOpen(false)}
+              confirmLoading={companyEditLoading}
+              okText="Save"
+              destroyOnClose
+            >
+              <Form form={companyEditForm} layout="vertical" style={{ marginTop: 16 }}>
+                <Form.Item name="name" label="Company name" rules={[{ required: true, message: 'Company name is required' }]}>
+                  <Input placeholder="Company name" />
+                </Form.Item>
+                <Form.Item name="color" label="Signature Color (hex)" initialValue="#000000">
+                  <ColorPickerInput />
+                </Form.Item>
+                <Form.Item name="is_active" label="Active" valuePropName="checked">
+                  <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+                </Form.Item>
+              </Form>
+            </Modal>
 
             <Divider />
 
@@ -1109,7 +1211,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                 requiredMark={false}
               >
                 <Card size="small" style={{ marginBottom: 16, background: '#f5f5f5' }}>
-                  <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                  <Space orientation="vertical" size="small" style={{ width: '100%' }}>
                     <Text strong>Website Information</Text>
                     <Text type="secondary" style={{ fontSize: 12 }}>
                       Add a website URL for this company. You can set one website as primary.

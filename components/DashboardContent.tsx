@@ -372,7 +372,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
               style={{ marginBottom: 16 }}
             >
               {activeTracker ? (
-                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
                     <div>
                       <Text type="secondary">Ticket:</Text>
@@ -511,7 +511,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
           </Col>
           <Col xs={24} lg={8}>
             <Card title="Account Information" style={{ height: '100%' }}>
-              <Space direction="vertical" style={{ width: '100%' }}>
+              <Space orientation="vertical" style={{ width: '100%' }}>
                 <div>
                   <Text type="secondary">Email:</Text>
                   <br />

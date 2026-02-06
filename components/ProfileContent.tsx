@@ -223,7 +223,7 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
             <Text type="secondary">Update your profile information</Text>
 
             <div style={{ marginTop: 32, marginBottom: 32, textAlign: 'center' }}>
-              <Space direction="vertical" size="large">
+              <Space orientation="vertical" size="large">
                 <div>
                   <Avatar
                     size={100}
@@ -427,7 +427,7 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
                 type="inner"
                 style={{ marginTop: 16, marginBottom: 16, background: '#f6ffed', borderColor: '#b7eb8f' }}
               >
-                <Space direction="vertical" style={{ width: '100%' }}>
+                <Space orientation="vertical" style={{ width: '100%' }}>
                   <Text strong>New Token Generated!</Text>
                   <Text code style={{ fontSize: 12, wordBreak: 'break-all', display: 'block' }}>
                     {newToken}
@@ -495,7 +495,7 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
                         </Popconfirm>,
                       ]}
                     >
-                      <Space direction="vertical" style={{ width: '100%' }}>
+                      <Space orientation="vertical" style={{ width: '100%' }}>
                         <div>
                           <Text strong>{token.name}</Text>
                           {token.is_active ? (

@@ -43,7 +43,7 @@ export default function TabAssignees({
   onStopTimeTracker,
 }: TabAssigneesProps) {
   return (
-    <Space direction="vertical" style={{ width: '100%' }} size="middle">
+    <Space orientation="vertical" style={{ width: '100%' }} size="middle">
       <Card
         title={
           <Space>
@@ -56,7 +56,7 @@ export default function TabAssignees({
         }
         size="small"
       >
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        <Space orientation="vertical" style={{ width: '100%' }} size="middle">
           <Space>
             {activeTimeTracker ? (
               <>
@@ -92,7 +92,7 @@ export default function TabAssignees({
               renderItem={(session: any) => (
                 <List.Item>
                   <List.Item.Meta
-                    avatar={<Avatar icon={<UserOutlined />} size="small" />}
+                    avatar={<Avatar icon={<UserOutlined />} size="small" src={session.user?.avatar_url} />}
                     title={
                       <Space size="small">
                         <Text strong style={{ fontSize: 13 }}>
@@ -104,7 +104,7 @@ export default function TabAssignees({
                       </Space>
                     }
                     description={
-                      <Space direction="vertical" size={0}>
+                      <Space orientation="vertical" size={0}>
                         <Text type="secondary" style={{ fontSize: 11 }}>
                           Started: <DateDisplay date={session.start_time} />
                         </Text>
@@ -140,7 +140,7 @@ export default function TabAssignees({
               renderItem={(member: any) => (
                 <List.Item>
                   <Space>
-                    <Avatar icon={<UserOutlined />} />
+                    <Avatar icon={<UserOutlined />} src={member.user?.avatar_url} />
                     <Text>
                       {member.user?.full_name || member.user?.email || 'Unknown'}
                     </Text>
@@ -163,7 +163,7 @@ export default function TabAssignees({
               renderItem={(assignee: any) => (
                 <List.Item>
                   <Space>
-                    <Avatar icon={<UserOutlined />} />
+                    <Avatar icon={<UserOutlined />} src={assignee.user?.avatar_url} />
                     <Text>
                       {assignee.user?.full_name || assignee.user?.email || 'Unknown'}
                     </Text>

@@ -31,7 +31,7 @@ export default async function TicketDetailPage({
       company:companies(id, name, color),
       assignees:todo_assignees(
         id,
-        user:users!todo_assignees_user_id_fkey(id, full_name, email)
+        user:users!todo_assignees_user_id_fkey(id, full_name, email, avatar_url)
       )
     `)
     .eq('id', parseInt(id))
@@ -53,7 +53,8 @@ export default async function TicketDetailPage({
     .from('todo_comments')
     .select(`
       *,
-      user:users!todo_comments_user_id_fkey(id, full_name, email)
+      user:users!todo_comments_user_id_fkey(id, full_name, email, avatar_url),
+      comment_attachments(id, file_url, file_name)
     `)
     .eq('todo_id', ticketId)
     .order('created_at', { ascending: true })

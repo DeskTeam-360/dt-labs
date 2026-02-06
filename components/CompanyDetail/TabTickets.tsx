@@ -270,7 +270,7 @@ export default function TabTickets({ companyData }: TabTicketsProps) {
 
   return (
     <Card>
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <Row gutter={[16, 8]} align="middle">
           <Col>
             <Input

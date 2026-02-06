@@ -33,7 +33,7 @@ export default function TabDataForm({
   return (
     <div>
       <Form form={form} layout="vertical">
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Space orientation="vertical" size="large" style={{ width: '100%' }}>
           <Space>
             <Button
               type="primary"

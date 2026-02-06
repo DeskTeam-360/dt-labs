@@ -65,6 +65,7 @@ interface TeamMember {
   joined_at: string
   user_name?: string
   user_email?: string
+  user_avatar_url?: string | null
 }
 
 interface UserRecord {
@@ -108,7 +109,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
             .from('team_members')
             .select(`
               *,
-              user:users!team_members_user_id_fkey(id, full_name, email)
+              user:users!team_members_user_id_fkey(id, full_name, email, avatar_url)
             `)
             .eq('team_id', team.id)
 
@@ -120,6 +121,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
             joined_at: member.joined_at,
             user_name: member.user?.full_name || member.user?.email || 'Unknown',
             user_email: member.user?.email || '',
+            user_avatar_url: member.user?.avatar_url || null,
           }))
 
           return {
@@ -285,7 +287,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
         .from('team_members')
         .select(`
           *,
-          user:users!team_members_user_id_fkey(id, full_name, email)
+          user:users!team_members_user_id_fkey(id, full_name, email, avatar_url)
         `)
         .eq('team_id', selectedTeam.id)
 
@@ -298,6 +300,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
           joined_at: member.joined_at,
           user_name: member.user?.full_name || member.user?.email || 'Unknown',
           user_email: member.user?.email || '',
+          user_avatar_url: member.user?.avatar_url || null,
         }))
         setTeamMembers(members)
       }
@@ -324,7 +327,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
           .from('team_members')
           .select(`
             *,
-            user:users!team_members_user_id_fkey(id, full_name, email)
+            user:users!team_members_user_id_fkey(id, full_name, email, avatar_url)
           `)
           .eq('team_id', selectedTeam.id)
 
@@ -337,6 +340,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
             joined_at: member.joined_at,
             user_name: member.user?.full_name || member.user?.email || 'Unknown',
             user_email: member.user?.email || '',
+            user_avatar_url: member.user?.avatar_url || null,
           }))
           setTeamMembers(members)
         }
@@ -391,29 +395,29 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
         <Space>
           <Tooltip title="View team detail">
             <Link href={`/teams/${record.id}`}>
-              <Button type="default" icon={<EyeOutlined />} size="small" />
+              <Button type="default" icon={<EyeOutlined />}> Details</Button> 
             </Link>
           </Tooltip>
-          <Tooltip title="Manage Members">
+          {/* <Tooltip title="Manage Members">
             <Button
               type="primary"
               icon={<UserAddOutlined />}
-              size="small"
+            
               onClick={() => handleManageMembers(record)}
             >
               Members
             </Button>
-          </Tooltip>
+          </Tooltip> */}
           {record.created_by === currentUser.id && (
             <>
-              <Tooltip title="Edit">
+              {/* <Tooltip title="Edit">
                 <Button
                   type="default"
                   icon={<EditOutlined />}
                   size="small"
                   onClick={() => handleEdit(record)}
                 />
-              </Tooltip>
+              </Tooltip> */}
               <Popconfirm
                 title="Delete Team"
                 description="Are you sure you want to delete this team? All members will be removed."
@@ -426,8 +430,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
                     type="primary"
                     danger
                     icon={<DeleteOutlined />}
-                    size="small"
-                  />
+                  > Delete</Button>
                 </Tooltip>
               </Popconfirm>
             </>
@@ -584,7 +587,8 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
                     ]}
                   >
                     <List.Item.Meta
-                      avatar={<Avatar icon={<UserOutlined />} />}
+                    style={{ marginBottom: 10, }}
+                      avatar={<Avatar icon={<UserOutlined />} src={member.user_avatar_url} />}
                       title={
                         <Space>
                           {member.user_name}

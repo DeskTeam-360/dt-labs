@@ -461,7 +461,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                 <Col xs={24} lg={12}>
                   <Card title="Basic Information" size="small">
                     {isEditing ? (
-                      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                      <Space orientation="vertical" style={{ width: '100%' }} size="middle">
                         <Form.Item label="Email">
                           <Input prefix={<MailOutlined />} value={userData.email} disabled />
                         </Form.Item>
@@ -512,7 +512,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                 <Col xs={24} lg={12}>
                   <Card title="Work Information" size="small">
                     {isEditing ? (
-                      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                      <Space orientation="vertical" style={{ width: '100%' }} size="middle">
                         <Form.Item name="department" label="Department">
                           <Input prefix={<BankOutlined />} placeholder="Department" />
                         </Form.Item>
@@ -596,7 +596,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
               <Col xs={24} lg={12}>
                 <Card title="Account Status" size="small">
                   {isEditing ? (
-                    <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                    <Space orientation="vertical" style={{ width: '100%' }} size="middle">
                       <Form.Item name="is_email_verified" label="Email Verified" valuePropName="checked">
                         <Switch />
                       </Form.Item>
@@ -823,7 +823,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
 
                       {/* Filter Section */}
                       <Card style={{ marginBottom: 24 }}>
-                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                        <Space orientation="vertical" style={{ width: '100%' }} size="middle">
                           <div>
                             <Text strong style={{ marginRight: 16 }}>Filter Period:</Text>
                             <Radio.Group 

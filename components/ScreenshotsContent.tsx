@@ -288,7 +288,7 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
               alt={selectedScreenshot.title || selectedScreenshot.file_name}
               style={{ width: '100%', marginBottom: 16 }}
             />
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space orientation="vertical" style={{ width: '100%' }}>
               <div>
                 <Text strong>Link to Todo:</Text>
                 <Select

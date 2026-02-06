@@ -117,7 +117,7 @@ export default function TabWebsites({
         />
       ) : (
         <Card>
-          <Space direction="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>
+          <Space orientation="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>
             <GlobalOutlined style={{ fontSize: 48, color: '#bfbfbf' }} />
             <Text type="secondary">No websites added yet</Text>
             <Button type="primary" icon={<PlusOutlined />} onClick={onAddWebsite}>

@@ -67,7 +67,7 @@ export default function TabInfo({ companyData, groupedDatas }: TabInfoProps) {
                     key={index}
                     label={item.company_data_templates?.title || 'Data'}
                   >
-                    <Space direction="vertical" size="small">
+                    <Space orientation="vertical" size="small">
                       <Text>{item.value || 'N/A'}</Text>
                       <Text type="secondary" style={{ fontSize: 12 }}>
                         Updated: <DateDisplay date={item.updated_at} />

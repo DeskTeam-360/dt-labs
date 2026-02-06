@@ -222,18 +222,10 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
             <Button
               type="default"
               icon={<EyeOutlined />}
-              size="small"
               onClick={() => router.push(`/companies/${record.id}`)}
-            />
+            > Details</Button> 
           </Tooltip>
-          <Tooltip title="Edit">
-            <Button
-              type="primary"
-              icon={<EditOutlined />}
-              size="small"
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
+          
           <Popconfirm
             title="Delete Company"
             description="Are you sure you want to delete this company?"
@@ -246,8 +238,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 type="primary"
                 danger
                 icon={<DeleteOutlined />}
-                size="small"
-              />
+              > Delete</Button>
             </Tooltip>
           </Popconfirm>
         </Space>

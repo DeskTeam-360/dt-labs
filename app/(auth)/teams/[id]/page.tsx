@@ -42,7 +42,7 @@ export default async function TeamDetailPage({
       user_id,
       role,
       joined_at,
-      user:users!team_members_user_id_fkey(id, full_name, email)
+      user:users!team_members_user_id_fkey(id, full_name, email, avatar_url)
     `)
     .eq('team_id', id)
     .order('joined_at', { ascending: true })
@@ -55,6 +55,7 @@ export default async function TeamDetailPage({
     joined_at: m.joined_at,
     user_name: m.user?.full_name || m.user?.email || 'Unknown',
     user_email: m.user?.email || '',
+    user_avatar_url: m.user?.avatar_url || null,
   }))
 
   const team = {

@@ -80,6 +80,21 @@ USING (
   AND (storage.foldername(name))[1] = 'screenshots'
 );
 
+-- 9. Allow authenticated users to upload ticket/comment images (path: ticket/{ticketId}/{unixtime}.ext)
+CREATE POLICY "Authenticated users can upload ticket images"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'dtlabs' 
+  AND (storage.foldername(name))[1] = 'ticket'
+);
+
+-- 10. Allow public to read ticket images (for display in editor/comments)
+CREATE POLICY "Public can read ticket images"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'dtlabs' AND (storage.foldername(name))[1] = 'ticket');
+
 -- Note: Make sure the bucket 'dtlabs' is created and set to PUBLIC or AUTHENTICATED
 -- In Supabase Dashboard: Storage > Create Bucket > Name: dtlabs > Public: Yes/No
 

@@ -78,7 +78,7 @@ export default function TabCrawling({
           return Math.round((crawled / total) * 100)
         }
         return (
-          <Space direction="vertical" size="small" style={{ width: '100%' }}>
+          <Space orientation="vertical" size="small" style={{ width: '100%' }}>
             <Progress
               percent={getProgressPercent()}
               status={record.status === 'crawling' ? 'active' : record.status === 'completed' ? 'success' : 'normal'}
@@ -177,7 +177,7 @@ export default function TabCrawling({
         />
       ) : (
         <Card>
-          <Space direction="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>
+          <Space orientation="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>
             <GlobalOutlined style={{ fontSize: 48, color: '#bfbfbf' }} />
             <Text type="secondary">No crawl sessions yet</Text>
             {websitesLength > 0 && (

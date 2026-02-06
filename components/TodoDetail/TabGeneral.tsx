@@ -8,7 +8,6 @@ import {
   Tag,
   Typography,
   Button,
-  List,
   Checkbox,
   Avatar,
   Input,
@@ -25,8 +24,10 @@ import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
+  PaperClipOutlined,
 } from '@ant-design/icons'
 import DateDisplay from '../DateDisplay'
+import CommentWysiwyg from './CommentWysiwyg'
 
 const { Text, Paragraph } = Typography
 
@@ -39,13 +40,15 @@ interface ChecklistItem {
   created_at: string
 }
 
+interface CommentAttachment { id: string; file_url: string; file_name: string }
 interface Comment {
   id: string
   todo_id: number
   user_id: string
   comment: string
   created_at: string
-  user?: { id: string; full_name: string | null; email: string }
+  user?: { id: string; full_name: string | null; email: string; avatar_url?: string | null }
+  comment_attachments?: CommentAttachment[] | null
 }
 
 interface Attribute {
@@ -56,8 +59,6 @@ interface Attribute {
   created_at: string
   updated_at: string
 }
-
-const { TextArea } = Input
 
 interface TabGeneralProps {
   todoData: any
@@ -87,7 +88,11 @@ interface TabGeneralProps {
   canDeleteComment: (createdAt: string) => boolean
   newComment: string
   onNewCommentChange: (v: string) => void
+  newCommentAttachments: { url: string; file_name: string; file_path: string }[]
+  onRemoveNewCommentAttachment: (index: number) => void
+  onCommentFilesSelected: (files: FileList | null) => void
   onAddComment: () => void
+  addCommentLoading?: boolean
   attributes: Attribute[]
   newAttributeKey: string
   newAttributeValue: string
@@ -129,7 +134,11 @@ export default function TabGeneral({
   canDeleteComment,
   newComment,
   onNewCommentChange,
+  newCommentAttachments,
+  onRemoveNewCommentAttachment,
+  onCommentFilesSelected,
   onAddComment,
+  addCommentLoading = false,
   attributes,
   newAttributeKey,
   newAttributeValue,
@@ -143,124 +152,182 @@ export default function TabGeneral({
   attributesLoading,
 }: TabGeneralProps) {
   return (
-    <Space direction="vertical" style={{ width: '100%' }} size="middle">
+    <Space orientation="vertical" style={{ width: '100%' }} size="middle">
       <Row gutter={[24, 24]}>
-      <Col xs={16}>
-          <Card
-            title={
-              <Space>
-                <CommentOutlined />
-                <Text strong>Comments ({comments.length})</Text>
-              </Space>
-            }
-            size="small"
-          >
-            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+      <Col xs={14}>
+
+
+      <Flex gap="middle" align="flex-start" style={{ padding: 10, marginBottom: 10, borderBottom: '1px solid black',  }}>
+                      <Avatar icon={<UserOutlined />} src={todoData.creator?.avatar_url} />
+                      <Flex vertical style={{ flex: 1, minWidth: 0 }}>
+                        <Flex justify="space-between" align="center" wrap="wrap" gap="small">
+                          <Space>
+                            <Text strong>
+                              {todoData.creator?.full_name || todoData.creator?.email || 'Unknown'}
+                            </Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              <DateDisplay date={todoData.created_at} />
+                            </Text>
+                          </Space>
+                         
+                        </Flex>
+                       
+                            <div
+                              className="ql-editor comment-html"
+                              style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
+                              dangerouslySetInnerHTML={{ __html: todoData.description }}
+                            />
+                      
+                      </Flex>
+                    </Flex>
+          
+            <Flex orientation="vertical" style={{ width: '100%', padding: 16 }} gap={30}>
               {comments.length > 0 ? (
-                <List
-                  dataSource={comments}
-                  renderItem={(comment) => (
-                    <List.Item>
-                      <List.Item.Meta
-                        avatar={<Avatar icon={<UserOutlined />} />}
-                        title={
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <Flex vertical gap="middle">
+                  {comments.map((comment) => (
+                    <Flex key={comment.id} gap="middle" align="flex-start" style={{ paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid #e8e8e8',  }}>
+                      <Avatar icon={<UserOutlined />} src={comment.user?.avatar_url} />
+                      <Flex vertical style={{ flex: 1, minWidth: 0 }}>
+                        <Flex justify="space-between" align="center" wrap="wrap" gap="small">
+                          <Space>
+                            <Text strong>
+                              {comment.user?.full_name || comment.user?.email || 'Unknown'}
+                            </Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              <DateDisplay date={comment.created_at} />
+                            </Text>
+                          </Space>
+                          {comment.user_id === currentUserId && editingComment !== comment.id && (
                             <Space>
-                              <Text strong>
-                                {comment.user?.full_name || comment.user?.email || 'Unknown'}
-                              </Text>
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                <DateDisplay date={comment.created_at} />
-                              </Text>
+                              
+                              {canDeleteComment(comment.created_at) && (
+                                <>
+                                <Button
+                                icon={<EditOutlined />}
+                                size="middle"
+                                onClick={() => {
+                                  onEditComment(comment.id, comment.comment)
+                                }}
+                              />
+                              <Popconfirm
+                                  title="Delete comment"
+                                  description="Are you sure?"
+                                  onConfirm={() => onDeleteComment(comment.id)}
+                                  okText="Yes"
+                                  cancelText="No"
+                                >
+                                  <Button
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    size="middle"
+                                  />
+                                </Popconfirm>
+                                </>
+                                
+                              )}
                             </Space>
-                            {comment.user_id === currentUserId && editingComment !== comment.id && (
+                          )}
+                        </Flex>
+                        <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 4 }}>
+                          {editingComment === comment.id ? (
+                            <Flex vertical gap={40} style={{ width: '100%' }}>
+                              <CommentWysiwyg
+                                ticketId={todoData?.id}
+                                value={editingCommentValue}
+                                onChange={onEditingCommentValueChange}
+                                height="200px"
+                              />
                               <Space>
                                 <Button
-                                  icon={<EditOutlined />}
-                                  size="middle"
-                                  onClick={() => {
-                                    onEditComment(comment.id, comment.comment)
-                                  }}
-                                />
-                                {canDeleteComment(comment.created_at) && (
-                                  <Popconfirm
-                                    title="Delete comment"
-                                    description="Are you sure?"
-                                    onConfirm={() => onDeleteComment(comment.id)}
-                                    okText="Yes"
-                                    cancelText="No"
-                                  >
-                                    <Button
-                                      danger
-                                      icon={<DeleteOutlined />}
-                                      size="middle"
-                                    />
-                                  </Popconfirm>
-                                )}
+                                  type="primary"
+                                  
+                                  onClick={() => onSaveEditComment(comment.id)}
+                                >
+                                  Save
+                                </Button>
+                                <Button
+                                  
+                                  onClick={onCancelEditComment}
+                                >
+                                  Cancel
+                                </Button>
                               </Space>
-                            )}
-                          </div>
-                        }
-                        description={
-                          <Space orientation="vertical" style={{ width: '100%' }} size="small">
-                            {editingComment === comment.id ? (
-                              <Space orientation="vertical" style={{ width: '100%' }} size="small">
-                                <TextArea
-                                  value={editingCommentValue}
-                                  onChange={(e) => onEditingCommentValueChange(e.target.value)}
-                                  rows={3}
-                                  style={{ resize: 'none' }}
-                                />
-                                <Space>
-                                  <Button
-                                    type="primary"
-                                    size="small"
-                                    onClick={() => onSaveEditComment(comment.id)}
-                                    // loading={loading}
-                                  >
-                                    Save
-                                  </Button>
-                                  <Button
-                                    size="small"
-                                    onClick={onCancelEditComment}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </Space>
-                              </Space>
-                            ) : (
-                              <Paragraph style={{ margin: 0 }}>{comment.comment}</Paragraph>
-                            )}
-                          </Space>
-                        }
-                      />
-                    </List.Item>
-                  )}
-                />
+                            </Flex>
+                          ) : comment.comment && /<[a-z][\s\S]*>/i.test(comment.comment) ? (
+                            <div
+                              className="ql-editor comment-html"
+                              style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
+                              dangerouslySetInnerHTML={{ __html: comment.comment }}
+                            />
+                          ) : (
+                            <Paragraph style={{ margin: 0 }}>{comment.comment}</Paragraph>
+                          )}
+                          {comment.comment_attachments?.length ? (
+                            <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
+                              {comment.comment_attachments.map((att) => (
+                                <a key={att.id || att.file_url} href={att.file_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <PaperClipOutlined /> {att.file_name}
+                                </a>
+                              ))}
+                            </Flex>
+                          ) : null}
+                        </Space>
+                      </Flex>
+                    </Flex>
+                  ))}
+                </Flex>
               ) : (
                 <Empty description="No comments" image={Empty.PRESENTED_IMAGE_SIMPLE} />
               )}
-              <Space.Compact style={{ width: '100%' }}>
-                <TextArea
-                  placeholder="Add a comment..."
-                  value={newComment}
-                  onChange={(e) => onNewCommentChange(e.target.value)}
-                  rows={3}
-                  style={{ resize: 'none' }}
+              <CommentWysiwyg
+                ticketId={todoData?.id}
+                value={newComment}
+                onChange={onNewCommentChange}
+                placeholder="Add a comment..."
+                height="200px"
+              />
+              {newCommentAttachments.length > 0 && (
+                <Flex gap={8} wrap="wrap" align="center" style={{ marginTop: 8 }}>
+                  {newCommentAttachments.map((a, i) => (
+                    <Flex key={i} align="center" gap={4} style={{ padding: '4px 8px', background: '#f5f5f5', borderRadius: 6 }}>
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <PaperClipOutlined /> {a.file_name}
+                      </a>
+                      <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => onRemoveNewCommentAttachment(i)} />
+                    </Flex>
+                  ))}
+                </Flex>
+              )}
+              <Flex gap={8} style={{ marginTop: 8 }}>
+                <input
+                  type="file"
+                  multiple
+                  style={{ display: 'none' }}
+                  id="comment-files-input"
+                  onChange={(e) => {
+                    onCommentFilesSelected(e.target.files)
+                    e.target.value = ''
+                  }}
                 />
-              </Space.Compact>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={onAddComment}
-              >
-                Add Comment
-              </Button>
-            </Space>
-          </Card>
+                <Button icon={<PaperClipOutlined />} onClick={() => document.getElementById('comment-files-input')?.click()}>
+                  Attach files
+                </Button>
+                <Button
+                  type="primary"
+                  style={{ width: '200px' }}
+                  icon={<PlusOutlined />}
+                  onClick={onAddComment}
+                  loading={addCommentLoading}
+                  disabled={addCommentLoading}
+                >
+                  Add Comment
+                </Button>
+              </Flex>
+            </Flex>
+          {/* </Card> */}
         </Col>
 
-        <Col xs={8}>
+        <Col xs={10}>
           <Descriptions column={1} bordered>
             <Descriptions.Item label="Status">
               <Tag color={getStatusColor(todoData.status)} style={{ fontSize: 14, padding: '4px 12px' }}>
@@ -289,11 +356,19 @@ export default function TabGeneral({
               </Descriptions.Item>
             )}
             <Descriptions.Item label="Description">
-              <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                {todoData.description || (
-                  <Text type="secondary" italic>No description. Click Edit to add a note.</Text>
-                )}
-              </Paragraph>
+              {todoData.description ? (
+                todoData.description && /<[a-z][\s\S]*>/i.test(todoData.description) ? (
+                  <div
+                    className="ql-editor comment-html"
+                    style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
+                    dangerouslySetInnerHTML={{ __html: todoData.description }}
+                  />
+                ) : (
+                  <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{todoData.description}</Paragraph>
+                )
+              ) : (
+                <Text type="secondary" italic>No description. Click Edit to add a note.</Text>
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="Created By">
               <Space>
@@ -338,7 +413,32 @@ export default function TabGeneral({
                         <Flex style={{ width: '100%', justifyContent: 'space-between' }}>
                           <Text strong>{attr.meta_key}</Text>
                           <Flex gap={5}>
-                            {editingAttribute === attr.id ? (
+                            
+                          </Flex>
+                        </Flex>
+                      }
+                    >
+                      <Flex justify="space-between" align="center">
+                        
+                      {editingAttribute === attr.id ? (
+                        <Flex style={{ width: '100%' }}>
+                          <Input
+                            defaultValue={attr.meta_value || ''}
+                            onPressEnter={(e) => {
+                              onUpdateAttribute(attr.id, e.currentTarget.value)
+                            }}
+                            onBlur={(e) => {
+                              onUpdateAttribute(attr.id, e.target.value)
+                            }}
+                            autoFocus
+                            style={{ width: '100%' }}
+                          />
+                        </Flex>
+                      ) : (
+                        <Text>{attr.meta_value || <Text type="secondary">(empty)</Text>}</Text>
+                      )}
+
+{editingAttribute === attr.id ? (
                               <Button
                                 type="text"
                                 size="small"
@@ -347,7 +447,7 @@ export default function TabGeneral({
                                 Cancel
                               </Button>
                             ) : (
-                              <>
+                              <Flex gap={5}>
                                 <Button
                                   type="text"
                                   icon={<EditOutlined />}
@@ -367,29 +467,9 @@ export default function TabGeneral({
                                     size="middle"
                                   />
                                 </Popconfirm>
-                              </>
+                              </Flex>
                             )}
-                          </Flex>
-                        </Flex>
-                      }
-                    >
-                      {editingAttribute === attr.id ? (
-                        <Space.Compact style={{ width: '100%' }}>
-                          <Input
-                            defaultValue={attr.meta_value || ''}
-                            onPressEnter={(e) => {
-                              onUpdateAttribute(attr.id, e.currentTarget.value)
-                            }}
-                            onBlur={(e) => {
-                              onUpdateAttribute(attr.id, e.target.value)
-                            }}
-                            autoFocus
-                            style={{ width: '100%' }}
-                          />
-                        </Space.Compact>
-                      ) : (
-                        <Text>{attr.meta_value || <Text type="secondary">(empty)</Text>}</Text>
-                      )}
+                      </Flex>
                     </Descriptions.Item>
                   ))}
                 </>
@@ -399,12 +479,12 @@ export default function TabGeneral({
           {/* Input fields for adding a new attribute */}
           
           <Descriptions.Item label="Add new attribute">
-            <Space.Compact style={{ width: '100%' }}>
+            <Flex  align="center" style={{ width: '100%' }} gap={10}>
               <Input
                 placeholder="Key"
                 value={newAttributeKey}
                 onChange={e => onNewAttributeKeyChange(e.target.value)}
-                style={{ maxWidth: 160 }}
+                style={{ maxWidth: 100 }}
               />
               <Input
                 placeholder="Value"
@@ -421,7 +501,7 @@ export default function TabGeneral({
               >
                 Add
               </Button>
-            </Space.Compact>
+            </Flex>
           </Descriptions.Item>
           </Descriptions>
           <br />
@@ -440,61 +520,61 @@ export default function TabGeneral({
             }
             size="small"
           >
-            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            <Space orientation="vertical" style={{ width: '100%' }} size="middle">
               {checklistItems.length > 0 ? (
-                <List
-                  dataSource={checklistItems}
-                  renderItem={(item) => (
-                    <List.Item
+                <Flex vertical gap="small">
+                  {checklistItems.map((item: ChecklistItem) => (
+                    <Flex
+                      key={item.id}
+                      align="center"
+                      justify="space-between"
                       style={{
                         padding: '8px 0',
                         textDecoration: item.is_completed ? 'line-through' : 'none',
                         opacity: item.is_completed ? 0.6 : 1,
                       }}
                     >
-                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                        <Checkbox
-                          checked={item.is_completed}
-                          onChange={() => onToggleChecklistItem(item.id, item.is_completed)}
-                        >
-                          <Text>{item.title}</Text>
-                        </Checkbox>
-                        <Popconfirm
-                          title="Delete checklist item"
-                          description="Are you sure?"
-                          onConfirm={() => onDeleteChecklistItem(item.id)}
-                          okText="Yes"
-                          cancelText="No"
-                        >
-                          <Button
-                            danger
-                            icon={<DeleteOutlined />}
-                            size="middle"
-                          />
-                        </Popconfirm>
-                      </Space>
-                    </List.Item>
-                  )}
-                />
+                      <Checkbox
+                        checked={item.is_completed}
+                        onChange={() => onToggleChecklistItem(item.id, item.is_completed)}
+                      >
+                        <Text>{item.title}</Text>
+                      </Checkbox>
+                      <Popconfirm
+                        title="Delete checklist item"
+                        description="Are you sure?"
+                        onConfirm={() => onDeleteChecklistItem(item.id)}
+                        okText="Yes"
+                        cancelText="No"
+                      >
+                        <Button
+                          danger
+                          icon={<DeleteOutlined />}
+                          size="middle"
+                        />
+                      </Popconfirm>
+                    </Flex>
+                  ))}
+                </Flex>
               ) : (
                 <Empty description="No checklist items" image={Empty.PRESENTED_IMAGE_SIMPLE} />
               )}
-              <Space.Compact style={{ width: '100%' }}>
+              <Flex gap="small" align="center" style={{ width: '100%' }}>
                 <Input
                   placeholder="Add checklist item..."
                   value={newChecklistTitle}
                   onChange={(e) => onNewChecklistTitleChange(e.target.value)}
                   onPressEnter={onAddChecklistItem}
+                  style={{ flex: 1 }}
                 />
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={onAddChecklistItem}
-                  // loading={loading}
                 >
                   Add
                 </Button>
-              </Space.Compact>
+              </Flex>
             </Space>
           </Card>
         </Col>

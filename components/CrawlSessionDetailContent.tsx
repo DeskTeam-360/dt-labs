@@ -1116,7 +1116,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
         }
 
         return (
-          <Space direction="vertical" size="small" style={{ width: '100%' }}>
+          <Space orientation="vertical" size="small" style={{ width: '100%' }}>
             {warnings.map((warning, index) => (
               <Tag key={`warning-${index}`} color="orange" style={{ fontSize: 11, margin: 0, display: 'block' }}>
                 {warning}
@@ -1156,7 +1156,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
               </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Progress">
-              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+              <Space orientation="vertical" size="small" style={{ width: '100%' }}>
                 <Progress 
                   percent={getProgress()} 
                   status={crawlSession.status === 'crawling' ? 'active' : crawlSession.status === 'completed' ? 'success' : 'normal'}
@@ -1265,7 +1265,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
           expandable={{
             expandedRowRender: (record) => (
               <div style={{ padding: '16px' }}>
-                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
                   {record.description && (
                     <div>
                       <Text strong>Description:</Text>

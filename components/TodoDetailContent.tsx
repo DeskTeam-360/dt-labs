@@ -25,14 +25,18 @@ import {
     UserOutlined,
     PlusOutlined,
     EditOutlined,
+    PaperClipOutlined,
+    DeleteOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/client'
+import { uploadTicketFile } from '@/utils/storage'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
 import { TabGeneral, TabAssignees, TabScreenshots } from './TodoDetail'
+import CommentWysiwyg from './TodoDetail/CommentWysiwyg'
 import dayjs from 'dayjs'
 
 const { Content } = Layout
@@ -73,6 +77,11 @@ interface ChecklistItem {
     created_at: string
 }
 
+interface CommentAttachment {
+    id: string
+    file_url: string
+    file_name: string
+}
 interface Comment {
     id: string
     todo_id: number
@@ -84,6 +93,7 @@ interface Comment {
         full_name: string | null
         email: string
     }
+    comment_attachments?: CommentAttachment[] | null
 }
 
 interface Attribute {
@@ -114,6 +124,7 @@ export default function TodoDetailContent({
     const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
     const [newChecklistTitle, setNewChecklistTitle] = useState('')
     const [newComment, setNewComment] = useState('')
+    const [newCommentAttachments, setNewCommentAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
     const [editingComment, setEditingComment] = useState<string | null>(null)
     const [editingCommentValue, setEditingCommentValue] = useState('')
     const [editingAttribute, setEditingAttribute] = useState<string | null>(null)
@@ -129,6 +140,9 @@ export default function TodoDetailContent({
     const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([])
     const [allTags, setAllTags] = useState<Array<{ id: string; name: string; slug: string }>>([])
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initialTags.map((t) => t.id))
+    const [descriptionAttachmentsFromDb, setDescriptionAttachmentsFromDb] = useState<{ id: string; file_url: string; file_name: string; file_path: string }[]>([])
+    const [newDescriptionAttachments, setNewDescriptionAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
+    const [deletedDescriptionAttachmentIds, setDeletedDescriptionAttachmentIds] = useState<string[]>([])
     const [form] = Form.useForm()
     const [activeTimeTracker, setActiveTimeTracker] = useState<any>(null)
     const [timeTrackerSessions, setTimeTrackerSessions] = useState<any[]>([])
@@ -538,17 +552,48 @@ export default function TodoDetailContent({
                 })
                 .select(`
           *,
-          user:users!todo_comments_user_id_fkey(id, full_name, email)
+          user:users!todo_comments_user_id_fkey(id, full_name, email, avatar_url)
         `)
                 .single()
 
             if (error) throw error
 
-            setComments([...comments, data])
+            if (newCommentAttachments.length > 0) {
+                await supabase.from('comment_attachments').insert(
+                    newCommentAttachments.map((a) => ({
+                        comment_id: data.id,
+                        file_url: a.url,
+                        file_name: a.file_name,
+                        file_path: a.file_path,
+                        uploaded_by: currentUser.id,
+                    }))
+                )
+            }
+
+            setComments((prev) => [...prev, { ...data, comment_attachments: newCommentAttachments.map((a) => ({ id: '', file_url: a.url, file_name: a.file_name })) }])
             setNewComment('')
+            setNewCommentAttachments([])
             message.success('Comment added')
         } catch (error: any) {
             message.error(error.message || 'Failed to add comment')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleCommentFilesSelected = async (files: FileList | null) => {
+        if (!files?.length || !todoData?.id) return
+        setLoading(true)
+        try {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i]
+                const result = await uploadTicketFile(file, todoData.id, 'comments')
+                if (result.url && result.path) {
+                    setNewCommentAttachments((prev) => [...prev, { url: result.url!, file_name: file.name, file_path: result.path! }])
+                } else if (result.error) {
+                    message.error(`${file.name}: ${result.error}`)
+                }
+            }
         } finally {
             setLoading(false)
         }
@@ -724,6 +769,8 @@ export default function TodoDetailContent({
     const handleEditTodo = () => {
         setSelectedAssignees(todoData.assignees?.map((a: any) => a.user_id) || [])
         setSelectedTagIds(initialTags.map((t) => t.id))
+        setNewDescriptionAttachments([])
+        setDeletedDescriptionAttachmentIds([])
         form.setFieldsValue({
             title: todoData.title,
             description: todoData.description || '',
@@ -735,6 +782,37 @@ export default function TodoDetailContent({
             due_date: todoData.due_date ? dayjs(todoData.due_date) : null,
         })
         setEditModalVisible(true)
+    }
+
+    useEffect(() => {
+        if (!editModalVisible || !todoData?.id) return
+        const fetchDescAttachments = async () => {
+            const { data } = await supabase
+                .from('ticket_attachments')
+                .select('id, file_url, file_name, file_path')
+                .eq('ticket_id', todoData.id)
+                .order('created_at', { ascending: true })
+            setDescriptionAttachmentsFromDb(data || [])
+        }
+        fetchDescAttachments()
+    }, [editModalVisible, todoData?.id])
+
+    const handleDescriptionFilesSelected = async (files: FileList | null) => {
+        if (!files?.length || !todoData?.id) return
+        setLoading(true)
+        try {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i]
+                const result = await uploadTicketFile(file, todoData.id, 'attachments')
+                if (result.url && result.path) {
+                    setNewDescriptionAttachments((prev) => [...prev, { url: result.url!, file_name: file.name, file_path: result.path! }])
+                } else if (result.error) {
+                    message.error(`${file.name}: ${result.error}`)
+                }
+            }
+        } finally {
+            setLoading(false)
+        }
     }
 
     const handleUpdateTodo = async (values: any) => {
@@ -801,6 +879,29 @@ export default function TodoDetailContent({
                     selectedTagIds.map((tagId) => ({ ticket_id: todoData.id, tag_id: tagId }))
                 )
             }
+
+            if (deletedDescriptionAttachmentIds.length > 0) {
+                await supabase.from('ticket_attachments').delete().in('id', deletedDescriptionAttachmentIds)
+            }
+            if (newDescriptionAttachments.length > 0) {
+                await supabase.from('ticket_attachments').insert(
+                    newDescriptionAttachments.map((a) => ({
+                        ticket_id: todoData.id,
+                        file_url: a.url,
+                        file_name: a.file_name,
+                        file_path: a.file_path,
+                        uploaded_by: currentUser.id,
+                    }))
+                )
+            }
+            setNewDescriptionAttachments([])
+            setDeletedDescriptionAttachmentIds([])
+            const { data: refreshed } = await supabase
+                .from('ticket_attachments')
+                .select('id, file_url, file_name, file_path')
+                .eq('ticket_id', todoData.id)
+                .order('created_at', { ascending: true })
+            setDescriptionAttachmentsFromDb(refreshed || [])
 
             message.success('Todo updated successfully')
             setEditModalVisible(false)
@@ -890,7 +991,7 @@ export default function TodoDetailContent({
                                     icon={<EditOutlined />}
                                     onClick={handleEditTodo}
                                 >
-                                    Edit Todo
+                                    Edit Ticket
                                 </Button>
                             </div>
                         </div>
@@ -938,7 +1039,11 @@ export default function TodoDetailContent({
                                             canDeleteComment={canDeleteComment}
                                             newComment={newComment}
                                             onNewCommentChange={setNewComment}
+                                            newCommentAttachments={newCommentAttachments}
+                                            onRemoveNewCommentAttachment={(i) => setNewCommentAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                                            onCommentFilesSelected={handleCommentFilesSelected}
                                             onAddComment={handleAddComment}
+                                            addCommentLoading={loading}
                                             attributes={attributes}
                                             newAttributeKey={newAttributeKey}
                                             newAttributeValue={newAttributeValue}
@@ -982,7 +1087,7 @@ export default function TodoDetailContent({
                     </Card>
 
                     <Modal
-                        title="Edit Todo"
+                        title="Edit Ticket"
                         open={editModalVisible}
                         onCancel={() => {
                             setEditModalVisible(false)
@@ -1003,7 +1108,34 @@ export default function TodoDetailContent({
                             </Form.Item>
 
                             <Form.Item name="description" label="Description">
-                                <TextArea rows={4} placeholder="Todo Description" />
+                                <CommentWysiwyg ticketId={todoData?.id} placeholder="Todo Description" height="160px" />
+                            </Form.Item>
+
+                            <Form.Item label="Attachments">
+                                <Space direction="vertical" style={{ width: '100%' }} size="small">
+                                    {descriptionAttachmentsFromDb
+                                        .filter((a) => !deletedDescriptionAttachmentIds.includes(a.id))
+                                        .map((a) => (
+                                            <Space key={a.id} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                                <a href={a.file_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <PaperClipOutlined /> {a.file_name}
+                                                </a>
+                                                <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => setDeletedDescriptionAttachmentIds((prev) => [...prev, a.id])} />
+                                            </Space>
+                                        ))}
+                                    {newDescriptionAttachments.map((a, i) => (
+                                        <Space key={`new-${i}`} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                            <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <PaperClipOutlined /> {a.file_name}
+                                            </a>
+                                            <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => setNewDescriptionAttachments((prev) => prev.filter((_, idx) => idx !== i))} />
+                                        </Space>
+                                    ))}
+                                    <input type="file" multiple style={{ display: 'none' }} id="edit-ticket-files-input" onChange={(e) => { handleDescriptionFilesSelected(e.target.files); e.target.value = '' }} />
+                                    <Button icon={<PaperClipOutlined />} onClick={() => document.getElementById('edit-ticket-files-input')?.click()}>
+                                        Attach files
+                                    </Button>
+                                </Space>
                             </Form.Item>
 
                             <Form.Item name="status" label="Status" rules={[{ required: true }]}>

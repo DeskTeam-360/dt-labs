@@ -42,7 +42,7 @@ export default function TabAttributes({
   loading,
 }: TabAttributesProps) {
   return (
-    <Space direction="vertical" style={{ width: '100%' }} size="middle">
+    <Space orientation="vertical" style={{ width: '100%' }} size="middle">
       <Row gutter={[16, 16]} align="bottom">
         <Col xs={24} sm={10}>
           <div>

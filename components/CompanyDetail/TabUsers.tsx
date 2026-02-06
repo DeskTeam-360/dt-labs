@@ -21,7 +21,7 @@ export default function TabUsers({ companyData }: TabUsersProps) {
               key={index}
               label={cu.users?.full_name || cu.users?.email || 'User'}
             >
-              <Space direction="vertical" size="small">
+              <Space orientation="vertical" size="small">
                 <Text>
                   <strong>Email:</strong> {cu.users?.email || 'N/A'}
                 </Text>

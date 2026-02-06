@@ -33,13 +33,16 @@ import {
   EyeOutlined,
   MoreOutlined,
   FilterOutlined,
+  PaperClipOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/client'
+import { uploadTicketFile, uploadTicketFileDraft } from '@/utils/storage'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
+import CommentWysiwyg from './TodoDetail/CommentWysiwyg'
 import dayjs from 'dayjs'
 import {
   DndContext,
@@ -432,6 +435,9 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
   const [filterCompanyId, setFilterCompanyId] = useState<string | undefined>(undefined)
   const [filterTagIds, setFilterTagIds] = useState<string[]>([])
   const [filterSearch, setFilterSearch] = useState('')
+  const [ticketAttachmentsFromDb, setTicketAttachmentsFromDb] = useState<{ id: string; file_url: string; file_name: string; file_path: string }[]>([])
+  const [newTicketAttachments, setNewTicketAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
+  const [deletedTicketAttachmentIds, setDeletedTicketAttachmentIds] = useState<string[]>([])
   const supabase = createClient()
 
   const filteredTodos = useMemo(() => {
@@ -689,6 +695,9 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
     setEditingTodo(null)
     setSelectedAssignees([])
     setSelectedTagIds([])
+    setNewTicketAttachments([])
+    setDeletedTicketAttachmentIds([])
+    setTicketAttachmentsFromDb([])
     form.resetFields()
     form.setFieldsValue({
       status: allStatuses[0]?.slug ?? 'to_do',
@@ -701,6 +710,8 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
     setEditingTodo(record)
     setSelectedAssignees(record.assignees?.map((a) => a.user_id) || [])
     setSelectedTagIds(record.tags?.map((t) => t.id) || [])
+    setNewTicketAttachments([])
+    setDeletedTicketAttachmentIds([])
     form.setFieldsValue({
       title: record.title,
       description: record.description || '',
@@ -712,6 +723,38 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
       due_date: record.due_date ? dayjs(record.due_date) : null,
     })
     setModalVisible(true)
+  }
+
+  useEffect(() => {
+    if (!modalVisible || !editingTodo?.id) return
+    const fetchAttachments = async () => {
+      const { data } = await supabase
+        .from('ticket_attachments')
+        .select('id, file_url, file_name, file_path')
+        .eq('ticket_id', editingTodo.id)
+        .order('created_at', { ascending: true })
+      setTicketAttachmentsFromDb(data || [])
+    }
+    fetchAttachments()
+  }, [modalVisible, editingTodo?.id])
+
+  const handleTicketFilesSelected = async (files: FileList | null) => {
+    if (!files?.length) return
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const result = editingTodo
+          ? await uploadTicketFile(file, editingTodo.id, 'attachments')
+          : await uploadTicketFileDraft(file, 'attachments')
+        if (result.url && result.path) {
+          setNewTicketAttachments((prev) => [...prev, { url: result.url!, file_name: file.name, file_path: result.path! }])
+        } else if (result.error) {
+          message.error(`${file.name}: ${result.error}`)
+        }
+      }
+    } catch (e) {
+      message.error('Failed to upload file')
+    }
   }
 
   const handleDelete = async (todoId: number) => {
@@ -800,6 +843,21 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
           )
         }
 
+        if (deletedTicketAttachmentIds.length > 0) {
+          await supabase.from('ticket_attachments').delete().in('id', deletedTicketAttachmentIds)
+        }
+        if (newTicketAttachments.length > 0) {
+          await supabase.from('ticket_attachments').insert(
+            newTicketAttachments.map((a) => ({
+              ticket_id: editingTodo.id,
+              file_url: a.url,
+              file_name: a.file_name,
+              file_path: a.file_path,
+              uploaded_by: currentUser.id,
+            }))
+          )
+        }
+
         message.success('Ticket updated successfully')
       } else {
         const { data: newTodo, error } = await supabase
@@ -832,6 +890,18 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
           )
         }
 
+        if (newTicketAttachments.length > 0) {
+          await supabase.from('ticket_attachments').insert(
+            newTicketAttachments.map((a) => ({
+              ticket_id: newTodo.id,
+              file_url: a.url,
+              file_name: a.file_name,
+              file_path: a.file_path,
+              uploaded_by: currentUser.id,
+            }))
+          )
+        }
+
         message.success('Ticket created successfully')
       }
 
@@ -839,6 +909,8 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
       form.resetFields()
       setSelectedAssignees([])
       setSelectedTagIds([])
+      setNewTicketAttachments([])
+      setDeletedTicketAttachmentIds([])
       fetchTodos()
     } catch (error: any) {
       message.error(error.message || 'Failed to save todo')
@@ -1038,7 +1110,34 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
               </Form.Item>
 
               <Form.Item name="description" label="Description">
-                <TextArea rows={4} placeholder="Ticket Description" />
+                <CommentWysiwyg ticketId={editingTodo?.id} placeholder="Ticket Description" height="160px" />
+              </Form.Item>
+
+              <Form.Item label="Attachments">
+                <Space direction="vertical" style={{ width: '100%' }} size="small">
+                  {ticketAttachmentsFromDb
+                    .filter((a) => !deletedTicketAttachmentIds.includes(a.id))
+                    .map((a) => (
+                      <Space key={a.id} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        <a href={a.file_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <PaperClipOutlined /> {a.file_name}
+                        </a>
+                        <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => setDeletedTicketAttachmentIds((prev) => [...prev, a.id])} />
+                      </Space>
+                    ))}
+                  {newTicketAttachments.map((a, i) => (
+                    <Space key={`new-${i}`} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <PaperClipOutlined /> {a.file_name}
+                      </a>
+                      <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => setNewTicketAttachments((prev) => prev.filter((_, idx) => idx !== i))} />
+                    </Space>
+                  ))}
+                  <input type="file" multiple style={{ display: 'none' }} id="ticket-files-input" onChange={(e) => { handleTicketFilesSelected(e.target.files); e.target.value = '' }} />
+                  <Button icon={<PaperClipOutlined />} onClick={() => document.getElementById('ticket-files-input')?.click()}>
+                    Attach files
+                  </Button>
+                </Space>
               </Form.Item>
 
               <Form.Item name="status" label="Status" rules={[{ required: true }]}>

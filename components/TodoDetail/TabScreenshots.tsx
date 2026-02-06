@@ -27,7 +27,7 @@ interface TabScreenshotsProps {
 
 export default function TabScreenshots({ screenshots }: TabScreenshotsProps) {
   return (
-    <Space direction="vertical" style={{ width: '100%' }} size="middle">
+    <Space orientation="vertical" style={{ width: '100%' }} size="middle">
       {screenshots.length > 0 ? (
         <Row gutter={[16, 16]}>
           {screenshots.map((screenshot) => (
