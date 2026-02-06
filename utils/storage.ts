@@ -29,9 +29,9 @@ export async function uploadFile(file: File, path: string): Promise<{ url: strin
       .getPublicUrl(data.path)
 
     return { url: urlData.publicUrl, error: null }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to upload file:', error)
-    return { url: null, error: error.message || 'Failed to upload file' }
+    return { url: null, error: error instanceof Error ? error.message : 'Failed to upload file' }
   }
 }
 

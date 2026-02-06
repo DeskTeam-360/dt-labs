@@ -28,8 +28,10 @@ import {
   UserDeleteOutlined,
   TeamOutlined,
   UserOutlined,
+  EyeOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
@@ -349,7 +351,11 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
       title: 'Team Name',
       dataIndex: 'name',
       key: 'name',
-      render: (name: string) => <strong>{name}</strong>,
+      render: (name: string, record: TeamRecord) => (
+        <Link href={`/teams/${record.id}`} style={{ fontWeight: 600 }}>
+          {name}
+        </Link>
+      ),
     },
     {
       title: 'Type',
@@ -383,6 +389,11 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
       key: 'actions',
       render: (_, record) => (
         <Space>
+          <Tooltip title="View team detail">
+            <Link href={`/teams/${record.id}`}>
+              <Button type="default" icon={<EyeOutlined />} size="small" />
+            </Link>
+          </Tooltip>
           <Tooltip title="Manage Members">
             <Button
               type="primary"

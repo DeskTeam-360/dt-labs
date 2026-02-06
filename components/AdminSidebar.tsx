@@ -19,6 +19,7 @@ import {
   RobotOutlined,
   TagOutlined,
   AppstoreOutlined,
+  ApiOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
@@ -139,6 +140,11 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       key: '/crawl-sessions',
       icon: <GlobalOutlined />,
       label: 'Crawling',
+    },
+    {
+      key: '/freshdesk-test',
+      icon: <ApiOutlined />,
+      label: 'Freshdesk API Test',
     },
     // {
     //   key: '/settings',

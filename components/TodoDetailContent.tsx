@@ -387,7 +387,10 @@ export default function TodoDetailContent({
         try {
             const stopTime = new Date().toISOString()
             const startTime = new Date(activeTimeTracker.start_time)
-            const durationSeconds = Math.floor((new Date(stopTime).getTime() - startTime.getTime()) / 1000)
+            let durationSeconds = Math.floor((new Date(stopTime).getTime() - startTime.getTime()) / 1000)
+            const MAX_DURATION = 2147483647
+            if (durationSeconds > MAX_DURATION) durationSeconds = MAX_DURATION
+            if (durationSeconds < 0) durationSeconds = 0
 
             const { error } = await supabase
                 .from('todo_time_tracker')
@@ -395,7 +398,7 @@ export default function TodoDetailContent({
                     stop_time: stopTime,
                     duration_seconds: durationSeconds,
                 })
-                .eq('id', activeTimeTracker.id)
+                .eq('id', String(activeTimeTracker.id))
 
             if (error) throw error
 
@@ -404,7 +407,7 @@ export default function TodoDetailContent({
             message.success('Time tracker stopped')
             fetchTimeTrackerSessions()
         } catch (error: any) {
-            message.error(error.message || 'Failed to stop time tracker')
+            message.error(error?.message || 'Failed to stop time tracker')
         } finally {
             setLoading(false)
         }

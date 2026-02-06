@@ -1,7 +1,7 @@
 'use client'
 
 import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Row, Col, Divider, Tabs, Form, Input, message, Spin, Select, Table, Popconfirm, Switch, Modal, Progress } from 'antd'
-import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, TeamOutlined, DatabaseOutlined, SaveOutlined, FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, GlobalOutlined, PlayCircleOutlined, EyeOutlined, ReadOutlined, CloudUploadOutlined, HistoryOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, TeamOutlined, DatabaseOutlined, SaveOutlined, FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, GlobalOutlined, PlayCircleOutlined, EyeOutlined, ReadOutlined, CloudUploadOutlined, HistoryOutlined, CheckSquareOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
@@ -16,6 +16,7 @@ import {
   TabKnowledgeBase,
   TabWebsites,
   TabCrawling,
+  TabTickets,
 } from './CompanyDetail'
 
 const { Content } = Layout
@@ -934,6 +935,15 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
         </span>
       ),
       children: <TabUsers companyData={companyData} />,
+    },
+    {
+      key: 'tickets',
+      label: (
+        <span>
+          <CheckSquareOutlined /> Tickets
+        </span>
+      ),
+      children: <TabTickets companyData={companyData} />,
     },
     {
       key: 'data-form',
