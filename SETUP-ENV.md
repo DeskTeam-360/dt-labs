@@ -37,6 +37,12 @@ OPENAI_API_KEY=sk-your_openai_api_key_here
 # OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 # Optional: model untuk generate konten dari knowledge base / RAG (default: gpt-4o-mini)
 # OPENAI_CHAT_MODEL=gpt-4o-mini
+
+# --- Freshdesk API (untuk testing integrasi) ---
+# Domain helpdesk (tanpa .freshdesk.com). Contoh: mycompany -> https://mycompany.freshdesk.com
+# FRESHDESK_DOMAIN=mycompany
+# API key dari Profile Settings di Freshdesk portal
+# FRESHDESK_API_KEY=your_freshdesk_api_key_here
 ```
 
 ### 4. Cara Mendapatkan Service Role Key
@@ -99,6 +105,24 @@ Agar fitur yang memakai OpenAI (misalnya embeddings untuk `company_knowledge_bas
 ⚠️ **PENTING**:  
 - Jangan commit `OPENAI_API_KEY` ke git.  
 - Di production, set env ini di dashboard hosting (Vercel, dll.).  
+
+---
+
+## Freshdesk API (Testing)
+
+Untuk menu **Freshdesk API Test** (testing integrasi Freshdesk):
+
+1. **FRESHDESK_DOMAIN** – nama domain helpdesk tanpa `.freshdesk.com`. Contoh: jika URL helpdesk Anda `https://mycompany.freshdesk.com`, isi `mycompany`.
+2. **FRESHDESK_API_KEY** – API key dari Freshdesk: Profile picture → Profile settings → API key (di bawah change password).
+
+Tambahkan di `.env.local`:
+
+```env
+FRESHDESK_DOMAIN=mycompany
+FRESHDESK_API_KEY=your_freshdesk_api_key_here
+```
+
+Key hanya dipakai di server (API route), tidak di-expose ke browser.
 
 ---
 

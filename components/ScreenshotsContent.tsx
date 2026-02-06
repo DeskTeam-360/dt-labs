@@ -90,9 +90,10 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
 
       if (error) throw error
 
-      // Update local state
+      // Update local state (normalize todoId to number | null for Screenshot type)
+      const normalizedTodoId: number | null = todoId === null || todoId === undefined || todoId === '' ? null : Number(todoId)
       setScreenshots(prev => prev.map(s => 
-        s.id === screenshotId ? { ...s, todo_id: todoId } : s
+        s.id === screenshotId ? { ...s, todo_id: normalizedTodoId } : s
       ))
 
       message.success('Screenshot linked to ticket successfully')
@@ -294,7 +295,7 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
                   style={{ width: '100%', marginTop: 8 }}
                   placeholder="Select a ticket"
                   value={selectedScreenshot.todo_id}
-                  onChange={(todoId) => handleLinkToTodo(selectedScreenshot.id, todoId)}
+                  onChange={(todoId) => handleLinkToTodo(selectedScreenshot.id, todoId.toString())}
                 >
                   <Option value={null}>No Todo</Option>
                   {todos.map(todo => (
