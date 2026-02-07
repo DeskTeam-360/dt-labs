@@ -15,6 +15,7 @@ import {
   Empty,
   Popconfirm,
   Flex,
+  Select,
 } from 'antd'
 import {
   UserOutlined,
@@ -60,10 +61,29 @@ interface Attribute {
   updated_at: string
 }
 
+interface StatusOption {
+  slug: string
+  title: string
+  color: string
+}
+
 interface TabGeneralProps {
   todoData: any
   getStatusColor: (status: string) => string
   getStatusLabel: (status: string) => string
+  statusOptions: StatusOption[]
+  onStatusChange: (newStatus: string) => void | Promise<void>
+  statusChanging?: boolean
+  typeOptions: { id: number; title: string; slug: string; color: string }[]
+  onTypeChange: (typeId: number | null) => void | Promise<void>
+  typeChanging?: boolean
+  companyOptions: { id: string; name: string }[]
+  onCompanyChange: (companyId: string | null) => void | Promise<void>
+  companyChanging?: boolean
+  tagOptions: { id: string; name: string; slug: string }[]
+  selectedTagIds: string[]
+  onTagsChange: (tagIds: string[]) => void | Promise<void>
+  tagsChanging?: boolean
   totalTimeSeconds: number
   activeTimeTracker: any
   currentTime: number
@@ -110,6 +130,19 @@ export default function TabGeneral({
   todoData,
   getStatusColor,
   getStatusLabel,
+  statusOptions,
+  onStatusChange,
+  statusChanging = false,
+  typeOptions,
+  onTypeChange,
+  typeChanging = false,
+  companyOptions,
+  onCompanyChange,
+  companyChanging = false,
+  tagOptions,
+  selectedTagIds,
+  onTagsChange,
+  tagsChanging = false,
   totalTimeSeconds,
   activeTimeTracker,
   currentTime,
@@ -330,45 +363,59 @@ export default function TabGeneral({
         <Col xs={10}>
           <Descriptions column={1} bordered>
             <Descriptions.Item label="Status">
-              <Tag color={getStatusColor(todoData.status)} style={{ fontSize: 14, padding: '4px 12px' }}>
-                {getStatusLabel(todoData.status)}
-              </Tag>
+              <Select
+
+                value={todoData.status ?? undefined}
+                onChange={(value) => value && onStatusChange(value)}
+                loading={statusChanging}
+                options={statusOptions.map((s) => ({
+                  value: s.slug,
+                  label: (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Tag color={s.color} style={{ margin: 0 }}>{s.title}</Tag>
+                    </span>
+                  ),
+                }))}
+                style={{ minWidth: 140, width: '100%' }}
+                allowClear={false}
+              />
             </Descriptions.Item>
-            {todoData.type && (
-              <Descriptions.Item label="Type">
-                <Tag color={todoData.type.color} style={{ fontSize: 14, padding: '4px 12px' }}>
-                  {todoData.type.title}
-                </Tag>
-              </Descriptions.Item>
-            )}
-            {todoData.company && (
-              <Descriptions.Item label="Company">
-                <Tag
-                  color={(todoData.company as any).color ? undefined : 'cyan'}
-                  style={
-                    (todoData.company as any).color
-                      ? { backgroundColor: (todoData.company as any).color, borderColor: (todoData.company as any).color, color: '#fff' }
-                      : undefined
-                  }
-                >
-                  {todoData.company.name}
-                </Tag>
-              </Descriptions.Item>
-            )}
-            <Descriptions.Item label="Description">
-              {todoData.description ? (
-                todoData.description && /<[a-z][\s\S]*>/i.test(todoData.description) ? (
-                  <div
-                    className="ql-editor comment-html"
-                    style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
-                    dangerouslySetInnerHTML={{ __html: todoData.description }}
-                  />
-                ) : (
-                  <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{todoData.description}</Paragraph>
-                )
-              ) : (
-                <Text type="secondary" italic>No description. Click Edit to add a note.</Text>
-              )}
+            <Descriptions.Item label="Type">
+              <Select
+                value={todoData.type_id ?? undefined}
+                onChange={(v) => onTypeChange(v ?? null)}
+                loading={typeChanging}
+                options={typeOptions.map((t) => ({
+                  value: t.id,
+                  label: <Tag color={t.color} style={{ margin: 0 }}>{t.title}</Tag>,
+                }))}
+                style={{ minWidth: 140, width: '100%' }}
+                allowClear
+                placeholder="Select type"
+              />
+            </Descriptions.Item>
+            <Descriptions.Item label="Company">
+              <Select
+                value={todoData.company_id ?? undefined}
+                onChange={(v) => onCompanyChange(v ?? null)}
+                loading={companyChanging}
+                options={companyOptions.map((c) => ({ value: c.id, label: c.name }))}
+                style={{ minWidth: 140, width: '100%' }}
+                allowClear
+                placeholder="Select company"
+              />
+            </Descriptions.Item>
+            <Descriptions.Item label="Tags">
+              <Select
+                mode="multiple"
+                value={selectedTagIds}
+                onChange={(v) => onTagsChange(v ?? [])}
+                loading={tagsChanging}
+                options={tagOptions.map((t) => ({ value: t.id, label: t.name }))}
+                style={{ minWidth: 160, width: '100%' }}
+                placeholder="Select tags"
+                allowClear
+              />
             </Descriptions.Item>
             <Descriptions.Item label="Created By">
               <Space>

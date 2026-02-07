@@ -128,6 +128,14 @@ const DEFAULT_ALL_STATUSES = [
   { slug: 'cancel', title: 'Cancel' },
   { slug: 'archived', title: 'Archived' },
 ]
+// All statuses with color for kanban columns when filter is active (including cancel, archived)
+const DEFAULT_ALL_STATUS_COLUMNS = [
+  { id: 'to_do', title: 'To Do', color: '#faad14' },
+  { id: 'in_progress', title: 'In Progress', color: '#1890ff' },
+  { id: 'completed', title: 'Completed', color: '#52c41a' },
+  { id: 'cancel', title: 'Cancel', color: '#8c8c8c' },
+  { id: 'archived', title: 'Archived', color: '#595959' },
+]
 
 // Kanban Card Component
 function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (todo: TodoRecord) => void; onDelete: (id: number) => void }) {
@@ -262,20 +270,7 @@ function KanbanCard({ todo, onEdit, onDelete }: { todo: TodoRecord; onEdit: (tod
           )}
         </Flex>
 
-        <div style={{ marginBottom: 8 }}>
-          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>
-            Description
-          </Text>
-          <Text
-            type="secondary"
-            ellipsis={{ tooltip: todo.description && todo.description.length > 100 ? todo.description : false }}
-            style={{ display: 'block', fontSize: 12 }}
-          >
-            {todo.description && todo.description.trim().length > 0
-              ? (todo.description.length > 100 ? `${todo.description.slice(0, 100)}...` : todo.description)
-              : '—'}
-          </Text>
-        </div>
+       
 
         {Number(todo.checklist_total) > 0 ? (
           <Tag color="green" style={{ fontSize: 11, marginBottom: 8 }}>
@@ -346,16 +341,7 @@ function KanbanColumn({
   // Filter todos by status
   let columnTodos = todos.filter((todo) => todo.status === column.id)
   
-  // // For completed column, only show todos completed within last 7 days
-  // if (column.id === 'completed') {
-  //   const sevenDaysAgo = dayjs().subtract(7, 'days')
-  //   columnTodos = columnTodos.filter((todo) => {
-  //     // Check if todo was updated to completed within last 7 days
-  //     // We'll use updated_at to determine when it was completed
-  //     const updatedDate = dayjs(todo.updated_at)
-  //     return updatedDate.isAfter(sevenDaysAgo)
-  //   })
-  // }
+
   
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -429,11 +415,13 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
   const [allTags, setAllTags] = useState<Array<{ id: string; name: string; slug: string; color?: string }>>([])
   const [activeId, setActiveId] = useState<number | null>(null)
   const [statusColumns, setStatusColumns] = useState<{ id: string; title: string; color: string }[]>(DEFAULT_KANBAN_COLUMNS)
+  const [allStatusColumns, setAllStatusColumns] = useState<{ id: string; title: string; color: string }[]>(DEFAULT_ALL_STATUS_COLUMNS)
   const [allStatuses, setAllStatuses] = useState<{ slug: string; title: string }[]>(DEFAULT_ALL_STATUSES)
-  const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined)
+  const [filterStatus, setFilterStatus] = useState<string[]>(DEFAULT_KANBAN_COLUMNS.map((c) => c.id))
   const [filterTypeId, setFilterTypeId] = useState<number | undefined>(undefined)
   const [filterCompanyId, setFilterCompanyId] = useState<string | undefined>(undefined)
   const [filterTagIds, setFilterTagIds] = useState<string[]>([])
+  const [filterDateRange, setFilterDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null)
   const [filterSearch, setFilterSearch] = useState('')
   const [ticketAttachmentsFromDb, setTicketAttachmentsFromDb] = useState<{ id: string; file_url: string; file_name: string; file_path: string }[]>([])
   const [newTicketAttachments, setNewTicketAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
@@ -442,8 +430,8 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
 
   const filteredTodos = useMemo(() => {
     return todos.filter((todo) => {
-      if (filterStatus != null && filterStatus !== '') {
-        if (todo.status !== filterStatus) return false
+      if (filterStatus.length > 0) {
+        if (!filterStatus.includes(todo.status)) return false
       }
       if (filterTypeId != null) {
         if (todo.type_id !== filterTypeId) return false
@@ -456,6 +444,10 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
         const hasMatch = filterTagIds.some((tagId) => todoTagIds.includes(tagId))
         if (!hasMatch) return false
       }
+      if (filterDateRange && filterDateRange[0] && filterDateRange[1]) {
+        const created = dayjs(todo.created_at)
+        if (created.isBefore(filterDateRange[0].startOf('day')) || created.isAfter(filterDateRange[1].endOf('day'))) return false
+      }
       if (filterSearch.trim()) {
         const q = filterSearch.trim().toLowerCase()
         const matchTitle = todo.title?.toLowerCase().includes(q)
@@ -464,7 +456,13 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
       }
       return true
     })
-  }, [todos, filterStatus, filterTypeId, filterCompanyId, filterTagIds, filterSearch])
+  }, [todos, filterStatus, filterTypeId, filterCompanyId, filterTagIds, filterDateRange, filterSearch])
+
+  // Kolom kanban yang ditampilkan: saat filter status aktif pakai semua status (termasuk cancel/archived), else pakai statusColumns (show_in_kanban saja)
+  const columnsToShow = useMemo(
+    () => (filterStatus.length > 0 ? allStatusColumns.filter((c) => filterStatus.includes(c.id)) : statusColumns),
+    [filterStatus, allStatusColumns, statusColumns]
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -624,10 +622,13 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
       if (error) throw error
       const list = (data || []) as TodoStatusRecord[]
       if (list.length > 0) {
+        const kanbanSlugs = list.filter((s) => s.show_in_kanban).map((s) => s.slug)
         setStatusColumns(
           list.filter((s) => s.show_in_kanban).map((s) => ({ id: s.slug, title: s.title, color: s.color }))
         )
+        setAllStatusColumns(list.map((s) => ({ id: s.slug, title: s.title, color: s.color })))
         setAllStatuses(list.map((s) => ({ slug: s.slug, title: s.title })))
+        setFilterStatus(kanbanSlugs)
       }
     } catch (error: any) {
       console.error('Failed to fetch todo statuses, using defaults:', error)
@@ -659,15 +660,14 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
     var newStatus = over.id as string
 
 
-       // Only allow drop on kanban columns (statuses with show_in_kanban)
-    if (!statusColumns.some((c) => c.id === newStatus)) {
+       // Allow drop on any visible column (when filter active: includes cancel/archived; else: show_in_kanban only)
+    if (!columnsToShow.some((c) => c.id === newStatus)) {
       const todo = todos.find((t) => t.id === Number(newStatus))
       if (todo) {
         newStatus = todo?.status as string
-      }else{
+      } else {
         return
       }
-      
     }
 
     // Optimistic update
@@ -919,17 +919,19 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
 
   const activeTodo = activeId ? filteredTodos.find((t) => t.id === activeId) : null
   const hasActiveFilters =
-    filterStatus != null ||
+    filterStatus.length > 0 ||
     filterTypeId != null ||
     filterCompanyId != null ||
     filterTagIds.length > 0 ||
+    (filterDateRange != null && filterDateRange[0] != null && filterDateRange[1] != null) ||
     filterSearch.trim() !== ''
 
   const clearFilters = () => {
-    setFilterStatus(undefined)
+    setFilterStatus(statusColumns.map((c) => c.id))
     setFilterTypeId(undefined)
     setFilterCompanyId(undefined)
     setFilterTagIds([])
+    setFilterDateRange(null)
     setFilterSearch('')
   }
 
@@ -952,19 +954,16 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
             <Flex gap="middle" wrap="wrap" align="center" style={{ marginBottom: 16 }}>
               <Space wrap align="center">
                 <FilterOutlined style={{ color: '#8c8c8c' }} />
-                {/* <Select
-                  placeholder="Status"
+                <Select
+                  mode="multiple"
+                  placeholder="Status (all)"
                   allowClear
-                  style={{ minWidth: 140 }}
+                  style={{ minWidth: 180 }}
                   value={filterStatus}
-                  onChange={setFilterStatus}
-                >
-                  {allStatuses.map((s) => (
-                    <Option key={s.slug} value={s.slug}>
-                      {s.title}
-                    </Option>
-                  ))}
-                </Select> */}
+                  onChange={(v) => setFilterStatus(v ?? [])}
+                  options={allStatuses.map((s) => ({ value: s.slug, label: s.title }))}
+                  maxTagCount="responsive"
+                />
                 <Select
                   placeholder="Type"
                   allowClear
@@ -1018,6 +1017,13 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
                     </Option>
                   ))}
                 </Select>
+                <DatePicker.RangePicker
+                  value={filterDateRange}
+                  onChange={(dates) => setFilterDateRange(dates)}
+                  allowClear
+                  style={{ minWidth: 240 }}
+                  placeholder={['Start date', 'End date']}
+                />
                 <Input
                   placeholder="Search title or description..."
                   allowClear
@@ -1059,7 +1065,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
                   margin: -4,
                 }}
               >
-                {statusColumns.map((column) => (
+                {columnsToShow.map((column) => (
                   <KanbanColumn
                     key={column.id}
                     column={column}

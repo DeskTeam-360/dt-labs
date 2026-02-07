@@ -143,6 +143,10 @@ export default function TodoDetailContent({
     const [descriptionAttachmentsFromDb, setDescriptionAttachmentsFromDb] = useState<{ id: string; file_url: string; file_name: string; file_path: string }[]>([])
     const [newDescriptionAttachments, setNewDescriptionAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
     const [deletedDescriptionAttachmentIds, setDeletedDescriptionAttachmentIds] = useState<string[]>([])
+    const [statusChanging, setStatusChanging] = useState(false)
+    const [typeChanging, setTypeChanging] = useState(false)
+    const [companyChanging, setCompanyChanging] = useState(false)
+    const [tagsChanging, setTagsChanging] = useState(false)
     const [form] = Form.useForm()
     const [activeTimeTracker, setActiveTimeTracker] = useState<any>(null)
     const [timeTrackerSessions, setTimeTrackerSessions] = useState<any[]>([])
@@ -765,6 +769,81 @@ export default function TodoDetailContent({
         setEditingDescription(false)
     }
 
+    const handleStatusChange = async (newStatus: string) => {
+        setStatusChanging(true)
+        try {
+            const { error } = await supabase
+                .from('tickets')
+                .update({ status: newStatus, updated_at: new Date().toISOString() })
+                .eq('id', todoData.id)
+            if (error) throw error
+            message.success('Status updated')
+            todoData.status = newStatus
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to update status')
+        } finally {
+            setStatusChanging(false)
+        }
+    }
+
+    const handleTypeChange = async (typeId: number | null) => {
+        setTypeChanging(true)
+        try {
+            const { error } = await supabase
+                .from('tickets')
+                .update({ type_id: typeId, updated_at: new Date().toISOString() })
+                .eq('id', todoData.id)
+            if (error) throw error
+            message.success('Type updated')
+            todoData.type_id = typeId
+            todoData.type = typeId != null ? ticketTypes.find((t) => t.id === typeId) ?? null : null
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to update type')
+        } finally {
+            setTypeChanging(false)
+        }
+    }
+
+    const handleCompanyChange = async (companyId: string | null) => {
+        setCompanyChanging(true)
+        try {
+            const { error } = await supabase
+                .from('tickets')
+                .update({ company_id: companyId, updated_at: new Date().toISOString() })
+                .eq('id', todoData.id)
+            if (error) throw error
+            message.success('Company updated')
+            todoData.company_id = companyId
+            todoData.company = companyId != null ? companies.find((c) => c.id === companyId) ?? null : null
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to update company')
+        } finally {
+            setCompanyChanging(false)
+        }
+    }
+
+    const handleTagsChange = async (tagIds: string[]) => {
+        setTagsChanging(true)
+        try {
+            await supabase.from('ticket_tags').delete().eq('ticket_id', todoData.id)
+            if (tagIds.length > 0) {
+                const { error } = await supabase
+                    .from('ticket_tags')
+                    .insert(tagIds.map((tagId) => ({ ticket_id: todoData.id, tag_id: tagId })))
+                if (error) throw error
+            }
+            message.success('Tags updated')
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to update tags')
+        } finally {
+            setTagsChanging(false)
+        }
+    }
+
     // Edit Todo functions
     const handleEditTodo = () => {
         setSelectedAssignees(todoData.assignees?.map((a: any) => a.user_id) || [])
@@ -937,7 +1016,7 @@ export default function TodoDetailContent({
                                     <Title level={2} style={{ marginBottom: 8 }}>
                                         {todoData.title}
                                     </Title>
-                                    <Space size="middle" wrap>
+                                    {/* <Space size="middle" wrap>
                                         <Tag color={getStatusColor(todoData.status)} style={{ fontSize: 14, padding: '4px 12px' }}>
                                             {getStatusLabel(todoData.status)}
                                         </Tag>
@@ -984,7 +1063,7 @@ export default function TodoDetailContent({
                                                     {t.name}
                                                 </Tag>
                                             ))}
-                                    </Space>
+                                    </Space> */}
                                 </div>
                                 <Button
                                     type="primary"
@@ -1009,6 +1088,19 @@ export default function TodoDetailContent({
                                             todoData={todoData}
                                             getStatusColor={getStatusColor}
                                             getStatusLabel={getStatusLabel}
+                                            statusOptions={allStatusesForSelect}
+                                            onStatusChange={handleStatusChange}
+                                            statusChanging={statusChanging}
+                                            typeOptions={ticketTypes}
+                                            onTypeChange={handleTypeChange}
+                                            typeChanging={typeChanging}
+                                            companyOptions={companies}
+                                            onCompanyChange={handleCompanyChange}
+                                            companyChanging={companyChanging}
+                                            tagOptions={allTags}
+                                            selectedTagIds={initialTags.map((t) => t.id)}
+                                            onTagsChange={handleTagsChange}
+                                            tagsChanging={tagsChanging}
                                             totalTimeSeconds={totalTimeSeconds}
                                             activeTimeTracker={activeTimeTracker}
                                             currentTime={currentTime}

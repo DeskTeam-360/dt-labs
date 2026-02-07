@@ -289,6 +289,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
           admin: 'red',
           manager: 'blue',
           user: 'green',
+          customer: 'purple',
           guest: 'default',
         }
         return <Tag color={colorMap[role] || 'default'}>{role.toUpperCase()}</Tag>
@@ -511,6 +512,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                   <Option value="admin">Admin</Option>
                   <Option value="manager">Manager</Option>
                   <Option value="user">User</Option>
+                  <Option value="customer">Customer</Option>
                   <Option value="guest">Guest</Option>
                 </Select>
               </Form.Item>
