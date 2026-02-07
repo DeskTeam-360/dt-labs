@@ -41,12 +41,25 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     thisWeek: 0,
     thisMonth: 0,
   })
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
   const supabase = createClient()
 
   useEffect(() => {
     setUserData(initialUserData)
     setAvatarUrl(initialUserData.avatar_url)
   }, [initialUserData])
+
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const { data } = await supabase.from('companies').select('id, name').eq('is_active', true).order('name')
+        setCompanies(data || [])
+      } catch {
+        setCompanies([])
+      }
+    }
+    fetchCompanies()
+  }, [])
 
   const fetchTimeTrackerData = useCallback(async (filter?: string, dateRange?: [Dayjs | null, Dayjs | null] | null) => {
     if (!userData?.id) return
@@ -202,6 +215,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       full_name: userData.full_name || '',
       role: userData.role,
       status: userData.status,
+      company_id: userData.company_id || undefined,
       phone: userData.phone || '',
       department: userData.department || '',
       position: userData.position || '',
@@ -270,6 +284,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
         full_name: values.full_name,
         role: values.role,
         status: values.status,
+        company_id: values.company_id || null,
         avatar_url: avatarUrl,
         phone: values.phone || null,
         department: values.department || null,
@@ -626,6 +641,13 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           <Option value="pending">Pending</Option>
                         </Select>
                       </Form.Item>
+                      <Form.Item name="company_id" label="Company">
+                        <Select placeholder="Select Company (optional)" allowClear style={{ width: '100%' }}>
+                          {companies.map((c) => (
+                            <Option key={c.id} value={c.id}>{c.name}</Option>
+                          ))}
+                        </Select>
+                      </Form.Item>
                     </Space>
                   ) : (
                     <Descriptions column={1} bordered>
@@ -643,6 +665,9 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         <Tag color={getStatusColor(userData.status)}>
                           {userData.status?.toUpperCase()}
                         </Tag>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Company">
+                        <Text>{userData.company?.name ?? '—'}</Text>
                       </Descriptions.Item>
                     </Descriptions>
                   )}

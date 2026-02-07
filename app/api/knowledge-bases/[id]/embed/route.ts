@@ -73,6 +73,7 @@ export async function POST(
 
     const resJson = await openaiRes.json()
     const embedding = resJson?.data?.[0]?.embedding as number[] | undefined
+    const totalTokens = resJson?.usage?.total_tokens ?? 0
     if (!embedding || !Array.isArray(embedding) || embedding.length !== EMBEDDING_DIMENSION) {
       return NextResponse.json(
         {
@@ -94,6 +95,16 @@ export async function POST(
         { status: 500 }
       )
     }
+
+    await supabase.from('ai_token_usage').insert({
+      user_id: user.id,
+      used_for: 'knowledge_base_embed',
+      ai_model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+      content_text: null,
+      prompt_tokens: totalTokens,
+      completion_tokens: 0,
+      total_tokens: totalTokens,
+    })
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

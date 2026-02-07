@@ -22,10 +22,13 @@ export default async function UserDetailPage({
   // Await params since it's a Promise in Next.js 15+
   const { id } = await params
 
-  // Fetch user data
+  // Fetch user data with company
   const { data: userData, error } = await supabase
     .from('users')
-    .select('*')
+    .select(`
+      *,
+      company:companies!users_company_id_fkey(id, name)
+    `)
     .eq('id', id)
     .single()
 

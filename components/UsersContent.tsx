@@ -27,6 +27,8 @@ interface UserRecord {
   full_name: string | null
   role: string
   status: string
+  company_id: string | null
+  company?: { id: string; name: string } | null
   avatar_url: string | null
   created_at: string
   last_login_at: string | null
@@ -46,6 +48,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [users, setUsers] = useState<UserRecord[]>([])
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null)
@@ -59,7 +62,10 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select(`
+          *,
+          company:companies!users_company_id_fkey(id, name)
+        `)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -72,8 +78,23 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     }
   }
 
+  const fetchCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name')
+      if (error) throw error
+      setCompanies(data || [])
+    } catch {
+      setCompanies([])
+    }
+  }
+
   useEffect(() => {
     fetchUsers()
+    fetchCompanies()
   }, [])
 
   const handleCreate = () => {
@@ -98,6 +119,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       full_name: record.full_name || '',
       role: record.role,
       status: record.status,
+      company_id: record.company_id || undefined,
       phone: record.phone || '',
       department: record.department || '',
       position: record.position || '',
@@ -182,6 +204,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
           full_name: values.full_name,
           role: values.role,
           status: values.status,
+          company_id: values.company_id || null,
           avatar_url: avatarUrl,
           phone: values.phone || null,
           department: values.department || null,
@@ -239,6 +262,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
             timezone: values.timezone || 'UTC',
             locale: values.locale || 'en',
             is_email_verified: values.is_email_verified || false,
+            company_id: values.company_id || null,
             permissions: permissions,
             metadata: metadata,
           }
@@ -294,6 +318,12 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
         }
         return <Tag color={colorMap[role] || 'default'}>{role.toUpperCase()}</Tag>
       },
+    },
+    {
+      title: 'Company',
+      key: 'company',
+      width: 140,
+      render: (_, r) => (<>{r.company?.name ?? 'N/A'}</>),
     },
     {
       title: 'Status',
@@ -527,6 +557,14 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                   <Option value="inactive">Inactive</Option>
                   <Option value="suspended">Suspended</Option>
                   <Option value="pending">Pending</Option>
+                </Select>
+              </Form.Item>
+
+              <Form.Item name="company_id" label="Company">
+                <Select placeholder="Select Company (optional)" allowClear>
+                  {companies.map((c) => (
+                    <Option key={c.id} value={c.id}>{c.name}</Option>
+                  ))}
                 </Select>
               </Form.Item>
 

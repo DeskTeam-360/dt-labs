@@ -17,6 +17,7 @@ import {
     Select,
     DatePicker,
     Tabs,
+    Flex,
 } from 'antd'
 import {
     ArrowLeftOutlined,
@@ -34,6 +35,7 @@ import { User } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/client'
 import { uploadTicketFile } from '@/utils/storage'
 import AdminSidebar from './AdminSidebar'
+import CustomerNavbar from './CustomerNavbar'
 import DateDisplay from './DateDisplay'
 import { TabGeneral, TabAssignees, TabScreenshots } from './TodoDetail'
 import CommentWysiwyg from './TodoDetail/CommentWysiwyg'
@@ -66,6 +68,8 @@ interface TodoDetailContentProps {
     attributes: any[]
     screenshots?: Screenshot[]
     tags?: Array<{ id: string; name: string; slug: string; color?: string }>
+    /** 'customer' = navbar layout, back to /customer; 'admin' = sidebar layout (default) */
+    variant?: 'admin' | 'customer'
 }
 
 interface ChecklistItem {
@@ -113,6 +117,7 @@ export default function TodoDetailContent({
     attributes: initialAttributes,
     screenshots: initialScreenshots = [],
     tags: initialTags = [],
+    variant = 'admin',
 }: TodoDetailContentProps) {
     const router = useRouter()
     const [collapsed, setCollapsed] = useState(false)
@@ -147,6 +152,7 @@ export default function TodoDetailContent({
     const [typeChanging, setTypeChanging] = useState(false)
     const [companyChanging, setCompanyChanging] = useState(false)
     const [tagsChanging, setTagsChanging] = useState(false)
+    const [dueDateChanging, setDueDateChanging] = useState(false)
     const [form] = Form.useForm()
     const [activeTimeTracker, setActiveTimeTracker] = useState<any>(null)
     const [timeTrackerSessions, setTimeTrackerSessions] = useState<any[]>([])
@@ -825,6 +831,24 @@ export default function TodoDetailContent({
         }
     }
 
+    const handleDueDateChange = async (dueDate: string | null) => {
+        setDueDateChanging(true)
+        try {
+            const { error } = await supabase
+                .from('tickets')
+                .update({ due_date: dueDate, updated_at: new Date().toISOString() })
+                .eq('id', todoData.id)
+            if (error) throw error
+            message.success('Due date updated')
+            todoData.due_date = dueDate
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to update due date')
+        } finally {
+            setDueDateChanging(false)
+        }
+    }
+
     const handleTagsChange = async (tagIds: string[]) => {
         setTagsChanging(true)
         try {
@@ -844,24 +868,7 @@ export default function TodoDetailContent({
         }
     }
 
-    // Edit Todo functions
-    const handleEditTodo = () => {
-        setSelectedAssignees(todoData.assignees?.map((a: any) => a.user_id) || [])
-        setSelectedTagIds(initialTags.map((t) => t.id))
-        setNewDescriptionAttachments([])
-        setDeletedDescriptionAttachmentIds([])
-        form.setFieldsValue({
-            title: todoData.title,
-            description: todoData.description || '',
-            status: todoData.status,
-            visibility: todoData.visibility,
-            team_id: todoData.team_id,
-            type_id: todoData.type_id ?? undefined,
-            company_id: todoData.company_id ?? undefined,
-            due_date: todoData.due_date ? dayjs(todoData.due_date) : null,
-        })
-        setEditModalVisible(true)
-    }
+  
 
     useEffect(() => {
         if (!editModalVisible || !todoData?.id) return
@@ -907,16 +914,18 @@ export default function TodoDetailContent({
                 return
             }
 
-            const updateData = {
+            const updateData: Record<string, unknown> = {
                 title: values.title,
                 description: values.description || null,
                 status: values.status,
                 visibility: values.visibility,
                 team_id: values.team_id || null,
                 type_id: values.type_id ?? null,
-                company_id: values.company_id ?? null,
                 due_date: values.due_date ? values.due_date.toISOString() : null,
                 updated_at: new Date().toISOString(),
+            }
+            if (variant !== 'customer') {
+                updateData.company_id = values.company_id ?? null
             }
 
             const { error } = await supabase
@@ -952,11 +961,13 @@ export default function TodoDetailContent({
                     .eq('todo_id', todoData.id)
             }
 
-            await supabase.from('ticket_tags').delete().eq('ticket_id', todoData.id)
-            if (selectedTagIds.length > 0) {
-                await supabase.from('ticket_tags').insert(
-                    selectedTagIds.map((tagId) => ({ ticket_id: todoData.id, tag_id: tagId }))
-                )
+            if (variant !== 'customer') {
+                await supabase.from('ticket_tags').delete().eq('ticket_id', todoData.id)
+                if (selectedTagIds.length > 0) {
+                    await supabase.from('ticket_tags').insert(
+                        selectedTagIds.map((tagId) => ({ ticket_id: todoData.id, tag_id: tagId }))
+                    )
+                }
             }
 
             if (deletedDescriptionAttachmentIds.length > 0) {
@@ -996,85 +1007,36 @@ export default function TodoDetailContent({
 
     const completedChecklistCount = checklistItems.filter((item) => item.is_completed).length
     const totalChecklistCount = checklistItems.length
+    const isCustomer = variant === 'customer'
 
     return (
         <Layout style={{ minHeight: '100vh' }}>
-            <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
+            {isCustomer ? (
+                <CustomerNavbar user={currentUser} />
+            ) : (
+                <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
+            )}
 
-            <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
+            <Layout style={{ marginLeft: isCustomer ? 0 : (collapsed ? 80 : 250), transition: 'margin-left 0.2s' }}>
                 <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
                     <Card>
-                        <Space style={{ marginBottom: 24 }}>
-                            <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/tickets')}>
-                                Back to Todos
+                        <Flex gap={16} align='center' style={{ marginBottom: 24 }}>
+                            <Button
+                                icon={<ArrowLeftOutlined />}
+                                onClick={() => router.push(isCustomer ? '/customer' : '/tickets')}
+                            >
+                                Back to {isCustomer ? 'Portal' : 'Todos'}
                             </Button>
-                        </Space>
-
-                        <div style={{ marginBottom: 32 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{ flex: 1 }}>
-                                    <Title level={2} style={{ marginBottom: 8 }}>
+                                    <Title level={2} >
                                         {todoData.title}
                                     </Title>
-                                    {/* <Space size="middle" wrap>
-                                        <Tag color={getStatusColor(todoData.status)} style={{ fontSize: 14, padding: '4px 12px' }}>
-                                            {getStatusLabel(todoData.status)}
-                                        </Tag>
-                                        {todoData.type && (
-                                            <Tag color={todoData.type.color} style={{ fontSize: 14, padding: '4px 12px' }}>
-                                                {todoData.type.title}
-                                            </Tag>
-                                        )}
-                                        {todoData.company && (
-                                            <Tag
-                                                color={todoData.company.color ? undefined : 'cyan'}
-                                                style={{
-                                                  fontSize: 14,
-                                                  padding: '4px 12px',
-                                                  ...(todoData.company.color
-                                                    ? { backgroundColor: todoData.company.color, borderColor: todoData.company.color, color: '#fff' }
-                                                    : {}),
-                                                }}
-                                            >
-                                                {todoData.company.name}
-                                            </Tag>
-                                        )}
-                                        <Tag color={getVisibilityColor(todoData.visibility)} style={{ fontSize: 14, padding: '4px 12px' }}>
-                                            {todoData.visibility?.toUpperCase()}
-                                        </Tag>
-                                        {todoData.team && (
-                                            <Tag color="blue" style={{ fontSize: 14, padding: '4px 12px' }}>
-                                                Team: {todoData.team.name}
-                                            </Tag>
-                                        )}
-                                        {initialTags.length > 0 &&
-                                            initialTags.map((t) => (
-                                                <Tag
-                                                    key={t.id}
-                                                    color={t.color ? undefined : 'default'}
-                                                    style={{
-                                                        fontSize: 14,
-                                                        padding: '4px 12px',
-                                                        ...(t.color
-                                                            ? { backgroundColor: t.color, borderColor: t.color, color: '#fff' }
-                                                            : {}),
-                                                    }}
-                                                >
-                                                    {t.name}
-                                                </Tag>
-                                            ))}
-                                    </Space> */}
                                 </div>
-                                <Button
-                                    type="primary"
-                                    icon={<EditOutlined />}
-                                    onClick={handleEditTodo}
-                                >
-                                    Edit Ticket
-                                </Button>
                             </div>
-                        </div>
+                        </Flex>
 
+                            
                         <Divider />
 
                         <Tabs
@@ -1101,6 +1063,9 @@ export default function TodoDetailContent({
                                             selectedTagIds={initialTags.map((t) => t.id)}
                                             onTagsChange={handleTagsChange}
                                             tagsChanging={tagsChanging}
+                                            canEditCompanyAndTags={variant !== 'customer'}
+                                            onDueDateChange={handleDueDateChange}
+                                            dueDateChanging={dueDateChanging}
                                             totalTimeSeconds={totalTimeSeconds}
                                             activeTimeTracker={activeTimeTracker}
                                             currentTime={currentTime}
@@ -1178,219 +1143,7 @@ export default function TodoDetailContent({
                         />
                     </Card>
 
-                    <Modal
-                        title="Edit Ticket"
-                        open={editModalVisible}
-                        onCancel={() => {
-                            setEditModalVisible(false)
-                            form.resetFields()
-                            setSelectedAssignees([])
-                            setSelectedTagIds(initialTags.map((t) => t.id))
-                        }}
-                        footer={null}
-                        width={700}
-                    >
-                        <Form form={form} layout="vertical" onFinish={handleUpdateTodo}>
-                            <Form.Item
-                                name="title"
-                                label="Title"
-                                rules={[{ required: true, message: 'Please enter todo title!' }]}
-                            >
-                                <Input placeholder="Todo Title" />
-                            </Form.Item>
-
-                            <Form.Item name="description" label="Description">
-                                <CommentWysiwyg ticketId={todoData?.id} placeholder="Todo Description" height="160px" />
-                            </Form.Item>
-
-                            <Form.Item label="Attachments">
-                                <Space direction="vertical" style={{ width: '100%' }} size="small">
-                                    {descriptionAttachmentsFromDb
-                                        .filter((a) => !deletedDescriptionAttachmentIds.includes(a.id))
-                                        .map((a) => (
-                                            <Space key={a.id} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                                <a href={a.file_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                    <PaperClipOutlined /> {a.file_name}
-                                                </a>
-                                                <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => setDeletedDescriptionAttachmentIds((prev) => [...prev, a.id])} />
-                                            </Space>
-                                        ))}
-                                    {newDescriptionAttachments.map((a, i) => (
-                                        <Space key={`new-${i}`} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                            <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <PaperClipOutlined /> {a.file_name}
-                                            </a>
-                                            <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => setNewDescriptionAttachments((prev) => prev.filter((_, idx) => idx !== i))} />
-                                        </Space>
-                                    ))}
-                                    <input type="file" multiple style={{ display: 'none' }} id="edit-ticket-files-input" onChange={(e) => { handleDescriptionFilesSelected(e.target.files); e.target.value = '' }} />
-                                    <Button icon={<PaperClipOutlined />} onClick={() => document.getElementById('edit-ticket-files-input')?.click()}>
-                                        Attach files
-                                    </Button>
-                                </Space>
-                            </Form.Item>
-
-                            <Form.Item name="status" label="Status" rules={[{ required: true }]}>
-                                <Select>
-                                    {allStatusesForSelect.map((s) => (
-                                        <Option key={s.slug} value={s.slug}>
-                                            {s.title}
-                                        </Option>
-                                    ))}
-                                </Select>
-                            </Form.Item>
-
-                            <Form.Item name="type_id" label="Type">
-                                <Select placeholder="Select type" allowClear>
-                                    {ticketTypes.map((t) => (
-                                        <Option key={t.id} value={t.id}>
-                                            <Space>
-                                                <span
-                                                    style={{
-                                                        display: 'inline-block',
-                                                        width: 12,
-                                                        height: 12,
-                                                        borderRadius: 2,
-                                                        backgroundColor: t.color,
-                                                    }}
-                                                />
-                                                {t.title}
-                                            </Space>
-                                        </Option>
-                                    ))}
-                                </Select>
-                            </Form.Item>
-
-                            <Form.Item name="company_id" label="Company">
-                                <Select placeholder="Select company" allowClear>
-                                    {companies.map((c) => (
-                                        <Option key={c.id} value={c.id}>
-                                            {c.name}
-                                        </Option>
-                                    ))}
-                                </Select>
-                            </Form.Item>
-
-                            <Form.Item label="Tags">
-                                <Select
-                                    mode="multiple"
-                                    placeholder="Select tags"
-                                    value={selectedTagIds}
-                                    onChange={setSelectedTagIds}
-                                    optionLabelProp="label"
-                                    allowClear
-                                >
-                                    {allTags.map((t) => (
-                                        <Option key={t.id} value={t.id} label={t.name}>
-                                            {t.name}
-                                        </Option>
-                                    ))}
-                                </Select>
-                            </Form.Item>
-
-                            <Form.Item name="visibility" label="Visibility" rules={[{ required: true }]}>
-                                <Select
-                                    onChange={(value) => {
-                                        if (value !== 'specific_users') {
-                                            setSelectedAssignees([])
-                                        }
-                                    }}
-                                >
-                                    <Option value="private">Private</Option>
-                                    <Option value="team">Team</Option>
-                                    <Option value="specific_users">Specific Users</Option>
-                                </Select>
-                            </Form.Item>
-
-                            <Form.Item
-                                noStyle
-                                shouldUpdate={(prevValues, currentValues) =>
-                                    prevValues.visibility !== currentValues.visibility
-                                }
-                            >
-                                {({ getFieldValue }) =>
-                                    getFieldValue('visibility') === 'team' ? (
-                                        <Form.Item name="team_id" label="Team" rules={[{ required: true }]}>
-                                            <Select placeholder="Select Team">
-                                                {teams.map((team) => (
-                                                    <Option key={team.id} value={team.id}>
-                                                        {team.name}
-                                                    </Option>
-                                                ))}
-                                            </Select>
-                                        </Form.Item>
-                                    ) : null
-                                }
-                            </Form.Item>
-
-                            <Form.Item
-                                noStyle
-                                shouldUpdate={(prevValues, currentValues) =>
-                                    prevValues.visibility !== currentValues.visibility
-                                }
-                            >
-                                {({ getFieldValue }) =>
-                                    getFieldValue('visibility') === 'specific_users' ? (
-                                        <Form.Item
-                                            label="Assign To Users"
-                                            required
-                                            validateStatus={
-                                                getFieldValue('visibility') === 'specific_users' && selectedAssignees.length === 0
-                                                    ? 'error'
-                                                    : ''
-                                            }
-                                            help={
-                                                getFieldValue('visibility') === 'specific_users' && selectedAssignees.length === 0
-                                                    ? 'Please select at least one user!'
-                                                    : ''
-                                            }
-                                        >
-                                            <Select
-                                                mode="multiple"
-                                                placeholder="Select Users"
-                                                value={selectedAssignees}
-                                                onChange={setSelectedAssignees}
-                                                optionLabelProp="label"
-                                            >
-                                                {users.map((user) => (
-                                                    <Option key={user.id} value={user.id} label={user.full_name || user.email}>
-                                                        {user.full_name || user.email}
-                                                    </Option>
-                                                ))}
-                                            </Select>
-                                        </Form.Item>
-                                    ) : null
-                                }
-                            </Form.Item>
-
-                            <Form.Item name="due_date" label="Due Date">
-                                <DatePicker
-                                    style={{ width: '100%' }}
-                                    showTime
-                                    format="YYYY-MM-DD HH:mm"
-                                    placeholder="Select Due Date"
-                                />
-                            </Form.Item>
-
-                            <Form.Item>
-                                <Space>
-                                    <Button type="primary" htmlType="submit" loading={loading}>
-                                        Update
-                                    </Button>
-                                    <Button
-                                        onClick={() => {
-                                            setEditModalVisible(false)
-                                            form.resetFields()
-                                            setSelectedAssignees([])
-                                            setSelectedTagIds(initialTags.map((t) => t.id))
-                                        }}
-                                    >
-                                        Cancel
-                                    </Button>
-                                </Space>
-                            </Form.Item>
-                        </Form>
-                    </Modal>
+                   
                 </Content>
             </Layout>
         </Layout>

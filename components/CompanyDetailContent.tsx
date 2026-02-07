@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
 import AdminSidebar from './AdminSidebar'
+import CustomerNavbar from './CustomerNavbar'
 import DateDisplay from './DateDisplay'
 import { createClient } from '@/utils/supabase/client'
 import {
@@ -17,6 +18,7 @@ import {
   TabWebsites,
   TabCrawling,
   TabTickets,
+  TabContentPlanner,
 } from './CompanyDetail'
 
 const { Content } = Layout
@@ -53,9 +55,13 @@ function ColorPickerInput({
 interface CompanyDetailContentProps {
   user: User
   companyData: any
+  /** 'customer' = navbar layout for customer portal; 'admin' = sidebar layout (default) */
+  variant?: 'admin' | 'customer'
+  /** When set, render only this section (no tabs). Keys: info, users, tickets, content-planner, data-form, generate, knowledge-base, websites, crawling */
+  activeSection?: string
 }
 
-export default function CompanyDetailContent({ user: currentUser, companyData }: CompanyDetailContentProps) {
+export default function CompanyDetailContent({ user: currentUser, companyData, variant = 'admin', activeSection }: CompanyDetailContentProps) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [form] = Form.useForm()
@@ -987,6 +993,8 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
     setHistoryPreviewVisible(true)
   }
 
+  const isCustomer = variant === 'customer'
+
   const tabItems = [
     {
       key: 'info',
@@ -1009,7 +1017,27 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
           <CheckSquareOutlined /> Tickets
         </span>
       ),
-      children: <TabTickets companyData={companyData} />,
+      children: (
+        <TabTickets
+          companyData={companyData}
+          currentUser={currentUser}
+          basePath={isCustomer ? '/customer' : undefined}
+        />
+      ),
+    },
+    {
+      key: 'content-planner',
+      label: (
+        <span>
+          <FileTextOutlined /> Content Planner
+        </span>
+      ),
+      children: (
+        <TabContentPlanner
+          companyData={companyData}
+          basePath={variant === 'customer' ? '/customer' : undefined}
+        />
+      ),
     },
     {
       key: 'data-form',
@@ -1121,43 +1149,22 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
-      
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
+      {isCustomer ? (
+        <CustomerNavbar user={currentUser} />
+      ) : (
+        <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
+      )}
+
+      <Layout style={{ marginLeft: isCustomer ? 0 : (collapsed ? 80 : 250), transition: 'margin-left 0.2s' }}>
         <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
           <Card>
-            <Space style={{ marginBottom: 24 }}>
-              <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => router.push('/companies')}
-              >
-                Back to Companies
-              </Button>
-              <Button icon={<EditOutlined />} onClick={openEditCompanyModal}>
-                Edit company
-              </Button>
-            </Space>
+           
 
-            <Flex justify="space-between" align="center" style={{ marginBottom: 32 }}>
-              <Title level={2} style={{ marginBottom: 8 }}>
+            <Flex justify="space-between" align="center" >
+              <Title level={2} >
                 {companyData.name}
               </Title>
-              <Space size="middle">
-                <Tag
-                  style={{
-                    fontSize: 14,
-                    padding: '4px 12px',
-                    backgroundColor: companyData.color || '#000000',
-                    borderColor: companyData.color || '#000000',
-                    color: '#fff',
-                  }}
-                >
-                  Signature Color
-                </Tag>
-                <Tag color={companyData.is_active ? 'green' : 'default'} style={{ fontSize: 14, padding: '4px 12px' }}>
-                  {companyData.is_active ? 'ACTIVE' : 'INACTIVE'}
-                </Tag>
-              </Space>
+            
             </Flex>
 
             <Modal
@@ -1173,18 +1180,24 @@ export default function CompanyDetailContent({ user: currentUser, companyData }:
                 <Form.Item name="name" label="Company name" rules={[{ required: true, message: 'Company name is required' }]}>
                   <Input placeholder="Company name" />
                 </Form.Item>
-                <Form.Item name="color" label="Signature Color (hex)" initialValue="#000000">
+                {/* <Form.Item name="color" label="Signature Color (hex)" initialValue="#000000">
                   <ColorPickerInput />
-                </Form.Item>
-                <Form.Item name="is_active" label="Active" valuePropName="checked">
+                </Form.Item> */}
+                {/* <Form.Item name="is_active" label="Active" valuePropName="checked">
                   <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
-                </Form.Item>
+                </Form.Item> */}
               </Form>
             </Modal>
 
-            <Divider />
 
-            <Tabs items={tabItems} />
+            {activeSection ? (
+              (() => {
+                const item = tabItems.find((t) => t.key === activeSection)
+                return item ? item.children : null
+              })()
+            ) : (
+              <Tabs items={tabItems} />
+            )}
 
             {/* Website Modal */}
             <Modal

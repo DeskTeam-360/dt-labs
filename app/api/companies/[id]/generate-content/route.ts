@@ -88,6 +88,7 @@ export async function POST(
     }
 
     const embedJson = await embedRes.json()
+    const embedTokens = embedJson?.usage?.total_tokens ?? 0
     const queryEmbedding = embedJson?.data?.[0]?.embedding as number[] | undefined
     if (!queryEmbedding || !Array.isArray(queryEmbedding) || queryEmbedding.length !== EMBEDDING_DIMENSION) {
       return NextResponse.json(
@@ -157,6 +158,11 @@ export async function POST(
 
     const chatJson = await chatRes.json()
     const rawContent = chatJson?.choices?.[0]?.message?.content?.trim() ?? ''
+    const usage = chatJson?.usage ?? {}
+    const chatPromptTokens = usage.prompt_tokens ?? 0
+    const completionTokens = usage.completion_tokens ?? 0
+    const promptTokens = embedTokens + chatPromptTokens
+    const totalTokens = embedTokens + (usage.total_tokens ?? chatPromptTokens + completionTokens)
 
     let result: Record<string, unknown> = {}
     try {
@@ -185,6 +191,18 @@ export async function POST(
       historyError = insertError.message || String(insertError)
       console.error('Failed to save generation history:', insertError)
     }
+
+    await supabase.from('ai_token_usage').insert({
+      user_id: user.id,
+      used_for: 'company_generate_content',
+      ai_model: OPENAI_CHAT_MODEL,
+      content_text: contentForHistory,
+      prompt_id: templateId,
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: totalTokens,
+      company_id: companyId,
+    })
 
     return NextResponse.json({ result, historyError })
   } catch (error: any) {
