@@ -33,6 +33,8 @@ interface TodoStatusRecord {
   id: number
   slug: string
   title: string
+  customer_title?: string
+  description?: string
   color: string
   show_in_kanban: boolean
   sort_order: number
@@ -128,6 +130,8 @@ export default function TodoStatusesContent({ user: currentUser }: TodoStatusesC
     form.setFieldsValue({
       title: record.title,
       slug: record.slug,
+      customer_title: record.customer_title ?? '',
+      description: record.description ?? '',
       color: record.color,
       show_in_kanban: record.show_in_kanban,
       sort_order: record.sort_order,
@@ -159,6 +163,8 @@ export default function TodoStatusesContent({ user: currentUser }: TodoStatusesC
       const payload = {
         title: values.title.trim(),
         slug: values.slug.trim().toLowerCase().replace(/\s+/g, '_'),
+        customer_title: values.customer_title?.trim() ?? null,
+        description: values.description?.trim() ?? '',
         color: values.color || '#8c8c8c',
         show_in_kanban: !!values.show_in_kanban,
         sort_order: Number(values.sort_order) ?? 0,
@@ -199,6 +205,19 @@ export default function TodoStatusesContent({ user: currentUser }: TodoStatusesC
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
+    },
+    {
+      title: 'Customer Title',
+      dataIndex: 'customer_title',
+      key: 'customer_title',
+      render: (v: string) => v || '—',
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      ellipsis: true,
+      render: (v: string) => v || '—',
     },
     {
       title: 'Slug',
@@ -302,6 +321,12 @@ export default function TodoStatusesContent({ user: currentUser }: TodoStatusesC
                 rules={[{ required: true, message: 'Required' }]}
               >
                 <Input placeholder="e.g. In Progress" onChange={handleTitleChange} />
+              </Form.Item>
+              <Form.Item name="customer_title" label="Customer Title">
+                <Input placeholder="e.g. In Progress (shown to customer)" />
+              </Form.Item>
+              <Form.Item name="description" label="Description">
+                <Input.TextArea rows={3} placeholder="Description of this status" />
               </Form.Item>
               <Form.Item
                 name="slug"

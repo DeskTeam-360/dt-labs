@@ -180,6 +180,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       admin: 'red',
       manager: 'blue',
       user: 'green',
+      customer: 'purple',
       guest: 'default',
     }
     return colorMap[role] || 'default'
@@ -609,6 +610,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           <Option value="admin">Admin</Option>
                           <Option value="manager">Manager</Option>
                           <Option value="user">User</Option>
+                          <Option value="customer">Customer</Option>
                           <Option value="guest">Guest</Option>
                         </Select>
                       </Form.Item>
