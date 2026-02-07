@@ -215,7 +215,7 @@ export default function ContentPlannerDetailContent({
 
           <Card title="Generate content with ChatGPT" style={{ marginBottom: 24 }}>
             <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-              Generate content based on this content planner. The system uses topic, channel, format, keywords, intent, and CTA from the form below, plus brand knowledge from the company knowledge base.
+            Select AI Agent
             </Text>
             <Select
               placeholder="AI System Template (optional - extra instructions)"
