@@ -9,6 +9,7 @@ import {
   Modal,
   Form,
   Input,
+  InputNumber,
   Select,
   Switch,
   DatePicker,
@@ -18,7 +19,7 @@ import {
   Col,
   message,
 } from 'antd'
-import { PlusOutlined, EditOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
@@ -85,8 +86,12 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
   const [formats, setFormats] = useState<{ id: string; title: string }[]>([])
   const [channels, setChannels] = useState<{ id: string; title: string }[]>([])
   const [modalVisible, setModalVisible] = useState(false)
+  const [generatorModalVisible, setGeneratorModalVisible] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [generatorSaving, setGeneratorSaving] = useState(false)
+  const [generateLoadingId, setGenerateLoadingId] = useState<string | null>(null)
   const [form] = Form.useForm()
+  const [generatorForm] = Form.useForm()
 
   const fetchPlanners = async () => {
     if (!companyData?.id) return
@@ -138,9 +143,83 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
     form.resetFields()
     form.setFieldsValue({
       cta_dynamic: true,
-      status: 'planned',
+      status: 'draft',
     })
     setModalVisible(true)
+  }
+
+  const handleOpenGenerator = () => {
+    generatorForm.resetFields()
+    generatorForm.setFieldsValue({
+      gbp_per_week: 0,
+      social_per_week: 0,
+      blogs_per_week: 0,
+      preferred_post_days: 'Mon, Fri',
+    })
+    setGeneratorModalVisible(true)
+  }
+
+  const handleGeneratorSubmit = async () => {
+    try {
+      const values = await generatorForm.validateFields()
+      const gbp = values.gbp_per_week ?? 0
+      const social = values.social_per_week ?? 0
+      const blogs = values.blogs_per_week ?? 0
+      if (gbp + social + blogs === 0) {
+        message.error('Minimal satu dari GBP, Social, atau Blogs harus > 0')
+        return
+      }
+      setGeneratorSaving(true)
+      const res = await fetch(`/api/companies/${companyData.id}/content-planner/generate-batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gbp_per_week: gbp,
+          social_per_week: social,
+          blogs_per_week: blogs,
+          preferred_post_days: values.preferred_post_days?.trim() || 'Mon, Fri',
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        message.error(data?.error ?? 'Gagal generate planners')
+        return
+      }
+      message.success(`${data.created ?? 0} content planner dibuat`)
+      setGeneratorModalVisible(false)
+      fetchPlanners()
+    } catch (e: unknown) {
+      if (String((e as { message?: string })?.message || '').includes('validateFields')) return
+      message.error((e as { message?: string })?.message ?? 'Gagal')
+    } finally {
+      setGeneratorSaving(false)
+    }
+  }
+
+  const generateApiUrl = (plannerId: string) =>
+    `/api/companies/${companyData.id}/content-planner/${plannerId}/generate`
+
+  const handleGenerateAI = async (record: ContentPlannerRecord) => {
+    setGenerateLoadingId(record.id)
+    try {
+      const res = await fetch(generateApiUrl(record.id), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        message.error(data?.error ?? 'Failed to generate content')
+        return
+      }
+      message.success('Content generated')
+      fetchPlanners()
+    } catch (e: unknown) {
+      const err = e as { message?: string }
+      message.error(err?.message ?? 'Failed to generate')
+    } finally {
+      setGenerateLoadingId(null)
+    }
   }
 
   const handleReview = (record: ContentPlannerRecord) => {
@@ -167,7 +246,7 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
         cta_type: ctaDynamic ? null : (values.cta_type || null),
         cta_text: ctaDynamic ? null : (values.cta_text?.trim() || null),
         publish_date: values.publish_date ? values.publish_date.format('YYYY-MM-DD') : null,
-        status: values.status || 'planned',
+        status: values.status || 'draft',
         insight: values.insight?.trim() || null,
       }
 
@@ -243,12 +322,23 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
     {
       title: 'Actions',
       key: 'actions',
-      width: 120,
+      width: 180,
       render: (_, record) => (
-        <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); handleReview(record) }}>
+        <Space onClick={(e) => e.stopPropagation()}>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleReview(record)}>
             Review
           </Button>
+          {record.status === 'draft' && (
+            <Button
+              type="link"
+              size="small"
+              icon={<PlayCircleOutlined />}
+              loading={generateLoadingId === record.id}
+              onClick={() => handleGenerateAI(record)}
+            >
+              Generate AI
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -373,9 +463,14 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
     <Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Text strong>Content Planner</Text>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Add Content
-        </Button>
+        <Space>
+          <Button icon={<PlusOutlined />} onClick={handleOpenGenerator}>
+            Generate Planners
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            Add Content
+          </Button>
+        </Space>
       </div>
       <Spin spinning={loading}>
         <Table
@@ -401,6 +496,40 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
         destroyOnClose
       >
         {renderForm()}
+      </Modal>
+
+      <Modal
+        title="Generate Planners"
+        open={generatorModalVisible}
+        onCancel={() => { setGeneratorModalVisible(false); generatorForm.resetFields() }}
+        footer={null}
+        width={480}
+        destroyOnClose
+      >
+        <Form form={generatorForm} layout="vertical" onFinish={handleGeneratorSubmit}>
+          <Form.Item name="gbp_per_week" label="GBP per week" initialValue={0}>
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="social_per_week" label="Social per week" initialValue={0}>
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="blogs_per_week" label="Blogs per week" initialValue={0}>
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="preferred_post_days" label="Preferred post days" initialValue="Mon, Fri">
+            <Input placeholder="e.g. Mon, Fri" />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Space>
+              <Button type="primary" htmlType="submit" loading={generatorSaving}>
+                Generate
+              </Button>
+              <Button onClick={() => { setGeneratorModalVisible(false); generatorForm.resetFields() }}>
+                Cancel
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
       </Modal>
     </Card>
   )
