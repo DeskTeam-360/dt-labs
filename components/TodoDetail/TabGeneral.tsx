@@ -16,6 +16,7 @@ import {
   Popconfirm,
   Flex,
   Select,
+  DatePicker,
 } from 'antd'
 import {
   UserOutlined,
@@ -28,6 +29,7 @@ import {
   PaperClipOutlined,
 } from '@ant-design/icons'
 import DateDisplay from '../DateDisplay'
+import dayjs from 'dayjs'
 import CommentWysiwyg from './CommentWysiwyg'
 
 const { Text, Paragraph } = Typography
@@ -84,6 +86,10 @@ interface TabGeneralProps {
   selectedTagIds: string[]
   onTagsChange: (tagIds: string[]) => void | Promise<void>
   tagsChanging?: boolean
+  /** When false, company and tags are read-only (customer view) */
+  canEditCompanyAndTags?: boolean
+  onDueDateChange?: (dueDate: string | null) => void | Promise<void>
+  dueDateChanging?: boolean
   totalTimeSeconds: number
   activeTimeTracker: any
   currentTime: number
@@ -143,6 +149,9 @@ export default function TabGeneral({
   selectedTagIds,
   onTagsChange,
   tagsChanging = false,
+  canEditCompanyAndTags = true,
+  onDueDateChange,
+  dueDateChanging = false,
   totalTimeSeconds,
   activeTimeTracker,
   currentTime,
@@ -395,27 +404,39 @@ export default function TabGeneral({
               />
             </Descriptions.Item>
             <Descriptions.Item label="Company">
-              <Select
-                value={todoData.company_id ?? undefined}
-                onChange={(v) => onCompanyChange(v ?? null)}
-                loading={companyChanging}
-                options={companyOptions.map((c) => ({ value: c.id, label: c.name }))}
-                style={{ minWidth: 140, width: '100%' }}
-                allowClear
-                placeholder="Select company"
-              />
+              {canEditCompanyAndTags ? (
+                <Select
+                  value={todoData.company_id ?? undefined}
+                  onChange={(v) => onCompanyChange(v ?? null)}
+                  loading={companyChanging}
+                  options={companyOptions.map((c) => ({ value: c.id, label: c.name }))}
+                  style={{ minWidth: 140, width: '100%' }}
+                  allowClear
+                  placeholder="Select company"
+                />
+              ) : (
+                <Text>{companyOptions.find((c) => c.id === todoData.company_id)?.name ?? (todoData.company?.name || '—')}</Text>
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="Tags">
-              <Select
-                mode="multiple"
-                value={selectedTagIds}
-                onChange={(v) => onTagsChange(v ?? [])}
-                loading={tagsChanging}
-                options={tagOptions.map((t) => ({ value: t.id, label: t.name }))}
-                style={{ minWidth: 160, width: '100%' }}
-                placeholder="Select tags"
-                allowClear
-              />
+              {canEditCompanyAndTags ? (
+                <Select
+                  mode="multiple"
+                  value={selectedTagIds}
+                  onChange={(v) => onTagsChange(v ?? [])}
+                  loading={tagsChanging}
+                  options={tagOptions.map((t) => ({ value: t.id, label: t.name }))}
+                  style={{ minWidth: 160, width: '100%' }}
+                  placeholder="Select tags"
+                  allowClear
+                />
+              ) : (
+                <Text>
+                  {selectedTagIds.length > 0
+                    ? tagOptions.filter((t) => selectedTagIds.includes(t.id)).map((t) => t.name).join(', ')
+                    : '—'}
+                </Text>
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="Created By">
               <Space>
@@ -426,7 +447,17 @@ export default function TabGeneral({
               </Space>
             </Descriptions.Item>
             <Descriptions.Item label="Due Date">
-              {todoData.due_date ? (
+              {onDueDateChange ? (
+                <DatePicker
+                  value={todoData.due_date ? dayjs(todoData.due_date) : null}
+                  onChange={(d) => onDueDateChange(d ? d.toISOString() : null)}
+                  allowClear
+                  showTime
+                  format="YYYY-MM-DD HH:mm"
+                  style={{ width: '100%' }}
+                  disabled={dueDateChanging}
+                />
+              ) : todoData.due_date ? (
                 <Space>
                   <ClockCircleOutlined />
                   <DateDisplay date={todoData.due_date} />
