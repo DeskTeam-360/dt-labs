@@ -278,7 +278,6 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
               form.resetFields()
             }}
             footer={null}
-            destroyOnClose
           >
             <Form form={form} layout="vertical" onFinish={handleSubmit}>
               <Form.Item

@@ -890,7 +890,6 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
         onCancel={() => { setModalVisible(false); form.resetFields() }}
         footer={null}
         width={600}
-        destroyOnClose
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Title is required' }]}>

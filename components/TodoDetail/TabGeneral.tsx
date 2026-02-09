@@ -17,6 +17,7 @@ import {
   Flex,
   Select,
   DatePicker,
+  Segmented,
 } from 'antd'
 import {
   UserOutlined,
@@ -27,6 +28,10 @@ import {
   EditOutlined,
   DeleteOutlined,
   PaperClipOutlined,
+  ForwardFilled,
+  MessageOutlined,
+  ArrowLeftOutlined,
+  SendOutlined,
 } from '@ant-design/icons'
 import DateDisplay from '../DateDisplay'
 import dayjs from 'dayjs'
@@ -50,6 +55,8 @@ interface Comment {
   user_id: string
   comment: string
   created_at: string
+  visibility?: 'note' | 'reply'
+  author_type?: 'customer' | 'agent'
   user?: { id: string; full_name: string | null; email: string; avatar_url?: string | null }
   comment_attachments?: CommentAttachment[] | null
 }
@@ -119,6 +126,9 @@ interface TabGeneralProps {
   onCommentFilesSelected: (files: FileList | null) => void
   onAddComment: () => void
   addCommentLoading?: boolean
+  commentVisibility?: 'note' | 'reply'
+  onCommentVisibilityChange?: (v: 'note' | 'reply') => void
+  showNoteOption?: boolean
   attributes: Attribute[]
   newAttributeKey: string
   newAttributeValue: string
@@ -181,6 +191,9 @@ export default function TabGeneral({
   onCommentFilesSelected,
   onAddComment,
   addCommentLoading = false,
+  commentVisibility = 'reply',
+  onCommentVisibilityChange = () => {},
+  showNoteOption = false,
   attributes,
   newAttributeKey,
   newAttributeValue,
@@ -225,9 +238,14 @@ export default function TabGeneral({
           
             <Flex orientation="vertical" style={{ width: '100%', padding: 16 }} gap={30}>
               {comments.length > 0 ? (
-                <Flex vertical gap="middle">
-                  {comments.map((comment) => (
-                    <Flex key={comment.id} gap="middle" align="flex-start" style={{ paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid #e8e8e8',  }}>
+                <Flex vertical gap={10}>
+                  {comments.map((comment) => {
+                    const isCustomer = comment.author_type === 'customer'
+                    const cardBg = isCustomer ? 'rgba(230, 247, 255, 0.5)' : (comment.visibility === 'note' ? '#f5f5f5' : 'rgba(255, 251, 230, 0.4)')
+                    const borderColor = isCustomer ? '#91caff' : (comment.visibility === 'note' ? '#d9d9d9' : '#ffe58f')
+                    return (
+                    <Flex key={comment.id} gap="middle" align="flex-start" 
+                    style={{ padding: 20, borderLeft: `3px solid ${borderColor}`, backgroundColor: cardBg, borderRadius: 10 }}>
                       <Avatar icon={<UserOutlined />} src={comment.user?.avatar_url} />
                       <Flex vertical style={{ flex: 1, minWidth: 0 }}>
                         <Flex justify="space-between" align="center" wrap="wrap" gap="small">
@@ -235,6 +253,14 @@ export default function TabGeneral({
                             <Text strong>
                               {comment.user?.full_name || comment.user?.email || 'Unknown'}
                             </Text>
+                            <Tag color={isCustomer ? 'cyan' : 'gold'}>
+                              {isCustomer ? 'Customer' : 'Agent'}
+                            </Tag>
+                            {showNoteOption && (
+                              <Tag color={comment.visibility === 'note' ? 'default' : 'blue'}>
+                                {comment.visibility === 'note' ? 'Note' : 'Reply'}
+                              </Tag>
+                            )}
                             <Text type="secondary" style={{ fontSize: 12 }}>
                               <DateDisplay date={comment.created_at} />
                             </Text>
@@ -316,16 +342,22 @@ export default function TabGeneral({
                         </Space>
                       </Flex>
                     </Flex>
-                  ))}
+                    )
+                  })}
                 </Flex>
               ) : (
                 <Empty description="No comments" image={Empty.PRESENTED_IMAGE_SIMPLE} />
               )}
+              
+              <Flex gap={8} style={{ marginTop: 8 }}>
+                <Button type="default" icon={<CommentOutlined />} onClick={() => onCommentVisibilityChange('note')}>Add note</Button>
+                <Button type="primary" icon={<SendOutlined />} onClick={() => onCommentVisibilityChange('reply')}>Reply</Button>
+              </Flex>
               <CommentWysiwyg
                 ticketId={todoData?.id}
                 value={newComment}
                 onChange={onNewCommentChange}
-                placeholder="Add a comment..."
+                placeholder={showNoteOption ? (commentVisibility === 'note' ? 'Add a note (agent only)...' : 'Reply (visible to client)...') : 'Add a comment...'}
                 height="200px"
               />
               {newCommentAttachments.length > 0 && (
@@ -362,7 +394,7 @@ export default function TabGeneral({
                   loading={addCommentLoading}
                   disabled={addCommentLoading}
                 >
-                  Add Comment
+                  {showNoteOption ? (commentVisibility === 'note' ? 'Add note' : 'Reply') : 'Reply'}
                 </Button>
               </Flex>
             </Flex>

@@ -134,12 +134,35 @@ export async function POST(
         .eq('id', companyId)
         .single()
       const companyName = (company as { name?: string } | null)?.name ?? 'Company'
+      const { data: companyInfo } = await supabase
+        .from('companies')
+        .select('name, description, address, city, state, zip, country, phone, email, website')
+        .eq('id', companyId)
+        .single()
+
+      const { data: knowledgeBases } = await supabase
+        .from('company_knowledge_bases')
+        .select('id, content')
+        .eq('company_id', companyId)
+        .eq('type', 'company_info')
+        .order('updated_at', { ascending: false })
+
+      const knowledgeBaseText =
+        (knowledgeBases && knowledgeBases.length > 0)
+          ? knowledgeBases
+              .map((kb: { id: string; content: string | null }) => (kb.content || '').trim())
+              .filter(Boolean)
+              .join('\n\n---\n\n')
+          : ''
 
       const channelLabels = items.map((it, idx) => `${idx + 1}. ${it.type.toUpperCase()} (${publishDates[idx]})`).join('\n')
 
       const systemPrompt = `You are a content strategist. Generate metadata for content planners.
 
 Company: ${companyName}
+
+My Business Information: ${JSON.stringify(companyInfo)}
+${knowledgeBaseText ? `\nAdditional Company Knowledge (from knowledge base, type company_info):\n${knowledgeBaseText}\n` : ''}
 
 Available intents (use ONLY these exact titles): ${intentTitles}
 

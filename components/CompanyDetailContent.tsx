@@ -1173,8 +1173,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
               onOk={handleSaveCompany}
               onCancel={() => setCompanyEditModalOpen(false)}
               confirmLoading={companyEditLoading}
-              okText="Save"
-              destroyOnClose
+              okText="Save" 
             >
               <Form form={companyEditForm} layout="vertical" style={{ marginTop: 16 }}>
                 <Form.Item name="name" label="Company name" rules={[{ required: true, message: 'Company name is required' }]}>
@@ -1215,7 +1214,6 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
               }}
               footer={null}
               width={700}
-              destroyOnClose
             >
               <Form
                 form={websiteForm}

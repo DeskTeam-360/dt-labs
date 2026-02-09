@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { Layout, Avatar, Dropdown, Typography, Menu, Flex } from 'antd'
 import {
   UserOutlined,
@@ -32,7 +33,7 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
   const pathname = usePathname()
   const supabase = createClient()
 
-  const getSelectedKey = () => {
+  const selectedKeys = useMemo(() => {
     if (pathname === '/customer') return ['dashboard']
     if (pathname?.startsWith('/customer/info')) return ['info']
     if (pathname?.startsWith('/customer/users')) return ['users']
@@ -44,7 +45,7 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
     if (pathname?.startsWith('/customer/websites')) return ['websites']
     if (pathname?.startsWith('/customer/crawling')) return ['crawling']
     return []
-  }
+  }, [pathname])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -123,7 +124,7 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
         <Menu
           mode="horizontal"
           theme="dark"
-          selectedKeys={getSelectedKey()}
+          selectedKeys={selectedKeys}
           style={{
             flex: 1,
             minWidth: 0,

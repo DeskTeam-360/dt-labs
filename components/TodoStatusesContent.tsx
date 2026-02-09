@@ -312,7 +312,6 @@ export default function TodoStatusesContent({ user: currentUser }: TodoStatusesC
               form.resetFields()
             }}
             footer={null}
-            destroyOnClose
           >
             <Form form={form} layout="vertical" onFinish={handleSubmit}>
               <Form.Item

@@ -493,7 +493,6 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
         onCancel={() => { setModalVisible(false); form.resetFields() }}
         footer={null}
         width={700}
-        destroyOnClose
       >
         {renderForm()}
       </Modal>
@@ -504,7 +503,6 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
         onCancel={() => { setGeneratorModalVisible(false); generatorForm.resetFields() }}
         footer={null}
         width={480}
-        destroyOnClose
       >
         <Form form={generatorForm} layout="vertical" onFinish={handleGeneratorSubmit}>
           <Form.Item name="gbp_per_week" label="GBP per week" initialValue={0}>

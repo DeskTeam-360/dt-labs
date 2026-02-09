@@ -71,6 +71,7 @@ export default async function CustomerTicketDetailPage({
       comment_attachments(id, file_url, file_name)
     `)
     .eq('todo_id', ticketId)
+    .eq('visibility', 'reply')
     .order('created_at', { ascending: true })
 
   const { data: attributes } = await supabase

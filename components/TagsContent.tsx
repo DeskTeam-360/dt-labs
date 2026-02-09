@@ -264,7 +264,6 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
               form.resetFields()
             }}
             footer={null}
-            destroyOnClose
           >
             <Form form={form} layout="vertical" onFinish={handleSubmit}>
               <Form.Item

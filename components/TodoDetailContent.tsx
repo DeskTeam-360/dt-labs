@@ -92,6 +92,8 @@ interface Comment {
     user_id: string
     comment: string
     created_at: string
+    visibility?: 'note' | 'reply'
+    author_type?: 'customer' | 'agent'
     user?: {
         id: string
         full_name: string | null
@@ -130,6 +132,7 @@ export default function TodoDetailContent({
     const [newChecklistTitle, setNewChecklistTitle] = useState('')
     const [newComment, setNewComment] = useState('')
     const [newCommentAttachments, setNewCommentAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
+    const [commentVisibility, setCommentVisibility] = useState<'note' | 'reply'>('reply')
     const [editingComment, setEditingComment] = useState<string | null>(null)
     const [editingCommentValue, setEditingCommentValue] = useState('')
     const [editingAttribute, setEditingAttribute] = useState<string | null>(null)
@@ -553,12 +556,16 @@ export default function TodoDetailContent({
 
         setLoading(true)
         try {
+            const visibility = variant === 'customer' ? 'reply' : commentVisibility
+            const author_type = variant === 'customer' ? 'customer' : 'agent'
             const { data, error } = await supabase
                 .from('todo_comments')
                 .insert({
                     todo_id: todoData.id,
                     user_id: currentUser.id,
                     comment: newComment.trim(),
+                    visibility,
+                    author_type,
                 })
                 .select(`
           *,
@@ -580,7 +587,7 @@ export default function TodoDetailContent({
                 )
             }
 
-            setComments((prev) => [...prev, { ...data, comment_attachments: newCommentAttachments.map((a) => ({ id: '', file_url: a.url, file_name: a.file_name })) }])
+            setComments((prev) => [...prev, { ...data, visibility, author_type, comment_attachments: newCommentAttachments.map((a) => ({ id: '', file_url: a.url, file_name: a.file_name })) }])
             setNewComment('')
             setNewCommentAttachments([])
             message.success('Comment added')
@@ -1101,6 +1108,9 @@ export default function TodoDetailContent({
                                             onCommentFilesSelected={handleCommentFilesSelected}
                                             onAddComment={handleAddComment}
                                             addCommentLoading={loading}
+                                            commentVisibility={commentVisibility}
+                                            onCommentVisibilityChange={setCommentVisibility}
+                                            showNoteOption={variant === 'admin'}
                                             attributes={attributes}
                                             newAttributeKey={newAttributeKey}
                                             newAttributeValue={newAttributeValue}

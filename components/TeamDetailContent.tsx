@@ -625,7 +625,6 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
               onCancel={() => setEditModalOpen(false)}
               confirmLoading={editLoading}
               okText="Save"
-              destroyOnClose
             >
               <Form form={editForm} layout="vertical" style={{ marginTop: 16 }}>
                 <Form.Item name="name" label="Team name" rules={[{ required: true, message: 'Name is required' }]}>
@@ -643,7 +642,6 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
               onCancel={() => setAddModalOpen(false)}
               confirmLoading={addLoading}
               okText="Add"
-              destroyOnClose
             >
               <Space orientation="vertical" style={{ width: '100%' }} size="middle">
                 <div>
