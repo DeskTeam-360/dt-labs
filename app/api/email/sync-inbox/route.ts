@@ -35,6 +35,11 @@ function parseEmailsFromRecipients(header: string): string[] {
   return out.filter(Boolean)
 }
 
+/** Escape special chars for ILIKE pattern (%, _, \) to avoid wildcard match */
+function escapeIlike(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+}
+
 /** Normalize email for comparison (Gmail plus-addressing: user+tag@gmail.com → user@gmail.com) */
 function normalizeForMatch(email: string): string {
   const lower = email.toLowerCase()
@@ -89,7 +94,7 @@ export async function POST(request: NextRequest) {
     const isCronCall = !!cronSecret && cronKey === cronSecret
 
     let supabase: Awaited<ReturnType<typeof createClient>>
-    let userId: string
+    let userId!: string // Set in both paths: session user (line 108) or integration.created_by (line 126)
 
     if (isCronCall) {
       supabase = createAdminClient() as any
@@ -114,10 +119,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email integration not connected' }, { status: 503 })
     }
 
-    if (isCronCall && !integration.created_by) {
-      return NextResponse.json({ error: 'Email integration has no created_by (connect via UI first)' }, { status: 503 })
+    if (isCronCall) {
+      if (!integration.created_by) {
+        return NextResponse.json({ error: 'Email integration has no created_by (connect via UI first)' }, { status: 503 })
+      }
+      userId = integration.created_by
     }
-    if (isCronCall) userId = integration.created_by!
 
     const oauth2Client = new google.auth.OAuth2(
       clientId,
@@ -257,6 +264,7 @@ export async function POST(request: NextRequest) {
             .select('ticket_id')
             .eq('thread_id', msgThreadId)
             .not('ticket_id', 'is', null)
+            .order('synced_at', { ascending: false })
             .limit(1)
             .maybeSingle()
           if (byMsg?.ticket_id) ticketId = byMsg.ticket_id
@@ -312,7 +320,8 @@ export async function POST(request: NextRequest) {
         const { data: company } = await supabase
           .from('companies')
           .select('id')
-          .ilike('email', senderEmail)
+          .ilike('email', escapeIlike(senderEmail))
+          .limit(1)
           .maybeSingle()
 
         // Dedup: same company + same thread already has ticket? (from earlier in this batch)
@@ -332,6 +341,7 @@ export async function POST(request: NextRequest) {
             .select('ticket_id')
             .eq('thread_id', msgThreadId)
             .not('ticket_id', 'is', null)
+            .order('synced_at', { ascending: false })
             .limit(1)
             .maybeSingle()
           if (dupByMsg?.ticket_id) existingTicketId = dupByMsg.ticket_id
@@ -388,8 +398,8 @@ export async function POST(request: NextRequest) {
           }
 
           ticketId = newTicket.id
-          if (msgThreadId) threadToTicketThisRun.set(msgThreadId, ticketId)
-          if (msgThreadId) {
+          if (msgThreadId && ticketId != null) {
+            threadToTicketThisRun.set(msgThreadId, ticketId)
             await supabase.from('tickets').update({ gmail_thread_id: msgThreadId }).eq('id', ticketId)
           }
           createdCount++

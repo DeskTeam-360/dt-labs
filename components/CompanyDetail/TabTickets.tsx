@@ -432,6 +432,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       const assigneesByTicket: Record<number, Array<{ id: string; user_name?: string }>> = {}
       const tagsByTicket: Record<number, Array<{ id: string; name: string; slug: string; color?: string }>> = {}
       const checklistByTicket: Record<number, { completed: number; total: number }> = {}
+      const latestRepliesByTicket: Record<number, string> = {}
 
       if (ticketIds.length > 0) {
         const [assigneesRes, tagsRes, latestRepliesRes] = await Promise.all([
@@ -451,7 +452,6 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
           if (!tagsByTicket[row.ticket_id]) tagsByTicket[row.ticket_id] = []
           tagsByTicket[row.ticket_id].push(row.tags)
         })
-        const latestRepliesByTicket: Record<number, string> = {}
         ;(latestRepliesRes.data || []).forEach((r: any) => {
           const cur = latestRepliesByTicket[r.todo_id]
           if (!cur || r.created_at > cur) latestRepliesByTicket[r.todo_id] = r.created_at
