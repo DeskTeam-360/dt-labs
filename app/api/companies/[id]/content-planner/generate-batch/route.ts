@@ -84,25 +84,15 @@ export async function POST(
     const { data: channels } = await supabase
       .from('content_planner_channels')
       .select('id, title')
-    const { data: formats } = await supabase
-      .from('content_planner_formats')
-      .select('id, title')
 
     const channelByTitle: Record<string, string> = {}
-    const formatByTitle: Record<string, string> = {}
     ;(channels || []).forEach((c: { id: string; title: string }) => {
       channelByTitle[c.title.toLowerCase()] = c.id
-    })
-    ;(formats || []).forEach((f: { id: string; title: string }) => {
-      formatByTitle[f.title.toLowerCase()] = f.id
     })
 
     const gbpChannelId = channelByTitle['gbp'] ?? (channels?.[0] as { id: string })?.id
     const socialChannelId = channelByTitle['social'] ?? (channels?.[0] as { id: string })?.id
     const blogChannelId = channelByTitle['blog'] ?? (channels?.[0] as { id: string })?.id
-    const socialFormatId = formatByTitle['social post'] ?? formatByTitle['social'] ?? (formats?.[0] as { id: string })?.id
-    const blogFormatId = formatByTitle['blog'] ?? (formats?.[0] as { id: string })?.id
-    const gbpFormatId = formatByTitle['website page'] ?? formatByTitle['landing page'] ?? (formats?.[0] as { id: string })?.id
 
     const { data: intentRows } = await supabase
       .from('content_planner_intents')
@@ -113,15 +103,15 @@ export async function POST(
     intents.forEach((i) => { intentByTitle[i.title.toLowerCase()] = i.id })
     const intentTitles = intents.map((i) => i.title).join(', ')
 
-    const items: Array<{ channel_id: string; format_id: string; type: string }> = []
+    const items: Array<{ channel_id: string; type: string }> = []
     for (let i = 0; i < gbpPerWeek; i++) {
-      items.push({ channel_id: gbpChannelId, format_id: gbpFormatId, type: 'gbp' })
+      items.push({ channel_id: gbpChannelId, type: 'gbp' })
     }
     for (let i = 0; i < socialPerWeek; i++) {
-      items.push({ channel_id: socialChannelId, format_id: socialFormatId, type: 'social' })
+      items.push({ channel_id: socialChannelId, type: 'social' })
     }
     for (let i = 0; i < blogsPerWeek; i++) {
-      items.push({ channel_id: blogChannelId, format_id: blogFormatId, type: 'blog' })
+      items.push({ channel_id: blogChannelId, type: 'blog' })
     }
 
     let metadataPerItem: Array<{ topic: string | null; primary_keyword: string | null; intents: string[]; secondary_keywords: string | null; location: string | null }> = []
@@ -228,11 +218,13 @@ Return ONLY valid JSON array, no markdown or explanation. Example format:
       return {
         company_id: companyId,
         channel_id: item.channel_id,
-        format_id: item.format_id,
         publish_date: publishDates[i],
         status: 'draft',
         cta_dynamic: true,
         topic: meta?.topic ?? null,
+        topic_description: null,
+        topic_type_id: null,
+        hashtags: null,
         primary_keyword: meta?.primary_keyword ?? null,
         secondary_keywords: meta?.secondary_keywords ?? null,
         intents: intentIds,

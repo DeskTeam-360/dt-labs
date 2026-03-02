@@ -259,7 +259,6 @@ export default function TodoStatusesContent({ user: currentUser }: TodoStatusesC
     {
       title: 'Actions',
       key: 'actions',
-      width: 120,
       render: (_, record) => (
         <Space>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
