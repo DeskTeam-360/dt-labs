@@ -459,19 +459,21 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     try {
       const { data, error } = await supabase
         .from('todo_statuses')
-        .select('slug, title, color, show_in_kanban, sort_order')
+        .select('slug, title, customer_title, color, show_in_kanban, sort_order')
         .order('sort_order', { ascending: true })
       if (error) throw error
-      const list = (data || []) as Array<{ slug: string; title: string; color?: string; show_in_kanban?: boolean }>
-      setStatuses(list.map((s) => ({ slug: s.slug, title: s.title })))
+      const list = (data || []) as Array<{ slug: string; title: string; customer_title?: string | null; color?: string; show_in_kanban?: boolean }>
+      const displayTitle = (s: { title: string; customer_title?: string | null }) =>
+        basePath && s.customer_title ? s.customer_title : s.title
+      setStatuses(list.map((s) => ({ slug: s.slug, title: displayTitle(s) })))
       const kanbanCols = list.filter((s) => s.show_in_kanban !== false).map((s) => ({
         id: s.slug,
-        title: s.title,
+        title: displayTitle(s),
         color: s.color || '#d9d9d9',
       }))
       const allCols = list.map((s) => ({
         id: s.slug,
-        title: s.title,
+        title: displayTitle(s),
         color: s.color || '#d9d9d9',
       }))
       if (kanbanCols.length > 0) {
@@ -479,7 +481,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
         setFilterStatus(kanbanCols.map((c) => c.id))
       }
       if (allCols.length > 0) setAllStatusColumns(allCols)
-      setAllStatuses(list.map((s) => ({ slug: s.slug, title: s.title })))
+      setAllStatuses(list.map((s) => ({ slug: s.slug, title: displayTitle(s) })))
     } catch {
       setStatuses([])
     }
@@ -519,7 +521,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     fetchStatuses()
     fetchTypes()
     fetchTags()
-  }, [])
+  }, [basePath])
 
   const hasActiveFilters =
     filterStatus.length > 0 ||
@@ -706,11 +708,16 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       dataIndex: 'status',
       key: 'status',
       width: 120,
-      render: (status: string) => (
-        <Tag color={status === 'completed' ? 'green' : status === 'in_progress' ? 'blue' : 'default'}>
-          {status.replace('_', ' ')}
-        </Tag>
-      ),
+      render: (status: string) => {
+        const col = allStatusColumns.find((c) => c.id === status)
+        const label = col ? col.title : status.replace('_', ' ')
+        const color = col?.color ? undefined : status === 'completed' ? 'green' : status === 'in_progress' ? 'blue' : 'default'
+        return (
+          <Tag color={color} style={col?.color ? { backgroundColor: col.color, borderColor: col.color, color: '#fff' } : undefined}>
+            {label}
+          </Tag>
+        )
+      },
     },
     {
       title: 'Type',

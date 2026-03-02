@@ -139,7 +139,7 @@ export default function TodoDetailContent({
     const [newAttributeKey, setNewAttributeKey] = useState('')
     const [newAttributeValue, setNewAttributeValue] = useState('')
     const [editingDescription, setEditingDescription] = useState(false)
-    const [descriptionValue, setDescriptionValue] = useState(todoData.description || '')
+    const [descriptionValue, setDescriptionValue] = useState(() => (typeof todoData?.description === 'string' ? todoData.description : '') || '')
     const [editModalVisible, setEditModalVisible] = useState(false)
     const [teams, setTeams] = useState<any[]>([])
     const [users, setUsers] = useState<any[]>([])
@@ -147,7 +147,7 @@ export default function TodoDetailContent({
     const [ticketTypes, setTicketTypes] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
     const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([])
     const [allTags, setAllTags] = useState<Array<{ id: string; name: string; slug: string }>>([])
-    const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initialTags.map((t) => t.id))
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>(() => (Array.isArray(initialTags) ? initialTags.map((t) => t?.id).filter(Boolean) as string[] : []))
     const [descriptionAttachmentsFromDb, setDescriptionAttachmentsFromDb] = useState<{ id: string; file_url: string; file_name: string; file_path: string }[]>([])
     const [newDescriptionAttachments, setNewDescriptionAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
     const [deletedDescriptionAttachmentIds, setDeletedDescriptionAttachmentIds] = useState<string[]>([])
@@ -224,12 +224,13 @@ export default function TodoDetailContent({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [todoData.team_id, todoData.visibility])
 
-    // Sync descriptionValue with todoData.description
+    // Sync descriptionValue with todoData.description (only when not editing and value actually changed)
+    const descriptionFromProps = typeof todoData?.description === 'string' ? todoData.description : ''
     useEffect(() => {
         if (!editingDescription) {
-            setDescriptionValue(todoData.description || '')
+            setDescriptionValue((prev: string) => (prev !== descriptionFromProps ? descriptionFromProps : prev))
         }
-    }, [todoData.description, editingDescription])
+    }, [descriptionFromProps, editingDescription])
 
     // Fetch teams and users for edit form
     useEffect(() => {
@@ -1023,10 +1024,9 @@ export default function TodoDetailContent({
             ) : (
                 <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
             )}
-
             <Layout style={{ marginLeft: isCustomer ? 0 : (collapsed ? 80 : 250), transition: 'margin-left 0.2s' }}>
                 <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
-                    <Card>
+                    <Card style={{  margin: '0 auto' }}>
                         <Flex gap={16} align='center' style={{ marginBottom: 24 }}>
                             <Button
                                 icon={<ArrowLeftOutlined />}
@@ -1067,7 +1067,7 @@ export default function TodoDetailContent({
                                             onCompanyChange={handleCompanyChange}
                                             companyChanging={companyChanging}
                                             tagOptions={allTags}
-                                            selectedTagIds={initialTags.map((t) => t.id)}
+                                            selectedTagIds={selectedTagIds}
                                             onTagsChange={handleTagsChange}
                                             tagsChanging={tagsChanging}
                                             canEditCompanyAndTags={variant !== 'customer'}

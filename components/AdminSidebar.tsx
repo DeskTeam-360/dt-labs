@@ -48,6 +48,8 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         setOpenKeys(['templates'])
       } else if (pathname.startsWith('/ticket-statuses') || pathname.startsWith('/ticket-types') || pathname.startsWith('/tags')) {
         setOpenKeys(['ticket-attributes'])
+      } else if (pathname.startsWith('/content-planner')) {
+        setOpenKeys(['content-planner'])
       }
     }
   }, [pathname])
@@ -101,6 +103,28 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           key: '/tags',
           icon: <TagOutlined />,
           label: 'Tags',
+        },
+      ],
+    },
+    {
+      key: 'content-planner',
+      icon: <FileTextOutlined />,
+      label: 'Content Planner',
+      children: [
+        {
+          key: '/content-planner/channel',
+          icon: <SettingOutlined />,
+          label: 'Channels',
+        },
+        {
+          key: '/content-planner/intents',
+          icon: <SettingOutlined />,
+          label: 'Intents',
+        },
+        {
+          key: '/content-planner/topic-type',
+          icon: <SettingOutlined />,
+          label: 'Topic Types',
         },
       ],
     },

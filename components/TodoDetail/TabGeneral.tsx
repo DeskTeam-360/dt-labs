@@ -241,11 +241,15 @@ export default function TabGeneral({
                 <Flex vertical gap={10}>
                   {comments.map((comment) => {
                     const isCustomer = comment.author_type === 'customer'
+                    const isCurrentUser = comment.user_id === currentUserId
                     const cardBg = isCustomer ? 'rgba(230, 247, 255, 0.5)' : (comment.visibility === 'note' ? '#f5f5f5' : 'rgba(255, 251, 230, 0.4)')
                     const borderColor = isCustomer ? '#91caff' : (comment.visibility === 'note' ? '#d9d9d9' : '#ffe58f')
+                    const borderStyle = isCurrentUser
+                      ? { borderRight: `3px solid green` as const }
+                      : { borderLeft: `3px solid ${borderColor}` as const }
                     return (
                     <Flex key={comment.id} gap="middle" align="flex-start" 
-                    style={{ padding: 20, borderLeft: `3px solid ${borderColor}`, backgroundColor: cardBg, borderRadius: 10 }}>
+                    style={{ padding: 20, backgroundColor: cardBg, borderRadius: 10, ...borderStyle }}>
                       <Avatar icon={<UserOutlined />} src={comment.user?.avatar_url} />
                       <Flex vertical style={{ flex: 1, minWidth: 0 }}>
                         <Flex justify="space-between" align="center" wrap="wrap" gap="small">

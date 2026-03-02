@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Layout, Avatar, Dropdown, Typography, Menu, Flex } from 'antd'
 import {
   UserOutlined,
@@ -32,20 +32,26 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const selectedKeys = useMemo(() => {
+    if (!mounted || !pathname) return []
     if (pathname === '/customer') return ['dashboard']
-    if (pathname?.startsWith('/customer/info')) return ['info']
-    if (pathname?.startsWith('/customer/users')) return ['users']
-    if (pathname?.startsWith('/customer/tickets')) return ['tickets']
-    if (pathname?.startsWith('/customer/content-planner')) return ['content-planner']
-    if (pathname?.startsWith('/customer/data-form')) return ['data-form']
-    if (pathname?.startsWith('/customer/generate')) return ['generate']
-    if (pathname?.startsWith('/customer/knowledge-base')) return ['knowledge-base']
-    if (pathname?.startsWith('/customer/websites')) return ['websites']
-    if (pathname?.startsWith('/customer/crawling')) return ['crawling']
+    if (pathname.startsWith('/customer/info')) return ['info']
+    if (pathname.startsWith('/customer/users')) return ['users']
+    if (pathname.startsWith('/customer/tickets')) return ['tickets']
+    if (pathname.startsWith('/customer/content-planner')) return ['content-planner']
+    if (pathname.startsWith('/customer/data-form')) return ['data-form']
+    if (pathname.startsWith('/customer/generate')) return ['generate']
+    if (pathname.startsWith('/customer/knowledge-base')) return ['knowledge-base']
+    if (pathname.startsWith('/customer/websites')) return ['websites']
+    if (pathname.startsWith('/customer/crawling')) return ['crawling']
     return []
-  }, [pathname])
+  }, [pathname, mounted])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -87,6 +93,8 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
         padding: '0 24px',
         background: '#001529',
         height: 64,
+        minHeight: 64,
+        flexShrink: 0,
         position: 'sticky',
         top: 0,
         zIndex: 1000,
@@ -171,13 +179,13 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
           >
             <Avatar
               icon={<UserOutlined />}
-              src={user.user_metadata?.avatar_url}
+              src={user?.user_metadata?.avatar_url}
               size={36}
             />
             <Flex vertical gap={0} style={{ lineHeight: 1, color: '#fff' }}>
-                <strong>{user.user_metadata?.full_name || 'User'}</strong>
+                <strong>{user?.user_metadata?.full_name || 'User'}</strong>
               
-                {user.email}
+                {user?.email}
               
             </Flex>
           </div>
