@@ -26,6 +26,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
     teams,
     users,
     ticketTypes,
+    ticketPriorities,
     companies,
     allTags,
     allStatuses,
@@ -143,6 +144,7 @@ export default function TodosContent({ user: currentUser }: TodosContentProps) {
         teams={teams}
         users={users}
         ticketTypes={ticketTypes}
+        ticketPriorities={ticketPriorities}
         companies={companies}
         allTags={allTags}
         allStatuses={allStatuses}

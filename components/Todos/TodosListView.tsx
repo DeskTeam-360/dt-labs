@@ -44,6 +44,9 @@ export default function TodosListView({
           ellipsis: true,
           render: (title: string, record: TodoRecord) => (
             <Button type="link" style={{ padding: 0, height: 'auto' }} onClick={() => onEdit(record)}>
+              {record.has_unread_replies && (
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
+              )}
               {title}
             </Button>
           ),
@@ -64,6 +67,17 @@ export default function TodosListView({
           width: 120,
           render: (_: unknown, record: TodoRecord) =>
             record.type ? <Tag color={record.type.color}>{record.type.title}</Tag> : '—',
+        },
+        {
+          title: 'Priority',
+          key: 'priority',
+          width: 100,
+          render: (_: unknown, record: TodoRecord) =>
+            record.priority ? (
+              <Tag color={record.priority.color ? undefined : 'default'} style={record.priority.color ? { backgroundColor: record.priority.color, borderColor: darkenColor(record.priority.color), color: '#fff' } : undefined}>
+                {record.priority.title}
+              </Tag>
+            ) : '—',
         },
         {
           title: 'Company',

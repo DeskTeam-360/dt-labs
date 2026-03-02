@@ -35,6 +35,9 @@ export default function CardViewCard({ todo, onEdit, onDelete }: CardViewCardPro
           style={{ fontSize: 14, flex: 1, cursor: 'pointer' }}
           onClick={() => router.push(`/tickets/${todo.id}`)}
         >
+          {todo.has_unread_replies && (
+            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
+          )}
           {todo.title}
         </Text>
         <Dropdown
@@ -66,11 +69,16 @@ export default function CardViewCard({ todo, onEdit, onDelete }: CardViewCardPro
       <Flex gap={5} wrap="wrap" style={{ maxWidth: '100%', marginBottom: 8 }}>
         {todo.visibility !== 'team' && (
           <Tag color={getVisibilityColor(todo.visibility)} style={{ fontSize: 11 }}>
-            {todo.visibility === 'specific_users' ? 'Specific Users' : todo.visibility.toUpperCase()}
+            {todo.visibility === 'specific_users' ? 'Specific Users' : todo.visibility === 'public' ? 'Public' : todo.visibility.toUpperCase()}
           </Tag>
         )}
         {todo.team_name && <Tag color="blue" style={{ fontSize: 11 }}>Team {todo.team_name}</Tag>}
         {todo.type && <Tag color={todo.type.color} style={{ fontSize: 11 }}>{todo.type.title}</Tag>}
+        {todo.priority && (
+          <Tag color={todo.priority.color ? undefined : 'default'} style={{ fontSize: 11, ...(todo.priority.color ? { backgroundColor: todo.priority.color, borderColor: darkenColor(todo.priority.color), color: '#fff' } : {}) }}>
+            {todo.priority.title}
+          </Tag>
+        )}
         {todo.company && (
           <Tag
             color={todo.company.color ? undefined : 'cyan'}

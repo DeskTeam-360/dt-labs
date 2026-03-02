@@ -1,75 +1,117 @@
-company_content_planners
-company_id
-content_id:
-channel:
-topic:
-primary_keyword:
-secondary_keywords:
-intents: array of intent_title
-location:
-format: format_title
-cta_dynamic (if true, cta_type & cta_text will be null if false, cta_type & cta_text will be required)
-cta_type:
-cta_text:
-publish_date:
-status:
-insight:
-ai_content_results:
-  ai_model:
-  ai_version:
-  generated_date:
-  content_text:
-  prompt_id:
-  vector_reference_id:
+🔐 1️⃣ Cara Connect Google untuk Shared Inbox
 
+Gunakan OAuth sekali saja untuk admin.
 
-status (enum):
-planned
-draft
-ai_generated
-human_reviewed
-approved
-published
-needs_update
+Alternatif lebih proper untuk production:
 
-cta_type (enum):
-call
-visit_website
-get_quote
-book_consultation
-learn_more
+Gunakan Google Workspace + Service Account (Domain Wide Delegation)
 
-intent create other table
+Kalau email kamu pakai Google Workspace, ini jauh lebih clean dibanding OAuth biasa.
+
+--
+
+Jika Pakai Gmail Biasa (tanpa Workspace)
+
+Gunakan OAuth 2.0 seperti ini:
+
+Login sebagai support@domain.com
+
+Connect Google
+
+Simpan:
+
+access_token
+
+refresh_token
+
+Semua request pakai token ini
+
+--
+
+email_integrations
+------------------
 id
-title
-description nullable
+provider (google)
+email_address
+access_token (encrypted)
+refresh_token (encrypted)
+expires_at
+is_active (boolean)
+created_at
+updated_at
 
-insert for intent:
-Brand Awareness
-Lead Generation
-Sales
-Customer Support
-Educational
-Engagement
-News and Information
-Transactional
-Informational
-Commercial
-Local
 
-format create other table
+email_messages
+--------------
 id
-title
-description nullable
+gmail_message_id (unique)
+thread_id
+from_email
+to_email
+subject
+snippet
+ticket_id (nullable)
+direction (incoming, outgoing)
+synced_at
+created_at
 
-channel create other table
-id
-title
-description nullable
 
-insert for channel:
-GBP
-Website
-Blog
-Landing Page
-Social
+🎯 STRATEGI YANG BENAR (Shared Inbox Architecture)
+
+Karena hanya 1 email:
+
+❌ Tidak perlu OAuth per user
+
+✅ Hanya 1 Google account terhubung
+
+✅ Semua agent pakai sistem, bukan login Gmail
+
+Artinya:
+
+Google Account (support@)
+        ↓
+Gmail API
+        ↓
+Backend (Next.js)
+        ↓
+Ticket System
+        ↓
+Agents
+
+
+
+1 Gmail inbox (misal: support@domain.com
+)
+Dipakai semua agent untuk:
+
+Read incoming email
+
+Send reply dari sistem
+
+Sinkronisasi ke ticket
+
+
+Next.js App
+   ↓
+API Routes
+   ↓
+Database
+   ↓
+Worker Process (Node)
+   ↓
+Gmail API
+
+
+--
+
+📧 Sync Inbox dari luar (Cron)
+
+POST /api/email/sync-inbox dengan header:
+  Authorization: Bearer <SYNC_INBOX_CRON_SECRET>
+  atau x-api-key: <SYNC_INBOX_CRON_SECRET>
+
+Set env: SYNC_INBOX_CRON_SECRET=your-secret-string
+
+Contoh cron (setiap 5 menit):
+  curl -X POST https://yoursite.com/api/email/sync-inbox \
+    -H "Authorization: Bearer your-secret-string"

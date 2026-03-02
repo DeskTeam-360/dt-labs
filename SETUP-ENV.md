@@ -43,6 +43,12 @@ OPENAI_API_KEY=sk-your_openai_api_key_here
 # FRESHDESK_DOMAIN=mycompany
 # API key dari Profile Settings di Freshdesk portal
 # FRESHDESK_API_KEY=your_freshdesk_api_key_here
+
+# --- Google OAuth (untuk Email Integration / Shared Inbox) ---
+# Dapatkan di Google Cloud Console: APIs & Services > Credentials
+# Buat OAuth 2.0 Client ID (Web application), tambahkan redirect URI: {NEXT_PUBLIC_SITE_URL}/api/email/google/callback
+# GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
+# GOOGLE_CLIENT_SECRET=your_google_client_secret
 ```
 
 ### 4. Cara Mendapatkan Service Role Key

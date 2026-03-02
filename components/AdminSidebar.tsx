@@ -2,24 +2,25 @@
 
 import { Layout, Menu, Avatar, Dropdown, Typography, Space } from 'antd'
 import {
-  DashboardOutlined,
-  UserOutlined,
-  LogoutOutlined,
-  LockOutlined,
-  FileTextOutlined,
-  TeamOutlined,
-  SettingOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-  DatabaseOutlined,
-  FormOutlined,
-  GlobalOutlined,
-  CheckSquareOutlined,
-  PictureOutlined,
-  RobotOutlined,
-  TagOutlined,
-  AppstoreOutlined,
-  ApiOutlined,
+    DashboardOutlined,
+    UserOutlined,
+    LogoutOutlined,
+    LockOutlined,
+    FileTextOutlined,
+    TeamOutlined,
+    SettingOutlined,
+    MenuFoldOutlined,
+    MenuUnfoldOutlined,
+    DatabaseOutlined,
+    FormOutlined,
+    GlobalOutlined,
+    CheckSquareOutlined,
+    PictureOutlined,
+    RobotOutlined,
+    TagOutlined,
+    AppstoreOutlined,
+    ApiOutlined,
+    MailOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
@@ -170,11 +171,11 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       icon: <ApiOutlined />,
       label: 'Freshdesk API Test',
     },
-    // {
-    //   key: '/settings',
-    //   icon: <SettingOutlined />,
-    //   label: 'Settings',
-    // },
+    {
+      key: '/email-integration',
+      icon: <MailOutlined />,
+      label: 'Email Integration',
+    },
   ]
 
   const accountMenuItems = [

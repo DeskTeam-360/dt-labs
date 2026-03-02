@@ -23,6 +23,7 @@ export default function TodosHeader({
           My Tickets
         </Typography.Title>
         <Segmented
+        
           value={viewMode}
           onChange={(v) => onViewModeChange(v as 'kanban' | 'list' | 'card')}
           options={[

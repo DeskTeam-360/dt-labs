@@ -43,7 +43,8 @@ export default async function CustomerTicketDetailPage({
       creator:users!todos_created_by_fkey(id, full_name, email),
       team:teams(id, name),
       type:ticket_types(id, title, slug, color),
-      company:companies(id, name, color),
+      priority:ticket_priorities(id, title, slug, color),
+      company:companies(id, name, color, email),
       assignees:todo_assignees(
         id,
         user:users!todo_assignees_user_id_fkey(id, full_name, email, avatar_url)

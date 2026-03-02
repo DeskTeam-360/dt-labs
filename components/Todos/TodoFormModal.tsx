@@ -24,6 +24,7 @@ interface TodoFormModalProps {
   teams: Team[]
   users: UserRecord[]
   ticketTypes: Array<{ id: number; title: string; color: string }>
+  ticketPriorities: Array<{ id: number; title: string; slug: string; color: string }>
   companies: Array<{ id: string; name: string }>
   allTags: Array<{ id: string; name: string }>
   allStatuses: Array<{ slug: string; title: string }>
@@ -48,6 +49,7 @@ export default function TodoFormModal({
   teams,
   users,
   ticketTypes,
+  ticketPriorities,
   companies,
   allTags,
   allStatuses,
@@ -152,6 +154,27 @@ export default function TodoFormModal({
           </Select>
         </Form.Item>
 
+        <Form.Item name="priority_id" label="Priority">
+          <Select placeholder="Select priority" allowClear>
+            {ticketPriorities.map((p) => (
+              <Option key={p.id} value={p.id}>
+                <Space>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 12,
+                      height: 12,
+                      borderRadius: 2,
+                      backgroundColor: p.color,
+                    }}
+                  />
+                  {p.title}
+                </Space>
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
+
         <Form.Item name="company_id" label="Company">
           <Select placeholder="Select company" allowClear>
             {companies.map((c) => (
@@ -190,6 +213,7 @@ export default function TodoFormModal({
             <Option value="private">Private</Option>
             <Option value="team">Team</Option>
             <Option value="specific_users">Specific Users</Option>
+            <Option value="public">Public</Option>
           </Select>
         </Form.Item>
 

@@ -18,6 +18,7 @@ import {
     DatePicker,
     Tabs,
     Flex,
+    notification,
 } from 'antd'
 import {
     ArrowLeftOutlined,
@@ -28,6 +29,7 @@ import {
     EditOutlined,
     PaperClipOutlined,
     DeleteOutlined,
+    SyncOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -130,8 +132,6 @@ export default function TodoDetailContent({
     const [loading, setLoading] = useState(false)
     const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
     const [newChecklistTitle, setNewChecklistTitle] = useState('')
-    const [newComment, setNewComment] = useState('')
-    const [newCommentAttachments, setNewCommentAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
     const [commentVisibility, setCommentVisibility] = useState<'note' | 'reply'>('reply')
     const [editingComment, setEditingComment] = useState<string | null>(null)
     const [editingCommentValue, setEditingCommentValue] = useState('')
@@ -145,6 +145,7 @@ export default function TodoDetailContent({
     const [users, setUsers] = useState<any[]>([])
     const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
     const [ticketTypes, setTicketTypes] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
+    const [ticketPriorities, setTicketPriorities] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
     const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([])
     const [allTags, setAllTags] = useState<Array<{ id: string; name: string; slug: string }>>([])
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>(() => (Array.isArray(initialTags) ? initialTags.map((t) => t?.id).filter(Boolean) as string[] : []))
@@ -153,6 +154,7 @@ export default function TodoDetailContent({
     const [deletedDescriptionAttachmentIds, setDeletedDescriptionAttachmentIds] = useState<string[]>([])
     const [statusChanging, setStatusChanging] = useState(false)
     const [typeChanging, setTypeChanging] = useState(false)
+    const [priorityChanging, setPriorityChanging] = useState(false)
     const [companyChanging, setCompanyChanging] = useState(false)
     const [tagsChanging, setTagsChanging] = useState(false)
     const [dueDateChanging, setDueDateChanging] = useState(false)
@@ -162,8 +164,28 @@ export default function TodoDetailContent({
     const [totalTimeSeconds, setTotalTimeSeconds] = useState<number>(0)
     const [currentTime, setCurrentTime] = useState<number>(0)
     const [statusesFromDb, setStatusesFromDb] = useState<{ slug: string; title: string; color: string }[]>([])
+    const [syncingEmail, setSyncingEmail] = useState(false)
+    const [assigneesChanging, setAssigneesChanging] = useState(false)
+    const [teamChanging, setTeamChanging] = useState(false)
+    const [visibilityChanging, setVisibilityChanging] = useState(false)
 
     const supabase = createClient()
+
+    // Mark ticket as read when user views it (global: 1 read = no notif for all)
+    useEffect(() => {
+        if (!todoData?.id) return
+        const markRead = async () => {
+            await supabase.rpc('mark_ticket_read', { ticket_id_param: todoData.id })
+        }
+        markRead()
+    }, [todoData?.id])
+
+    const VISIBILITY_OPTIONS = [
+        { value: 'private', label: 'Private' },
+        { value: 'team', label: 'Team' },
+        { value: 'specific_users', label: 'Specific Users' },
+        { value: 'public', label: 'Public' },
+    ]
 
     // Default status labels/colors when DB has no todo_statuses
     const DEFAULT_STATUS_MAP: Record<string, { title: string; color: string }> = {
@@ -193,6 +215,71 @@ export default function TodoDetailContent({
         }
         fetchStatuses()
     }, [])
+
+    // Auto-sync inbox: company email replies -> comments (admin only, background)
+    useEffect(() => {
+        if (variant !== 'admin' || !todoData?.company?.email) return
+        let cancelled = false
+        fetch('/api/email/sync-inbox', { method: 'POST' })
+            .then((res) => res.json())
+            .then((data) => {
+                if (cancelled || !data.addedCount) return
+                router.refresh()
+            })
+            .catch(() => {})
+        return () => { cancelled = true }
+    }, [variant, todoData?.id, router])
+
+    // Realtime: notify when someone adds a new reply or note (from another user)
+    useEffect(() => {
+        if (!todoData?.id) return
+        const channel = supabase
+            .channel(`todo_comments:${todoData.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'todo_comments',
+                    filter: `todo_id=eq.${todoData.id}`,
+                },
+                (payload) => {
+                    const newComment = payload.new as { user_id?: string; visibility?: string; author_type?: string }
+                    if (newComment.user_id === currentUser.id) return
+                    const isNote = newComment.visibility === 'note'
+                    const isCustomer = newComment.author_type === 'customer'
+                    const title = isNote
+                        ? 'New internal note'
+                        : isCustomer
+                          ? 'New reply from customer'
+                          : 'New reply'
+                    const key = `new-comment-${Date.now()}`
+                    notification.info({
+                        key,
+                        message: title,
+                        description: 'Refresh to view the latest messages.',
+                        btn: (
+                            <Button
+                                type="primary"
+                                size="small"
+                                onClick={() => {
+                                    notification.destroy(key)
+                                    router.refresh()
+                                }}
+                            >
+                                Refresh
+                            </Button>
+                        ),
+                        duration: 8,
+                    })
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [todoData?.id, currentUser.id, supabase])
 
     // Fetch team members if todo has a team
     useEffect(() => {
@@ -273,6 +360,17 @@ export default function TodoDetailContent({
                 // ignore
             }
         }
+        const fetchTicketPriorities = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('ticket_priorities')
+                    .select('id, title, slug, color')
+                    .order('sort_order', { ascending: true })
+                if (!error) setTicketPriorities((data || []) as Array<{ id: number; title: string; slug: string; color: string }>)
+            } catch {
+                // ignore
+            }
+        }
         const fetchCompanies = async () => {
             try {
                 const { data, error } = await supabase
@@ -298,6 +396,7 @@ export default function TodoDetailContent({
         fetchTeams()
         fetchUsers()
         fetchTicketTypes()
+        fetchTicketPriorities()
         fetchCompanies()
         fetchTags()
         fetchTimeTrackerSessions()
@@ -472,7 +571,8 @@ export default function TodoDetailContent({
         const colorMap: Record<string, string> = {
             private: 'default',
             team: 'blue',
-            specific_users: 'green',
+            specific_users: 'lime',
+            public: 'green',
         }
         return colorMap[visibility] || 'default'
     }
@@ -549,8 +649,8 @@ export default function TodoDetailContent({
     }
 
     // Comment functions
-    const handleAddComment = async () => {
-        if (!newComment.trim()) {
+    const handleAddComment = async (commentText: string, attachments: { url: string; file_name: string; file_path: string }[]) => {
+        if (!commentText.trim()) {
             message.warning('Please enter a comment')
             return
         }
@@ -564,7 +664,7 @@ export default function TodoDetailContent({
                 .insert({
                     todo_id: todoData.id,
                     user_id: currentUser.id,
-                    comment: newComment.trim(),
+                    comment: commentText.trim(),
                     visibility,
                     author_type,
                 })
@@ -576,9 +676,9 @@ export default function TodoDetailContent({
 
             if (error) throw error
 
-            if (newCommentAttachments.length > 0) {
+            if (attachments.length > 0) {
                 await supabase.from('comment_attachments').insert(
-                    newCommentAttachments.map((a) => ({
+                    attachments.map((a) => ({
                         comment_id: data.id,
                         file_url: a.url,
                         file_name: a.file_name,
@@ -588,30 +688,31 @@ export default function TodoDetailContent({
                 )
             }
 
-            setComments((prev) => [...prev, { ...data, visibility, author_type, comment_attachments: newCommentAttachments.map((a) => ({ id: '', file_url: a.url, file_name: a.file_name })) }])
-            setNewComment('')
-            setNewCommentAttachments([])
+            setComments((prev) => [...prev, { ...data, visibility, author_type, comment_attachments: attachments.map((a) => ({ id: '', file_url: a.url, file_name: a.file_name })) }])
             message.success('Comment added')
-        } catch (error: any) {
-            message.error(error.message || 'Failed to add comment')
-        } finally {
-            setLoading(false)
-        }
-    }
 
-    const handleCommentFilesSelected = async (files: FileList | null) => {
-        if (!files?.length || !todoData?.id) return
-        setLoading(true)
-        try {
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i]
-                const result = await uploadTicketFile(file, todoData.id, 'comments')
-                if (result.url && result.path) {
-                    setNewCommentAttachments((prev) => [...prev, { url: result.url!, file_name: file.name, file_path: result.path! }])
-                } else if (result.error) {
-                    message.error(`${file.name}: ${result.error}`)
+            if (variant === 'admin' && visibility === 'reply' && author_type === 'agent' && todoData.company?.email?.trim()) {
+                try {
+                    const res = await fetch('/api/email/send-reply', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ticketId: todoData.id,
+                            commentBody: commentText.trim(),
+                            ticketTitle: todoData.title,
+                            companyEmail: todoData.company.email.trim(),
+                        }),
+                    })
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}))
+                        message.warning('Balasan dikirim, tapi email ke company gagal: ' + (err?.error || res.statusText))
+                    }
+                } catch {
+                    message.warning('Balasan dikirim, tapi email ke company gagal.')
                 }
             }
+        } catch (error: any) {
+            message.error(error.message || 'Failed to add comment')
         } finally {
             setLoading(false)
         }
@@ -820,6 +921,26 @@ export default function TodoDetailContent({
         }
     }
 
+    const handlePriorityChange = async (priorityId: number | null) => {
+        setPriorityChanging(true)
+        try {
+            const { error } = await supabase
+                .from('tickets')
+                .update({ priority_id: priorityId, updated_at: new Date().toISOString() })
+                .eq('id', todoData.id)
+            if (error) throw error
+            message.success('Priority updated')
+            todoData.priority_id = priorityId
+            todoData.priority = priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to update priority')
+        } finally {
+            setPriorityChanging(false)
+        }
+    }
+
+
     const handleCompanyChange = async (companyId: string | null) => {
         setCompanyChanging(true)
         try {
@@ -854,6 +975,80 @@ export default function TodoDetailContent({
             message.error(err instanceof Error ? err.message : 'Failed to update due date')
         } finally {
             setDueDateChanging(false)
+        }
+    }
+
+    const handleVisibilityChange = async (visibility: string) => {
+        setVisibilityChanging(true)
+        try {
+            const payload: Record<string, unknown> = {
+                visibility,
+                updated_at: new Date().toISOString(),
+            }
+            if (visibility !== 'team') payload.team_id = null
+            if (visibility !== 'specific_users') {
+                await supabase.from('todo_assignees').delete().eq('todo_id', todoData.id)
+            }
+            const { error } = await supabase.from('tickets').update(payload).eq('id', todoData.id)
+            if (error) throw error
+            message.success('Visibility updated')
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to update visibility')
+        } finally {
+            setVisibilityChanging(false)
+        }
+    }
+
+    const handleTeamChange = async (teamId: string | null) => {
+        setTeamChanging(true)
+        try {
+            const { error } = await supabase
+                .from('tickets')
+                .update({
+                    team_id: teamId,
+                    visibility: teamId ? 'team' : (todoData.visibility === 'team' ? 'private' : todoData.visibility),
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', todoData.id)
+            if (error) throw error
+            if (teamId) {
+                await supabase.from('todo_assignees').delete().eq('todo_id', todoData.id)
+            }
+            message.success('Team updated')
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to update team')
+        } finally {
+            setTeamChanging(false)
+        }
+    }
+
+    const handleAssigneesChange = async (userIds: string[]) => {
+        setAssigneesChanging(true)
+        try {
+            await supabase.from('todo_assignees').delete().eq('todo_id', todoData.id)
+            if (userIds.length > 0) {
+                const { error } = await supabase
+                    .from('todo_assignees')
+                    .insert(userIds.map((userId) => ({ todo_id: todoData.id, user_id: userId })))
+                if (error) throw error
+                await supabase
+                    .from('tickets')
+                    .update({ visibility: 'specific_users', team_id: null, updated_at: new Date().toISOString() })
+                    .eq('id', todoData.id)
+            } else {
+                await supabase
+                    .from('tickets')
+                    .update({ visibility: todoData.visibility === 'specific_users' ? 'private' : todoData.visibility, updated_at: new Date().toISOString() })
+                    .eq('id', todoData.id)
+            }
+            message.success('Assignees updated')
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to update assignees')
+        } finally {
+            setAssigneesChanging(false)
         }
     }
 
@@ -943,13 +1138,12 @@ export default function TodoDetailContent({
 
             if (error) throw error
 
-            // Update assignees if visibility is specific_users
+            // Update assignees and team based on visibility
+            await supabase.from('todo_assignees').delete().eq('todo_id', todoData.id)
+            if (values.visibility !== 'team') {
+                await supabase.from('tickets').update({ team_id: null }).eq('id', todoData.id)
+            }
             if (values.visibility === 'specific_users') {
-                await supabase
-                    .from('todo_assignees')
-                    .delete()
-                    .eq('todo_id', todoData.id)
-
                 if (selectedAssignees.length > 0) {
                     const assigneesToInsert = selectedAssignees.map((userId) => ({
                         todo_id: todoData.id,
@@ -962,11 +1156,6 @@ export default function TodoDetailContent({
 
                     if (assigneesError) throw assigneesError
                 }
-            } else {
-                await supabase
-                    .from('todo_assignees')
-                    .delete()
-                    .eq('todo_id', todoData.id)
             }
 
             if (variant !== 'customer') {
@@ -1017,6 +1206,24 @@ export default function TodoDetailContent({
     const totalChecklistCount = checklistItems.length
     const isCustomer = variant === 'customer'
 
+    const handleSyncEmail = async () => {
+        setSyncingEmail(true)
+        try {
+            const res = await fetch('/api/email/sync-inbox', { method: 'POST' })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'Sync failed')
+            const parts = []
+            if (data.addedCount > 0) parts.push(`${data.addedCount} new comment(s)`)
+            if (data.createdCount > 0) parts.push(`${data.createdCount} new ticket(s)`)
+            message.success(parts.length > 0 ? `Synced: ${parts.join(', ')}` : 'Synced. No new emails.')
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to sync email')
+        } finally {
+            setSyncingEmail(false)
+        }
+    }
+
     return (
         <Layout style={{ minHeight: '100vh' }}>
             {isCustomer ? (
@@ -1034,6 +1241,15 @@ export default function TodoDetailContent({
                             >
                                 Back to {isCustomer ? 'Portal' : 'Todos'}
                             </Button>
+                            {isCustomer && (
+                                <Button
+                                    icon={<SyncOutlined />}
+                                    onClick={handleSyncEmail}
+                                    loading={syncingEmail}
+                                >
+                                    Sync Email
+                                </Button>
+                            )}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{ flex: 1 }}>
                                     <Title level={2} >
@@ -1063,6 +1279,9 @@ export default function TodoDetailContent({
                                             typeOptions={ticketTypes}
                                             onTypeChange={handleTypeChange}
                                             typeChanging={typeChanging}
+                                            priorityOptions={ticketPriorities}
+                                            onPriorityChange={handlePriorityChange}
+                                            priorityChanging={priorityChanging}
                                             companyOptions={companies}
                                             onCompanyChange={handleCompanyChange}
                                             companyChanging={companyChanging}
@@ -1073,6 +1292,19 @@ export default function TodoDetailContent({
                                             canEditCompanyAndTags={variant !== 'customer'}
                                             onDueDateChange={handleDueDateChange}
                                             dueDateChanging={dueDateChanging}
+                                            visibilityOptions={VISIBILITY_OPTIONS}
+                                            selectedVisibility={todoData.visibility || 'private'}
+                                            onVisibilityChange={handleVisibilityChange}
+                                            visibilityChanging={visibilityChanging}
+                                            teamOptions={teams}
+                                            selectedTeamId={todoData.team_id ?? null}
+                                            onTeamChange={handleTeamChange}
+                                            teamChanging={teamChanging}
+                                            assigneeOptions={users}
+                                            selectedAssigneeIds={(todoData.assignees || []).map((a: any) => a.user_id || a.user?.id).filter(Boolean)}
+                                            onAssigneesChange={handleAssigneesChange}
+                                            assigneesChanging={assigneesChanging}
+                                            canEditAssignees={variant !== 'customer'}
                                             totalTimeSeconds={totalTimeSeconds}
                                             activeTimeTracker={activeTimeTracker}
                                             currentTime={currentTime}
@@ -1101,11 +1333,6 @@ export default function TodoDetailContent({
                                             }}
                                             onDeleteComment={handleDeleteComment}
                                             canDeleteComment={canDeleteComment}
-                                            newComment={newComment}
-                                            onNewCommentChange={setNewComment}
-                                            newCommentAttachments={newCommentAttachments}
-                                            onRemoveNewCommentAttachment={(i) => setNewCommentAttachments((prev) => prev.filter((_, idx) => idx !== i))}
-                                            onCommentFilesSelected={handleCommentFilesSelected}
                                             onAddComment={handleAddComment}
                                             addCommentLoading={loading}
                                             commentVisibility={commentVisibility}

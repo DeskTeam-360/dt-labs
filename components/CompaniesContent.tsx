@@ -20,6 +20,7 @@ interface CompaniesContentProps {
 interface CompanyRecord {
   id: string
   name: string
+  email?: string | null
   is_active: boolean
   color: string
   created_at: string
@@ -99,6 +100,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
     form.setFieldsValue({
       is_active: true,
       color: '#000000',
+      email: undefined,
     })
     setModalVisible(true)
   }
@@ -107,6 +109,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
     setEditingCompany(record)
     form.setFieldsValue({
       name: record.name,
+      email: record.email || '',
       is_active: record.is_active,
       color: record.color || '#000000',
     })
@@ -137,6 +140,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
           .from('companies')
           .update({
             name: values.name,
+            email: values.email?.trim() || null,
             is_active: values.is_active,
             color: values.color || '#000000',
           })
@@ -154,6 +158,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
           .from('companies')
           .insert({
             name: values.name,
+            email: values.email?.trim() || null,
             is_active: values.is_active,
             color: values.color || '#000000',
           })
@@ -176,6 +181,12 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       dataIndex: 'name',
       key: 'name',
       render: (name: string) => <strong>{name}</strong>,
+    },
+    {
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
+      render: (email: string) => email ? <a href={`mailto:${email}`}>{email}</a> : '—',
     },
     {
       title: 'Status',
@@ -298,6 +309,13 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 rules={[{ required: true, message: 'Please enter company name!' }]}
               >
                 <Input placeholder="Company Name" />
+              </Form.Item>
+
+              <Form.Item
+                name="email"
+                label="Email (untuk reply ticket)"
+              >
+                <Input type="email" placeholder="support@company.com" />
               </Form.Item>
 
               <Form.Item

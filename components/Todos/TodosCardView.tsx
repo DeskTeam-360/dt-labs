@@ -22,7 +22,7 @@ export default function TodosCardView({ todos, onEdit, onDelete }: TodosCardView
   return (
     <Row gutter={24} style={{ width: '100%', paddingRight: 24, paddingLeft: 24 }}>
       {todos.map((todo) => (
-        <Col span={24} md={12} lg={8} xl={6} style={{ margin: 0 }} key={todo.id}>
+        <Col span={24} md={12} lg={8} xl={6} style={{ padding:12 }} key={todo.id}>
           <CardViewCard todo={todo} onEdit={onEdit} onDelete={onDelete} />
         </Col>
       ))}

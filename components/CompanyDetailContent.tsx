@@ -128,6 +128,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
   const openEditCompanyModal = () => {
     companyEditForm.setFieldsValue({
       name: companyData.name,
+      email: companyData.email || '',
       is_active: companyData.is_active ?? true,
       color: companyData.color || '#000000',
     })
@@ -144,9 +145,10 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
       }
       const color = (values.color || '#000000').trim() || '#000000'
       setCompanyEditLoading(true)
+      const email = (values.email ?? '').trim() || null
       const { error } = await supabase
         .from('companies')
-        .update({ name, is_active: !!values.is_active, color })
+        .update({ name, email, is_active: !!values.is_active, color })
         .eq('id', companyData.id)
       if (error) throw error
       message.success('Company updated')
@@ -1178,6 +1180,9 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
               <Form form={companyEditForm} layout="vertical" style={{ marginTop: 16 }}>
                 <Form.Item name="name" label="Company name" rules={[{ required: true, message: 'Company name is required' }]}>
                   <Input placeholder="Company name" />
+                </Form.Item>
+                <Form.Item name="email" label="Email (untuk reply ticket)">
+                  <Input type="email" placeholder="support@company.com" />
                 </Form.Item>
                 {/* <Form.Item name="color" label="Signature Color (hex)" initialValue="#000000">
                   <ColorPickerInput />

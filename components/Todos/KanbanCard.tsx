@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, Button, Dropdown, Flex, Tag, Tooltip, Avatar, Modal, Typography } from 'antd'
-import { EditOutlined, DeleteOutlined, UserOutlined, MoreOutlined } from '@ant-design/icons'
+import { EditOutlined, DeleteOutlined, UserOutlined, MoreOutlined, FlagOutlined, FieldTimeOutlined, CommentOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -40,28 +40,62 @@ export default function KanbanCard({ todo, onEdit, onDelete }: KanbanCardProps) 
       <Card
         size="small"
         style={{
-          marginBottom: 12,
+          margin: 6,
           cursor: 'grab',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-          maxWidth: '300px',
+          borderRadius: 12,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          maxWidth: 300,
           width: '100%',
+          backgroundColor: '#fafafa',
+          border: '1px solid rgba(0,0,0,0.04)',
         }}
+        styles={{ body: { padding: 14 } }}
         {...listeners}
       >
-        <Flex justify="space-between" align="center">
-          <Text
-            strong
-            style={{ fontSize: 14, flex: 1, cursor: 'pointer' }}
-            onClick={(e) => {
-              e.stopPropagation()
-              router.push(`/tickets/${todo.id}`)
-            }}
-          >
-            {todo.title}
-            <div style={{ fontSize: 11, color: '#8c8c8c' }}>
-              Created by {todo.creator_name}
-            </div>
-          </Text>
+        {/* Tags + menu row */}
+        <Flex justify="space-between" align="flex-start" style={{ marginBottom: 10 }}>
+          <Flex gap={6} wrap="wrap" style={{ flex: 1, minWidth: 0 }}>
+            {todo.priority && (
+              <Tag color={todo.priority.color ? undefined : 'default'} style={{ fontSize: 11, margin: 0, borderRadius: 9999, ...(todo.priority.color ? { backgroundColor: todo.priority.color, borderColor: darkenColor(todo.priority.color), color: '#fff' } : {}) }}>
+                {todo.priority.title}
+              </Tag>
+            )}
+            {todo.visibility !== 'team' && (
+              <Tag color={getVisibilityColor(todo.visibility as string)} style={{ border:'1px solid', fontSize: 11, margin: 0, borderRadius: 9999 }}>
+                {todo.visibility === 'specific_users' ? 'Specific Users' : todo.visibility === 'public' ? 'Public' : todo.visibility.toUpperCase()}
+              </Tag>
+            )}
+            {todo.team_name && <Tag color="blue" style={{ border:'1px solid', fontSize: 11, margin: 0, borderRadius: 9999 }}>Team {todo.team_name}</Tag>}
+            {todo.type && (
+              <Tag color={todo.type.color} style={{ border:'1px solid', margin: 0, fontSize: 11, borderRadius: 9999 }}>
+                {todo.type.title}
+              </Tag>
+            )}
+            {todo.company && (
+              <Tag
+                color={todo.company.color ? undefined : 'default'}
+                style={{ margin: 0, fontSize: 11, borderRadius: 9999, ...(todo.company.color ? { backgroundColor: todo.company.color, borderColor: darkenColor(todo.company.color), color: '#fff' } : {}) }}
+              >
+                {todo.company.name}
+              </Tag>
+            )}
+            {todo.tags && todo.tags.length > 0 && (
+              todo.tags.map((t) => (
+                <Tag
+                  key={t.id}
+                  color={t.color ? undefined : 'default'}
+                  style={{ margin: 0, fontSize: 11, borderRadius: 9999, ...(t.color ? { backgroundColor: t.color, borderColor: darkenColor(t.color), color: '#fff' } : {}) }}
+                >
+                  {t.name}
+                </Tag>
+              ))
+            )}
+            {Number(todo.checklist_total) > 0 && (
+              <Tag color="green" style={{ fontSize: 11, margin: 0, borderRadius: 9999 }}>
+                Checklist: {todo.checklist_completed}/{todo.checklist_total}
+              </Tag>
+            )}
+          </Flex>
           <Dropdown 
             menu={{
               items: [
@@ -92,59 +126,56 @@ export default function KanbanCard({ todo, onEdit, onDelete }: KanbanCardProps) 
           >
             <Button
               type="text"
-              size="large"
-              icon={<MoreOutlined />}
+              size="small"
+              icon={<MoreOutlined style={{ fontSize: 16, color: '#8c8c8c' }} />}
               onClick={(e) => e.stopPropagation()}
             />
           </Dropdown>
         </Flex>
 
-        <Flex gap={5} wrap="wrap" style={{ maxWidth: '100%', marginTop: 8 }}>
-          {todo.visibility !== 'team' && (
-            <Tag color={getVisibilityColor(todo.visibility as string)} style={{ fontSize: 11, border: '1px solid' }}>
-              {todo.visibility === 'specific_users' ? 'Specific Users' : todo.visibility.toUpperCase()}
-            </Tag>
+        {/* Title + subtitle */}
+        <div
+          style={{ cursor: 'pointer' }}
+          onClick={(e) => {
+            e.stopPropagation()
+            router.push(`/tickets/${todo.id}`)
+          }}
+        >
+          <Text strong style={{ fontSize: 14, color: '#262626', lineHeight: 1.4, display: 'block' }}>
+            {todo.has_unread_replies && (
+              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
+            )}
+            {todo.title}
+          </Text>
+          {todo.creator_name && (
+            <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic', color: '#1890ff', display: 'block', marginTop: 4 }}>
+              by {todo.creator_name}
+            </Text>
           )}
-          {todo.team_name && <Tag color="blue" style={{ fontSize: 11, border: '1px solid' }}>Team {todo.team_name}</Tag>}
-          {todo.type && (
-            <Tag color={todo.type.color} style={{ border: '1px solid', fontSize: 11 }}>
-              {todo.type.title}
-            </Tag>
-          )}
-          {todo.company && (
-            <Tag
-              color={todo.company.color ? undefined : 'cyan'}
-              style={{ border: '1px solid', fontSize: 11, ...(todo.company.color ? { backgroundColor: todo.company.color, borderColor: darkenColor(todo.company.color), color: '#fff' } : {}) }}
-            >
-              {todo.company.name}
-            </Tag>
-          )}
-          {todo.tags && todo.tags.length > 0 && (
-            <Flex gap={4} wrap="wrap">
-              {todo.tags.map((t) => (
-                <Tag
-                  key={t.id}
-                  color={t.color ? undefined : 'default'}
-                  style={{ border: '1px solid', fontSize: 11, ...(t.color ? { backgroundColor: t.color, borderColor: darkenColor(t.color), color: '#fff' } : {}) }}
-                >
-                  {t.name}
-                </Tag>
-              ))}
-            </Flex>
-          )}
-          <div style={{ width: '100%' }}>
-          {Number(todo.checklist_total) > 0 ? (
-          <Tag color="green" style={{ fontSize: 11, border: '1px solid' }}>
-            Checklist: {todo.checklist_completed}/{todo.checklist_total}
-          </Tag>
-        ) : null}
-          </div>
-        </Flex>
+        </div>
 
-     
-
-        {todo.assignees && todo.assignees.length > 0 && (
-          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+        {/* Bottom: due, updated, comment, avatars */}
+        <Flex justify="space-between" align="center" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.06)' }} wrap="wrap" gap={8}>
+          <Flex gap={10} align="center" wrap="wrap" style={{ flex: 1, minWidth: 0 }}>
+            {todo.due_date && (
+              <Flex align="center" gap={4} style={{ fontSize: 11, color: dayjs(todo.due_date).isBefore(dayjs()) && todo.status !== 'completed' && todo.status !== 'cancel' ? '#ff4d4f' : '#8c8c8c' }}>
+                <FlagOutlined />
+                <span>Due <DateDisplay date={todo.due_date} format="date-only" /></span>
+              </Flex>
+            )}
+            {todo.updated_at && (
+              <Flex align="center" gap={4} style={{ color: '#8c8c8c', fontSize: 11 }}>
+                <FieldTimeOutlined />
+                <span>Updated <DateDisplay date={todo.updated_at} format="date-only" /></span>
+              </Flex>
+            )}
+            {todo.has_unread_replies && (
+              <Tooltip title="Unread replies">
+                <CommentOutlined style={{ color: '#8c8c8c', fontSize: 12 }} />
+              </Tooltip>
+            )}
+          </Flex>
+          {todo.assignees && todo.assignees.length > 0 && (
             <Avatar.Group size="small" maxCount={3}>
               {todo.assignees.map((assignee) => (
                 <Tooltip key={assignee.id} title={assignee.user_name}>
@@ -152,21 +183,8 @@ export default function KanbanCard({ todo, onEdit, onDelete }: KanbanCardProps) 
                 </Tooltip>
               ))}
             </Avatar.Group>
-          </div>
-        )}
-
-        {todo.due_date && (
-          <div style={{ marginTop: 8 }}>
-            <Tag
-              color={dayjs(todo.due_date).isBefore(dayjs()) && todo.status !== 'completed' && todo.status !== 'cancel' ? 'error' : 'default'}
-              style={{ fontSize: 11, border: '1px solid' }}
-            >
-              Due Date: <DateDisplay date={todo.due_date} />
-            </Tag>
-          </div>
-        )}
-
-       
+          )}
+        </Flex>
       </Card>
     </div>
   )

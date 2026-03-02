@@ -36,6 +36,7 @@ import {
 import DateDisplay from '../DateDisplay'
 import dayjs from 'dayjs'
 import CommentWysiwyg from './CommentWysiwyg'
+import CommentComposer from './CommentComposer'
 
 const { Text, Paragraph } = Typography
 
@@ -86,6 +87,9 @@ interface TabGeneralProps {
   typeOptions: { id: number; title: string; slug: string; color: string }[]
   onTypeChange: (typeId: number | null) => void | Promise<void>
   typeChanging?: boolean
+  priorityOptions: { id: number; title: string; slug: string; color: string }[]
+  onPriorityChange: (priorityId: number | null) => void | Promise<void>
+  priorityChanging?: boolean
   companyOptions: { id: string; name: string }[]
   onCompanyChange: (companyId: string | null) => void | Promise<void>
   companyChanging?: boolean
@@ -97,6 +101,19 @@ interface TabGeneralProps {
   canEditCompanyAndTags?: boolean
   onDueDateChange?: (dueDate: string | null) => void | Promise<void>
   dueDateChanging?: boolean
+  visibilityOptions: { value: string; label: string }[]
+  selectedVisibility: string
+  onVisibilityChange: (visibility: string) => void | Promise<void>
+  visibilityChanging?: boolean
+  teamOptions: { id: string; name: string }[]
+  selectedTeamId: string | null
+  onTeamChange: (teamId: string | null) => void | Promise<void>
+  teamChanging?: boolean
+  assigneeOptions: { id: string; full_name: string | null; email: string }[]
+  selectedAssigneeIds: string[]
+  onAssigneesChange: (userIds: string[]) => void | Promise<void>
+  assigneesChanging?: boolean
+  canEditAssignees?: boolean
   totalTimeSeconds: number
   activeTimeTracker: any
   currentTime: number
@@ -119,12 +136,7 @@ interface TabGeneralProps {
   onCancelEditComment: () => void
   onDeleteComment: (commentId: string) => void
   canDeleteComment: (createdAt: string) => boolean
-  newComment: string
-  onNewCommentChange: (v: string) => void
-  newCommentAttachments: { url: string; file_name: string; file_path: string }[]
-  onRemoveNewCommentAttachment: (index: number) => void
-  onCommentFilesSelected: (files: FileList | null) => void
-  onAddComment: () => void
+  onAddComment: (commentText: string, attachments: { url: string; file_name: string; file_path: string }[]) => Promise<void>
   addCommentLoading?: boolean
   commentVisibility?: 'note' | 'reply'
   onCommentVisibilityChange?: (v: 'note' | 'reply') => void
@@ -152,6 +164,9 @@ export default function TabGeneral({
   typeOptions,
   onTypeChange,
   typeChanging = false,
+  priorityOptions,
+  onPriorityChange,
+  priorityChanging = false,
   companyOptions,
   onCompanyChange,
   companyChanging = false,
@@ -162,6 +177,19 @@ export default function TabGeneral({
   canEditCompanyAndTags = true,
   onDueDateChange,
   dueDateChanging = false,
+  visibilityOptions,
+  selectedVisibility,
+  onVisibilityChange,
+  visibilityChanging = false,
+  teamOptions,
+  selectedTeamId,
+  onTeamChange,
+  teamChanging = false,
+  assigneeOptions,
+  selectedAssigneeIds,
+  onAssigneesChange,
+  assigneesChanging = false,
+  canEditAssignees = true,
   totalTimeSeconds,
   activeTimeTracker,
   currentTime,
@@ -184,11 +212,6 @@ export default function TabGeneral({
   onCancelEditComment,
   onDeleteComment,
   canDeleteComment,
-  newComment,
-  onNewCommentChange,
-  newCommentAttachments,
-  onRemoveNewCommentAttachment,
-  onCommentFilesSelected,
   onAddComment,
   addCommentLoading = false,
   commentVisibility = 'reply',
@@ -255,7 +278,9 @@ export default function TabGeneral({
                         <Flex justify="space-between" align="center" wrap="wrap" gap="small">
                           <Space>
                             <Text strong>
-                              {comment.user?.full_name || comment.user?.email || 'Unknown'}
+                              {isCustomer
+                                ? (todoData.company?.name || todoData.company?.email || 'Customer')
+                                : (comment.user?.full_name || comment.user?.email || 'Unknown')}
                             </Text>
                             <Tag color={isCustomer ? 'cyan' : 'gold'}>
                               {isCustomer ? 'Customer' : 'Agent'}
@@ -269,7 +294,7 @@ export default function TabGeneral({
                               <DateDisplay date={comment.created_at} />
                             </Text>
                           </Space>
-                          {comment.user_id === currentUserId && editingComment !== comment.id && (
+                          {!isCustomer && comment.user_id === currentUserId && editingComment !== comment.id && (
                             <Space>
                               
                               {canDeleteComment(comment.created_at) && (
@@ -353,54 +378,14 @@ export default function TabGeneral({
                 <Empty description="No comments" image={Empty.PRESENTED_IMAGE_SIMPLE} />
               )}
               
-              <Flex gap={8} style={{ marginTop: 8 }}>
-                <Button type="default" icon={<CommentOutlined />} onClick={() => onCommentVisibilityChange('note')}>Add note</Button>
-                <Button type="primary" icon={<SendOutlined />} onClick={() => onCommentVisibilityChange('reply')}>Reply</Button>
-              </Flex>
-              <CommentWysiwyg
-                ticketId={todoData?.id}
-                value={newComment}
-                onChange={onNewCommentChange}
-                placeholder={showNoteOption ? (commentVisibility === 'note' ? 'Add a note (agent only)...' : 'Reply (visible to client)...') : 'Add a comment...'}
-                height="200px"
+              <CommentComposer
+                ticketId={todoData?.id ?? 0}
+                onAddComment={onAddComment}
+                loading={addCommentLoading}
+                commentVisibility={commentVisibility}
+                onCommentVisibilityChange={onCommentVisibilityChange}
+                showNoteOption={showNoteOption ?? false}
               />
-              {newCommentAttachments.length > 0 && (
-                <Flex gap={8} wrap="wrap" align="center" style={{ marginTop: 8 }}>
-                  {newCommentAttachments.map((a, i) => (
-                    <Flex key={i} align="center" gap={4} style={{ padding: '4px 8px', background: '#f5f5f5', borderRadius: 6 }}>
-                      <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <PaperClipOutlined /> {a.file_name}
-                      </a>
-                      <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => onRemoveNewCommentAttachment(i)} />
-                    </Flex>
-                  ))}
-                </Flex>
-              )}
-              <Flex gap={8} style={{ marginTop: 8 }}>
-                <input
-                  type="file"
-                  multiple
-                  style={{ display: 'none' }}
-                  id="comment-files-input"
-                  onChange={(e) => {
-                    onCommentFilesSelected(e.target.files)
-                    e.target.value = ''
-                  }}
-                />
-                <Button icon={<PaperClipOutlined />} onClick={() => document.getElementById('comment-files-input')?.click()}>
-                  Attach files
-                </Button>
-                <Button
-                  type="primary"
-                  style={{ width: '200px' }}
-                  icon={<PlusOutlined />}
-                  onClick={onAddComment}
-                  loading={addCommentLoading}
-                  disabled={addCommentLoading}
-                >
-                  {showNoteOption ? (commentVisibility === 'note' ? 'Add note' : 'Reply') : 'Reply'}
-                </Button>
-              </Flex>
             </Flex>
           {/* </Card> */}
         </Col>
@@ -437,6 +422,20 @@ export default function TabGeneral({
                 style={{ minWidth: 140, width: '100%' }}
                 allowClear
                 placeholder="Select type"
+              />
+            </Descriptions.Item>
+            <Descriptions.Item label="Priority">
+              <Select
+                value={todoData.priority_id ?? undefined}
+                onChange={(v) => onPriorityChange(v ?? null)}
+                loading={priorityChanging}
+                options={priorityOptions.map((p) => ({
+                  value: p.id,
+                  label: <Tag color={p.color} style={{ margin: 0 }}>{p.title}</Tag>,
+                }))}
+                style={{ minWidth: 140, width: '100%' }}
+                allowClear
+                placeholder="Select priority"
               />
             </Descriptions.Item>
             <Descriptions.Item label="Company">
@@ -500,6 +499,66 @@ export default function TabGeneral({
                 </Space>
               ) : (
                 <Text type="secondary">No due date</Text>
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="Visibility">
+              {canEditAssignees ? (
+                <Select
+                  value={selectedVisibility}
+                  onChange={(v) => v && onVisibilityChange(v)}
+                  loading={visibilityChanging}
+                  options={visibilityOptions}
+                  style={{ minWidth: 140, width: '100%' }}
+                />
+              ) : (
+                <Text>{visibilityOptions.find((o) => o.value === todoData.visibility)?.label ?? todoData.visibility}</Text>
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="Team">
+              {canEditAssignees ? (
+                <Select
+                  value={selectedTeamId ?? undefined}
+                  onChange={(v) => onTeamChange(v ?? null)}
+                  loading={teamChanging}
+                  options={teamOptions.map((t) => ({ value: t.id, label: t.name }))}
+                  style={{ minWidth: 140, width: '100%' }}
+                  placeholder="Select team"
+                  allowClear
+                />
+              ) : (
+                <Text>{todoData.team?.name ?? '—'}</Text>
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="Assignees">
+              {canEditAssignees ? (
+                <Select
+                  mode="multiple"
+                  value={selectedAssigneeIds}
+                  onChange={(v) => onAssigneesChange(v ?? [])}
+                  loading={assigneesChanging}
+                  options={assigneeOptions.map((u) => ({
+                    value: u.id,
+                    label: u.full_name || u.email || u.id,
+                  }))}
+                  style={{ minWidth: 160, width: '100%' }}
+                  placeholder="Select assignees"
+                  allowClear
+                  filterOption={(input, opt) =>
+                    (opt?.label?.toString().toLowerCase() ?? '').includes(input.toLowerCase())
+                  }
+                  showSearch
+                  optionFilterProp="label"
+                />
+              ) : (
+                <Space wrap size={4}>
+                  {todoData.assignees?.length > 0 ? (
+                    todoData.assignees.map((a: any) => (
+                      <Text key={a.id}>{a.user?.full_name || a.user?.email || '—'}</Text>
+                    ))
+                  ) : (
+                    <Text type="secondary">—</Text>
+                  )}
+                </Space>
               )}
             </Descriptions.Item>
             <Descriptions.Item label="Created At">

@@ -35,7 +35,8 @@ export default function KanbanColumn({
           display: 'flex',
           flexDirection: 'column',
           background: '#fafafa',
-          border: isOver ? `2px solid ${column.color}` : undefined,
+          borderRadius: 16,
+          border: `3px solid ${column.color}`,
         }}
         styles={{
           header: { backgroundColor: column.color },

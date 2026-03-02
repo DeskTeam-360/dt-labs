@@ -9,21 +9,25 @@ export interface TodoRecord {
   created_by: string
   due_date: string | null
   status: 'to_do' | 'in_progress' | 'completed' | 'cancel' | 'archived'
-  visibility: 'private' | 'team' | 'specific_users'
+  visibility: 'private' | 'team' | 'specific_users' | 'public'
   team_id: string | null
   type_id: number | null
+  priority_id: number | null
   company_id: string | null
   created_at: string
   updated_at: string
   creator_name?: string
   team_name?: string
   type?: { id: number; title: string; slug: string; color: string } | null
-  company?: { id: string; name: string; color?: string } | null
+  priority?: { id: number; title: string; slug: string; color: string } | null
+  company?: { id: string; name: string; color?: string; email?: string | null } | null
   tags?: Array<{ id: string; name: string; slug: string; color?: string }>
   assignees?: Array<{ id: string; user_id: string; user_name?: string }>
   checklist_items?: Array<unknown>
   checklist_completed?: number
   checklist_total?: number
+  last_read_at?: string | null
+  has_unread_replies?: boolean
 }
 
 export interface Team {
@@ -101,12 +105,14 @@ export function darkenColor(hex: string, percent: number = 30): string {
 
 export function getVisibilityColor(visibility: string): string {
   switch (visibility) {
-    case 'private':
+  case 'public':
+    return 'green'
+  case 'private':
       return 'default'
     case 'team':
       return 'blue'
     case 'specific_users':
-      return 'green'
+      return 'lime'
     default:
       return 'default'
   }

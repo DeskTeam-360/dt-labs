@@ -30,6 +30,7 @@ export function useTodosData(currentUserId: string) {
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [ticketTypes, setTicketTypes] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
+  const [ticketPriorities, setTicketPriorities] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
   const [companies, setCompanies] = useState<Array<{ id: string; name: string; color?: string }>>([])
   const [allTags, setAllTags] = useState<Array<{ id: string; name: string; slug: string; color?: string }>>([])
   const [activeId, setActiveId] = useState<number | null>(null)
@@ -112,19 +113,26 @@ export function useTodosData(currentUserId: string) {
           creator:users!todos_created_by_fkey(id, full_name, email),
           team:teams(id, name),
           type:ticket_types(id, title, slug, color),
-          company:companies(id, name)
+          priority:ticket_priorities(id, title, slug, color),
+          company:companies(id, name, color, email)
         `)
         .order('created_at', { ascending: false })
 
       if (todosError) throw todosError
 
       const ticketIds = (todosData || []).map((t: { id: number }) => t.id)
-      const { data: ticketTagsData } = ticketIds.length > 0
-        ? await supabase
-            .from('ticket_tags')
-            .select('ticket_id, tag_id, tags(id, name, slug, color)')
-            .in('ticket_id', ticketIds)
-        : { data: [] }
+      const [ticketTagsRes, latestRepliesRes] = ticketIds.length > 0
+        ? await Promise.all([
+            supabase.from('ticket_tags').select('ticket_id, tag_id, tags(id, name, slug, color)').in('ticket_id', ticketIds),
+            supabase.from('todo_comments').select('todo_id, created_at').eq('visibility', 'reply').in('todo_id', ticketIds),
+          ])
+        : [{ data: [] }, { data: [] }]
+      const ticketTagsData = ticketTagsRes.data
+      const latestReplies: Record<number, string> = {}
+      ;(latestRepliesRes.data || []).forEach((r: { todo_id: number; created_at: string }) => {
+        const cur = latestReplies[r.todo_id]
+        if (!cur || r.created_at > cur) latestReplies[r.todo_id] = r.created_at
+      })
       const tagsByTicketId: Record<number, Array<{ id: string; name: string; slug: string; color?: string }>> = {}
       ;(ticketTagsData || []).forEach((row: Record<string, unknown>) => {
         const tags = row.tags as { id: string; name: string; slug: string; color?: string } | undefined
@@ -158,6 +166,9 @@ export function useTodosData(currentUserId: string) {
           const completedCount = (checklistData || []).filter((item: { is_completed: boolean }) => item.is_completed).length
           const totalCount = checklistData?.length || 0
 
+          const latestReplyAt = latestReplies[todo.id]
+          const lastReadAt = (todo as any).last_read_at
+          const hasUnread = !!latestReplyAt && (!lastReadAt || latestReplyAt > lastReadAt)
           return {
             ...todo,
             creator_name: todo.creator?.full_name || todo.creator?.email || 'Unknown',
@@ -171,6 +182,7 @@ export function useTodosData(currentUserId: string) {
             checklist_items: checklistData || [],
             checklist_completed: completedCount,
             checklist_total: totalCount,
+            has_unread_replies: hasUnread,
           }
         })
       )
@@ -222,11 +234,24 @@ export function useTodosData(currentUserId: string) {
     }
   }
 
+  const fetchTicketPriorities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ticket_priorities')
+        .select('id, title, slug, color')
+        .order('sort_order', { ascending: true })
+      if (error) throw error
+      setTicketPriorities((data || []) as Array<{ id: number; title: string; slug: string; color: string }>)
+    } catch (e) {
+      console.error('Failed to fetch ticket priorities', e)
+    }
+  }
+
   const fetchCompanies = async () => {
     try {
       const { data, error } = await supabase
         .from('companies')
-        .select('id, name, color')
+        .select('id, name, color, email')
         .order('name', { ascending: true })
       if (error) throw error
       setCompanies(data || [])
@@ -274,6 +299,7 @@ export function useTodosData(currentUserId: string) {
     fetchUsers()
     fetchStatuses()
     fetchTicketTypes()
+    fetchTicketPriorities()
     fetchCompanies()
     fetchTags()
   }, [])
@@ -359,6 +385,7 @@ export function useTodosData(currentUserId: string) {
       visibility: record.visibility,
       team_id: record.team_id,
       type_id: record.type_id ?? undefined,
+      priority_id: record.priority_id ?? undefined,
       company_id: record.company_id ?? undefined,
       due_date: record.due_date ? dayjs(record.due_date) : null,
     })
@@ -385,6 +412,7 @@ export function useTodosData(currentUserId: string) {
   }
 
   const handleDelete = async (todoId: number) => {
+    setTodos((prev) => prev.filter((t) => t.id !== todoId))
     try {
       const { error: assigneesError } = await supabase
         .from('todo_assignees')
@@ -399,9 +427,9 @@ export function useTodosData(currentUserId: string) {
       if (error) throw error
 
       message.success('Ticket deleted successfully')
-      fetchTodos()
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to delete ticket')
+      fetchTodos()
     }
   }
 
@@ -424,6 +452,7 @@ export function useTodosData(currentUserId: string) {
         visibility: values.visibility,
         team_id: values.team_id || null,
         type_id: values.type_id ?? null,
+        priority_id: values.priority_id ?? null,
         company_id: values.company_id ?? null,
         due_date: values.due_date ? (values.due_date as dayjs.Dayjs).toISOString() : null,
       }
@@ -472,6 +501,39 @@ export function useTodosData(currentUserId: string) {
         }
 
         message.success('Ticket updated successfully')
+
+        // Optimistic update: patch only the edited ticket instead of full refetch
+        const typeId = values.type_id as number | undefined
+        const priorityId = values.priority_id as number | undefined
+        const companyId = values.company_id as string | undefined
+        const teamId = values.team_id as string | undefined
+        const updatedRecord: TodoRecord = {
+          ...editingTodo,
+          title: values.title as string,
+          description: (values.description as string) || null,
+          status: values.status as TodoRecord['status'],
+          visibility: values.visibility as TodoRecord['visibility'],
+          team_id: teamId ?? null,
+          type_id: typeId ?? null,
+          priority_id: priorityId ?? null,
+          company_id: companyId ?? null,
+          due_date: values.due_date ? (values.due_date as dayjs.Dayjs).toISOString() : null,
+          updated_at: new Date().toISOString(),
+          team_name: teamId ? teams.find((t) => t.id === teamId)?.name ?? null : null,
+          type: typeId != null ? ticketTypes.find((t) => t.id === typeId) ?? null : null,
+          priority: priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null,
+          company: companyId ? companies.find((c) => c.id === companyId) ?? null : null,
+          tags: allTags.filter((t) => selectedTagIds.includes(t.id)),
+          assignees:
+            values.visibility === 'specific_users'
+              ? selectedAssignees.map((userId) => ({
+                  id: `temp-${userId}`,
+                  user_id: userId,
+                  user_name: users.find((u) => u.id === userId)?.full_name || users.find((u) => u.id === userId)?.email || 'Unknown',
+                }))
+              : [],
+        }
+        setTodos((prev) => prev.map((t) => (t.id === editingTodo.id ? updatedRecord : t)))
       } else {
         const { data: newTodo, error } = await supabase
           .from('tickets')
@@ -511,6 +573,45 @@ export function useTodosData(currentUserId: string) {
         }
 
         message.success('Ticket created successfully')
+
+        // Optimistic add: prepend new ticket instead of full refetch
+        const typeId = values.type_id as number | undefined
+        const priorityId = values.priority_id as number | undefined
+        const companyId = values.company_id as string | undefined
+        const teamId = values.team_id as string | undefined
+        const newRecord: TodoRecord = {
+          id: newTodo.id,
+          title: values.title as string,
+          description: (values.description as string) || null,
+          created_by: currentUserId,
+          due_date: values.due_date ? (values.due_date as dayjs.Dayjs).toISOString() : null,
+          status: values.status as TodoRecord['status'],
+          visibility: values.visibility as TodoRecord['visibility'],
+          team_id: teamId ?? null,
+          type_id: typeId ?? null,
+          priority_id: priorityId ?? null,
+          company_id: companyId ?? null,
+          created_at: newTodo.created_at,
+          updated_at: newTodo.updated_at,
+          creator_name: users.find((u) => u.id === currentUserId)?.full_name || users.find((u) => u.id === currentUserId)?.email || 'Unknown',
+          team_name: teamId ? teams.find((t) => t.id === teamId)?.name ?? null : null,
+          type: typeId != null ? ticketTypes.find((t) => t.id === typeId) ?? null : null,
+          priority: priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null,
+          company: companyId ? companies.find((c) => c.id === companyId) ?? null : null,
+          tags: allTags.filter((t) => selectedTagIds.includes(t.id)),
+          assignees:
+            values.visibility === 'specific_users'
+              ? selectedAssignees.map((userId) => ({
+                  id: `temp-${userId}`,
+                  user_id: userId,
+                  user_name: users.find((u) => u.id === userId)?.full_name || users.find((u) => u.id === userId)?.email || 'Unknown',
+                }))
+              : [],
+          checklist_completed: 0,
+          checklist_total: 0,
+          has_unread_replies: false,
+        }
+        setTodos((prev) => [newRecord, ...prev])
       }
 
       setModalVisible(false)
@@ -519,7 +620,6 @@ export function useTodosData(currentUserId: string) {
       setSelectedTagIds([])
       setNewTicketAttachments([])
       setDeletedTicketAttachmentIds([])
-      fetchTodos()
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to save todo')
     }
@@ -547,6 +647,7 @@ export function useTodosData(currentUserId: string) {
     selectedTagIds,
     setSelectedTagIds,
     ticketTypes,
+    ticketPriorities,
     companies,
     allTags,
     allStatuses,

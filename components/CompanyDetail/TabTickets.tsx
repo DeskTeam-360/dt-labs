@@ -22,6 +22,7 @@ import {
   Flex,
   Avatar,
   Tooltip,
+  message,
 } from 'antd'
 import {
   CheckSquareOutlined,
@@ -34,6 +35,7 @@ import {
   AppstoreOutlined,
   MoreOutlined,
   FilterOutlined,
+  SyncOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -87,6 +89,7 @@ interface TicketRecord {
   description: string | null
   status: string
   type_id: number | null
+  priority_id: number | null
   company_id: string | null
   due_date: string | null
   created_at: string
@@ -95,11 +98,13 @@ interface TicketRecord {
   creator_name?: string
   team_name?: string
   type?: { id: number; title: string; slug: string; color: string } | null
+  priority?: { id: number; title: string; slug: string; color: string } | null
   company?: { id: string; name: string; color?: string } | null
   assignees?: Array<{ id: string; user_name?: string }>
   tags?: Array<{ id: string; name: string; slug: string; color?: string }>
   checklist_completed?: number
   checklist_total?: number
+  has_unread_replies?: boolean
 }
 
 interface StatusOption {
@@ -179,6 +184,9 @@ function TicketKanbanCard({
               onClick()
             }}
           >
+            {ticket.has_unread_replies && (
+              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
+            )}
             {ticket.title || 'Untitled'}
           </Text>
           <Dropdown
@@ -203,6 +211,9 @@ function TicketKanbanCard({
           {ticket.team_name && <Tag color="blue" style={{ fontSize: 11 }}>Team {ticket.team_name}</Tag>}
           {ticket.type && (
             <Tag color={ticket.type.color} style={{ fontSize: 11 }}>{ticket.type.title}</Tag>
+          )}
+          {ticket.priority && (
+            <Tag color={ticket.priority.color} style={{ fontSize: 11 }}>{ticket.priority.title}</Tag>
           )}
           {ticket.company && (
             <Tag
@@ -348,6 +359,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
   const [loading, setLoading] = useState(true)
   const [statuses, setStatuses] = useState<StatusOption[]>([])
   const [types, setTypes] = useState<TypeOption[]>([])
+  const [priorities, setPriorities] = useState<TypeOption[]>([])
   const [allTags, setAllTags] = useState<Array<{ id: string; name: string }>>([])
   const [filterStatus, setFilterStatus] = useState<string[]>(DEFAULT_KANBAN_COLUMNS.map((c) => c.id))
   const [filterTypeId, setFilterTypeId] = useState<number | undefined>(undefined)
@@ -364,14 +376,33 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [activeId, setActiveId] = useState<number | null>(null)
   const [form] = Form.useForm()
+  const [syncingEmail, setSyncingEmail] = useState(false)
 
   const ticketDetailUrl = (id: number) => (basePath ? `${basePath}/tickets/${id}` : `/tickets/${id}`)
+
+  const handleSyncEmail = async () => {
+    setSyncingEmail(true)
+    try {
+      const res = await fetch('/api/email/sync-inbox', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Sync failed')
+      const parts = []
+      if (data.addedCount > 0) parts.push(`${data.addedCount} reply(ies)`)
+      if (data.createdCount > 0) parts.push(`${data.createdCount} new ticket(s)`)
+      message.success(parts.length > 0 ? `Synced: ${parts.join(', ')}` : 'Synced. No new emails.')
+      fetchTickets()
+    } catch (err: unknown) {
+      message.error(err instanceof Error ? err.message : 'Failed to sync email')
+    } finally {
+      setSyncingEmail(false)
+    }
+  }
 
   const fetchTickets = async () => {
     if (!companyData?.id) return
     setLoading(true)
     try {
-      const { data: ticketsData, error } = await supabase
+        const { data: ticketsData, error } = await supabase
         .from('tickets')
         .select(`
           id,
@@ -379,14 +410,17 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
           description,
           status,
           type_id,
+          priority_id,
           company_id,
           due_date,
           created_at,
           updated_at,
+          last_read_at,
           visibility,
           creator:users!todos_created_by_fkey(id, full_name, email),
           type:ticket_types(id, title, slug, color),
-          company:companies(id, name, color),
+          priority:ticket_priorities(id, title, slug, color),
+          company:companies(id, name, color, email),
           team:teams(id, name)
         `)
         .eq('company_id', companyData.id)
@@ -400,9 +434,10 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       const checklistByTicket: Record<number, { completed: number; total: number }> = {}
 
       if (ticketIds.length > 0) {
-        const [assigneesRes, tagsRes] = await Promise.all([
+        const [assigneesRes, tagsRes, latestRepliesRes] = await Promise.all([
           supabase.from('todo_assignees').select('todo_id, id, user:users!todo_assignees_user_id_fkey(id, full_name, email)').in('todo_id', ticketIds),
           supabase.from('ticket_tags').select('ticket_id, tag_id, tags(id, name, slug, color)').in('ticket_id', ticketIds),
+          supabase.from('todo_comments').select('todo_id, created_at').eq('visibility', 'reply').in('todo_id', ticketIds),
         ])
         ;(assigneesRes.data || []).forEach((row: any) => {
           if (!assigneesByTicket[row.todo_id]) assigneesByTicket[row.todo_id] = []
@@ -416,6 +451,11 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
           if (!tagsByTicket[row.ticket_id]) tagsByTicket[row.ticket_id] = []
           tagsByTicket[row.ticket_id].push(row.tags)
         })
+        const latestRepliesByTicket: Record<number, string> = {}
+        ;(latestRepliesRes.data || []).forEach((r: any) => {
+          const cur = latestRepliesByTicket[r.todo_id]
+          if (!cur || r.created_at > cur) latestRepliesByTicket[r.todo_id] = r.created_at
+        })
         for (const tid of ticketIds) {
           const { data: checklistData } = await supabase.from('todo_checklist').select('is_completed').eq('todo_id', tid)
           const total = checklistData?.length ?? 0
@@ -426,12 +466,16 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
 
       const list = (ticketsData || []).map((t: any) => {
         const cb = checklistByTicket[t.id] ?? { completed: 0, total: 0 }
+        const latestReplyAt = latestRepliesByTicket[t.id]
+        const lastReadAt = t.last_read_at
+        const hasUnread = !!latestReplyAt && (!lastReadAt || latestReplyAt > lastReadAt)
         return {
           id: t.id,
           title: t.title,
           description: t.description,
           status: t.status,
           type_id: t.type_id,
+          priority_id: t.priority_id,
           company_id: t.company_id,
           due_date: t.due_date,
           created_at: t.created_at,
@@ -440,10 +484,12 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
           creator_name: t.creator?.full_name || t.creator?.email || 'Unknown',
           team_name: t.team?.name || null,
           type: t.type || null,
+          priority: t.priority || null,
           company: t.company || null,
           assignees: assigneesByTicket[t.id] || [],
           tags: tagsByTicket[t.id] || [],
           checklist_completed: cb.completed,
+          has_unread_replies: hasUnread,
           checklist_total: cb.total,
         }
       })
@@ -500,6 +546,19 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     }
   }
 
+  const fetchPriorities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ticket_priorities')
+        .select('id, title, slug, color')
+        .order('sort_order', { ascending: true })
+      if (error) throw error
+      setPriorities((data || []) as TypeOption[])
+    } catch {
+      setPriorities([])
+    }
+  }
+
   const fetchTags = async () => {
     try {
       const { data, error } = await supabase
@@ -520,6 +579,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
   useEffect(() => {
     fetchStatuses()
     fetchTypes()
+    fetchPriorities()
     fetchTags()
   }, [basePath])
 
@@ -605,6 +665,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       description: ticket.description || '',
       status: ticket.status,
       type_id: ticket.type_id ?? undefined,
+      priority_id: ticket.priority_id ?? undefined,
       company_id: companyData.id,
       due_date: ticket.due_date ? dayjs(ticket.due_date) : null,
     })
@@ -635,6 +696,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
         description: values.description || null,
         status: values.status || 'to_do',
         type_id: values.type_id ?? null,
+        priority_id: values.priority_id ?? null,
         company_id: companyData.id,
         due_date: values.due_date ? values.due_date.format('YYYY-MM-DD') : null,
         visibility: 'private',
@@ -693,12 +755,15 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
-      render: (title: string, record) => (
+      render: (title: string, record: TicketRecord) => (
         <Button
           type="link"
           style={{ padding: 0, height: 'auto', fontWeight: 500 }}
           onClick={() => router.push(ticketDetailUrl(record.id))}
         >
+          {record.has_unread_replies && (
+            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
+          )}
           {title}
         </Button>
       ),
@@ -805,6 +870,11 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
                 ))}
               </Select>
               <Button onClick={fetchTickets}>Refresh</Button>
+              {basePath && (
+                <Button icon={<SyncOutlined />} onClick={handleSyncEmail} loading={syncingEmail}>
+                  Sync Email
+                </Button>
+              )}
               {hasActiveFilters && (
                 <Button type="link" size="small" onClick={clearFilters}>
                   Clear filters
@@ -919,6 +989,18 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
                   <Space>
                     <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, backgroundColor: t.color }} />
                     {t.title}
+                  </Space>
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="priority_id" label="Priority">
+            <Select placeholder="Select priority" allowClear>
+              {priorities.map((p) => (
+                <Option key={p.id} value={p.id}>
+                  <Space>
+                    <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, backgroundColor: p.color }} />
+                    {p.title}
                   </Space>
                 </Option>
               ))}

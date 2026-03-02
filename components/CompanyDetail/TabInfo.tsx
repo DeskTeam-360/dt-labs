@@ -22,6 +22,13 @@ export default function TabInfo({ companyData, groupedDatas }: TabInfoProps) {
             <Descriptions.Item label="Company Name">
               <Text strong>{companyData.name}</Text>
             </Descriptions.Item>
+            <Descriptions.Item label="Email">
+              {companyData.email ? (
+                <a href={`mailto:${companyData.email}`}>{companyData.email}</a>
+              ) : (
+                <Text type="secondary">—</Text>
+              )}
+            </Descriptions.Item>
             <Descriptions.Item label="Status">
               <Tag color={companyData.is_active ? 'green' : 'default'} style={{ fontSize: 14, padding: '4px 12px' }}>
                 {companyData.is_active ? (
