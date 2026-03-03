@@ -75,6 +75,7 @@ export default function ContentPlannerDetailContent({
   const [savingContent, setSavingContent] = useState(false)
   const [generateLoading, setGenerateLoading] = useState(false)
   const [generateImageLoading, setGenerateImageLoading] = useState(false)
+  const [imagePromptPrefix, setImagePromptPrefix] = useState('')
   const aiResults = plannerData?.ai_content_results ?? {}
   const rawOutputJson = aiResults.output_json as Record<string, unknown> | undefined
   let outputJson: Record<string, unknown> = (rawOutputJson ?? {}) as Record<string, unknown>
@@ -92,13 +93,15 @@ export default function ContentPlannerDetailContent({
       }
     }
   }
+  const outputContent = (outputJson.content ?? outputJson.post_text) as string | undefined
   const displayContent =
     (aiResults.content_text_edited as string) ??
-    (outputJson.content as string) ??
+    outputContent ??
     (aiResults.content_text as string) ??
     ''
   const [aiContentText, setAiContentText] = useState<string>(displayContent)
-  const imagePrompt = typeof outputJson.image_prompt === 'string' ? outputJson.image_prompt : ''
+  const imagePrompt = (typeof outputJson.image_prompt === 'string' ? outputJson.image_prompt : '') ||
+    (typeof outputJson.image_recommendation === 'string' ? outputJson.image_recommendation : '')
   const callToAction = typeof outputJson.call_to_action === 'string' ? outputJson.call_to_action : ''
   const bestTimeToPost = typeof outputJson.best_time_to_post === 'string' ? outputJson.best_time_to_post : ''
   const engagementQuestion = typeof outputJson.engagement_question === 'string' ? outputJson.engagement_question : ''
@@ -107,9 +110,10 @@ export default function ContentPlannerDetailContent({
   useEffect(() => {
     const results = plannerData?.ai_content_results ?? {}
     const out = (results.output_json ?? {}) as Record<string, unknown>
+    const outContent = (out.content ?? out.post_text) as string | undefined
     const nextContent =
       (results.content_text_edited as string) ??
-      (out.content as string) ??
+      outContent ??
       (results.content_text as string) ??
       ''
     setAiContentText(nextContent)
@@ -199,7 +203,11 @@ export default function ContentPlannerDetailContent({
     try {
       const res = await fetch(
         `/api/companies/${companyData.id}/content-planner/${plannerData.id}/generate-image`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_prompt_prefix: imagePromptPrefix?.trim() || undefined }),
+        }
       )
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -492,7 +500,7 @@ export default function ContentPlannerDetailContent({
                             wordBreak: 'break-word',
                           }}
                         >
-                          {(outputJson.content as string) ?? plannerData.ai_content_results?.content_text ?? '—'}
+                          {((outputJson.content ?? outputJson.post_text) as string) ?? plannerData.ai_content_results?.content_text ?? '—'}
                         </div>
                       </Col>
                       <Col xs={24} lg={12}>
@@ -555,6 +563,13 @@ export default function ContentPlannerDetailContent({
                         </Space>
                       }
                     >
+                      <Input
+                        placeholder="Prefix / comment (optional) — e.g. Professional, high-quality:"
+                        value={imagePromptPrefix}
+                        onChange={(e) => setImagePromptPrefix(e.target.value)}
+                        style={{ marginBottom: 12 }}
+                        allowClear
+                      />
                       <div style={{ padding: 12, background: '#fafafa', borderRadius: 8, border: '1px solid #f0f0f0', marginBottom: 12 }}>
                         {imagePrompt}
                       </div>

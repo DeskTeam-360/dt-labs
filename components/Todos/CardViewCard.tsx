@@ -38,7 +38,7 @@ export default function CardViewCard({ todo, onEdit, onDelete }: CardViewCardPro
           {todo.has_unread_replies && (
             <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
           )}
-          {todo.title}
+          #{todo.id} {todo.title}
         </Text>
         <Dropdown
           menu={{

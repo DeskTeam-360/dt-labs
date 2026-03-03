@@ -168,8 +168,25 @@ export default function TodoDetailContent({
     const [assigneesChanging, setAssigneesChanging] = useState(false)
     const [teamChanging, setTeamChanging] = useState(false)
     const [visibilityChanging, setVisibilityChanging] = useState(false)
+    const [optimisticVisibility, setOptimisticVisibility] = useState<string | null>(null)
+    const [optimisticAssignees, setOptimisticAssignees] = useState<string[] | null>(null)
 
     const supabase = createClient()
+
+    // Sync optimistic assignees when server data catches up
+    useEffect(() => {
+        const serverIds = (todoData?.assignees || []).map((a: any) => a.user_id || a.user?.id).filter(Boolean) as string[]
+        if (optimisticAssignees && JSON.stringify([...serverIds].sort()) === JSON.stringify([...optimisticAssignees].sort())) {
+            setOptimisticAssignees(null)
+        }
+    }, [todoData?.assignees, optimisticAssignees])
+
+    // Sync optimistic visibility when server data catches up
+    useEffect(() => {
+        if (optimisticVisibility && todoData?.visibility === optimisticVisibility) {
+            setOptimisticVisibility(null)
+        }
+    }, [todoData?.visibility, optimisticVisibility])
 
     // Mark ticket as read when user views it (global: 1 read = no notif for all)
     useEffect(() => {
@@ -979,6 +996,7 @@ export default function TodoDetailContent({
     }
 
     const handleVisibilityChange = async (visibility: string) => {
+        setOptimisticVisibility(visibility)
         setVisibilityChanging(true)
         try {
             const payload: Record<string, unknown> = {
@@ -994,6 +1012,7 @@ export default function TodoDetailContent({
             message.success('Visibility updated')
             router.refresh()
         } catch (err: unknown) {
+            setOptimisticVisibility(null)
             message.error(err instanceof Error ? err.message : 'Failed to update visibility')
         } finally {
             setVisibilityChanging(false)
@@ -1025,6 +1044,7 @@ export default function TodoDetailContent({
     }
 
     const handleAssigneesChange = async (userIds: string[]) => {
+        setOptimisticAssignees(userIds)
         setAssigneesChanging(true)
         try {
             await supabase.from('todo_assignees').delete().eq('todo_id', todoData.id)
@@ -1046,6 +1066,7 @@ export default function TodoDetailContent({
             message.success('Assignees updated')
             router.refresh()
         } catch (err: unknown) {
+            setOptimisticAssignees(null)
             message.error(err instanceof Error ? err.message : 'Failed to update assignees')
         } finally {
             setAssigneesChanging(false)
@@ -1253,7 +1274,7 @@ export default function TodoDetailContent({
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{ flex: 1 }}>
                                     <Title level={2} >
-                                        {todoData.title}
+                                        #{todoData.id} {todoData.title}
                                     </Title>
                                 </div>
                             </div>
@@ -1293,7 +1314,7 @@ export default function TodoDetailContent({
                                             onDueDateChange={handleDueDateChange}
                                             dueDateChanging={dueDateChanging}
                                             visibilityOptions={VISIBILITY_OPTIONS}
-                                            selectedVisibility={todoData.visibility || 'private'}
+                                            selectedVisibility={optimisticVisibility ?? todoData.visibility ?? 'private'}
                                             onVisibilityChange={handleVisibilityChange}
                                             visibilityChanging={visibilityChanging}
                                             teamOptions={teams}
@@ -1301,7 +1322,7 @@ export default function TodoDetailContent({
                                             onTeamChange={handleTeamChange}
                                             teamChanging={teamChanging}
                                             assigneeOptions={users}
-                                            selectedAssigneeIds={(todoData.assignees || []).map((a: any) => a.user_id || a.user?.id).filter(Boolean)}
+                                            selectedAssigneeIds={(optimisticAssignees ?? (todoData.assignees || []).map((a: any) => a.user_id || a.user?.id).filter(Boolean)).map((id: string) => String(id))}
                                             onAssigneesChange={handleAssigneesChange}
                                             assigneesChanging={assigneesChanging}
                                             canEditAssignees={variant !== 'customer'}

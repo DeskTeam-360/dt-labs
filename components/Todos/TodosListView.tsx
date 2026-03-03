@@ -47,7 +47,7 @@ export default function TodosListView({
               {record.has_unread_replies && (
                 <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
               )}
-              {title}
+              #{record.id} {title}
             </Button>
           ),
         },

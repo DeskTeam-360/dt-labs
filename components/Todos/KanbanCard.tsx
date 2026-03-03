@@ -145,7 +145,7 @@ export default function KanbanCard({ todo, onEdit, onDelete }: KanbanCardProps) 
             {todo.has_unread_replies && (
               <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
             )}
-            {todo.title}
+            #{todo.id} {todo.title}
           </Text>
           {todo.creator_name && (
             <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic', color: '#1890ff', display: 'block', marginTop: 4 }}>

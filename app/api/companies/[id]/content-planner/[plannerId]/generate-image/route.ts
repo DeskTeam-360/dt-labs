@@ -32,7 +32,8 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}))
     let imagePrompt =
-      typeof body?.image_prompt === 'string' ? body.image_prompt.trim() : ''
+      typeof body?.image_prompt === 'string' ? body.image_prompt.trim() : '' ||
+      typeof body?.image_recommendation === 'string' ? body.image_recommendation.trim() : ''
 
     if (!imagePrompt) {
       const { data: planner, error: plannerError } = await supabase
@@ -48,10 +49,9 @@ export async function POST(
 
       const results = (planner as any).ai_content_results
       const outputJson = results?.output_json
+      const imgPromptRaw = outputJson?.image_prompt ?? outputJson?.image_recommendation
       imagePrompt =
-        typeof outputJson?.image_prompt === 'string'
-          ? outputJson.image_prompt.trim()
-          : ''
+        typeof imgPromptRaw === 'string' ? imgPromptRaw.trim() : ''
     }
 
     if (!imagePrompt) {
@@ -61,6 +61,9 @@ export async function POST(
       )
     }
 
+    const prefix = typeof body?.image_prompt_prefix === 'string' ? body.image_prompt_prefix.trim() : ''
+    const finalPrompt = prefix ? `${prefix} ${imagePrompt}` : imagePrompt
+
     const imageRes = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
@@ -69,7 +72,7 @@ export async function POST(
       },
       body: JSON.stringify({
         model: OPENAI_IMAGE_MODEL,
-        prompt: imagePrompt,
+        prompt: finalPrompt,
         n: 1,
         size: '1024x1024',
         response_format: 'b64_json',
