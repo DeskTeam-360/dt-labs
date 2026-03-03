@@ -514,53 +514,60 @@ export default function TabGeneral({
                 <Text>{visibilityOptions.find((o) => o.value === todoData.visibility)?.label ?? todoData.visibility}</Text>
               )}
             </Descriptions.Item>
-            <Descriptions.Item label="Team">
-              {canEditAssignees ? (
-                <Select
-                  value={selectedTeamId ?? undefined}
-                  onChange={(v) => onTeamChange(v ?? null)}
-                  loading={teamChanging}
-                  options={teamOptions.map((t) => ({ value: t.id, label: t.name }))}
-                  style={{ minWidth: 140, width: '100%' }}
-                  placeholder="Select team"
-                  allowClear
-                />
-              ) : (
-                <Text>{todoData.team?.name ?? '—'}</Text>
-              )}
-            </Descriptions.Item>
-            <Descriptions.Item label="Assignees">
-              {canEditAssignees ? (
-                <Select
-                  mode="multiple"
-                  value={selectedAssigneeIds}
-                  onChange={(v) => onAssigneesChange(v ?? [])}
-                  loading={assigneesChanging}
-                  options={assigneeOptions.map((u) => ({
-                    value: u.id,
-                    label: u.full_name || u.email || u.id,
-                  }))}
-                  style={{ minWidth: 160, width: '100%' }}
-                  placeholder="Select assignees"
-                  allowClear
-                  filterOption={(input, opt) =>
-                    (opt?.label?.toString().toLowerCase() ?? '').includes(input.toLowerCase())
-                  }
-                  showSearch
-                  optionFilterProp="label"
-                />
-              ) : (
-                <Space wrap size={4}>
-                  {todoData.assignees?.length > 0 ? (
-                    todoData.assignees.map((a: any) => (
-                      <Text key={a.id}>{a.user?.full_name || a.user?.email || '—'}</Text>
-                    ))
-                  ) : (
-                    <Text type="secondary">—</Text>
-                  )}
-                </Space>
-              )}
-            </Descriptions.Item>
+            {selectedVisibility === 'team' ? (
+              <Descriptions.Item label="Team">
+                {canEditAssignees ? (
+                  <Select
+                    value={selectedTeamId ?? undefined}
+                    onChange={(v) => onTeamChange(v ?? null)}
+                    loading={teamChanging}
+                    options={teamOptions.map((t) => ({ value: t.id, label: t.name }))}
+                    style={{ minWidth: 140, width: '100%' }}
+                    placeholder="Select team"
+                    allowClear
+                  />
+                ) : (
+                  <Text>{todoData.team?.name ?? '—'}</Text>
+                )}
+              </Descriptions.Item>
+            ) : selectedVisibility === 'specific_users' ? (
+              <Descriptions.Item label="Assignees">
+                {canEditAssignees ? (
+                  <Select
+                    mode="multiple"
+                    value={selectedAssigneeIds}
+                    onChange={(v) => onAssigneesChange(v ?? [])}
+                    loading={assigneesChanging}
+                    options={assigneeOptions.map((u) => ({
+                      value: String(u.id),
+                      label: String(u.full_name || u.email || u.id || 'Unknown'),
+                    }))}
+                    style={{ minWidth: 160, width: '100%' }}
+                    placeholder="Select assignees"
+                    allowClear
+                    showSearch
+                    filterOption={(input, option) => {
+                      const label = option?.label
+                      if (label == null) return false
+                      return String(label).toLowerCase().includes(input.toLowerCase())
+                    }}
+                    optionFilterProp="label"
+                    dropdownStyle={{ maxHeight: 280 }}
+                    getPopupContainer={(node) => node.parentElement || document.body}
+                  />
+                ) : (
+                  <Space wrap size={4}>
+                    {todoData.assignees?.length > 0 ? (
+                      todoData.assignees.map((a: any) => (
+                        <Text key={a.id}>{a.user?.full_name || a.user?.email || '—'}</Text>
+                      ))
+                    ) : (
+                      <Text type="secondary">—</Text>
+                    )}
+                  </Space>
+                )}
+              </Descriptions.Item>
+            ) : null}
             <Descriptions.Item label="Created At">
               <Space>
                 <ClockCircleOutlined />

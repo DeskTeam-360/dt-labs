@@ -83,7 +83,7 @@ export default function TodosKanbanView({
             }}
             bodyStyle={{ padding: 12 }}
           >
-            <Text strong>{activeTodo.title}</Text>
+            <Text strong>#{activeTodo.id} {activeTodo.title}</Text>
           </Card>
         ) : null}
       </DragOverlay>

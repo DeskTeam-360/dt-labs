@@ -385,7 +385,7 @@ export async function POST(request: NextRequest) {
               description: body || null,
               created_by: userId,
               status: 'to_do',
-              visibility: 'private',
+              visibility: 'public',
               company_id: company?.id ?? null,
               ...(emailDateIso && { created_at: emailDateIso }),
             })
