@@ -25,6 +25,32 @@ function parseEmailFromHeader(from: string): string {
   return from.trim().toLowerCase()
 }
 
+/** Extract display name from From header, e.g. "John Doe <a@b.com>" -> "John Doe" */
+function parseNameFromHeader(from: string): string | null {
+  const match = from.match(/^([^<]+)</)
+  if (match) {
+    const name = match[1].trim().replace(/^["']|["']$/g, '')
+    return name || null
+  }
+  return null
+}
+
+/** Derive company name from email, e.g. "john@acme.com" -> "Acme" */
+function companyNameFromEmail(email: string): string {
+  const domain = email.split('@')[1] || email
+  const base = domain.split('.')[0] || domain
+  return base.charAt(0).toUpperCase() + base.slice(1).toLowerCase()
+}
+
+function randomPassword(length = 24): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  let result = ''
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
 /** Extract all email addresses from To/Cc/Bcc header string */
 function parseEmailsFromRecipients(header: string): string[] {
   const out: string[] = []
@@ -38,6 +64,11 @@ function parseEmailsFromRecipients(header: string): string[] {
 /** Escape special chars for ILIKE pattern (%, _, \) to avoid wildcard match */
 function escapeIlike(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+}
+
+/** Normalize subject for dedup: strip Re:/Fw:, trim, lowercase */
+function normalizeSubject(s: string): string {
+  return s.replace(/^(Re:\s*|Fwd?:\s*)+/i, '').trim().toLowerCase()
 }
 
 /** Normalize email for comparison (Gmail plus-addressing: user+tag@gmail.com → user@gmail.com) */
@@ -110,7 +141,7 @@ export async function POST(request: NextRequest) {
 
     const { data: integration, error: integrationError } = await supabase
       .from('email_integrations')
-      .select('id, email_address, access_token, refresh_token, expires_at, created_by')
+      .select('id, email_address, access_token, refresh_token, expires_at, created_by, last_sync_at')
       .eq('provider', 'google')
       .eq('is_active', true)
       .maybeSingle()
@@ -156,10 +187,17 @@ export async function POST(request: NextRequest) {
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
     const inboxEmail = integration.email_address?.toLowerCase()
 
-    // Fetch recent messages in inbox
+    // Build query: only fetch emails since last_sync_at (or last 7 days for first sync)
+    const lastSyncAt = integration.last_sync_at ? new Date(integration.last_sync_at) : null
+    const sinceSeconds = lastSyncAt
+      ? Math.floor(lastSyncAt.getTime() / 1000)
+      : Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000)
+    const searchQuery = `is:inbox after:${sinceSeconds}`
+
+    // Fetch messages in inbox since last sync
     const listRes = await gmail.users.messages.list({
       userId: 'me',
-      q: 'is:inbox',
+      q: searchQuery,
       maxResults: 50,
     })
 
@@ -246,6 +284,17 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Skip: email ada di email_skip_list (tidak perlu ticket/user)
+      const { data: skipRow } = await supabase
+        .from('email_skip_list')
+        .select('id')
+        .ilike('email', escapeIlike(senderEmail))
+        .maybeSingle()
+      if (skipRow) {
+        alreadyProcessed.add(gmailMessageId)
+        continue
+      }
+
       // 1) Match by thread_id (ticket, email_messages, or created this run)
       let ticketId: number | null = null
       if (msgThreadId) {
@@ -317,48 +366,113 @@ export async function POST(request: NextRequest) {
         await supabase.from('email_messages').update({ ticket_id: ticketId }).eq('gmail_message_id', gmailMessageId)
       } else {
         // NEW: create ticket only if no existing ticket for this thread/company/subject
-        const { data: company } = await supabase
+        let company = await supabase
           .from('companies')
-          .select('id')
+          .select('id, name, email')
           .ilike('email', escapeIlike(senderEmail))
           .limit(1)
           .maybeSingle()
+          .then((r) => r.data)
 
-        // Dedup: same company + same thread already has ticket? (from earlier in this batch)
-        let existingTicketId: number | null = null
-        if (msgThreadId) existingTicketId = threadToTicketThisRun.get(msgThreadId) ?? null
-        if (!existingTicketId && company?.id && msgThreadId) {
-          const { data: dupByThread } = await supabase
-            .from('tickets')
-            .select('id')
-            .eq('gmail_thread_id', msgThreadId)
-            .maybeSingle()
-          if (dupByThread) existingTicketId = dupByThread.id
+        let creatorUserId: string | null = null
+        let ticketCompanyId: string | null = company?.id ?? null
+        const { data: existingUser } = await supabase.from('users').select('id, company_id').ilike('email', escapeIlike(senderEmail)).maybeSingle()
+        if (existingUser) {
+          creatorUserId = existingUser.id
+          ticketCompanyId = existingUser.company_id ?? company?.id ?? null
+        } else {
+          // Email not registered: create company + user, send password reset
+          const adminSupabase = createAdminClient()
+          const displayName = parseNameFromHeader(from) || senderEmail.split('@')[0] || 'User'
+          const newCompanyName = company?.name || companyNameFromEmail(senderEmail)
+          if (!company?.id) {
+            const { data: newCompany, error: companyErr } = await adminSupabase
+              .from('companies')
+              .insert({ name: newCompanyName, email: senderEmail })
+              .select('id')
+              .single()
+            if (!companyErr && newCompany) {
+              company = { id: newCompany.id, name: newCompanyName, email: senderEmail }
+            }
+          }
+          if (company?.id) {
+            const password = randomPassword()
+            const { data: authUser, error: createErr } = await adminSupabase.auth.admin.createUser({
+              email: senderEmail,
+              password,
+              email_confirm: true,
+              user_metadata: { full_name: displayName },
+            })
+            if (!createErr && authUser?.user?.id) {
+              // Upsert ensures users row exists (trigger may not have run yet)
+              await adminSupabase.from('users').upsert({
+                id: authUser.user.id,
+                email: senderEmail,
+                full_name: displayName,
+                company_id: company.id,
+                role: 'customer',
+              }, { onConflict: 'id' })
+              creatorUserId = authUser.user.id
+            }
+          }
         }
-        if (!existingTicketId && msgThreadId) {
-          const { data: dupByMsg } = await supabase
-            .from('email_messages')
-            .select('ticket_id')
-            .eq('thread_id', msgThreadId)
-            .not('ticket_id', 'is', null)
-            .order('synced_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-          if (dupByMsg?.ticket_id) existingTicketId = dupByMsg.ticket_id
+
+        // Dedup: same thread, or same company+subject (for threadless emails)
+        let existingTicketId: number | null = null
+        if (msgThreadId) {
+          existingTicketId = threadToTicketThisRun.get(msgThreadId) ?? null
+          if (!existingTicketId) {
+            const { data: dupByThread } = await supabase
+              .from('tickets')
+              .select('id')
+              .eq('gmail_thread_id', msgThreadId)
+              .maybeSingle()
+            if (dupByThread) existingTicketId = dupByThread.id
+          }
+          if (!existingTicketId) {
+            const { data: dupByMsg } = await supabase
+              .from('email_messages')
+              .select('ticket_id')
+              .eq('thread_id', msgThreadId)
+              .not('ticket_id', 'is', null)
+              .order('synced_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            if (dupByMsg?.ticket_id) existingTicketId = dupByMsg.ticket_id
+          }
+        }
+        // For threadless emails: same company + same subject + recent (last 48h) → add as comment
+        if (!existingTicketId && ticketCompanyId) {
+          const normSubj = normalizeSubject(subject)
+          const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+          const { data: dupBySubject } = await supabase
+            .from('tickets')
+            .select('id, title')
+            .eq('company_id', ticketCompanyId)
+            .eq('created_via', 'email')
+            .gte('created_at', since)
+            .limit(20)
+            .order('created_at', { ascending: false })
+          const match = dupBySubject?.find((t) => normalizeSubject(t.title || '') === normSubj)
+          if (match) existingTicketId = match.id
         }
 
         if (existingTicketId) {
-          // Already have ticket for this thread - add as comment instead of creating duplicate
+          // Already have ticket for this thread/subject - add as comment instead of creating duplicate
           ticketId = existingTicketId
+          if (msgThreadId) threadToTicketThisRun.set(msgThreadId, ticketId)
           const { data: extTicket } = await supabase.from('tickets').select('id, company_id, company:companies(id, email)').eq('id', ticketId).single()
           const extCompany = extTicket?.company as { email?: string } | null
           const extCompanyEmail = extCompany?.email?.trim().toLowerCase()
-          if (extCompanyEmail && (senderEmail === extCompanyEmail || normalizeForMatch(senderEmail) === normalizeForMatch(extCompanyEmail))) {
+          const senderMatches = extCompanyEmail && (senderEmail === extCompanyEmail || normalizeForMatch(senderEmail) === normalizeForMatch(extCompanyEmail))
+          const isFromCompanyUser = ticketCompanyId && extTicket?.company_id === ticketCompanyId
+          if (senderMatches || isFromCompanyUser) {
             const commentBody = body || (msg.snippet || '').trim() || '(No content)'
             const emailDateIso = getEmailDateIso(msg)
+            const commentUserId = creatorUserId ?? userId
             await supabase.from('todo_comments').insert({
               todo_id: ticketId,
-              user_id: userId,
+              user_id: commentUserId,
               comment: commentBody,
               visibility: 'reply',
               author_type: 'customer',
@@ -383,10 +497,11 @@ export async function POST(request: NextRequest) {
             .insert({
               title,
               description: body || null,
-              created_by: userId,
+              created_by: creatorUserId ?? null,
               status: 'to_do',
               visibility: 'public',
-              company_id: company?.id ?? null,
+              company_id: ticketCompanyId,
+              created_via: 'email',
               ...(emailDateIso && { created_at: emailDateIso }),
             })
             .select('id')
@@ -411,10 +526,17 @@ export async function POST(request: NextRequest) {
       addedCount++
     }
 
+    // Update last_sync_at after successful sync
+    await supabase
+      .from('email_integrations')
+      .update({ last_sync_at: new Date().toISOString() })
+      .eq('id', integration.id)
+
     return NextResponse.json({
       success: true,
       addedCount,
       createdCount,
+      lastSyncAt: new Date().toISOString(),
       ...(process.env.NODE_ENV === 'development' && {
         _debug: { skippedClaimFailed, skippedCompanyMismatch },
       }),

@@ -96,6 +96,7 @@ interface TicketRecord {
   updated_at?: string
   visibility?: string
   creator_name?: string
+  by_label?: string
   team_name?: string
   type?: { id: number; title: string; slug: string; color: string } | null
   priority?: { id: number; title: string; slug: string; color: string } | null
@@ -267,9 +268,9 @@ function TicketKanbanCard({
           </div>
         )}
 
-        {ticket.creator_name && (
+        {ticket.by_label && (
           <div style={{ marginTop: 8, fontSize: 11, color: '#8c8c8c' }}>
-            By {ticket.creator_name}
+            By {ticket.by_label}
           </div>
         )}
       </Card>
@@ -482,6 +483,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
           updated_at: t.updated_at,
           visibility: t.visibility,
           creator_name: t.creator?.full_name || t.creator?.email || 'Unknown',
+          by_label: t.company?.name || t.creator?.full_name || t.creator?.email || 'Unknown',
           team_name: t.team?.name || null,
           type: t.type || null,
           priority: t.priority || null,
@@ -715,7 +717,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       } else {
         const { data: inserted, error } = await supabase
           .from('tickets')
-          .insert({ ...payload, created_by: currentUser.id })
+          .insert({ ...payload, created_by: currentUser.id, created_via: 'portal' })
           .select()
           .single()
         if (error) throw error
@@ -810,10 +812,10 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       render: (d: string) => <DateDisplay date={d} />,
     },
     {
-      title: 'Created by',
+      title: 'By',
       key: 'creator_name',
       width: 120,
-      render: (_, r) => <Text type="secondary">{r.creator_name || '—'}</Text>,
+      render: (_, r) => <Text type="secondary">{r.by_label || r.creator_name || '—'}</Text>,
     },
     {
       title: 'Assignees',

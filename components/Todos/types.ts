@@ -16,7 +16,9 @@ export interface TodoRecord {
   company_id: string | null
   created_at: string
   updated_at: string
+  created_via?: string
   creator_name?: string
+  by_label?: string
   team_name?: string
   type?: { id: number; title: string; slug: string; color: string } | null
   priority?: { id: number; title: string; slug: string; color: string } | null
