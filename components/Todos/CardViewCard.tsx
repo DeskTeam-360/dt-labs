@@ -118,7 +118,7 @@ export default function CardViewCard({ todo, onEdit, onDelete }: CardViewCardPro
         </div>
       )}
       <div style={{ marginTop: 8, fontSize: 11, color: '#8c8c8c' }}>
-        By {todo.creator_name}
+        By {todo.by_label ?? todo.creator_name}
       </div>
     </Card>
   )

@@ -241,7 +241,7 @@ export default function TabGeneral({
                         <Flex justify="space-between" align="center" wrap="wrap" gap="small">
                           <Space>
                             <Text strong>
-                              {todoData.creator?.full_name || todoData.creator?.email || 'Unknown'}
+                              {todoData.company?.name || todoData.creator?.full_name || todoData.creator?.email || 'Unknown'}
                             </Text>
                             <Text type="secondary" style={{ fontSize: 12 }}>
                               <DateDisplay date={todoData.created_at} />
@@ -477,7 +477,7 @@ export default function TabGeneral({
               <Space>
                 <UserOutlined />
                 <Text>
-                  {todoData.creator?.full_name || todoData.creator?.email || 'Unknown'}
+                  {todoData.company?.name || todoData.creator?.full_name || todoData.creator?.email || 'Unknown'}
                 </Text>
               </Space>
             </Descriptions.Item>

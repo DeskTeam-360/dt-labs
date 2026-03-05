@@ -17,7 +17,7 @@ export default async function EmailIntegrationPage() {
 
   const { data: integration } = await supabase
     .from('email_integrations')
-    .select('id, provider, email_address, is_active, expires_at, created_at')
+    .select('id, provider, email_address, is_active, expires_at, created_at, last_sync_at')
     .eq('provider', 'google')
     .maybeSingle()
 

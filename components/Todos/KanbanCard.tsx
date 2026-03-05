@@ -147,9 +147,9 @@ export default function KanbanCard({ todo, onEdit, onDelete }: KanbanCardProps) 
             )}
             #{todo.id} {todo.title}
           </Text>
-          {todo.creator_name && (
+          {todo.by_label && (
             <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic', color: '#1890ff', display: 'block', marginTop: 4 }}>
-              by {todo.creator_name}
+              by {todo.by_label}
             </Text>
           )}
         </div>

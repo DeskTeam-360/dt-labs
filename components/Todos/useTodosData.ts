@@ -169,9 +169,12 @@ export function useTodosData(currentUserId: string) {
           const latestReplyAt = latestReplies[todo.id]
           const lastReadAt = (todo as any).last_read_at
           const hasUnread = !!latestReplyAt && (!lastReadAt || latestReplyAt > lastReadAt)
+          const companyName = (todo as { company?: { name?: string } }).company?.name
+          const creatorName = todo.creator?.full_name || todo.creator?.email || 'Unknown'
           return {
             ...todo,
-            creator_name: todo.creator?.full_name || todo.creator?.email || 'Unknown',
+            creator_name: creatorName,
+            by_label: companyName || creatorName,
             team_name: todo.team?.name || null,
             tags: tagsByTicketId[todo.id] || [],
             assignees: (assigneesData || []).map((assignee: { id: string; user_id: string; user?: { full_name?: string; email?: string } }) => ({
@@ -540,6 +543,7 @@ export function useTodosData(currentUserId: string) {
           .insert({
             ...todoData,
             created_by: currentUserId,
+            created_via: 'portal',
           })
           .select()
           .single()

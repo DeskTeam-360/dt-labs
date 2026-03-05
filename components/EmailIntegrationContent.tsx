@@ -18,6 +18,7 @@ interface Integration {
   is_active: boolean
   expires_at: string | null
   created_at: string
+  last_sync_at: string | null
 }
 
 interface EmailIntegrationContentProps {
@@ -140,7 +141,7 @@ export default function EmailIntegrationContent({
                       <Tag icon={<CheckCircleOutlined />} color="success">Connected</Tag>
                       <Text strong>{integration.email_address}</Text>
                     </Space>
-                    <Space>
+                    <Space wrap align="center">
                       <Button
                         icon={<SyncOutlined />}
                         onClick={handleSyncInbox}
@@ -148,6 +149,11 @@ export default function EmailIntegrationContent({
                       >
                         Sync inbox (company replies → comments)
                       </Button>
+                      {integration.last_sync_at && (
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          Last sync: {new Date(integration.last_sync_at).toLocaleString()}
+                        </Text>
+                      )}
                       <Button
                         danger
                         icon={<DisconnectOutlined />}
