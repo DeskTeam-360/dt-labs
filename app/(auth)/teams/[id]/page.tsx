@@ -1,68 +1,55 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db, teams, users, teamMembers } from '@/lib/db'
+import { eq, asc } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import TeamDetailContent from '@/components/TeamDetailContent'
 
-export default async function TeamDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+function toSessionUser(u: { id: string; email?: string | null; name?: string | null; image?: string | null }) {
+  return { id: u.id, email: u.email ?? undefined, user_metadata: { full_name: u.name, avatar_url: u.image } }
+}
 
-  const {
-    data: { user: currentUser },
-  } = await supabase.auth.getUser()
-
-  if (!currentUser) {
-    redirect('/login')
-  }
+export default async function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  if (!session?.user) redirect('/login')
 
   const { id } = await params
 
-  const { data: teamData, error: teamError } = await supabase
-    .from('teams')
-    .select(`
-      *,
-      creator:users!teams_created_by_fkey(id, full_name, email)
-    `)
-    .eq('id', id)
-    .single()
+  const [teamRow] = await db
+    .select({ team: teams, creator: users })
+    .from(teams)
+    .leftJoin(users, eq(teams.createdBy, users.id))
+    .where(eq(teams.id, id))
+    .limit(1)
 
-  if (teamError || !teamData) {
-    redirect('/teams')
-  }
+  if (!teamRow) redirect('/teams')
 
-  const { data: membersData } = await supabase
-    .from('team_members')
-    .select(`
-      id,
-      team_id,
-      user_id,
-      role,
-      joined_at,
-      user:users!team_members_user_id_fkey(id, full_name, email, avatar_url)
-    `)
-    .eq('team_id', id)
-    .order('joined_at', { ascending: true })
+  const membersRows = await db
+    .select({ member: teamMembers, user: users })
+    .from(teamMembers)
+    .leftJoin(users, eq(teamMembers.userId, users.id))
+    .where(eq(teamMembers.teamId, id))
+    .orderBy(asc(teamMembers.joinedAt))
 
-  const members = (membersData || []).map((m: any) => ({
-    id: m.id,
-    team_id: m.team_id,
-    user_id: m.user_id,
-    role: m.role,
-    joined_at: m.joined_at,
-    user_name: m.user?.full_name || m.user?.email || 'Unknown',
+  const members = membersRows.map((m) => ({
+    id: m.member.id,
+    team_id: m.member.teamId,
+    user_id: m.member.userId,
+    role: m.member.role,
+    joined_at: m.member.joinedAt.toISOString(),
+    user_name: m.user?.fullName || m.user?.email || 'Unknown',
     user_email: m.user?.email || '',
-    user_avatar_url: m.user?.avatar_url || null,
+    user_avatar_url: m.user?.avatarUrl || null,
   }))
 
   const team = {
-    ...teamData,
-    creator_name: teamData.creator?.full_name || teamData.creator?.email || 'Unknown',
+    id: teamRow.team.id,
+    name: teamRow.team.name,
+    type: teamRow.team.type,
+    created_by: teamRow.team.createdBy,
+    created_at: teamRow.team.createdAt.toISOString(),
+    creator_name: teamRow.creator?.fullName || teamRow.creator?.email || 'Unknown',
     members,
   }
 
-  return <TeamDetailContent user={currentUser} team={team} />
+  return <TeamDetailContent user={toSessionUser(session.user)} team={team} />
 }

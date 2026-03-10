@@ -15,8 +15,6 @@ import {
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -24,7 +22,16 @@ const { Content } = Layout
 const { Title } = Typography
 
 interface TagsContentProps {
-  user: User
+  user: { id: string; email?: string | null; user_metadata?: { full_name?: string | null } }
+}
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: 'include' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string })?.error || res.statusText || 'Request failed')
+  }
+  return res.json()
 }
 
 interface TagRecord {
@@ -86,20 +93,14 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
   const [modalVisible, setModalVisible] = useState(false)
   const [editingTag, setEditingTag] = useState<TagRecord | null>(null)
   const [form] = Form.useForm()
-  const supabase = createClient()
 
   const fetchTags = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('tags')
-        .select('*')
-        .order('name', { ascending: true })
-
-      if (error) throw error
-      setTags((data || []) as TagRecord[])
-    } catch (error: any) {
-      message.error(error.message || 'Failed to fetch tags')
+      const data = await apiFetch<TagRecord[]>('/api/tags')
+      setTags(data || [])
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to fetch tags')
     } finally {
       setLoading(false)
     }
@@ -128,12 +129,11 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from('tags').delete().eq('id', id)
-      if (error) throw error
+      await apiFetch(`/api/tags/${id}`, { method: 'DELETE' })
       message.success('Tag deleted')
       fetchTags()
-    } catch (error: any) {
-      message.error(error.message || 'Failed to delete tag')
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to delete tag')
     }
   }
 
@@ -144,31 +144,34 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
     }
   }
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: Record<string, unknown>) => {
     try {
       const payload = {
-        name: values.name.trim(),
-        slug: values.slug.trim().toLowerCase().replace(/\s+/g, '_'),
-        color: values.color || '#000000',
+        name: String(values.name || '').trim(),
+        slug: String(values.slug || '').trim().toLowerCase().replace(/\s+/g, '_'),
+        color: (values.color as string) || '#000000',
       }
 
       if (editingTag) {
-        const { error } = await supabase
-          .from('tags')
-          .update(payload)
-          .eq('id', editingTag.id)
-        if (error) throw error
+        await apiFetch(`/api/tags/${editingTag.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
         message.success('Tag updated')
       } else {
-        const { error } = await supabase.from('tags').insert(payload)
-        if (error) throw error
+        await apiFetch('/api/tags', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
         message.success('Tag created')
       }
       setModalVisible(false)
       form.resetFields()
       fetchTags()
-    } catch (error: any) {
-      message.error(error.message || 'Failed to save tag')
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to save tag')
     }
   }
 

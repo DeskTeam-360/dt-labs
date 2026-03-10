@@ -1,37 +1,33 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db, companyContentTemplates } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import ContentTemplateForm from '@/components/ContentTemplateForm'
 
-export default async function EditContentTemplatePage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+function toSessionUser(u: { id: string; email?: string | null; name?: string | null; image?: string | null }) {
+  return { id: u.id, email: u.email ?? undefined, user_metadata: { full_name: u.name, avatar_url: u.image } }
+}
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
+export default async function EditContentTemplatePage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  if (!session?.user) redirect('/login')
 
   const { id } = await params
+  const [row] = await db.select().from(companyContentTemplates).where(eq(companyContentTemplates.id, id)).limit(1)
 
-  // Fetch template data
-  const { data: template, error } = await supabase
-    .from('company_content_templates')
-    .select('*')
-    .eq('id', id)
-    .single()
+  if (!row) redirect('/company-content-templates')
 
-  if (error || !template) {
-    redirect('/company-content-templates')
+  const template = {
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    description: row.description,
+    fields: row.fields,
+    type: row.type,
+    created_at: row.createdAt.toISOString(),
+    updated_at: row.updatedAt.toISOString(),
   }
 
-  return <ContentTemplateForm user={user} template={template} />
+  return <ContentTemplateForm user={toSessionUser(session.user)} template={template} />
 }
 

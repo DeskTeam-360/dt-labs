@@ -1,6 +1,7 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+import { db, users, companies } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 import UserDetailContent from '@/components/UserDetailContent'
 
 export default async function UserDetailPage({
@@ -8,34 +9,48 @@ export default async function UserDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
-
-  const {
-    data: { user: currentUser },
-  } = await supabase.auth.getUser()
-
-  if (!currentUser) {
+  const session = await auth()
+  if (!session?.user) {
     redirect('/login')
   }
 
-  // Await params since it's a Promise in Next.js 15+
   const { id } = await params
 
-  // Fetch user data with company
-  const { data: userData, error } = await supabase
-    .from('users')
-    .select(`
-      *,
-      company:companies!users_company_id_fkey(id, name)
-    `)
-    .eq('id', id)
-    .single()
+  const [row] = await db
+    .select({ user: users, company: companies })
+    .from(users)
+    .leftJoin(companies, eq(users.companyId, companies.id))
+    .where(eq(users.id, id))
 
-  if (error || !userData) {
+  if (!row?.user) {
     redirect('/users')
   }
 
-  return <UserDetailContent user={currentUser} userData={userData} />
+  const u = row.user
+  const userData = {
+    id: u.id,
+    email: u.email,
+    full_name: u.fullName,
+    role: u.role,
+    status: u.status,
+    company_id: u.companyId,
+    company: row.company ? { id: row.company.id, name: row.company.name } : null,
+    avatar_url: u.avatarUrl,
+    created_at: u.createdAt ? new Date(u.createdAt).toISOString() : '',
+    updated_at: u.updatedAt ? new Date(u.updatedAt).toISOString() : '',
+    last_login_at: u.lastLoginAt ? new Date(u.lastLoginAt).toISOString() : null,
+    last_active_at: u.lastActiveAt ? new Date(u.lastActiveAt).toISOString() : null,
+    phone: u.phone,
+    department: u.department,
+    position: u.position,
+    bio: u.bio,
+    timezone: u.timezone,
+    locale: u.locale,
+    permissions: u.permissions,
+    is_email_verified: u.isEmailVerified,
+    metadata: u.metadata,
+  }
+
+  return <UserDetailContent user={session.user} userData={userData} />
 }
 

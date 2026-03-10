@@ -1,13 +1,20 @@
 'use client'
 
 import { Layout, Table, Button, Space, Typography, Card, Tag, Avatar, Modal, Form, Input, Select, message, Popconfirm, Tooltip, Upload, Switch, InputNumber } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, UploadOutlined, EyeOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, UploadOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import { createUser } from '@/app/actions/users'
 import { uploadAvatar } from '@/utils/storage'
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: 'include' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error || res.statusText || 'Request failed')
+  }
+  return res.json()
+}
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
 import type { ColumnsType } from 'antd/es/table'
@@ -54,22 +61,26 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [searchText, setSearchText] = useState('')
   const [form] = Form.useForm()
-  const supabase = createClient()
+
+  const filteredUsers = useMemo(() => {
+    if (!searchText.trim()) return users
+    const q = searchText.trim().toLowerCase()
+    return users.filter(
+      (u) =>
+        (u.full_name || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q) ||
+        (u.company?.name || '').toLowerCase().includes(q) ||
+        (u.department || '').toLowerCase().includes(q) ||
+        (u.position || '').toLowerCase().includes(q)
+    )
+  }, [users, searchText])
 
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select(`
-          *,
-          company:companies!users_company_id_fkey(id, name)
-        `)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
+      const data = await apiFetch<any[]>('/api/users')
       setUsers(data || [])
     } catch (error: any) {
       message.error(error.message || 'Failed to fetch users')
@@ -80,13 +91,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
 
   const fetchCompanies = async () => {
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name')
-      if (error) throw error
-      setCompanies(data || [])
+      const data = await apiFetch<{ companies: { id: string; name: string }[] }>('/api/tickets/lookup')
+      setCompanies(data?.companies || [])
     } catch {
       setCompanies([])
     }
@@ -160,13 +166,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
 
   const handleDelete = async (userId: string) => {
     try {
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', userId)
-
-      if (error) throw error
-
+      await apiFetch(`/api/users/${userId}`, { method: 'DELETE' })
       message.success('User deleted successfully')
       fetchUsers()
     } catch (error: any) {
@@ -199,41 +199,26 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       }
 
       if (editingUser) {
-        // Update existing user
-        const updateData: any = {
-          full_name: values.full_name,
-          role: values.role,
-          status: values.status,
-          company_id: values.company_id || null,
-          avatar_url: avatarUrl,
-          phone: values.phone || null,
-          department: values.department || null,
-          position: values.position || null,
-          bio: values.bio || null,
-          timezone: values.timezone || 'UTC',
-          locale: values.locale || 'en',
-          is_email_verified: values.is_email_verified || false,
-          permissions: permissions,
-          metadata: metadata,
-          updated_at: new Date().toISOString(),
-        }
-
-        const { error } = await supabase
-          .from('users')
-          .update(updateData)
-          .eq('id', editingUser.id)
-
-        if (error) throw error
-
-        // Update auth metadata if avatar changed
-        if (avatarUrl) {
-          await supabase.auth.admin.updateUserById(editingUser.id, {
-            user_metadata: {
-              avatar_url: avatarUrl,
-              full_name: values.full_name,
-            },
-          })
-        }
+        await apiFetch(`/api/users/${editingUser.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name: values.full_name,
+            role: values.role,
+            status: values.status,
+            company_id: values.company_id || null,
+            avatar_url: avatarUrl,
+            phone: values.phone || null,
+            department: values.department || null,
+            position: values.position || null,
+            bio: values.bio || null,
+            timezone: values.timezone || 'UTC',
+            locale: values.locale || 'en',
+            is_email_verified: values.is_email_verified || false,
+            permissions,
+            metadata,
+          }),
+        })
 
         message.success('User updated successfully')
         setModalVisible(false)
@@ -272,10 +257,11 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
           }
 
           if (result.data) {
-            await supabase
-              .from('users')
-              .update(updateData)
-              .eq('id', result.data.id)
+            await apiFetch(`/api/users/${result.data.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updateData),
+            })
           }
 
           message.success('User created successfully')
@@ -294,6 +280,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     {
       title: 'User',
       key: 'user',
+      sorter: (a, b) => (a.full_name || '').localeCompare(b.full_name || ''),
+      sortDirections: ['ascend', 'descend'],
       render: (_, record) => (
         <Space>
           <Avatar icon={<UserOutlined />} src={record.avatar_url} />
@@ -308,6 +296,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       title: 'Role',
       dataIndex: 'role',
       key: 'role',
+      sorter: (a, b) => a.role.localeCompare(b.role),
+      sortDirections: ['ascend', 'descend'],
       render: (role: string) => {
         const colorMap: Record<string, string> = {
           admin: 'red',
@@ -323,12 +313,16 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       title: 'Company',
       key: 'company',
       width: 140,
+      sorter: (a, b) => (a.company?.name || '').localeCompare(b.company?.name || ''),
+      sortDirections: ['ascend', 'descend'],
       render: (_, r) => (<>{r.company?.name ?? 'N/A'}</>),
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      sorter: (a, b) => a.status.localeCompare(b.status),
+      sortDirections: ['ascend', 'descend'],
       render: (status: string) => {
         const colorMap: Record<string, string> = {
           active: 'green',
@@ -355,6 +349,12 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       title: 'Last Login',
       dataIndex: 'last_login_at',
       key: 'last_login_at',
+      sorter: (a, b) => {
+        const da = a.last_login_at ? new Date(a.last_login_at).getTime() : 0
+        const db2 = b.last_login_at ? new Date(b.last_login_at).getTime() : 0
+        return da - db2
+      },
+      sortDirections: ['ascend', 'descend'],
       render: (date: string | null) => date ? <DateDisplay date={date} /> : 'Never',
     },
     {
@@ -367,6 +367,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       title: 'Created At',
       dataIndex: 'created_at',
       key: 'created_at',
+      sorter: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      sortDirections: ['ascend', 'descend'],
       render: (date: string) => <DateDisplay date={date} format="date-only" />,
     },
     {
@@ -418,20 +420,30 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
         <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
           <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
               <Title level={2} style={{ margin: 0 }}>Users Management</Title>
-              <Button
+              <Space>
+                <Input
+                  placeholder="Search by name, email, company..."
+                  prefix={<SearchOutlined />}
+                  allowClear
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  style={{ width: 260 }}
+                />
+                <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={handleCreate}
               >
                 Add User
               </Button>
+              </Space>
             </div>
 
             <Table
               columns={columns}
-              dataSource={users}
+              dataSource={filteredUsers}
               rowKey="id"
               loading={loading}
               pagination={{

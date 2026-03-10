@@ -1,20 +1,22 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
 import ChangePasswordContent from '@/components/ChangePasswordContent'
 
 export default async function ChangePasswordPage() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  const session = await auth()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session?.user) {
     return null
   }
 
-  return <ChangePasswordContent user={user} />
+  return (
+    <ChangePasswordContent
+      user={{
+        id: session.user.id!,
+        email: session.user.email ?? null,
+        user_metadata: { full_name: session.user.name },
+      }}
+    />
+  )
 }
 
 

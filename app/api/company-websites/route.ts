@@ -1,106 +1,97 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db } from '@/lib/db'
+import { companyWebsites } from '@/lib/db'
+import { eq, desc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-// GET - Get all company websites
+/** GET /api/company-websites?company_id=... */
 export async function GET(request: Request) {
-  try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get query params for filtering
-    const { searchParams } = new URL(request.url)
-    const company_id = searchParams.get('company_id')
-    const is_primary = searchParams.get('is_primary')
-
-    let query = supabase
-      .from('company_websites')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (company_id) {
-      query = query.eq('company_id', company_id)
-    }
-
-    if (is_primary !== null) {
-      query = query.eq('is_primary', is_primary === 'true')
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
-
-    return NextResponse.json({ data })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to fetch company websites' }, { status: 500 })
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { searchParams } = new URL(request.url)
+  const companyId = searchParams.get('company_id')
+  const isPrimary = searchParams.get('is_primary')
+
+  let rows = await db.select().from(companyWebsites)
+
+  if (companyId) {
+    rows = rows.filter((r) => r.companyId === companyId)
+  }
+  if (isPrimary !== null && isPrimary !== undefined) {
+    rows = rows.filter((r) => r.isPrimary === (isPrimary === 'true'))
+  }
+
+  rows.sort((a, b) => {
+    if ((a.isPrimary ? 1 : 0) !== (b.isPrimary ? 1 : 0)) return (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0)
+    const da = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const db2 = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    return db2 - da
+  })
+
+  const data = rows.map((r) => ({
+    id: r.id,
+    company_id: r.companyId,
+    url: r.url,
+    title: r.title,
+    description: r.description,
+    is_primary: r.isPrimary ?? false,
+    created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
+    updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
+  }))
+
+  return NextResponse.json({ data })
 }
 
-// POST - Create new company website
+/** POST /api/company-websites */
 export async function POST(request: Request) {
-  try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { company_id, url, title, description, is_primary } = body
-
-    if (!company_id) {
-      return NextResponse.json({ error: 'company_id is required' }, { status: 400 })
-    }
-
-    if (!url) {
-      return NextResponse.json({ error: 'url is required' }, { status: 400 })
-    }
-
-    // If setting as primary, unset other primary websites for this company
-    if (is_primary) {
-      await supabase
-        .from('company_websites')
-        .update({ is_primary: false })
-        .eq('company_id', company_id)
-        .eq('is_primary', true)
-    }
-
-    const { data, error } = await supabase
-      .from('company_websites')
-      .insert({
-        company_id,
-        url,
-        title: title || null,
-        description: description || null,
-        is_primary: is_primary || false,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
-
-    return NextResponse.json({ data, success: true }, { status: 201 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to create company website' }, { status: 500 })
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-}
 
+  const body = await request.json()
+  const { company_id, url, title, description, is_primary } = body
+
+  if (!company_id || !url) {
+    return NextResponse.json({ error: 'company_id and url are required' }, { status: 400 })
+  }
+
+  if (is_primary) {
+    await db
+      .update(companyWebsites)
+      .set({ isPrimary: false })
+      .where(eq(companyWebsites.companyId, company_id))
+  }
+
+  const [row] = await db
+    .insert(companyWebsites)
+    .values({
+      companyId: company_id,
+      url,
+      title: title || null,
+      description: description || null,
+      isPrimary: is_primary || false,
+    })
+    .returning()
+
+  if (!row) {
+    return NextResponse.json({ error: 'Failed to create' }, { status: 500 })
+  }
+
+  return NextResponse.json({
+    data: {
+      id: row.id,
+      company_id: row.companyId,
+      url: row.url,
+      title: row.title,
+      description: row.description,
+      is_primary: row.isPrimary ?? false,
+      created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',
+      updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : '',
+    },
+    success: true,
+  }, { status: 201 })
+}

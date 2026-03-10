@@ -1,26 +1,40 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db, users } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 import ProfileContent from '@/components/ProfileContent'
 
 export default async function ProfilePage() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  const session = await auth()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session?.user) {
     return null
   }
 
-  // Fetch user data from users table
-  const { data: userData, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const [userRow] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1)
+  const userData = userRow
+    ? {
+        full_name: userRow.fullName,
+        avatar_url: userRow.avatarUrl,
+        phone: userRow.phone,
+        bio: userRow.bio,
+        department: userRow.department,
+        position: userRow.position,
+        timezone: userRow.timezone ?? 'UTC',
+        locale: userRow.locale ?? 'en',
+      }
+    : undefined
 
-  return <ProfileContent user={user} userData={userData} />
+  return (
+    <ProfileContent
+      user={{
+        id: session.user.id!,
+        email: session.user.email ?? null,
+        name: session.user.name ?? null,
+        image: session.user.image ?? null,
+        user_metadata: { full_name: session.user.name, avatar_url: userRow?.avatarUrl ?? null },
+      }}
+      userData={userData}
+    />
+  )
 }
 

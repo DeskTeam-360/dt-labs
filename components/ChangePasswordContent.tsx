@@ -3,22 +3,28 @@
 import { Layout, Card, Form, Input, Button, Typography, message } from 'antd'
 import { LockOutlined } from '@ant-design/icons'
 import { useState } from 'react'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 
 const { Content } = Layout
 const { Title, Text } = Typography
 
 interface ChangePasswordContentProps {
-  user: User
+  user: { id: string; email?: string | null; user_metadata?: { full_name?: string | null } }
+}
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: 'include' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string })?.error || res.statusText || 'Request failed')
+  }
+  return res.json()
 }
 
 export default function ChangePasswordContent({ user }: ChangePasswordContentProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
-  const supabase = createClient()
 
   const onFinish = async (values: { currentPassword: string; newPassword: string; confirmPassword: string }) => {
     if (values.newPassword !== values.confirmPassword) {
@@ -33,20 +39,19 @@ export default function ChangePasswordContent({ user }: ChangePasswordContentPro
 
     setLoading(true)
     try {
-      // Update password
-      const { error } = await supabase.auth.updateUser({
-        password: values.newPassword
+      await apiFetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: values.currentPassword,
+          newPassword: values.newPassword,
+        }),
       })
-
-      if (error) {
-        message.error(error.message || 'Failed to change password')
-        return
-      }
 
       message.success('Password changed successfully!')
       form.resetFields()
     } catch (error) {
-      message.error('An error occurred while changing password')
+      message.error((error as Error).message || 'An error occurred while changing password')
     } finally {
       setLoading(false)
     }

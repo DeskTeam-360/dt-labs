@@ -1,5 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -12,13 +11,9 @@ const SCOPES = [
 
 export async function GET() {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth()
 
-    if (!user) {
+    if (!session?.user?.id) {
       return NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'))
     }
 
@@ -31,7 +26,7 @@ export async function GET() {
       return NextResponse.redirect(new URL('/email-integration?error=missing_config', baseUrl))
     }
 
-    const state = Buffer.from(JSON.stringify({ userId: user.id })).toString('base64url')
+    const state = Buffer.from(JSON.stringify({ userId: session.user.id })).toString('base64url')
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,

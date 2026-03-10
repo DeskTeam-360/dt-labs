@@ -38,12 +38,19 @@ import {
 } from '@ant-design/icons'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
 import dayjs, { Dayjs } from 'dayjs'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
-import { createClient } from '@/utils/supabase/client'
 import type { ColumnsType } from 'antd/es/table'
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: 'include' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string })?.error || res.statusText || 'Request failed')
+  }
+  return res.json()
+}
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -77,7 +84,7 @@ interface ReportRow {
   user_id: string
   user_name: string
   user_email?: string
-  todo_id: number
+  ticket_id: number
   ticket_title?: string
   start_time: string
   stop_time: string | null
@@ -85,7 +92,7 @@ interface ReportRow {
 }
 
 interface TeamDetailContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null }
   team: TeamData
 }
 
@@ -124,7 +131,6 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editLoading, setEditLoading] = useState(false)
   const [editForm] = Form.useForm()
-  const supabase = createClient()
 
   const memberUserIds = useMemo(() => members.map((m) => m.user_id), [members])
   const isCreator = currentUser.id === team.created_by
@@ -143,12 +149,12 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
   const fetchUsers = async () => {
     setUsersLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, full_name, email, avatar_url')
-        .order('full_name', { ascending: true, nullsFirst: false })
-      if (error) throw error
-      setUsersList(data || [])
+      const data = await apiFetch<Array<{ id: string; full_name: string | null; email: string; avatar_url?: string | null; role?: string }>>('/api/users')
+      const teamEligible = data.filter((u) => {
+        const r = (u.role ?? '').toLowerCase()
+        return r !== 'customer' && r !== 'guest'
+      })
+      setUsersList(teamEligible.map((u) => ({ id: u.id, full_name: u.full_name, email: u.email, avatar_url: u.avatar_url })))
     } catch {
       message.error('Failed to load users')
       setUsersList([])
@@ -171,26 +177,18 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
     }
     setAddLoading(true)
     try {
-      const { data: newRow, error } = await supabase
-        .from('team_members')
-        .insert({ team_id: team.id, user_id: addUserId, role: addRole })
-        .select('id, team_id, user_id, role, joined_at')
-        .single()
-      if (error) throw error
-      const u = usersList.find((x) => x.id === addUserId)
-      setMembers((prev) => [
-        ...prev,
+      const { members: newMembers } = await apiFetch<{ members: TeamMember[]; added: number }>(
+        `/api/teams/${team.id}/members`,
         {
-          id: newRow.id,
-          team_id: newRow.team_id,
-          user_id: newRow.user_id,
-          role: newRow.role,
-          joined_at: newRow.joined_at,
-          user_name: u?.full_name || u?.email || 'Unknown',
-          user_email: u?.email ?? '',
-          user_avatar_url: u?.avatar_url ?? null,
-        },
-      ])
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_ids: [addUserId], role: addRole }),
+        }
+      )
+      const added = newMembers.find((m) => m.user_id === addUserId)
+      if (added) {
+        setMembers((prev) => [...prev, added])
+      }
       message.success('Member added')
       setAddModalOpen(false)
     } catch (e: unknown) {
@@ -209,11 +207,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
     if (!confirm(`Remove ${member.user_name} from this team?`)) return
     setRemoveLoadingId(member.id)
     try {
-      const { error } = await supabase
-        .from('team_members')
-        .delete()
-        .eq('id', member.id)
-      if (error) throw error
+      await apiFetch(`/api/teams/${team.id}/members/${member.id}`, { method: 'DELETE' })
       setMembers((prev) => prev.filter((m) => m.id !== member.id))
       message.success('Member removed')
     } catch (e: unknown) {
@@ -238,17 +232,17 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
         return
       }
       setEditLoading(true)
-      const { error } = await supabase
-        .from('teams')
-        .update({ name, type: values.type || null })
-        .eq('id', team.id)
-      if (error) throw error
+      await apiFetch(`/api/teams/${team.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, type: values.type || null }),
+      })
       setTeamName(name)
       setTeamType(values.type || null)
       message.success('Team updated')
       setEditModalOpen(false)
     } catch (e: unknown) {
-      const err = e as { message?: string }
+      const err = e as Error & { message?: string }
       if (err?.message && !err.message.includes('validateFields')) {
         message.error(err.message || 'Failed to update team')
       }
@@ -289,37 +283,9 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
     try {
       const startIso = rangeStart.toISOString()
       const endIso = rangeEnd.toISOString()
-
-      const { data, error } = await supabase
-        .from('todo_time_tracker')
-        .select(`
-          id,
-          user_id,
-          todo_id,
-          start_time,
-          stop_time,
-          duration_seconds,
-          ticket:tickets(id, title),
-          user:users!todo_time_tracker_user_id_fkey(id, full_name, email)
-        `)
-        .in('user_id', memberUserIds)
-        .gte('start_time', startIso)
-        .lte('start_time', endIso)
-        .order('start_time', { ascending: false })
-
-      if (error) throw error
-
-      const rows: ReportRow[] = (data || []).map((r: any) => ({
-        id: r.id,
-        user_id: r.user_id,
-        user_name: r.user?.full_name || r.user?.email || 'Unknown',
-        user_email: r.user?.email,
-        todo_id: r.todo_id,
-        ticket_title: r.ticket?.title,
-        start_time: r.start_time,
-        stop_time: r.stop_time,
-        duration_seconds: r.duration_seconds,
-      }))
+      const rows = await apiFetch<ReportRow[]>(
+        `/api/teams/${team.id}/time-report?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
+      )
       setReportSessions(rows)
     } catch {
       setReportSessions([])
@@ -352,7 +318,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
       key: 'ticket',
       render: (_, r) => (
         <Space>
-          <Text strong>#{r.todo_id}</Text>
+          <Text strong>#{r.ticket_id}</Text>
           {r.ticket_title ? r.ticket_title : '-'}
         </Space>
       ),
@@ -384,7 +350,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
         map[s.user_id] = { name: s.user_name, seconds: 0, tickets: new Set() }
       }
       map[s.user_id].seconds += s.duration_seconds ?? 0
-      map[s.user_id].tickets.add(s.todo_id)
+      map[s.user_id].tickets.add(s.ticket_id)
     })
     return Object.entries(map).map(([userId, v]) => ({
       user_id: userId,

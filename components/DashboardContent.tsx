@@ -9,13 +9,21 @@ import {
   ClockCircleOutlined,
   StopOutlined,
   UserOutlined,
+  CloudUploadOutlined,
 } from '@ant-design/icons'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: 'include' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string })?.error || res.statusText || 'Request failed')
+  }
+  return res.json()
+}
 import dayjs from 'dayjs'
 import {
   Radar,
@@ -32,12 +40,12 @@ const { Content } = Layout
 const { Title, Text } = Typography
 
 interface DashboardContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null }
   stats: {
     totalUsers: number
     totalTeams: number
-    completedTodos: number
-    totalTodos: number
+    completedTickets: number
+    totalTickets: number
   }
 }
 
@@ -54,7 +62,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
   const [collapsed, setCollapsed] = useState(false)
   const [activeTracker, setActiveTracker] = useState<{
     id: number
-    todo_id: number
+    ticket_id: number
     user_id: string
     start_time: string
     ticket?: { id: number; title: string }
@@ -64,7 +72,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
   const [lastTrackers, setLastTrackers] = useState<
     Array<{
       id: number | string
-      todo_id: number
+      ticket_id: number
       start_time: string
       stop_time: string | null
       duration_seconds: number | null
@@ -73,25 +81,54 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
     }>
   >([])
   const [loadingTrackers, setLoadingTrackers] = useState(false)
+  const [idriveTestLoading, setIdriveTestLoading] = useState(false)
+  const [idriveTestResult, setIdriveTestResult] = useState<{ ok: boolean; url?: string; error?: string } | null>(null)
+
+  const idriveTestInputRef = useRef<HTMLInputElement>(null)
+
+  const handleIdriveTest = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setIdriveTestResult(null)
+    setIdriveTestLoading(true)
+    try {
+      const path = `connection-test/test-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+      const formData = new FormData()
+      formData.set('file', file)
+      formData.set('path', path)
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setIdriveTestResult({ ok: false, error: (data as { error?: string }).error || res.statusText })
+        return
+      }
+      setIdriveTestResult({ ok: true, url: (data as { url?: string }).url })
+      message.success('iDrive connection OK')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload failed'
+      setIdriveTestResult({ ok: false, error: msg })
+      message.error(msg)
+    } finally {
+      setIdriveTestLoading(false)
+    }
+  }
   const [allSessionsForStats, setAllSessionsForStats] = useState<
-    Array<{ todo_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null }>
+    Array<{ ticket_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null }>
   >([])
   const router = useRouter()
-  const supabase = createClient()
 
   const fetchAllSessionsForStats = async () => {
     try {
       const startOfMonth = dayjs().subtract(30, 'day').startOf('day').toISOString()
-      const { data, error } = await supabase
-        .from('todo_time_tracker')
-        .select('todo_id, start_time, stop_time, duration_seconds')
-        .eq('user_id', user.id)
-        .not('stop_time', 'is', null)
-        .gte('start_time', startOfMonth)
-        .order('start_time', { ascending: false })
-
-      if (error) throw error
-      setAllSessionsForStats((data || []) as any)
+      const data = await apiFetch<Array<{ ticket_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null }>>(
+        `/api/users/time-tracker?user_id=${user.id}&filter=custom&start=${encodeURIComponent(startOfMonth)}&end=${encodeURIComponent(dayjs().toISOString())}&stopped_only=1&limit=500`
+      )
+      setAllSessionsForStats(Array.isArray(data) ? data : [])
     } catch {
       setAllSessionsForStats([])
     }
@@ -115,15 +152,15 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
       const dur = s.duration_seconds ?? 0
       if (start.isAfter(todayStart)) {
         todaySeconds += dur
-        todayTickets.add(s.todo_id)
+        todayTickets.add(s.ticket_id)
       }
       if (start.isAfter(weekStart)) {
         weekSeconds += dur
-        weekTickets.add(s.todo_id)
+        weekTickets.add(s.ticket_id)
       }
       if (start.isAfter(monthStart)) {
         monthSeconds += dur
-        monthTickets.add(s.todo_id)
+        monthTickets.add(s.ticket_id)
       }
     })
 
@@ -162,15 +199,10 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
   const fetchLastTrackers = async () => {
     setLoadingTrackers(true)
     try {
-      const { data, error } = await supabase
-        .from('todo_time_tracker')
-        .select('id, todo_id, start_time, stop_time, duration_seconds, ticket:tickets(id, title), user:users!todo_time_tracker_user_id_fkey(id, full_name, email)')
-        .eq('user_id', user.id)
-        .order('start_time', { ascending: false })
-        .limit(15)
-
-      if (error) throw error
-      setLastTrackers((data || []) as any)
+      const data = await apiFetch<Array<{ id: string; ticket_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null; ticket?: { id: number; title: string } }>>(
+        `/api/users/time-tracker?user_id=${user.id}&filter=all&limit=15`
+      )
+      setLastTrackers(Array.isArray(data) ? data : [])
     } catch {
       setLastTrackers([])
     } finally {
@@ -185,17 +217,10 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
 
   const fetchActiveTracker = async () => {
     try {
-      const { data, error } = await supabase
-        .from('todo_time_tracker')
-        .select('id, todo_id, user_id, start_time, ticket:tickets(id, title)')
-        .eq('user_id', user.id)
-        .is('stop_time', null)
-        .order('start_time', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (error) throw error
-      setActiveTracker(data as any)
+      const data = await apiFetch<{ id: string; ticket_id: number; user_id: string; start_time: string; ticket?: { id: number; title: string } } | null>(
+        `/api/users/time-tracker?user_id=${user.id}&active_only=1`
+      )
+      setActiveTracker(data)
     } catch {
       setActiveTracker(null)
     }
@@ -233,15 +258,11 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
       if (durationSeconds > MAX_DURATION) durationSeconds = MAX_DURATION
       if (durationSeconds < 0) durationSeconds = 0
 
-      const { error } = await supabase
-        .from('todo_time_tracker')
-        .update({
-          stop_time: stopTime,
-          duration_seconds: durationSeconds,
-        })
-        .eq('id', String(activeTracker.id))
-
-      if (error) throw error
+      await apiFetch(`/api/tickets/${activeTracker.ticket_id}/time-tracker`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop', session_id: activeTracker.id }),
+      })
       setActiveTracker(null)
       setElapsedSeconds(0)
       message.success('Time tracker stopped')
@@ -260,7 +281,16 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={user} collapsed={collapsed} onCollapse={setCollapsed} />
       
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
+      <Layout
+        style={{
+          marginLeft: collapsed ? 80 : 250,
+          transition: 'margin-left 0.2s',
+          borderRadius: '16px 0 0 16px',
+          overflow: 'hidden',
+          background: '#f0f2f5',
+          minHeight: '100vh',
+        }}
+      >
         <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
         <div style={{ marginBottom: 24 }}>
           <Title level={2}>Welcome!</Title>
@@ -294,7 +324,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
             <Card>
               <Statistic
                 title="Completed Tickets"
-                value={stats.completedTodos}
+                value={stats.completedTickets}
                 prefix={<CheckCircleOutlined />}
                 valueStyle={{ color: '#52c41a' }}
               />
@@ -304,7 +334,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
             <Card>
               <Statistic
                 title="Total Tickets"
-                value={stats.totalTodos}
+                value={stats.totalTickets}
                 prefix={<FileTextOutlined />}
                 valueStyle={{ color: '#722ed1' }}
               />
@@ -380,9 +410,9 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                       <Text
                         strong
                         style={{ cursor: 'pointer', color: '#1890ff' }}
-                        onClick={() => router.push(`/tickets/${activeTracker.todo_id}`)}
+                        onClick={() => router.push(`/tickets/${activeTracker.ticket_id}`)}
                       >
-                        {activeTracker.ticket?.title || `#${activeTracker.todo_id}`}
+                        {activeTracker.ticket?.title || `#${activeTracker.ticket_id}`}
                       </Text>
                     </div>
                     <div>
@@ -401,7 +431,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                     </Button>
                     <Button
                       type="default"
-                      onClick={() => router.push(`/tickets/${activeTracker.todo_id}`)}
+                      onClick={() => router.push(`/tickets/${activeTracker.ticket_id}`)}
                     >
                       Open Ticket
                     </Button>
@@ -436,18 +466,18 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                   renderItem={(item) => (
                     <List.Item
                       style={{ cursor: 'pointer' }}
-                      onClick={() => router.push(`/tickets/${item.todo_id}`)}
+                      onClick={() => router.push(`/tickets/${item.ticket_id}`)}
                     >
                       <List.Item.Meta
                         avatar={<UserOutlined style={{ color: '#8c8c8c' }} />}
                         title={
                           <Space>
                             <Link
-                              href={`/tickets/${item.todo_id}`}
+                              href={`/tickets/${item.ticket_id}`}
                               onClick={(e) => e.stopPropagation()}
                               style={{ color: '#1890ff', fontWeight: 600 }}
                             >
-                              {item.ticket?.title || `Ticket #${item.todo_id}`}
+                              {item.ticket?.title || `Ticket #${item.ticket_id}`}
                             </Link>
                             {!item.stop_time && (
                               <Text type="secondary" style={{ fontSize: 11 }}>(running)</Text>
@@ -510,6 +540,62 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
             </Card>
           </Col>
           <Col xs={24} lg={8}>
+            <Card
+              title={
+                <Space>
+                  <CloudUploadOutlined />
+                  <span>Test iDrive Connection</span>
+                </Space>
+              }
+              style={{ marginBottom: 16 }}
+            >
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div>
+                  <input
+                    ref={idriveTestInputRef}
+                    type="file"
+                    accept="*/*"
+                    style={{ display: 'none' }}
+                    onChange={handleIdriveTest}
+                  />
+                  <Button
+                    type="dashed"
+                    icon={<CloudUploadOutlined />}
+                    onClick={() => idriveTestInputRef.current?.click()}
+                    loading={idriveTestLoading}
+                    block
+                  >
+                    Upload file to test iDrive
+                  </Button>
+                </div>
+                {idriveTestResult && (
+                  <div
+                    style={{
+                      padding: 12,
+                      borderRadius: 6,
+                      background: idriveTestResult.ok ? '#f6ffed' : '#fff2f0',
+                      border: `1px solid ${idriveTestResult.ok ? '#b7eb8f' : '#ffccc7'}`,
+                    }}
+                  >
+                    {idriveTestResult.ok ? (
+                      <>
+                        <Text type="success" strong>Connection OK</Text>
+                        {idriveTestResult.url && (
+                          <div style={{ marginTop: 8 }}>
+                            <Text type="secondary" style={{ fontSize: 12 }}>URL: </Text>
+                            <a href={idriveTestResult.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>
+                              {idriveTestResult.url}
+                            </a>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <Text type="danger">Error: {idriveTestResult.error}</Text>
+                    )}
+                  </div>
+                )}
+              </Space>
+            </Card>
             <Card title="Account Information" style={{ height: '100%' }}>
               <Space orientation="vertical" style={{ width: '100%' }}>
                 <div>
@@ -525,11 +611,9 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                   </Text>
                 </div>
                 <div>
-                  <Text type="secondary">Last Login:</Text>
+                  <Text type="secondary">Name:</Text>
                   <br />
-                  <Text>
-                    {new Date(user.last_sign_in_at || '').toLocaleString('en-US')}
-                  </Text>
+                  <Text>{user.name || user.email || '—'}</Text>
                 </div>
               </Space>
             </Card>

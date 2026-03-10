@@ -1,12 +1,12 @@
 'use client'
 
 import { Layout, Card, Row, Col, Image, Typography, Select, DatePicker, Button, Space, Tag, Modal, message, Empty } from 'antd'
-import { PictureOutlined, LinkOutlined, CopyOutlined, DeleteOutlined, EditOutlined, CalendarOutlined } from '@ant-design/icons'
+import { PictureOutlined, CopyOutlined, DeleteOutlined, EditOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import dayjs, { Dayjs } from 'dayjs'
+
+type SessionUser = { id: string; email?: string; user_metadata?: { full_name?: string } }
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -20,7 +20,7 @@ interface Screenshot {
   file_url: string
   file_size: number
   mime_type: string
-  todo_id: number | null
+  ticket_id: number | null
   title: string | null
   description: string | null
   tags: string[] | null
@@ -33,7 +33,7 @@ interface Screenshot {
   } | null
 }
 
-interface Todo {
+interface Ticket {
   id: number
   title: string
   status: string
@@ -41,29 +41,28 @@ interface Todo {
 }
 
 interface ScreenshotsContentProps {
-  user: User
+  user: SessionUser
   screenshots: Screenshot[]
-  todos: Todo[]
+  tickets: Ticket[]
 }
 
-export default function ScreenshotsContent({ user, screenshots: initialScreenshots, todos }: ScreenshotsContentProps) {
+export default function ScreenshotsContent({ user, screenshots: initialScreenshots, tickets }: ScreenshotsContentProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [screenshots, setScreenshots] = useState<Screenshot[]>(initialScreenshots)
   const [filteredScreenshots, setFilteredScreenshots] = useState<Screenshot[]>(initialScreenshots)
-  const [selectedTodo, setSelectedTodo] = useState<number | null>(null)
+  const [selectedTicket, setSelectedTicket] = useState<number | null>(null)
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null])
   const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null)
   const [modalVisible, setModalVisible] = useState(false)
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
 
   // Filter screenshots
   useEffect(() => {
     let filtered = [...screenshots]
 
-    // Filter by todo
-    if (selectedTodo) {
-      filtered = filtered.filter(s => s.todo_id === selectedTodo)
+    // Filter by ticket
+    if (selectedTicket) {
+      filtered = filtered.filter(s => s.ticket_id === selectedTicket)
     }
 
     // Filter by date range
@@ -76,29 +75,31 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
     }
 
     setFilteredScreenshots(filtered)
-  }, [screenshots, selectedTodo, dateRange])
+  }, [screenshots, selectedTicket, dateRange])
 
-  // Link screenshot to todo
-  const handleLinkToTodo = async (screenshotId: string, todoId: string | null) => {
+  // Link screenshot to ticket
+  const handleLinkToTicket = async (screenshotId: string, ticketId: string | number | null) => {
     setLoading(true)
     try {
-      const { error } = await supabase
-        .from('screenshots')
-        .update({ todo_id: todoId })
-        .eq('id', screenshotId)
-        .eq('user_id', user.id)
+      const res = await fetch('/api/screenshots/link', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: screenshotId,
+          ticket_id: ticketId === null || ticketId === undefined || ticketId === '' ? null : Number(ticketId),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to link screenshot')
 
-      if (error) throw error
-
-      // Update local state (normalize todoId to number | null for Screenshot type)
-      const normalizedTodoId: number | null = todoId === null || todoId === undefined || todoId === '' ? null : Number(todoId)
-      setScreenshots(prev => prev.map(s => 
-        s.id === screenshotId ? { ...s, todo_id: normalizedTodoId } : s
+      const normalizedTicketId: number | null = ticketId === null || ticketId === undefined || ticketId === '' ? null : Number(ticketId)
+      setScreenshots(prev => prev.map(s =>
+        s.id === screenshotId ? { ...s, ticket_id: normalizedTicketId } : s
       ))
 
       message.success('Screenshot linked to ticket successfully')
-    } catch (error: any) {
-      message.error(error.message || 'Failed to link screenshot')
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : 'Failed to link screenshot')
     } finally {
       setLoading(false)
     }
@@ -110,30 +111,18 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
 
     setLoading(true)
     try {
-      // Delete from database
-      const { error: dbError } = await supabase
-        .from('screenshots')
-        .delete()
-        .eq('id', screenshot.id)
-        .eq('user_id', user.id)
+      const res = await fetch('/api/screenshots/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: screenshot.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete screenshot')
 
-      if (dbError) throw dbError
-
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from('dtlabs')
-        .remove([screenshot.file_path])
-
-      if (storageError) {
-        console.error('Error deleting from storage:', storageError)
-        // Continue anyway, database record is deleted
-      }
-
-      // Update local state
       setScreenshots(prev => prev.filter(s => s.id !== screenshot.id))
       message.success('Screenshot deleted successfully')
-    } catch (error: any) {
-      message.error(error.message || 'Failed to delete screenshot')
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : 'Failed to delete screenshot')
     } finally {
       setLoading(false)
     }
@@ -161,18 +150,18 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
             <div style={{ marginTop: 24, marginBottom: 24 }}>
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12} md={8}>
-                  <Text strong style={{ display: 'block', marginBottom: 8 }}>Filter by Todo:</Text>
+                  <Text strong style={{ display: 'block', marginBottom: 8 }}>Filter by Ticket:</Text>
                   <Select
                     style={{ width: '100%' }}
                     placeholder="All tickets"
                     allowClear
-                    value={selectedTodo}
-                    onChange={setSelectedTodo}
+                    value={selectedTicket}
+                    onChange={setSelectedTicket}
                   >
                     <Option value={null}>All Screenshots</Option>
-                    {todos.map(todo => (
-                      <Option key={todo.id} value={todo.id}>
-                        {todo.title} ({todo.status})
+                    {tickets.map(ticket => (
+                      <Option key={ticket.id} value={ticket.id}>
+                        #{ticket.id} - {ticket.title} ({ticket.status})
                       </Option>
                     ))}
                   </Select>
@@ -290,17 +279,17 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
             />
             <Space orientation="vertical" style={{ width: '100%' }}>
               <div>
-                <Text strong>Link to Todo:</Text>
+                <Text strong>Link to Ticket:</Text>
                 <Select
                   style={{ width: '100%', marginTop: 8 }}
                   placeholder="Select a ticket"
-                  value={selectedScreenshot.todo_id}
-                  onChange={(todoId) => handleLinkToTodo(selectedScreenshot.id, todoId.toString())}
+                  value={selectedScreenshot.ticket_id}
+                  onChange={(ticketId) => handleLinkToTicket(selectedScreenshot.id, ticketId ?? null)}
                 >
-                  <Option value={null}>No Todo</Option>
-                  {todos.map(todo => (
-                    <Option key={todo.id} value={todo.id}>
-                      {todo.title} ({todo.status})
+                  <Option value={null}>No Ticket</Option>
+                  {tickets.map(ticket => (
+                    <Option key={ticket.id} value={ticket.id}>
+                      #{ticket.id} - {ticket.title} ({ticket.status})
                     </Option>
                   ))}
                 </Select>

@@ -1,20 +1,14 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import ContentTemplateForm from '@/components/ContentTemplateForm'
 
+function toSessionUser(u: { id: string; email?: string | null; name?: string | null; image?: string | null }) {
+  return { id: u.id, email: u.email ?? undefined, user_metadata: { full_name: u.name, avatar_url: u.image } }
+}
+
 export default async function CreateContentTemplatePage() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  return <ContentTemplateForm user={user} />
+  const session = await auth()
+  if (!session?.user) redirect('/login')
+  return <ContentTemplateForm user={toSessionUser(session.user)} />
 }
 

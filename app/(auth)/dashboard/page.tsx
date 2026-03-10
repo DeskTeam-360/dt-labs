@@ -1,58 +1,55 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db, users, teams, tickets } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 import DashboardContent from '@/components/DashboardContent'
 
-export default async function DashboardPage() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+/** Session user shape for compatibility with components that expected Supabase User */
+function toSessionUser(user: { id: string; email?: string | null; name?: string | null; image?: string | null }) {
+  return {
+    id: user.id,
+    email: user.email ?? undefined,
+    user_metadata: { full_name: user.name },
+    ...user,
+  }
+}
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default async function DashboardPage() {
+  const session = await auth()
+  const user = session?.user
 
   if (!user) {
-    return null // Layout akan handle redirect
+    return null // Middleware akan redirect ke login
   }
 
-  // Fetch statistics
-  const [usersResult, teamsResult, completedTodosResult, totalTodosResult] = await Promise.all([
-    // Total Users
-    supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true }),
-    
-    // Total Teams
-    supabase
-      .from('teams')
-      .select('*', { count: 'exact', head: true }),
-    
-    // Total Completed Tickets
-    supabase
-      .from('tickets')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'completed'),
-    
-    // Total Tickets
-    supabase
-      .from('tickets')
-      .select('*', { count: 'exact', head: true }),
-  ])
+  let usersCount = 0
+  let teamsCount = 0
+  let completedTicketsCount = 0
+  let totalTicketsCount = 0
 
-  const usersCount = usersResult.count || 0
-  const teamsCount = teamsResult.count || 0
-  const completedTodosCount = completedTodosResult.count || 0
-  const totalTodosCount = totalTodosResult.count || 0
+  try {
+    const [usersResult, teamsResult, completedResult, totalResult] = await Promise.all([
+      db.select().from(users),
+      db.select().from(teams),
+      db.select().from(tickets).where(eq(tickets.status, 'completed')),
+      db.select().from(tickets),
+    ])
+    usersCount = usersResult.length
+    teamsCount = teamsResult.length
+    completedTicketsCount = completedResult.length
+    totalTicketsCount = totalResult.length
+  } catch (err) {
+    console.error('Dashboard query failed. Run `npm run db:push` if tables do not exist:', err)
+  }
 
   return (
     <DashboardContent
-      user={user}
+      user={toSessionUser(user) as any}
       stats={{
         totalUsers: usersCount,
         totalTeams: teamsCount,
-        completedTodos: completedTodosCount,
-        totalTodos: totalTodosCount,
+        completedTickets: completedTicketsCount,
+        totalTickets: totalTicketsCount,
       }}
     />
   )
 }
-

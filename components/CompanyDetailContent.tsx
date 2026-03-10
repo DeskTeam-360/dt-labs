@@ -4,11 +4,9 @@ import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Row, Col, D
 import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, TeamOutlined, DatabaseOutlined, SaveOutlined, FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, GlobalOutlined, PlayCircleOutlined, EyeOutlined, ReadOutlined, CloudUploadOutlined, HistoryOutlined, CheckSquareOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
 import AdminSidebar from './AdminSidebar'
 import CustomerNavbar from './CustomerNavbar'
 import DateDisplay from './DateDisplay'
-import { createClient } from '@/utils/supabase/client'
 import {
   TabInfo,
   TabUsers,
@@ -53,7 +51,7 @@ function ColorPickerInput({
 }
 
 interface CompanyDetailContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null }
   companyData: any
   /** 'customer' = navbar layout for customer portal; 'admin' = sidebar layout (default) */
   variant?: 'admin' | 'customer'
@@ -107,7 +105,15 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
   const [companyEditModalOpen, setCompanyEditModalOpen] = useState(false)
   const [companyEditLoading, setCompanyEditLoading] = useState(false)
   const [companyEditForm] = Form.useForm()
-  const supabase = createClient()
+
+  async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+    const res = await fetch(url, { ...options, credentials: 'include' })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err?.error || res.statusText || 'Request failed')
+    }
+    return res.json()
+  }
 
   // Group company datas by template group
   const groupedDatas = (companyData.company_datas || []).reduce((acc: any, item: any) => {
@@ -146,11 +152,11 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
       const color = (values.color || '#000000').trim() || '#000000'
       setCompanyEditLoading(true)
       const email = (values.email ?? '').trim() || null
-      const { error } = await supabase
-        .from('companies')
-        .update({ name, email, is_active: !!values.is_active, color })
-        .eq('id', companyData.id)
-      if (error) throw error
+      await apiFetch(`/api/companies/${companyData.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, is_active: !!values.is_active, color }),
+      })
       message.success('Company updated')
       setCompanyEditModalOpen(false)
       router.refresh()
@@ -166,18 +172,10 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
 
   const handleCrawlDelete = async (crawlSessionId: string) => {
     try {
-      const { error } = await supabase
-        .from('crawl_sessions')
-        .delete()
-        .eq('id', crawlSessionId)
-
-        // if (error) throw error
-
-    message.success('Crawl session deleted successfully')
-    fetchCrawlSessions()
-    }
-    
-    catch (error: any) {
+      await apiFetch(`/api/crawl-sessions/${crawlSessionId}`, { method: 'DELETE' })
+      message.success('Crawl session deleted successfully')
+      fetchCrawlSessions()
+    } catch (error: any) {
       message.error('Failed to delete crawl session')
       console.error('Error deleting crawl session:', error)
     } finally {
@@ -189,37 +187,8 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
     if (!companyData?.id) return
     setLoadingKnowledgeBases(true)
     try {
-      const { data: kbData, error } = await supabase
-        .from('company_knowledge_bases')
-        .select('*')
-        .eq('company_id', companyData.id)
-        .order('updated_at', { ascending: false })
-
-      if (error) throw error
-
-      const list = kbData || []
-      const templateIds = [...new Set(list.map((r: any) => r.content_template_id).filter(Boolean))] as string[]
-      let templateMap: Record<string, { id: string; title: string; fields: string[] | null }> = {}
-
-      if (templateIds.length > 0) {
-        const { data: templates } = await supabase
-          .from('company_content_templates')
-          .select('id, title, fields')
-          .in('id', templateIds)
-        if (templates) {
-          templateMap = templates.reduce(
-            (acc, t) => ({ ...acc, [t.id]: { id: t.id, title: t.title, fields: t.fields || null } }),
-            {}
-          )
-        }
-      }
-
-      setKnowledgeBases(
-        list.map((row: any) => ({
-          ...row,
-          company_content_templates: row.content_template_id ? templateMap[row.content_template_id] ?? null : null,
-        }))
-      )
+      const list = await apiFetch<any[]>(`/api/companies/${companyData.id}/knowledge-bases`)
+      setKnowledgeBases(list || [])
     } catch (error: any) {
       message.error('Failed to load knowledge base')
     } finally {
@@ -230,11 +199,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
   const fetchAiSystemTemplates = async () => {
     setLoadingAiSystemTemplates(true)
     try {
-      const { data, error } = await supabase
-        .from('company_ai_system_template')
-        .select('id, title')
-        .order('title', { ascending: true })
-      if (error) throw error
+      const data = await apiFetch<{ id: string; title: string }[]>('/api/company-ai-system-templates')
       setAiSystemTemplates(data ?? [])
     } catch (error: any) {
       message.error('Failed to load AI system templates')
@@ -248,19 +213,10 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
     setLoadingGenerationHistory(true)
     setGenerationHistoryError('')
     try {
-      const { data, error } = await supabase
-        .from('company_content_generation_history')
-        .select('id, prompt, content, created_at')
-        .eq('company_id', companyData.id)
-        .order('created_at', { ascending: false })
-        .limit(50)
-
-      if (error) {
-        setGenerationHistoryError(error.message || JSON.stringify(error))
-        throw error
-      }
+      const data = await apiFetch<any[]>(`/api/companies/${companyData.id}/generation-history`)
       setGenerationHistory(data ?? [])
     } catch (error: any) {
+      setGenerationHistoryError(error?.message || '')
       message.error('Failed to load generation history')
     } finally {
       setLoadingGenerationHistory(false)
@@ -339,16 +295,9 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
   const fetchDataTemplates = async () => {
     setLoadingTemplates(true)
     try {
-      const { data, error } = await supabase
-        .from('company_data_templates')
-        .select('*')
-        .eq('is_active', true)
-        .order('group', { ascending: true })
-        .order('title', { ascending: true })
-
-      if (error) throw error
-
-      setDataTemplates(data || [])
+      const res = await apiFetch<{ data: any[] }>('/api/company-data-templates?is_active=true')
+      const data = res?.data || []
+      setDataTemplates(data)
       
       // Initialize form with existing values after templates are loaded
       // Recreate existingDatasMap from fresh companyData
@@ -394,14 +343,9 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
   const fetchContentTemplates = async () => {
     setLoadingContentTemplates(true)
     try {
-      const { data, error } = await supabase
-        .from('company_content_templates')
-        .select('*')
-        .order('title', { ascending: true })
-
-      if (error) throw error
-
-      setContentTemplates(data || [])
+      const res = await apiFetch<{ data: any[] }>('/api/company-content-templates')
+      const data = res?.data || []
+      setContentTemplates(data)
     } catch (error: any) {
       message.error('Failed to load content templates')
       console.error('Error fetching content templates:', error)
@@ -413,16 +357,8 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
   const fetchWebsites = async () => {
     setLoadingWebsites(true)
     try {
-      const { data, error } = await supabase
-        .from('company_websites')
-        .select('*')
-        .eq('company_id', companyData.id)
-        .order('is_primary', { ascending: false })
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      setWebsites(data || [])
+      const res = await apiFetch<{ data: any[] }>(`/api/company-websites?company_id=${companyData.id}`)
+      setWebsites(res?.data || [])
     } catch (error: any) {
       message.error('Failed to load websites')
       console.error('Error fetching websites:', error)
@@ -434,30 +370,12 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
   const fetchCrawlSessions = async () => {
     setLoadingCrawlSessions(true)
     try {
-      // Get all website IDs for this company
-      const websiteIds = websites.length > 0 ? websites.map(w => w.id) : (companyData.company_websites || []).map((w: any) => w.id)
-      
-      if (websiteIds.length === 0) {
+      if (!companyData?.id) {
         setCrawlSessions([])
         setLoadingCrawlSessions(false)
         return
       }
-
-      const { data, error } = await supabase
-        .from('crawl_sessions')
-        .select(`
-          *,
-          company_websites (
-            id,
-            url,
-            title
-          )
-        `)
-        .in('company_website_id', websiteIds)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
+      const data = await apiFetch<any[]>(`/api/companies/${companyData.id}/crawl-sessions`)
       setCrawlSessions(data || [])
     } catch (error: any) {
       message.error('Failed to load crawl sessions')
@@ -596,23 +514,16 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
       const contentTemplate = contentTemplates.find((t) => t.id === selectedContentTemplate)
       const templateType = contentTemplate?.type ?? contentTemplate?.type ?? 'generated'
 
-      const payload = {
-        company_id: companyData.id,
-        type: templateType,
-        content: generatedContent,
-        content_template_id: selectedContentTemplate,
-        // used_fields: usedFieldsInGenerated.length > 0 ? usedFieldsInGenerated : null,
-        source_ids: usedSourceIdsFromCompanyDatas.length > 0 ? usedSourceIdsFromCompanyDatas : null,
-        is_updated: false,
-      }
-
-      const { error } = await supabase
-        .from('company_knowledge_bases')
-        .upsert(payload, {
-          onConflict: 'company_id,content_template_id',
-        })
-
-      if (error) throw error
+      await apiFetch(`/api/companies/${companyData.id}/knowledge-bases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: templateType,
+          content: generatedContent,
+          content_template_id: selectedContentTemplate,
+          source_ids: usedSourceIdsFromCompanyDatas.length > 0 ? usedSourceIdsFromCompanyDatas : null,
+        }),
+      })
       message.success('Saved to Knowledge Base')
       fetchKnowledgeBases()
     } catch (error: any) {
@@ -630,12 +541,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
 
   const handleDeleteKb = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('company_knowledge_bases')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
+      await apiFetch(`/api/knowledge-bases/${id}`, { method: 'DELETE' })
       message.success('Removed from Knowledge Base')
       fetchKnowledgeBases()
     } catch (error: any) {
@@ -760,69 +666,30 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
       const isPrimary = Boolean(values.is_primary === true || values.is_primary === 'true' || values.is_primary === 1)
 
       if (editingWebsite) {
-        // Update existing website
-        // If setting as primary, unset other primary websites (excluding the current one)
-        if (isPrimary) {
-          const { error: unsetError } = await supabase
-            .from('company_websites')
-            .update({ is_primary: false })
-            .eq('company_id', companyData.id)
-            .eq('is_primary', true)
-            .neq('id', editingWebsite.id)
-
-          if (unsetError) {
-            console.error('Error unsetting other primary websites:', unsetError)
-            throw unsetError
-          }
-        }
-
-        const { error } = await supabase
-          .from('company_websites')
-          .update({
+        await apiFetch(`/api/company-websites/${editingWebsite.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             url: values.url,
             title: values.title || null,
             description: values.description || null,
             is_primary: isPrimary,
-          })
-          .eq('id', editingWebsite.id)
-
-        if (error) {
-          console.error('Error updating website:', error)
-          throw error
-        }
-
+            company_id: companyData.id,
+          }),
+        })
         message.success('Website updated successfully')
       } else {
-        // Create new website
-        // If setting as primary, unset other primary websites
-        if (isPrimary) {
-          const { error: unsetError } = await supabase
-            .from('company_websites')
-            .update({ is_primary: false })
-            .eq('company_id', companyData.id)
-            .eq('is_primary', true)
-
-          if (unsetError) {
-            console.error('Error unsetting other primary websites:', unsetError)
-            throw unsetError
-          }
-        }
-
-        const { error } = await supabase
-          .from('company_websites')
-          .insert({
+        await apiFetch('/api/company-websites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             company_id: companyData.id,
             url: values.url,
             title: values.title || null,
             description: values.description || null,
             is_primary: isPrimary,
-          })
-
-        if (error) {
-          console.error('Error creating website:', error)
-          throw error
-        }
-
+          }),
+        })
         message.success('Website created successfully')
       }
 
@@ -838,13 +705,7 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
 
   const handleWebsiteDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('company_websites')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-
+      await apiFetch(`/api/company-websites/${id}`, { method: 'DELETE' })
       message.success('Website deleted successfully')
       fetchWebsites()
     } catch (error: any) {
@@ -963,19 +824,11 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
         throw new Error('Company ID is missing')
       }
 
-      const response = await fetch(`/api/companies/${companyData.id}/company-datas`, {
+      await apiFetch(`/api/companies/${companyData.id}/company-datas`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ datas: datasToSave }),
       })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to save company data')
-      }
 
       message.success(`${datasToSave.length} data field(s) saved successfully`)
       

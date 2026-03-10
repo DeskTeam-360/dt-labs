@@ -1,35 +1,20 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db, users } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import CustomerDashboardContent from '@/components/CustomerDashboardContent'
 
+function toSessionUser(u: { id: string; email?: string | null; name?: string | null; image?: string | null }) {
+  return { id: u.id, email: u.email ?? undefined, user_metadata: { full_name: u.name, avatar_url: u.image } }
+}
+
 export default async function CustomerPage() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  const session = await auth()
+  if (!session?.user) redirect('/login')
 
-  const {
-    data: { user: currentUser },
-  } = await supabase.auth.getUser()
+  const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, session.user.id!)).limit(1)
+  const companyId = userRow?.companyId
+  if (!companyId) redirect('/dashboard')
 
-  if (!currentUser) {
-    redirect('/login')
-  }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('company_id')
-    .eq('id', currentUser.id)
-    .single()
-
-  const companyId = userData?.company_id
-  if (!companyId) {
-    redirect('/dashboard')
-  }
-
-  return (
-    <CustomerDashboardContent
-      user={currentUser}
-      companyId={companyId}
-    />
-  )
+  return <CustomerDashboardContent user={toSessionUser(session.user)} companyId={companyId} />
 }

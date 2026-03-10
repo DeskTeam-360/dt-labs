@@ -24,3 +24,38 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Admin sidebar - DeskTeam360 style: purple bg, active item light gray with rounded right */
+.admin-sidebar-deskteam.ant-layout-sider {
+  background: #2B1251 !important;
+  border-radius: 0px 30px 0px 0px !important;
+}
+.admin-sidebar-deskteam .ant-menu-dark {
+  background: transparent !important;
+}
+.admin-sidebar-deskteam .ant-menu-dark .ant-menu-item,
+.admin-sidebar-deskteam .ant-menu-dark .ant-menu-submenu-title {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+.admin-sidebar-deskteam .ant-menu-dark .ant-menu-item:hover,
+.admin-sidebar-deskteam .ant-menu-dark .ant-menu-submenu-title:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+.admin-sidebar-deskteam .ant-menu-dark .ant-menu-item-selected {
+  background: rgb(240, 242, 245) !important;
+  color: #333 !important;
+  border-radius: 50px 0 0 50px;
+  margin: 4px 0 4px 8px;
+  width: calc(100% - 8px) !important;
+  border-radius: 50px 0 0 50px;
+}
+.admin-sidebar-deskteam .ant-menu-dark .ant-menu-item-selected .anticon {
+  color: #333 !important;
+}
+.admin-sidebar-deskteam .ant-menu-dark .ant-menu-submenu .ant-menu-item-selected {
+  margin-left: 10px;
+  width: 100%;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}

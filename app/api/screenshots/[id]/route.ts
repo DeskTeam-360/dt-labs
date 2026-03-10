@@ -1,146 +1,112 @@
-import { createAdminClient } from '@/utils/supabase/admin'
+import { db, screenshots, apiTokens } from '@/lib/db'
+import { eq, and } from 'drizzle-orm'
+import { deleteObject } from '@/lib/storage-idrive'
 import { NextResponse } from 'next/server'
 
-// PATCH - Update screenshot (link to todo, etc)
+function validateToken(request: Request) {
+  const authHeader = request.headers.get('Authorization')
+  const token = authHeader?.replace('Bearer ', '')
+  return token
+}
+
+async function getUserIdFromToken(token: string) {
+  const [row] = await db
+    .select({ userId: apiTokens.userId })
+    .from(apiTokens)
+    .where(and(eq(apiTokens.token, token), eq(apiTokens.isActive, true)))
+    .limit(1)
+  return row?.userId ?? null
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Get token from Authorization header
-    const authHeader = request.headers.get('Authorization')
-    const token = authHeader?.replace('Bearer ', '')
-
+    const token = validateToken(request)
     if (!token) {
       return NextResponse.json({ error: 'Token is required' }, { status: 401 })
     }
 
-    // Validate token
-    const adminSupabase = createAdminClient()
-
-    const { data: tokenData, error: tokenError } = await adminSupabase
-      .from('api_tokens')
-      .select('user_id')
-      .eq('token', token)
-      .eq('is_active', true)
-      .single()
-
-    if (tokenError || !tokenData) {
+    const userId = await getUserIdFromToken(token)
+    if (!userId) {
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
     }
 
     const { id } = await params
     const body = await request.json()
-    const { todo_id, title, description } = body
+    const { todo_id, ticket_id, title, description } = body
+    const tId = ticket_id ?? todo_id
 
-    // Update screenshot
-    const { data, error } = await adminSupabase
-      .from('screenshots')
-      .update({
-        todo_id: todo_id || null,
+    const [updated] = await db
+      .update(screenshots)
+      .set({
+        ticketId: tId != null && tId !== '' ? Number(tId) : null,
         title: title || null,
         description: description || null,
-        updated_at: new Date().toISOString()
+        updatedAt: new Date(),
       })
-      .eq('id', id)
-      .eq('user_id', tokenData.user_id)
-      .select()
-      .single()
+      .where(and(eq(screenshots.id, id), eq(screenshots.userId, userId)))
+      .returning()
 
-    if (error) {
-      console.error('Error updating screenshot:', error)
-      return NextResponse.json(
-        { error: error.message || 'Failed to update screenshot' },
-        { status: 500 }
-      )
+    if (!updated) {
+      return NextResponse.json({ error: 'Screenshot not found' }, { status: 404 })
     }
 
-    return NextResponse.json({
-      success: true,
-      screenshot: data
-    })
-  } catch (error: any) {
+    return NextResponse.json({ success: true, screenshot: updated })
+  } catch (error: unknown) {
     console.error('Failed to update screenshot:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to update screenshot' },
+      { error: error instanceof Error ? error.message : 'Failed to update screenshot' },
       { status: 500 }
     )
   }
 }
 
-// DELETE - Delete screenshot
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Get token from Authorization header
-    const authHeader = request.headers.get('Authorization')
-    const token = authHeader?.replace('Bearer ', '')
-
+    const token = validateToken(request)
     if (!token) {
       return NextResponse.json({ error: 'Token is required' }, { status: 401 })
     }
 
-    // Validate token
-    const adminSupabase = createAdminClient()
-
-    const { data: tokenData, error: tokenError } = await adminSupabase
-      .from('api_tokens')
-      .select('user_id')
-      .eq('token', token)
-      .eq('is_active', true)
-      .single()
-
-    if (tokenError || !tokenData) {
+    const userId = await getUserIdFromToken(token)
+    if (!userId) {
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
     }
 
     const { id } = await params
 
-    // Get screenshot first to get file path
-    const { data: screenshot, error: fetchError } = await adminSupabase
-      .from('screenshots')
-      .select('file_path')
-      .eq('id', id)
-      .eq('user_id', tokenData.user_id)
-      .single()
+    const [row] = await db
+      .select({ filePath: screenshots.filePath })
+      .from(screenshots)
+      .where(and(eq(screenshots.id, id), eq(screenshots.userId, userId)))
+      .limit(1)
 
-    if (fetchError || !screenshot) {
+    if (!row) {
       return NextResponse.json({ error: 'Screenshot not found' }, { status: 404 })
     }
 
-    // Delete from database
-    const { error: dbError } = await adminSupabase
-      .from('screenshots')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', tokenData.user_id)
+    await db
+      .delete(screenshots)
+      .where(and(eq(screenshots.id, id), eq(screenshots.userId, userId)))
 
-    if (dbError) {
-      return NextResponse.json(
-        { error: dbError.message || 'Failed to delete screenshot' },
-        { status: 500 }
-      )
+    if (row.filePath) {
+      try {
+        await deleteObject(row.filePath)
+      } catch (e) {
+        console.error('Failed to delete file from storage:', e)
+      }
     }
 
-    // Delete from storage
-    const { error: storageError } = await adminSupabase.storage
-      .from('dtlabs')
-      .remove([screenshot.file_path])
-
-    if (storageError) {
-      console.error('Error deleting from storage:', storageError)
-      // Continue anyway, database record is deleted
-    }
-
-    return NextResponse.json({
-      success: true
-    })
-  } catch (error: any) {
+    return NextResponse.json({ success: true })
+  } catch (error: unknown) {
     console.error('Failed to delete screenshot:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete screenshot' },
+      { error: error instanceof Error ? error.message : 'Failed to delete screenshot' },
       { status: 500 }
     )
   }

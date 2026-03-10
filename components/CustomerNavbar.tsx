@@ -16,14 +16,13 @@ import {
   DatabaseOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client'
-import { User } from '@supabase/supabase-js'
+import { signOut } from 'next-auth/react'
 
 const { Header } = Layout
 const { Text } = Typography
 
 interface CustomerNavbarProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null }
 }
 
 const PORTAL_TITLE = 'Deskteam360 Portal'
@@ -31,7 +30,6 @@ const PORTAL_TITLE = 'Deskteam360 Portal'
 export default function CustomerNavbar({ user }: CustomerNavbarProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const supabase = createClient()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -54,7 +52,7 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
   }, [pathname, mounted])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await signOut()
     router.push('/login')
     router.refresh()
   }

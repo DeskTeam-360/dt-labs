@@ -1,39 +1,67 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db, screenshots, tickets } from '@/lib/db'
+import { eq, desc } from 'drizzle-orm'
 import ScreenshotsContent from '@/components/ScreenshotsContent'
 
 export default async function ScreenshotsPage() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  const session = await auth()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session?.user) {
     return null
   }
 
-  // Fetch screenshots with ticket info
-  const { data: screenshots, error } = await supabase
-    .from('screenshots')
-    .select(`
-      *,
-      tickets:tickets (
-        id,
-        title,
-        status
-      )
-    `)
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
+  const screenshotsRows = await db
+    .select({
+      screenshot: screenshots,
+      ticket: tickets,
+    })
+    .from(screenshots)
+    .leftJoin(tickets, eq(screenshots.ticketId, tickets.id))
+    .where(eq(screenshots.userId, session.user.id!))
+    .orderBy(desc(screenshots.createdAt))
 
-  // Fetch tickets for integration
-  const { data: todos } = await supabase
-    .from('tickets')
-    .select('id, title, status, due_date')
-    .order('created_at', { ascending: false })
+  const screenshotsData = screenshotsRows.map((r) => ({
+    id: r.screenshot.id,
+    file_name: r.screenshot.fileName,
+    file_path: r.screenshot.filePath,
+    file_url: r.screenshot.fileUrl,
+    file_size: r.screenshot.fileSize ?? 0,
+    mime_type: r.screenshot.mimeType ?? '',
+    ticket_id: r.screenshot.ticketId,
+    title: r.screenshot.title,
+    description: r.screenshot.description,
+    tags: r.screenshot.tags,
+    created_at: r.screenshot.createdAt ? new Date(r.screenshot.createdAt).toISOString() : '',
+    updated_at: r.screenshot.updatedAt ? new Date(r.screenshot.updatedAt).toISOString() : '',
+    tickets: r.ticket
+      ? { id: r.ticket.id, title: r.ticket.title, status: r.ticket.status }
+      : null,
+  }))
+
+  const ticketsRows = await db
+    .select({ id: tickets.id, title: tickets.title, status: tickets.status, dueDate: tickets.dueDate })
+    .from(tickets)
+    .orderBy(desc(tickets.createdAt))
     .limit(100)
 
-  return <ScreenshotsContent user={user} screenshots={screenshots || []} todos={todos || []} />
+  const ticketsData = ticketsRows.map((t) => ({
+    id: t.id,
+    title: t.title,
+    status: t.status,
+    due_date: t.dueDate ? new Date(t.dueDate).toISOString() : null,
+  }))
+
+  return (
+    <ScreenshotsContent
+      user={{
+        id: session.user.id!,
+        email: session.user.email ?? undefined,
+        name: session.user.name ?? undefined,
+        image: session.user.image ?? undefined,
+        user_metadata: { full_name: session.user.name },
+      }}
+      screenshots={screenshotsData}
+      tickets={ticketsData}
+    />
+  )
 }

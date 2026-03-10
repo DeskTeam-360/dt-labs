@@ -1,19 +1,21 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import TagsContent from '@/components/TagsContent'
 
 export default async function TagsPage() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  const session = await auth()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session?.user) {
     redirect('/login')
   }
 
-  return <TagsContent user={user} />
+  return (
+    <TagsContent
+      user={{
+        id: session.user.id!,
+        email: session.user.email ?? null,
+        user_metadata: { full_name: session.user.name },
+      }}
+    />
+  );
 }

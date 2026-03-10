@@ -1,10 +1,17 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db } from '@/lib/db'
+import { emailIntegrations, emailMessages, tickets } from '@/lib/db/schema'
+import { eq, and, desc, isNotNull, isNull } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { ticketId, commentBody, ticketTitle, companyEmail } = body as {
       ticketId: number
@@ -31,23 +38,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const [integration] = await db
+      .select({
+        id: emailIntegrations.id,
+        emailAddress: emailIntegrations.emailAddress,
+        accessToken: emailIntegrations.accessToken,
+        refreshToken: emailIntegrations.refreshToken,
+        expiresAt: emailIntegrations.expiresAt,
+      })
+      .from(emailIntegrations)
+      .where(and(eq(emailIntegrations.provider, 'google'), eq(emailIntegrations.isActive, true)))
+      .limit(1)
 
-    const { data: integration, error: integrationError } = await supabase
-      .from('email_integrations')
-      .select('id, email_address, access_token, refresh_token, expires_at')
-      .eq('provider', 'google')
-      .eq('is_active', true)
-      .maybeSingle()
-
-    if (integrationError || !integration) {
+    if (!integration?.accessToken) {
       return NextResponse.json(
         { error: 'Email integration not connected' },
         { status: 503 }
@@ -60,54 +63,56 @@ export async function POST(request: NextRequest) {
       `${baseUrl}/api/email/google/callback`
     )
 
-    let accessToken = integration.access_token
-    const expiresAt = integration.expires_at ? new Date(integration.expires_at) : null
+    let accessToken = integration.accessToken
+    const expiresAt = integration.expiresAt ? new Date(integration.expiresAt) : null
     const needsRefresh = !expiresAt || expiresAt <= new Date()
 
-    if (needsRefresh && integration.refresh_token) {
-      oauth2Client.setCredentials({ refresh_token: integration.refresh_token })
+    if (needsRefresh && integration.refreshToken) {
+      oauth2Client.setCredentials({ refresh_token: integration.refreshToken })
       const { credentials } = await oauth2Client.refreshAccessToken()
-      accessToken = credentials.access_token ?? integration.access_token
+      accessToken = credentials.access_token ?? integration.accessToken
       if (credentials.access_token && credentials.expiry_date) {
-        await supabase
-          .from('email_integrations')
-          .update({
-            access_token: credentials.access_token,
-            expires_at: new Date(credentials.expiry_date).toISOString(),
+        await db
+          .update(emailIntegrations)
+          .set({
+            accessToken: credentials.access_token,
+            expiresAt: new Date(credentials.expiry_date),
+            updatedAt: new Date(),
           })
-          .eq('id', integration.id)
+          .where(eq(emailIntegrations.id, integration.id))
       }
     } else {
       oauth2Client.setCredentials({ access_token: accessToken })
     }
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
-    const fromEmail = integration.email_address || 'noreply@example.com'
+    const fromEmail = integration.emailAddress || 'noreply@example.com'
     const subject = ticketTitle
       ? `Re: [Ticket #${ticketId}] ${ticketTitle}`
       : `Re: [Ticket #${ticketId}]`
 
-    // Get thread + last incoming message for proper reply (In-Reply-To, References)
-    const { data: ticketRow } = await supabase
-      .from('tickets')
-      .select('gmail_thread_id')
-      .eq('id', ticketId)
-      .single()
-
-    const { data: lastIncoming } = await supabase
-      .from('email_messages')
-      .select('rfc_message_id, thread_id')
-      .eq('ticket_id', ticketId)
-      .eq('direction', 'incoming')
-      .not('rfc_message_id', 'is', null)
-      .order('synced_at', { ascending: false })
+    const [ticketRow] = await db
+      .select({ gmailThreadId: tickets.gmailThreadId })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
       .limit(1)
-      .maybeSingle()
 
-    let threadId = ticketRow?.gmail_thread_id || lastIncoming?.thread_id || null
-    let inReplyTo = lastIncoming?.rfc_message_id || null
+    const [lastIncoming] = await db
+      .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId })
+      .from(emailMessages)
+      .where(
+        and(
+          eq(emailMessages.ticketId, ticketId),
+          eq(emailMessages.direction, 'incoming'),
+          isNotNull(emailMessages.rfcMessageId)
+        )
+      )
+      .orderBy(desc(emailMessages.syncedAt))
+      .limit(1)
 
-    // Fallback: if we have thread but no Message-ID in DB, fetch from Gmail to ensure reply
+    let threadId = ticketRow?.gmailThreadId || lastIncoming?.threadId || null
+    let inReplyTo = lastIncoming?.rfcMessageId || null
+
     if (threadId && !inReplyTo) {
       try {
         const threadRes = await gmail.users.threads.get({ userId: 'me', id: threadId })
@@ -162,22 +167,21 @@ export async function POST(request: NextRequest) {
     const sentThreadId = sendRes.data.threadId
 
     if (sentMessageId) {
-      await supabase.from('email_messages').insert({
-        gmail_message_id: sentMessageId,
-        thread_id: sentThreadId || null,
-        from_email: fromEmail,
-        to_email: companyEmail.trim(),
+      await db.insert(emailMessages).values({
+        gmailMessageId: sentMessageId,
+        threadId: sentThreadId || null,
+        fromEmail,
+        toEmail: companyEmail.trim(),
         subject,
         snippet: commentBody.trim().slice(0, 500),
-        ticket_id: ticketId,
+        ticketId,
         direction: 'outgoing',
       })
-      if (sentThreadId) {
-        await supabase
-          .from('tickets')
-          .update({ gmail_thread_id: sentThreadId })
-          .eq('id', ticketId)
-          .is('gmail_thread_id', null)
+      if (sentThreadId && !ticketRow?.gmailThreadId) {
+        await db
+          .update(tickets)
+          .set({ gmailThreadId: sentThreadId, updatedAt: new Date() })
+          .where(and(eq(tickets.id, ticketId), isNull(tickets.gmailThreadId)))
       }
     }
 

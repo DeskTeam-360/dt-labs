@@ -1,19 +1,13 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import TodosContent from '@/components/TodosContent'
+import TicketsContent from '@/components/TicketsContent'
 
 export default async function TicketsPage() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  const session = await auth()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session?.user) {
     redirect('/login')
   }
 
-  return <TodosContent user={user} />
+  return <TicketsContent user={session.user} />
 }

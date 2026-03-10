@@ -1,10 +1,8 @@
 'use client'
 
 import { Layout, Card, Form, Input, Button, Typography, message, Avatar, Space, Upload, Select, Row, Col, Divider, Tag, Popconfirm } from 'antd'
-import { UserOutlined, MailOutlined, UploadOutlined, PhoneOutlined, BankOutlined, IdcardOutlined, GlobalOutlined, TranslationOutlined, KeyOutlined, CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { UserOutlined, MailOutlined, UploadOutlined, PhoneOutlined, BankOutlined, IdcardOutlined, KeyOutlined, CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import { uploadAvatar } from '@/utils/storage'
 import AdminSidebar from './AdminSidebar'
 
@@ -13,9 +11,26 @@ const { Title, Text } = Typography
 const { TextArea } = Input
 const { Option } = Select
 
+type SessionUser = {
+  id: string
+  email?: string | null
+  name?: string | null
+  image?: string | null
+  user_metadata?: { full_name?: string | null; avatar_url?: string | null }
+}
+
 interface ProfileContentProps {
-  user: User
-  userData?: any
+  user: SessionUser
+  userData?: {
+    full_name?: string | null
+    avatar_url?: string | null
+    phone?: string | null
+    department?: string | null
+    position?: string | null
+    bio?: string | null
+    timezone?: string
+    locale?: string
+  }
 }
 
 interface ApiToken {
@@ -34,7 +49,6 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
   const [uploading, setUploading] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(userData?.avatar_url || user.user_metadata?.avatar_url || null)
   const [form] = Form.useForm()
-  const supabase = createClient()
   const [tokens, setTokens] = useState<ApiToken[]>([])
   const [loadingTokens, setLoadingTokens] = useState(false)
   const [generatingToken, setGeneratingToken] = useState(false)
@@ -56,20 +70,15 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
     }
   }, [userData, form, user])
 
-  // Fetch API tokens
   const fetchTokens = async () => {
     setLoadingTokens(true)
     try {
-      const { data, error } = await supabase
-        .from('api_tokens')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      setTokens(data || [])
-    } catch (error: any) {
-      message.error(error.message || 'Failed to fetch tokens')
+      const res = await fetch('/api/auth/tokens')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch tokens')
+      setTokens(data.tokens || [])
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : 'Failed to fetch tokens')
     } finally {
       setLoadingTokens(false)
     }
@@ -105,21 +114,15 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
     }
   }
 
-  // Delete token
   const handleDeleteToken = async (tokenId: string) => {
     try {
-      const { error } = await supabase
-        .from('api_tokens')
-        .delete()
-        .eq('id', tokenId)
-        .eq('user_id', user.id)
-
-      if (error) throw error
-
+      const res = await fetch(`/api/auth/tokens/${tokenId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete token')
       message.success('Token deleted successfully')
       fetchTokens()
-    } catch (error: any) {
-      message.error(error.message || 'Failed to delete token')
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : 'Failed to delete token')
     }
   }
 
@@ -133,80 +136,50 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
     setUploading(true)
     try {
       const result = await uploadAvatar(file, user.id)
-      
       if (result.error || !result.url) {
         message.error(result.error || 'Failed to upload avatar. Please check storage bucket permissions.')
-        console.error('Upload error details:', result.error)
         return
       }
-
       setAvatarUrl(result.url)
 
-      // Update avatar URL in auth metadata
-      const { error: authError } = await supabase.auth.updateUser({
-        data: {
-          avatar_url: result.url,
-        },
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar_url: result.url }),
       })
-
-      if (authError) throw authError
-
-      // Update avatar URL in users table
-      const { error: userError } = await supabase
-        .from('users')
-        .update({
-          avatar_url: result.url,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id)
-
-      if (userError) throw userError
-
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update profile')
       message.success('Avatar uploaded successfully!')
-    } catch (error: any) {
-      message.error(error.message || 'Failed to upload avatar')
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : 'Failed to upload avatar')
     } finally {
       setUploading(false)
     }
   }
 
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: { full_name?: string; phone?: string; department?: string; position?: string; bio?: string; timezone?: string; locale?: string }) => {
     setLoading(true)
     try {
-      // Update user metadata in auth
-      const { error: authError } = await supabase.auth.updateUser({
-        data: {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           full_name: values.full_name,
           avatar_url: avatarUrl,
-        },
-      })
-
-      if (authError) throw authError
-
-      // Update user record in users table with all fields
-      const { error: userError } = await supabase
-        .from('users')
-        .update({
-          full_name: values.full_name,
-          avatar_url: avatarUrl,
-          phone: values.phone || null,
-          department: values.department || null,
-          position: values.position || null,
-          bio: values.bio || null,
+          phone: values.phone,
+          department: values.department,
+          position: values.position,
+          bio: values.bio,
           timezone: values.timezone || 'UTC',
           locale: values.locale || 'en',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id)
-
-      if (userError) throw userError
-
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update profile')
       message.success('Profile updated successfully!')
-      
-      // Refresh the page to show updated data
       window.location.reload()
-    } catch (error: any) {
-      message.error(error.message || 'Failed to update profile')
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : 'Failed to update profile')
     } finally {
       setLoading(false)
     }

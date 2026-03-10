@@ -1,10 +1,10 @@
 'use client'
 
-import { Form, Input, Button, Card, Typography, message } from 'antd'
+import { Form, Input, Button, Card, Typography, message, Alert } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client'
+import { signIn } from 'next-auth/react'
 
 const { Title, Text } = Typography
 
@@ -13,30 +13,74 @@ interface LoginFormValues {
   password: string
 }
 
+interface DbCheck {
+  ok: boolean
+  host?: string
+  error?: string
+  code?: string
+  detail?: string
+  hint?: string
+  userCount?: number
+  usersWithPassword?: number
+  message?: string
+}
+
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
+  const [dbCheckLoading, setDbCheckLoading] = useState(false)
+  const [dbError, setDbError] = useState<DbCheck | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+
+  const checkDb = async () => {
+    setDbCheckLoading(true)
+    setDbError(null)
+    try {
+      const res = await fetch('/api/auth/check-db')
+      const data = (await res.json()) as DbCheck
+      setDbError(data)
+    } catch {
+      setDbError({ ok: false, error: 'Gagal fetch /api/auth/check-db' })
+    } finally {
+      setDbCheckLoading(false)
+    }
+  }
 
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true)
+    setDbError(null)
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const result = await signIn('credentials', {
         email: values.email,
         password: values.password,
+        redirect: false,
       })
 
-      if (error) {
-        message.error(error.message || 'Login failed. Please try again.')
+      if (result?.error) {
+        // Ambil error detail dari DB saat login gagal
+        const res = await fetch('/api/auth/check-db')
+        const data = (await res.json()) as DbCheck
+        setDbError(data)
+
+        const msg = result.error === 'CredentialsSignin' || result.error === 'Configuration'
+          ? 'Invalid email or password'
+          : result.error
+        message.error(msg)
         return
       }
 
-      if (data.user) {
+      if (result?.ok) {
         message.success('Login successful!')
         router.push('/dashboard')
         router.refresh()
       }
-    } catch (error) {
+    } catch {
+      try {
+        const res = await fetch('/api/auth/check-db')
+        const data = (await res.json()) as DbCheck
+        setDbError(data)
+      } catch {
+        setDbError({ ok: false, error: 'Gagal cek koneksi', hint: 'Pastikan dev server jalan' })
+      }
       message.error('An error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -114,18 +158,45 @@ export default function LoginPage() {
               Login
             </Button>
           </Form.Item>
-        </Form>
 
-        {/* <div style={{ textAlign: 'center', marginTop: 16 }}> */}
-          {/* <Text type="secondary">
-            Don't have an account?{' '}
-            <a href="/register" style={{ fontWeight: 500 }}>
-              Sign up now
-            </a>
-          </Text> */}
-        {/* </div> */}
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Button
+              type="link"
+              block
+              loading={dbCheckLoading}
+              onClick={checkDb}
+              style={{ padding: 0, fontSize: 12 }}
+            >
+              Cek koneksi DB
+            </Button>
+          </Form.Item>
+
+          {dbError && (
+            <Alert
+              type={dbError.ok ? 'info' : 'error'}
+              showIcon
+              message={dbError.ok ? 'Database' : 'Error Database/Connection'}
+              description={
+                dbError.ok ? (
+                  <>
+                    Host: {dbError.host} | Users: {dbError.userCount} | Dengan password: {dbError.usersWithPassword}
+                    <br />
+                    <Text type="secondary">{dbError.message}</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text strong>{dbError.error}</Text>
+                    {dbError.code && <div>Code: {dbError.code}</div>}
+                    {dbError.detail && <div>Detail: {dbError.detail}</div>}
+                    {dbError.hint && <div style={{ marginTop: 8, color: '#fa8c16' }}>💡 {dbError.hint}</div>}
+                  </>
+                )
+              }
+              style={{ marginTop: 16 }}
+            />
+          )}
+        </Form>
       </Card>
     </div>
   )
 }
-

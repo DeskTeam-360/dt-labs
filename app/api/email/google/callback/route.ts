@@ -1,5 +1,6 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db, emailIntegrations } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
@@ -63,34 +64,44 @@ export async function GET(request: NextRequest) {
     const userInfo = userInfoResponse.ok ? await userInfoResponse.json() : null
     const emailAddress = userInfo?.email || null
 
-    const expiresAt = expiresIn
-      ? new Date(Date.now() + expiresIn * 1000).toISOString()
-      : null
+    const expiresAt = expiresIn ? new Date(Date.now() + expiresIn * 1000) : null
 
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth()
+    const userId = session?.user?.id ?? null
 
-    const { error } = await supabase
-      .from('email_integrations')
-      .upsert(
-        {
+    const [existing] = await db
+      .select()
+      .from(emailIntegrations)
+      .where(eq(emailIntegrations.provider, 'google'))
+      .limit(1)
+
+    try {
+      if (existing) {
+        await db
+          .update(emailIntegrations)
+          .set({
+            emailAddress: emailAddress || null,
+            accessToken,
+            refreshToken: refreshToken || null,
+            expiresAt,
+            isActive: true,
+            createdBy: userId,
+            updatedAt: new Date(),
+          })
+          .where(eq(emailIntegrations.id, existing.id))
+      } else {
+        await db.insert(emailIntegrations).values({
           provider: 'google',
-          email_address: emailAddress,
-          access_token: accessToken,
-          refresh_token: refreshToken,
-          expires_at: expiresAt,
-          is_active: true,
-          created_by: user?.id || null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'provider' }
-      )
-
-    if (error) {
-      console.error('Failed to save email integration:', error)
+          emailAddress: emailAddress || null,
+          accessToken,
+          refreshToken: refreshToken || null,
+          expiresAt,
+          isActive: true,
+          createdBy: userId,
+        })
+      }
+    } catch (err) {
+      console.error('Failed to save email integration:', err)
       return NextResponse.redirect(new URL('/email-integration?error=save_failed', baseUrl))
     }
 

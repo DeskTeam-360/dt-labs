@@ -1,6 +1,17 @@
-import { createClient } from '@/utils/supabase/server'
-import { createAdminClient } from '@/utils/supabase/admin'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import {
+  db,
+  emailIntegrations,
+  emailMessages,
+  emailSkipList,
+  tickets,
+  ticketComments,
+  companies,
+  users,
+} from '@/lib/db'
+import { runAutomationRules } from '@/lib/automation-engine'
+import { eq, and, ilike, not, isNull, desc, gte, or, sql } from 'drizzle-orm'
+import bcrypt from 'bcryptjs'
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 
@@ -35,6 +46,12 @@ function parseNameFromHeader(from: string): string | null {
   return null
 }
 
+/** Extract domain from email, e.g. "john@acme.com" -> "acme.com" */
+function getDomainFromEmail(email: string): string {
+  const domain = email.split('@')[1] || ''
+  return domain.toLowerCase().trim()
+}
+
 /** Derive company name from email, e.g. "john@acme.com" -> "Acme" */
 function companyNameFromEmail(email: string): string {
   const domain = email.split('@')[1] || email
@@ -51,14 +68,11 @@ function randomPassword(length = 24): string {
   return result
 }
 
-/** Extract all email addresses from To/Cc/Bcc header string */
-function parseEmailsFromRecipients(header: string): string[] {
-  const out: string[] = []
-  for (const part of header.split(/[,;]/)) {
-    const m = part.trim().match(/<([^>]+)>/)
-    out.push((m ? m[1] : part).trim().toLowerCase())
-  }
-  return out.filter(Boolean)
+/** Truncate string to fit PostgreSQL VARCHAR limit (avoid "value too long" error) */
+function truncateVarchar(s: string | null | undefined, maxLen: number): string {
+  if (s == null || s === '') return ''
+  const str = String(s).trim()
+  return str.length <= maxLen ? str : str.slice(0, maxLen)
 }
 
 /** Escape special chars for ILIKE pattern (%, _, \) to avoid wildcard match */
@@ -124,37 +138,38 @@ export async function POST(request: NextRequest) {
     const cronKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : apiKey
     const isCronCall = !!cronSecret && cronKey === cronSecret
 
-    let supabase: Awaited<ReturnType<typeof createClient>>
-    let userId!: string // Set in both paths: session user (line 108) or integration.created_by (line 126)
+    let userId!: string
 
     if (isCronCall) {
-      supabase = createAdminClient() as any
+      // Cron: no session, userId from integration below
     } else {
-      const cookieStore = await cookies()
-      supabase = createClient(cookieStore)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      const session = await auth()
+      if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
-      userId = user.id
+      userId = session.user.id
     }
 
-    const { data: integration, error: integrationError } = await supabase
-      .from('email_integrations')
-      .select('id, email_address, access_token, refresh_token, expires_at, created_by, last_sync_at')
-      .eq('provider', 'google')
-      .eq('is_active', true)
-      .maybeSingle()
+    const [integration] = await db
+      .select()
+      .from(emailIntegrations)
+      .where(
+        and(
+          eq(emailIntegrations.provider, 'google'),
+          eq(emailIntegrations.isActive, true)
+        )
+      )
+      .limit(1)
 
-    if (integrationError || !integration) {
+    if (!integration) {
       return NextResponse.json({ error: 'Email integration not connected' }, { status: 503 })
     }
 
     if (isCronCall) {
-      if (!integration.created_by) {
+      if (!integration.createdBy) {
         return NextResponse.json({ error: 'Email integration has no created_by (connect via UI first)' }, { status: 503 })
       }
-      userId = integration.created_by
+      userId = integration.createdBy
     }
 
     const oauth2Client = new google.auth.OAuth2(
@@ -163,38 +178,36 @@ export async function POST(request: NextRequest) {
       `${baseUrl}/api/email/google/callback`
     )
 
-    let accessToken = integration.access_token
-    const expiresAt = integration.expires_at ? new Date(integration.expires_at) : null
+    let accessToken = integration.accessToken
+    const expiresAt = integration.expiresAt ? new Date(integration.expiresAt) : null
     const needsRefresh = !expiresAt || expiresAt <= new Date()
 
-    if (needsRefresh && integration.refresh_token) {
-      oauth2Client.setCredentials({ refresh_token: integration.refresh_token })
+    if (needsRefresh && integration.refreshToken) {
+      oauth2Client.setCredentials({ refresh_token: integration.refreshToken })
       const { credentials } = await oauth2Client.refreshAccessToken()
-      accessToken = credentials.access_token ?? integration.access_token
+      accessToken = credentials.access_token ?? integration.accessToken
       if (credentials.access_token && credentials.expiry_date) {
-        await supabase
-          .from('email_integrations')
-          .update({
-            access_token: credentials.access_token,
-            expires_at: new Date(credentials.expiry_date).toISOString(),
+        await db
+          .update(emailIntegrations)
+          .set({
+            accessToken: credentials.access_token,
+            expiresAt: new Date(credentials.expiry_date),
+            updatedAt: new Date(),
           })
-          .eq('id', integration.id)
+          .where(eq(emailIntegrations.id, integration.id))
       }
     } else {
       oauth2Client.setCredentials({ access_token: accessToken })
     }
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
-    const inboxEmail = integration.email_address?.toLowerCase()
 
-    // Build query: only fetch emails since last_sync_at (or last 7 days for first sync)
-    const lastSyncAt = integration.last_sync_at ? new Date(integration.last_sync_at) : null
+    const lastSyncAt = integration.lastSyncAt ? new Date(integration.lastSyncAt) : null
     const sinceSeconds = lastSyncAt
       ? Math.floor(lastSyncAt.getTime() / 1000)
       : Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000)
     const searchQuery = `is:inbox after:${sinceSeconds}`
 
-    // Fetch messages in inbox since last sync
     const listRes = await gmail.users.messages.list({
       userId: 'me',
       q: searchQuery,
@@ -205,17 +218,14 @@ export async function POST(request: NextRequest) {
     const alreadyProcessed = new Set<string>()
     const threadToTicketThisRun = new Map<string, number>()
 
-    const { data: existingMessages } = await supabase
-      .from('email_messages')
-      .select('gmail_message_id')
-    existingMessages?.forEach((m) => alreadyProcessed.add(m.gmail_message_id))
+    const existingMessagesRows = await db.select({ gmailMessageId: emailMessages.gmailMessageId }).from(emailMessages)
+    existingMessagesRows.forEach((m) => alreadyProcessed.add(m.gmailMessageId))
 
     let addedCount = 0
     let createdCount = 0
     let skippedClaimFailed = 0
     let skippedCompanyMismatch = 0
 
-    // Fetch all messages, sort by date (oldest first) so first email in thread is processed before replies
     const fetched: { msg: any; id: string; threadId: string | null }[] = []
     for (const msgRef of messages) {
       if (alreadyProcessed.has(msgRef.id!)) continue
@@ -242,101 +252,105 @@ export async function POST(request: NextRequest) {
         headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
       const from = getHeader('From')
       const to = getHeader('To')
-      const cc = getHeader('Cc')
-      const bcc = getHeader('Bcc')
       const subject = getHeader('Subject')
 
       const senderEmail = parseEmailFromHeader(from)
       if (!senderEmail) continue
 
-      // Skip recipient check: messages from is:inbox are already in our inbox
-      // To/Cc/Bcc can miss us (BCC, Reply-To, mailing lists, encoding)
       const body = getMessageBody(msg.payload || {}).trim()
       const rfcMessageId = getHeader('Message-ID')?.trim() || null
 
-      // Claim message first to prevent duplicate processing from concurrent syncs
-      const { error: claimErr } = await supabase.from('email_messages').insert({
-        gmail_message_id: gmailMessageId,
-        thread_id: msgThreadId,
-        from_email: senderEmail,
-        to_email: to,
-        subject,
-        snippet: (msg.snippet || '').slice(0, 500),
-        ticket_id: null,
-        direction: 'incoming',
-        ...(rfcMessageId && { rfc_message_id: rfcMessageId }),
-      })
-      if (claimErr) {
-        // Retry without rfc_message_id if column may not exist yet
-        const { error: retryErr } = await supabase.from('email_messages').insert({
-          gmail_message_id: gmailMessageId,
-          thread_id: msgThreadId,
-          from_email: senderEmail,
-          to_email: to,
-          subject,
-          snippet: (msg.snippet || '').slice(0, 500),
-          ticket_id: null,
+      try {
+        await db.insert(emailMessages).values({
+          gmailMessageId: truncateVarchar(gmailMessageId, 255),
+          threadId: msgThreadId ? truncateVarchar(msgThreadId, 255) : null,
+          fromEmail: truncateVarchar(senderEmail, 255),
+          toEmail: truncateVarchar(to, 255),
+          subject: subject || null,
+          snippet: (msg.snippet || '').slice(0, 500) || null,
+          ticketId: null,
           direction: 'incoming',
+          ...(rfcMessageId && { rfcMessageId: truncateVarchar(rfcMessageId, 512) }),
         })
-        if (retryErr) {
+      } catch (claimErr: any) {
+        try {
+          await db.insert(emailMessages).values({
+            gmailMessageId: truncateVarchar(gmailMessageId, 255),
+            threadId: msgThreadId ? truncateVarchar(msgThreadId, 255) : null,
+            fromEmail: truncateVarchar(senderEmail, 255),
+            toEmail: truncateVarchar(to, 255),
+            subject: subject || null,
+            snippet: (msg.snippet || '').slice(0, 500) || null,
+            ticketId: null,
+            direction: 'incoming',
+          })
+        } catch (retryErr) {
           skippedClaimFailed++
           continue
         }
       }
 
-      // Skip: email ada di email_skip_list (tidak perlu ticket/user)
-      const { data: skipRow } = await supabase
-        .from('email_skip_list')
-        .select('id')
-        .ilike('email', escapeIlike(senderEmail))
-        .maybeSingle()
+      const [skipRow] = await db
+        .select({ id: emailSkipList.id })
+        .from(emailSkipList)
+        .where(ilike(emailSkipList.email, escapeIlike(senderEmail)))
+        .limit(1)
+
       if (skipRow) {
         alreadyProcessed.add(gmailMessageId)
         continue
       }
 
-      // 1) Match by thread_id (ticket, email_messages, or created this run)
       let ticketId: number | null = null
       if (msgThreadId) {
         ticketId = threadToTicketThisRun.get(msgThreadId) ?? null
         if (!ticketId) {
-          const { data: byThread } = await supabase
-            .from('tickets')
-            .select('id')
-            .eq('gmail_thread_id', msgThreadId)
-            .maybeSingle()
+          const [byThread] = await db
+            .select({ id: tickets.id })
+            .from(tickets)
+            .where(eq(tickets.gmailThreadId, msgThreadId))
+            .limit(1)
           if (byThread) ticketId = byThread.id
         }
         if (!ticketId) {
-          const { data: byMsg } = await supabase
-            .from('email_messages')
-            .select('ticket_id')
-            .eq('thread_id', msgThreadId)
-            .not('ticket_id', 'is', null)
-            .order('synced_at', { ascending: false })
+          const [byMsg] = await db
+            .select({ ticketId: emailMessages.ticketId })
+            .from(emailMessages)
+            .where(
+              and(
+                eq(emailMessages.threadId, msgThreadId),
+                not(isNull(emailMessages.ticketId))
+              )
+            )
+            .orderBy(desc(emailMessages.syncedAt))
             .limit(1)
-            .maybeSingle()
-          if (byMsg?.ticket_id) ticketId = byMsg.ticket_id
+          if (byMsg?.ticketId) ticketId = byMsg.ticketId
         }
       }
 
-      // 2) Match by subject [Ticket #N]
       if (!ticketId) {
         ticketId = parseTicketIdFromSubject(subject)
       }
 
       if (ticketId) {
-        // REPLY: add as comment
-        const { data: ticket, error: ticketErr } = await supabase
-          .from('tickets')
-          .select('id, company_id, company:companies(id, email)')
-          .eq('id', ticketId)
-          .single()
+        const [ticketRow] = await db
+          .select({ id: tickets.id, companyId: tickets.companyId })
+          .from(tickets)
+          .where(eq(tickets.id, ticketId))
+          .limit(1)
 
-        if (ticketErr || !ticket) continue
+        if (!ticketRow) continue
 
-        const company = ticket.company as { id?: string; email?: string } | null
-        const companyEmail = company?.email?.trim().toLowerCase()
+        let companyEmail: string | null = null
+        if (ticketRow.companyId) {
+          const [companyRow] = await db
+            .select({ email: companies.email })
+            .from(companies)
+            .where(eq(companies.id, ticketRow.companyId))
+            .limit(1)
+          companyEmail = companyRow?.email?.trim().toLowerCase() ?? null
+        }
+
         if (!companyEmail || (senderEmail !== companyEmail && normalizeForMatch(senderEmail) !== normalizeForMatch(companyEmail))) {
           skippedCompanyMismatch++
           continue
@@ -345,180 +359,253 @@ export async function POST(request: NextRequest) {
         const commentBody = body || (msg.snippet || '').trim() || '(No content)'
         const emailDateIso = getEmailDateIso(msg)
 
-        const { error: insertErr } = await supabase
-          .from('todo_comments')
-          .insert({
-            todo_id: ticketId,
-            user_id: userId,
+        try {
+          await db.insert(ticketComments).values({
+            ticketId,
+            userId,
             comment: commentBody,
             visibility: 'reply',
-            author_type: 'customer',
-            ...(emailDateIso && { created_at: emailDateIso }),
+            authorType: 'customer',
+            ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
           })
-          .single()
-
-        if (insertErr) {
+        } catch (insertErr) {
           console.error('Failed to insert comment from email:', insertErr)
           continue
         }
 
-        await supabase.from('tickets').update({ gmail_thread_id: msgThreadId }).eq('id', ticketId).is('gmail_thread_id', null)
-        await supabase.from('email_messages').update({ ticket_id: ticketId }).eq('gmail_message_id', gmailMessageId)
+        if (msgThreadId) {
+          const [curTicket] = await db.select({ gmailThreadId: tickets.gmailThreadId }).from(tickets).where(eq(tickets.id, ticketId)).limit(1)
+          if (curTicket && !curTicket.gmailThreadId) {
+            await db.update(tickets).set({ gmailThreadId: truncateVarchar(msgThreadId, 255), updatedAt: new Date() }).where(eq(tickets.id, ticketId))
+          }
+        }
+        await db.update(emailMessages).set({ ticketId }).where(eq(emailMessages.gmailMessageId, gmailMessageId))
       } else {
-        // NEW: create ticket only if no existing ticket for this thread/company/subject
-        let company = await supabase
-          .from('companies')
-          .select('id, name, email')
-          .ilike('email', escapeIlike(senderEmail))
-          .limit(1)
-          .maybeSingle()
-          .then((r) => r.data)
+        // Match company: 1) email exact match, 2) domain in domain_list (user@acme.com → acme.com)
+        // Rule: user email = company email → user is part of company; domain in list → user is part of company
+        const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1]!.toLowerCase() : ''
+        const companyRows = await db
+          .select({ id: companies.id, name: companies.name, email: companies.email, domainList: companies.domainList })
+          .from(companies)
+          .where(
+            senderDomain
+              ? or(
+                  ilike(companies.email, escapeIlike(senderEmail)),
+                  sql`${senderDomain} = ANY(COALESCE(${companies.domainList}, ARRAY[]::text[]))`
+                )
+              : ilike(companies.email, escapeIlike(senderEmail))
+          )
+          .limit(2)
+        // Prefer email match over domain match
+        let company = companyRows.find((r) => r.email?.toLowerCase() === senderEmail) ?? companyRows[0] ?? null
 
         let creatorUserId: string | null = null
         let ticketCompanyId: string | null = company?.id ?? null
-        const { data: existingUser } = await supabase.from('users').select('id, company_id').ilike('email', escapeIlike(senderEmail)).maybeSingle()
+
+        const [existingUser] = await db
+          .select({ id: users.id, companyId: users.companyId })
+          .from(users)
+          .where(ilike(users.email, escapeIlike(senderEmail)))
+          .limit(1)
+
         if (existingUser) {
           creatorUserId = existingUser.id
-          ticketCompanyId = existingUser.company_id ?? company?.id ?? null
+          ticketCompanyId = existingUser.companyId ?? company?.id ?? null
+          // Update user's companyId if they belong to company (email match or domain match) but weren't linked
+          if (company?.id && !existingUser.companyId) {
+            await db.update(users).set({ companyId: company.id, updatedAt: new Date() }).where(eq(users.id, existingUser.id))
+            ticketCompanyId = company.id
+          }
         } else {
-          // Email not registered: create company + user, send password reset
-          const adminSupabase = createAdminClient()
           const displayName = parseNameFromHeader(from) || senderEmail.split('@')[0] || 'User'
           const newCompanyName = company?.name || companyNameFromEmail(senderEmail)
+
+          // Prevent double company: check again before insert (by email or domain)
           if (!company?.id) {
-            const { data: newCompany, error: companyErr } = await adminSupabase
-              .from('companies')
-              .insert({ name: newCompanyName, email: senderEmail })
-              .select('id')
-              .single()
-            if (!companyErr && newCompany) {
-              company = { id: newCompany.id, name: newCompanyName, email: senderEmail }
+            const [existingByDomain] = await db
+              .select({ id: companies.id, name: companies.name, email: companies.email, domainList: companies.domainList })
+              .from(companies)
+              .where(sql`${senderDomain} = ANY(COALESCE(${companies.domainList}, ARRAY[]::text[]))`)
+              .limit(1)
+            if (existingByDomain) {
+              company = existingByDomain
             }
           }
+          if (!company?.id) {
+            const [newCompany] = await db
+              .insert(companies)
+              .values({
+                name: truncateVarchar(newCompanyName, 255),
+                email: truncateVarchar(senderEmail, 255),
+                domainList: senderDomain ? [senderDomain] : [],
+              })
+              .returning({ id: companies.id, name: companies.name, email: companies.email })
+            if (newCompany) {
+              company = { id: newCompany.id, name: newCompany.name ?? newCompanyName, email: newCompany.email ?? senderEmail, domainList: senderDomain ? [senderDomain] : [] }
+            }
+          }
+
           if (company?.id) {
             const password = randomPassword()
-            const { data: authUser, error: createErr } = await adminSupabase.auth.admin.createUser({
-              email: senderEmail,
-              password,
-              email_confirm: true,
-              user_metadata: { full_name: displayName },
-            })
-            if (!createErr && authUser?.user?.id) {
-              // Upsert ensures users row exists (trigger may not have run yet)
-              await adminSupabase.from('users').upsert({
-                id: authUser.user.id,
-                email: senderEmail,
-                full_name: displayName,
-                company_id: company.id,
+            const passwordHash = await bcrypt.hash(password, 10)
+            const [upsertedUser] = await db
+              .insert(users)
+              .values({
+                email: truncateVarchar(senderEmail, 255),
+                fullName: truncateVarchar(displayName, 255),
+                companyId: company.id,
                 role: 'customer',
-              }, { onConflict: 'id' })
-              creatorUserId = authUser.user.id
+                passwordHash,
+              })
+              .onConflictDoUpdate({
+                target: users.email,
+                set: {
+                  fullName: truncateVarchar(displayName, 255),
+                  companyId: company.id,
+                  updatedAt: new Date(),
+                },
+              })
+              .returning({ id: users.id })
+            if (upsertedUser) {
+              creatorUserId = upsertedUser.id
             }
           }
         }
 
-        // Dedup: same thread, or same company+subject (for threadless emails)
         let existingTicketId: number | null = null
         if (msgThreadId) {
           existingTicketId = threadToTicketThisRun.get(msgThreadId) ?? null
           if (!existingTicketId) {
-            const { data: dupByThread } = await supabase
-              .from('tickets')
-              .select('id')
-              .eq('gmail_thread_id', msgThreadId)
-              .maybeSingle()
+            const [dupByThread] = await db
+              .select({ id: tickets.id })
+              .from(tickets)
+              .where(eq(tickets.gmailThreadId, msgThreadId))
+              .limit(1)
             if (dupByThread) existingTicketId = dupByThread.id
           }
           if (!existingTicketId) {
-            const { data: dupByMsg } = await supabase
-              .from('email_messages')
-              .select('ticket_id')
-              .eq('thread_id', msgThreadId)
-              .not('ticket_id', 'is', null)
-              .order('synced_at', { ascending: false })
+            const [dupByMsg] = await db
+              .select({ ticketId: emailMessages.ticketId })
+              .from(emailMessages)
+              .where(
+                and(
+                  eq(emailMessages.threadId, msgThreadId),
+                  not(isNull(emailMessages.ticketId))
+                )
+              )
+              .orderBy(desc(emailMessages.syncedAt))
               .limit(1)
-              .maybeSingle()
-            if (dupByMsg?.ticket_id) existingTicketId = dupByMsg.ticket_id
+            if (dupByMsg?.ticketId) existingTicketId = dupByMsg.ticketId
           }
         }
-        // For threadless emails: same company + same subject + recent (last 48h) → add as comment
+
         if (!existingTicketId && ticketCompanyId) {
           const normSubj = normalizeSubject(subject)
-          const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
-          const { data: dupBySubject } = await supabase
-            .from('tickets')
-            .select('id, title')
-            .eq('company_id', ticketCompanyId)
-            .eq('created_via', 'email')
-            .gte('created_at', since)
+          const since = new Date(Date.now() - 48 * 60 * 60 * 1000)
+          const dupBySubject = await db
+            .select({ id: tickets.id, title: tickets.title })
+            .from(tickets)
+            .where(
+              and(
+                eq(tickets.companyId, ticketCompanyId),
+                eq(tickets.createdVia, 'email'),
+                gte(tickets.createdAt, since)
+              )
+            )
+            .orderBy(desc(tickets.createdAt))
             .limit(20)
-            .order('created_at', { ascending: false })
-          const match = dupBySubject?.find((t) => normalizeSubject(t.title || '') === normSubj)
+          const match = dupBySubject.find((t) => normalizeSubject(t.title || '') === normSubj)
           if (match) existingTicketId = match.id
         }
 
         if (existingTicketId) {
-          // Already have ticket for this thread/subject - add as comment instead of creating duplicate
           ticketId = existingTicketId
           if (msgThreadId) threadToTicketThisRun.set(msgThreadId, ticketId)
-          const { data: extTicket } = await supabase.from('tickets').select('id, company_id, company:companies(id, email)').eq('id', ticketId).single()
-          const extCompany = extTicket?.company as { email?: string } | null
-          const extCompanyEmail = extCompany?.email?.trim().toLowerCase()
+
+          const [extTicket] = await db
+            .select({ id: tickets.id, companyId: tickets.companyId })
+            .from(tickets)
+            .where(eq(tickets.id, ticketId))
+            .limit(1)
+
+          let extCompanyEmail: string | null = null
+          if (extTicket?.companyId) {
+            const [extCompany] = await db.select({ email: companies.email }).from(companies).where(eq(companies.id, extTicket.companyId!)).limit(1)
+            extCompanyEmail = extCompany?.email?.trim().toLowerCase() ?? null
+          }
+
           const senderMatches = extCompanyEmail && (senderEmail === extCompanyEmail || normalizeForMatch(senderEmail) === normalizeForMatch(extCompanyEmail))
-          const isFromCompanyUser = ticketCompanyId && extTicket?.company_id === ticketCompanyId
+          const isFromCompanyUser = ticketCompanyId && extTicket?.companyId === ticketCompanyId
+
           if (senderMatches || isFromCompanyUser) {
             const commentBody = body || (msg.snippet || '').trim() || '(No content)'
             const emailDateIso = getEmailDateIso(msg)
             const commentUserId = creatorUserId ?? userId
-            await supabase.from('todo_comments').insert({
-              todo_id: ticketId,
-              user_id: commentUserId,
+            await db.insert(ticketComments).values({
+              ticketId,
+              userId: commentUserId,
               comment: commentBody,
               visibility: 'reply',
-              author_type: 'customer',
-              ...(emailDateIso && { created_at: emailDateIso }),
+              authorType: 'customer',
+              ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
             })
           }
-          await supabase.from('email_messages').update({ ticket_id: ticketId }).eq('gmail_message_id', gmailMessageId)
+          await db.update(emailMessages).set({ ticketId }).where(eq(emailMessages.gmailMessageId, gmailMessageId))
         } else {
-          // Only create new tickets from recent emails (last 7 days); skip old ones
           let internalDateMs = msg.internalDate ? parseInt(String(msg.internalDate), 10) : 0
-          if (internalDateMs > 0 && internalDateMs < 1e12) internalDateMs *= 1000 // seconds -> ms
+          if (internalDateMs > 0 && internalDateMs < 1e12) internalDateMs *= 1000
           const emailAgeDays = internalDateMs > 0 ? (Date.now() - internalDateMs) / (24 * 60 * 60 * 1000) : 0
           if (internalDateMs > 0 && emailAgeDays > 7) {
             alreadyProcessed.add(gmailMessageId)
             continue
           }
 
-          const title = subject.replace(/^(Re:\s*)+/i, '').trim() || 'New support request'
+          const title = truncateVarchar(subject.replace(/^(Re:\s*)+/i, '').trim() || 'New support request', 255)
           const emailDateIso = getEmailDateIso(msg)
-          const { data: newTicket, error: createErr } = await supabase
-            .from('tickets')
-            .insert({
+
+          const [newTicket] = await db
+            .insert(tickets)
+            .values({
               title,
               description: body || null,
-              created_by: creatorUserId ?? null,
+              createdBy: creatorUserId ?? null,
               status: 'to_do',
               visibility: 'public',
-              company_id: ticketCompanyId,
-              created_via: 'email',
-              ...(emailDateIso && { created_at: emailDateIso }),
+              companyId: ticketCompanyId,
+              createdVia: 'email',
+              ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
             })
-            .select('id')
-            .single()
+            .returning({ id: tickets.id })
 
-          if (createErr) {
-            console.error('Failed to create ticket from email:', createErr)
+          if (!newTicket) {
+            console.error('Failed to create ticket from email')
             continue
           }
 
           ticketId = newTicket.id
           if (msgThreadId && ticketId != null) {
             threadToTicketThisRun.set(msgThreadId, ticketId)
-            await supabase.from('tickets').update({ gmail_thread_id: msgThreadId }).eq('id', ticketId)
+            await db.update(tickets).set({ gmailThreadId: truncateVarchar(msgThreadId, 255), updatedAt: new Date() }).where(eq(tickets.id, ticketId))
           }
           createdCount++
-          await supabase.from('email_messages').update({ ticket_id: ticketId }).eq('gmail_message_id', gmailMessageId)
+
+          try {
+            await runAutomationRules('ticket_created', {
+              id: ticketId,
+              title,
+              description: body || null,
+              status: 'to_do',
+              priority_slug: null,
+              company_id: ticketCompanyId,
+              created_via: 'email',
+              sender_email: senderEmail,
+              sender_domain: senderDomain || null,
+            })
+          } catch (autoErr) {
+            console.error('Automation rules error:', autoErr)
+          }
+
+          await db.update(emailMessages).set({ ticketId }).where(eq(emailMessages.gmailMessageId, gmailMessageId))
         }
       }
 
@@ -526,11 +613,10 @@ export async function POST(request: NextRequest) {
       addedCount++
     }
 
-    // Update last_sync_at after successful sync
-    await supabase
-      .from('email_integrations')
-      .update({ last_sync_at: new Date().toISOString() })
-      .eq('id', integration.id)
+    await db
+      .update(emailIntegrations)
+      .set({ lastSyncAt: new Date(), updatedAt: new Date() })
+      .where(eq(emailIntegrations.id, integration.id))
 
     return NextResponse.json({
       success: true,

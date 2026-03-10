@@ -1,82 +1,83 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db, companies } from '@/lib/db'
+import { eq, desc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-// GET - Get all companies
+/** GET /api/companies - List companies */
 export async function GET(request: Request) {
-  try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get query params for filtering
-    const { searchParams } = new URL(request.url)
-    const is_active = searchParams.get('is_active')
-
-    let query = supabase.from('companies').select('*').order('created_at', { ascending: false })
-
-    if (is_active !== null) {
-      query = query.eq('is_active', is_active === 'true')
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
-
-    return NextResponse.json({ data })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to fetch companies' }, { status: 500 })
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const url = new URL(request.url)
+  const isActiveParam = url.searchParams.get('is_active')
+
+  const rows = await db
+    .select()
+    .from(companies)
+    .orderBy(desc(companies.createdAt))
+
+  let filtered = rows
+  if (isActiveParam !== null && isActiveParam !== undefined) {
+    const active = isActiveParam === 'true'
+    filtered = rows.filter((r) => r.isActive === active)
+  }
+
+  const data = filtered.map((r) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    color: r.color,
+    is_active: r.isActive ?? true,
+    created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
+    updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
+  }))
+
+  return NextResponse.json({ data })
 }
 
-// POST - Create new company
+/** POST /api/companies - Create company */
 export async function POST(request: Request) {
-  try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { name, is_active } = body
-
-    if (!name) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 })
-    }
-
-    const { data, error } = await supabase
-      .from('companies')
-      .insert({
-        name,
-        is_active: is_active !== undefined ? is_active : true,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
-
-    return NextResponse.json({ data, success: true }, { status: 201 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to create company' }, { status: 500 })
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-}
 
+  const body = await request.json()
+  const { name, email, is_active, color } = body
+
+  if (!name) {
+    return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+  }
+
+  const [row] = await db
+    .insert(companies)
+    .values({
+      name,
+      email: email?.trim() || null,
+      color: color || '#000000',
+      isActive: is_active !== undefined ? is_active : true,
+    })
+    .returning()
+
+  if (!row) {
+    return NextResponse.json({ error: 'Failed to create company' }, { status: 500 })
+  }
+
+  return NextResponse.json(
+    {
+      data: {
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        color: row.color,
+        is_active: row.isActive ?? true,
+        created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',
+        updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : '',
+      },
+      success: true,
+    },
+    { status: 201 }
+  )
+}

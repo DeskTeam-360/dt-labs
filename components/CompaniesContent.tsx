@@ -1,12 +1,19 @@
 'use client'
 
 import { Layout, Table, Button, Space, Typography, Card, Tag, Modal, Form, Input, Switch, message, Popconfirm, Tooltip } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: 'include' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error || res.statusText || 'Request failed')
+  }
+  return res.json()
+}
 import DateDisplay from './DateDisplay'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -14,7 +21,7 @@ const { Content } = Layout
 const { Title } = Typography
 
 interface CompaniesContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null }
 }
 
 interface CompanyRecord {
@@ -69,22 +76,26 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingCompany, setEditingCompany] = useState<CompanyRecord | null>(null)
+  const [searchText, setSearchText] = useState('')
   const [form] = Form.useForm()
-  const supabase = createClient()
+
+  const filteredCompanies = useMemo(() => {
+    if (!searchText.trim()) return companies
+    const q = searchText.trim().toLowerCase()
+    return companies.filter(
+      (c) =>
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.email || '').toLowerCase().includes(q)
+    )
+  }, [companies, searchText])
 
   const fetchCompanies = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      setCompanies(data || [])
-    } catch (error: any) {
-      message.error(error.message || 'Failed to fetch companies')
+      const res = await apiFetch<{ data: CompanyRecord[] }>('/api/companies')
+      setCompanies(res.data || [])
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to fetch companies')
     } finally {
       setLoading(false)
     }
@@ -118,60 +129,49 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
 
   const handleDelete = async (companyId: string) => {
     try {
-      const { error } = await supabase
-        .from('companies')
-        .delete()
-        .eq('id', companyId)
-
-      if (error) throw error
-
+      await apiFetch(`/api/companies/${companyId}`, { method: 'DELETE' })
       message.success('Company deleted successfully')
       fetchCompanies()
-    } catch (error: any) {
-      message.error(error.message || 'Failed to delete company')
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to delete company')
     }
   }
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: { name: string; email?: string; is_active: boolean; color?: string }) => {
     try {
       if (editingCompany) {
-        // Update existing company
-        const { error } = await supabase
-          .from('companies')
-          .update({
+        await apiFetch(`/api/companies/${editingCompany.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             name: values.name,
             email: values.email?.trim() || null,
             is_active: values.is_active,
             color: values.color || '#000000',
-          })
-          .eq('id', editingCompany.id)
-
-        if (error) throw error
-
+          }),
+        })
         message.success('Company updated successfully')
         setModalVisible(false)
         form.resetFields()
         fetchCompanies()
       } else {
-        // Create new company
-        const { error } = await supabase
-          .from('companies')
-          .insert({
+        await apiFetch('/api/companies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             name: values.name,
             email: values.email?.trim() || null,
             is_active: values.is_active,
             color: values.color || '#000000',
-          })
-
-        if (error) throw error
-
+          }),
+        })
         message.success('Company created successfully')
         setModalVisible(false)
         form.resetFields()
         fetchCompanies()
       }
-    } catch (error: any) {
-      message.error(error.message || 'Failed to save company')
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to save company')
     }
   }
 
@@ -180,18 +180,24 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
+      sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
+      sortDirections: ['ascend', 'descend'],
       render: (name: string) => <strong>{name}</strong>,
     },
     {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
+      sorter: (a, b) => (a.email || '').localeCompare(b.email || ''),
+      sortDirections: ['ascend', 'descend'],
       render: (email: string) => email ? <a href={`mailto:${email}`}>{email}</a> : '—',
     },
     {
       title: 'Status',
       dataIndex: 'is_active',
       key: 'is_active',
+      sorter: (a, b) => (a.is_active ? 1 : 0) - (b.is_active ? 1 : 0),
+      sortDirections: ['ascend', 'descend'],
       render: (is_active: boolean) => (
         <Tag color={is_active ? 'green' : 'default'}>
           {is_active ? 'ACTIVE' : 'INACTIVE'}
@@ -222,6 +228,8 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       title: 'Created At',
       dataIndex: 'created_at',
       key: 'created_at',
+      sorter: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      sortDirections: ['ascend', 'descend'],
       render: (date: string) => <DateDisplay date={date} />,
     },
     {
@@ -264,20 +272,30 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
         <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
           <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
               <Title level={2} style={{ margin: 0 }}>Companies Management</Title>
-              <Button
+              <Space>
+                <Input
+                  placeholder="Search by name or email..."
+                  prefix={<SearchOutlined />}
+                  allowClear
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  style={{ width: 260 }}
+                />
+                <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={handleCreate}
               >
                 Add Company
               </Button>
+              </Space>
             </div>
 
             <Table
               columns={columns}
-              dataSource={companies}
+              dataSource={filteredCompanies}
               rowKey="id"
               loading={loading}
               pagination={{

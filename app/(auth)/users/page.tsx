@@ -1,20 +1,15 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { redirect } from 'next/navigation'
 import UsersContent from '@/components/UsersContent'
 
 export default async function UsersPage() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  const session = await auth()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return null
+  if (!session?.user) {
+    redirect('/login')
   }
 
-  return <UsersContent user={user} />
+  return <UsersContent user={session.user} />
 }
 
 

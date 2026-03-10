@@ -1,9 +1,10 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db, companyContentPlanners } from '@/lib/db'
+import { and, eq } from 'drizzle-orm'
+import { uploadBuffer } from '@/lib/storage-idrive'
 import { NextResponse } from 'next/server'
 
 const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'dall-e-3'
-const STORAGE_BUCKET = 'dtlabs'
 const STORAGE_PREFIX = 'content-planner'
 
 export async function POST(
@@ -11,16 +12,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string; plannerId: string }> }
 ) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-    const { id: companyId, plannerId } = await params
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await auth()
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const { id: companyId, plannerId } = await params
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
@@ -36,19 +33,20 @@ export async function POST(
       typeof body?.image_recommendation === 'string' ? body.image_recommendation.trim() : ''
 
     if (!imagePrompt) {
-      const { data: planner, error: plannerError } = await supabase
-        .from('company_content_planners')
-        .select('ai_content_results')
-        .eq('id', plannerId)
-        .eq('company_id', companyId)
-        .single()
+      const [planner] = await db.select({ aiContentResults: companyContentPlanners.aiContentResults })
+        .from(companyContentPlanners)
+        .where(and(
+          eq(companyContentPlanners.id, plannerId),
+          eq(companyContentPlanners.companyId, companyId)
+        ))
+        .limit(1)
 
-      if (plannerError || !planner) {
+      if (!planner?.aiContentResults) {
         return NextResponse.json({ error: 'Content planner not found' }, { status: 404 })
       }
 
-      const results = (planner as any).ai_content_results
-      const outputJson = results?.output_json
+      const results = planner.aiContentResults as Record<string, unknown>
+      const outputJson = results?.output_json as Record<string, unknown> | undefined
       const imgPromptRaw = outputJson?.image_prompt ?? outputJson?.image_recommendation
       imagePrompt =
         typeof imgPromptRaw === 'string' ? imgPromptRaw.trim() : ''
@@ -83,7 +81,7 @@ export async function POST(
     if (!imageRes.ok) {
       const err = await imageRes.json().catch(() => ({}))
       return NextResponse.json(
-        { error: err?.error?.message || 'OpenAI image generation failed' },
+        { error: (err as any)?.error?.message || 'OpenAI image generation failed' },
         { status: imageRes.status }
       )
     }
@@ -101,56 +99,44 @@ export async function POST(
     const fileName = `${Date.now()}.png`
     const storagePath = `${STORAGE_PREFIX}/${companyId}/${plannerId}/${fileName}`
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: 'image/png',
-        cacheControl: '3600',
-        upsert: true,
-      })
+    const { url: publicUrl, error: uploadError } = await uploadBuffer(
+      storagePath,
+      buffer,
+      'image/png'
+    )
 
-    if (uploadError) {
+    if (uploadError || !publicUrl) {
       return NextResponse.json(
-        { error: uploadError.message || 'Failed to upload image to storage' },
+        { error: uploadError || 'Failed to upload image to storage' },
         { status: 500 }
       )
     }
 
-    const { data: urlData } = supabase.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(uploadData.path)
-    const publicUrl = urlData.publicUrl
+    const [planner] = await db.select({ aiContentResults: companyContentPlanners.aiContentResults })
+      .from(companyContentPlanners)
+      .where(and(
+        eq(companyContentPlanners.id, plannerId),
+        eq(companyContentPlanners.companyId, companyId)
+      ))
+      .limit(1)
 
-    const { data: planner } = await supabase
-      .from('company_content_planners')
-      .select('ai_content_results')
-      .eq('id', plannerId)
-      .eq('company_id', companyId)
-      .single()
-
-    const currentResults = ((planner as any)?.ai_content_results || {}) as Record<string, unknown>
+    const currentResults = ((planner?.aiContentResults || {}) as Record<string, unknown>)
     const updatedResults = {
       ...currentResults,
       generated_image_url: publicUrl,
-      generated_image_path: uploadData.path,
+      generated_image_path: storagePath,
     }
 
-    const { error: updateError } = await supabase
-      .from('company_content_planners')
-      .update({ ai_content_results: updatedResults })
-      .eq('id', plannerId)
-      .eq('company_id', companyId)
-
-    if (updateError) {
-      return NextResponse.json(
-        { error: 'Failed to save image URL to planner' },
-        { status: 500 }
-      )
-    }
+    await db.update(companyContentPlanners)
+      .set({ aiContentResults: updatedResults })
+      .where(and(
+        eq(companyContentPlanners.id, plannerId),
+        eq(companyContentPlanners.companyId, companyId)
+      ))
 
     return NextResponse.json({
       url: publicUrl,
-      path: uploadData.path,
+      path: storagePath,
       result: { generated_image_url: publicUrl },
     })
   } catch (error: unknown) {

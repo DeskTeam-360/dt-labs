@@ -6,9 +6,16 @@ import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import { uploadAvatar } from '@/utils/storage'
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: 'include' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error || res.statusText || 'Request failed')
+  }
+  return res.json()
+}
 import AdminSidebar from './AdminSidebar'
 
 const { Content } = Layout
@@ -18,7 +25,7 @@ const { TextArea } = Input
 const { RangePicker } = DatePicker
 
 interface UserDetailContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null }
   userData: any
 }
 
@@ -42,7 +49,6 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     thisMonth: 0,
   })
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
-  const supabase = createClient()
 
   useEffect(() => {
     setUserData(initialUserData)
@@ -52,8 +58,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const { data } = await supabase.from('companies').select('id, name').eq('is_active', true).order('name')
-        setCompanies(data || [])
+        const data = await apiFetch<{ companies: { id: string; name: string }[] }>('/api/tickets/lookup')
+        setCompanies(data?.companies || [])
       } catch {
         setCompanies([])
       }
@@ -63,57 +69,29 @@ export default function UserDetailContent({ user: currentUser, userData: initial
 
   const fetchTimeTrackerData = useCallback(async (filter?: string, dateRange?: [Dayjs | null, Dayjs | null] | null) => {
     if (!userData?.id) return
-    
     setTimeTrackerLoading(true)
     try {
-      let query = supabase
-        .from('todo_time_tracker')
-        .select(`
-          *,
-          todo:tickets!todo_time_tracker_todo_id_fkey(id, title, description)
-        `)
-        .eq('user_id', userData.id)
-
-      // Apply date filter
+      let url = `/api/users/time-tracker?user_id=${userData.id}&filter=${filter || 'all'}`
       if (filter === 'week') {
-        const weekAgo = dayjs().subtract(7, 'day').startOf('day').toISOString()
-        query = query.gte('start_time', weekAgo)
+        url += `&start=${dayjs().subtract(7, 'day').startOf('day').toISOString()}`
       } else if (filter === 'month') {
-        const monthAgo = dayjs().subtract(30, 'day').startOf('day').toISOString()
-        query = query.gte('start_time', monthAgo)
-      } else if (filter === 'custom' && dateRange && dateRange[0] && dateRange[1]) {
-        const startDate = dateRange[0].startOf('day').toISOString()
-        const endDate = dateRange[1].endOf('day').toISOString()
-        query = query.gte('start_time', startDate).lte('start_time', endDate)
+        url += `&start=${dayjs().subtract(30, 'day').startOf('day').toISOString()}`
+      } else if (filter === 'custom' && dateRange?.[0] && dateRange?.[1]) {
+        url += `&start=${dateRange[0].startOf('day').toISOString()}&end=${dateRange[1].endOf('day').toISOString()}`
       }
-
-      const { data, error } = await query.order('created_at', { ascending: false })
-
-      if (error) throw error
-
+      const data = await apiFetch<any[]>(url)
       setTimeTrackerData(data || [])
     } catch (error: any) {
       message.error(error.message || 'Failed to fetch time tracker data')
     } finally {
       setTimeTrackerLoading(false)
     }
-  }, [userData?.id, supabase])
+  }, [userData?.id])
 
   const fetchAllTimeTrackerData = useCallback(async () => {
     if (!userData?.id) return
-    
     try {
-      const { data, error } = await supabase
-        .from('todo_time_tracker')
-        .select(`
-          *,
-          todo:tickets!todo_time_tracker_todo_id_fkey(id, title, description)
-        `)
-        .eq('user_id', userData.id)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
+      const data = await apiFetch<any[]>(`/api/users/time-tracker?user_id=${userData.id}&filter=all`)
       setAllTimeTrackerData(data || [])
       
       // Calculate overview
@@ -122,27 +100,29 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       const weekStart = now.startOf('week')
       const monthStart = now.startOf('month')
 
-      const todayTotal = (data || [])
+      const dataArr = data || []
+      const todayTotal = dataArr
         .filter((item: any) => {
           const startTime = dayjs(item.start_time)
           return (startTime.isAfter(todayStart) || startTime.isSame(todayStart)) && item.duration_seconds
         })
         .reduce((sum: number, item: any) => sum + (item.duration_seconds || 0), 0)
 
-      const weekTotal = (data || [])
+      const weekTotal = dataArr
         .filter((item: any) => {
           const startTime = dayjs(item.start_time)
           return (startTime.isAfter(weekStart) || startTime.isSame(weekStart)) && item.duration_seconds
         })
         .reduce((sum: number, item: any) => sum + (item.duration_seconds || 0), 0)
 
-      const monthTotal = (data || [])
+      const monthTotal = dataArr
         .filter((item: any) => {
           const startTime = dayjs(item.start_time)
           return (startTime.isAfter(monthStart) || startTime.isSame(monthStart)) && item.duration_seconds
         })
         .reduce((sum: number, item: any) => sum + (item.duration_seconds || 0), 0)
 
+      setAllTimeTrackerData(dataArr)
       setOverviewData({
         today: todayTotal,
         thisWeek: weekTotal,
@@ -151,7 +131,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     } catch (error: any) {
       console.error('Failed to fetch all time tracker data:', error)
     }
-  }, [userData?.id, supabase])
+  }, [userData?.id])
 
   useEffect(() => {
     fetchAllTimeTrackerData()
@@ -298,26 +278,17 @@ export default function UserDetailContent({ user: currentUser, userData: initial
         updated_at: new Date().toISOString(),
       }
 
-      const { data, error } = await supabase
-        .from('users')
-        .update(updateData)
-        .eq('id', userData.id)
-        .select()
-        .single()
+      await apiFetch(`/api/users/${userData.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      })
 
-      if (error) throw error
-
-      // Update auth metadata if avatar changed
-      if (avatarUrl) {
-        await supabase.auth.admin.updateUserById(userData.id, {
-          user_metadata: {
-            avatar_url: avatarUrl,
-            full_name: values.full_name,
-          },
-        })
-      }
-
-      setUserData(data)
+      setUserData((prev: any) => ({
+        ...prev,
+        ...updateData,
+        avatar_url: avatarUrl ?? prev.avatar_url,
+      }))
       setIsEditing(false)
       message.success('User updated successfully')
     } catch (error: any) {
@@ -883,18 +854,18 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         <Table
                         columns={[
                           {
-                            title: 'Todo',
-                            key: 'todo',
+                            title: 'Ticket',
+                            key: 'ticket',
                             render: (_, record) => (
                               <div>
                                 <div style={{ fontWeight: 500 }}>
-                                  {record.todo?.title || 'N/A'}
+                                  {record.ticket?.title || 'N/A'}
                                 </div>
-                                {record.todo?.description && (
+                                {record.ticket?.description && (
                                   <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-                                    {record.todo.description.length > 50 
-                                      ? `${record.todo.description.substring(0, 50)}...`
-                                      : record.todo.description}
+                                    {record.ticket.description.length > 50 
+                                      ? `${record.ticket.description.substring(0, 50)}...`
+                                      : record.ticket.description}
                                   </div>
                                 )}
                               </div>

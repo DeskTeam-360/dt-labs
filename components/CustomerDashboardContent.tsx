@@ -39,7 +39,7 @@ export default function CustomerDashboardContent({ user, companyId }: CustomerDa
   const [loading, setLoading] = useState(true)
   const [totalTickets, setTotalTickets] = useState(0)
   const [myTicketsCount, setMyTicketsCount] = useState(0)
-  const [timeSessions, setTimeSessions] = useState<Array<{ todo_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null }>>([])
+  const [timeSessions, setTimeSessions] = useState<Array<{ ticket_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null }>>([])
   const [ticketsByType, setTicketsByType] = useState<Array<{ type_title: string; type_id: number | null; count: number }>>([])
 
   const fetchStats = async () => {
@@ -61,9 +61,9 @@ export default function CustomerDashboardContent({ user, companyId }: CustomerDa
         .eq('created_by', user.id)
       const { data: assigneeRows } = await supabase
         .from('todo_assignees')
-        .select('todo_id')
+        .select('ticket_id')
         .eq('user_id', user.id)
-      const assignedIds = new Set((assigneeRows || []).map((r: any) => r.todo_id))
+      const assignedIds = new Set((assigneeRows || []).map((r: any) => r.ticket_id))
       const { data: myAssigned } = await supabase
         .from('tickets')
         .select('id')
@@ -77,12 +77,12 @@ export default function CustomerDashboardContent({ user, companyId }: CustomerDa
 
       // Time tracker sessions for this user (tickets in company)
       const { data: trackerData } = await supabase
-        .from('todo_time_tracker')
-        .select('todo_id, start_time, stop_time, duration_seconds')
+        .from('ticket_time_tracker')
+        .select('ticket_id, start_time, stop_time, duration_seconds')
         .eq('user_id', user.id)
         .not('stop_time', 'is', null)
       const trackerList = trackerData || []
-      const ticketIds = [...new Set(trackerList.map((t: any) => t.todo_id))]
+      const ticketIds = [...new Set(trackerList.map((t: any) => t.ticket_id))]
       let companyTicketIds = new Set<number>()
       if (ticketIds.length > 0) {
         const { data: companyTickets } = await supabase
@@ -92,7 +92,7 @@ export default function CustomerDashboardContent({ user, companyId }: CustomerDa
           .in('id', ticketIds)
         companyTicketIds = new Set((companyTickets || []).map((t: any) => t.id))
       }
-      const filteredSessions = trackerList.filter((t: any) => companyTicketIds.has(t.todo_id))
+      const filteredSessions = trackerList.filter((t: any) => companyTicketIds.has(t.ticket_id))
       setTimeSessions(filteredSessions)
 
       // Tickets by type

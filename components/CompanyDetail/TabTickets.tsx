@@ -9,77 +9,36 @@ import {
   Tag,
   Typography,
   Spin,
-  Empty,
   Button,
   Row,
   Col,
   Modal,
   Form,
-  Badge,
-  Segmented,
-  Dropdown,
-  DatePicker,
-  Flex,
-  Avatar,
-  Tooltip,
   message,
 } from 'antd'
 import {
-  CheckSquareOutlined,
   SearchOutlined,
   UserOutlined,
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
-  UnorderedListOutlined,
-  AppstoreOutlined,
-  MoreOutlined,
   FilterOutlined,
   SyncOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import DateDisplay from '../DateDisplay'
-import CommentWysiwyg from '../TodoDetail/CommentWysiwyg'
+import CommentWysiwyg from '../TicketDetail/CommentWysiwyg'
+import { DatePicker } from 'antd'
 import dayjs from 'dayjs'
-import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCorners,
-  useDroppable,
-} from '@dnd-kit/core'
-import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import type { ColumnsType } from 'antd/es/table'
 
 const { Text } = Typography
 const { Option } = Select
-const { TextArea } = Input
-
-const DEFAULT_KANBAN_COLUMNS = [
-  { id: 'to_do', title: 'To Do', color: '#faad14' },
-  { id: 'in_progress', title: 'In Progress', color: '#1890ff' },
-  { id: 'completed', title: 'Completed', color: '#52c41a' },
-]
-const DEFAULT_ALL_STATUS_COLUMNS = [
-  { id: 'to_do', title: 'To Do', color: '#faad14' },
-  { id: 'in_progress', title: 'In Progress', color: '#1890ff' },
-  { id: 'completed', title: 'Completed', color: '#52c41a' },
-  { id: 'cancel', title: 'Cancel', color: '#8c8c8c' },
-  { id: 'archived', title: 'Archived', color: '#595959' },
-]
 
 interface TabTicketsProps {
   companyData: { id: string; name?: string }
-  currentUser?: User | null
-  /** When set (e.g. /customer), ticket links go to basePath/tickets/[id] */
+  currentUser?: { id: string; email?: string | null; name?: string | null } | null
   basePath?: string
 }
 
@@ -94,7 +53,6 @@ interface TicketRecord {
   due_date: string | null
   created_at: string
   updated_at?: string
-  visibility?: string
   creator_name?: string
   by_label?: string
   team_name?: string
@@ -111,6 +69,7 @@ interface TicketRecord {
 interface StatusOption {
   slug: string
   title: string
+  color?: string
 }
 
 interface TypeOption {
@@ -120,262 +79,30 @@ interface TypeOption {
   color: string
 }
 
-interface KanbanColumnType {
-  id: string
-  title: string
-  color: string
-}
-
-function TicketKanbanCard({
-  ticket,
-  onClick,
-  onEdit,
-  onDelete,
-  basePath,
-}: {
-  ticket: TicketRecord
-  onClick: () => void
-  onEdit: (t: TicketRecord) => void
-  onDelete: (id: number) => void
-  basePath?: string
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: ticket.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: 'include' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error || res.statusText || 'Request failed')
   }
-
-  const getVisibilityColor = (v: string) => {
-    switch (v) {
-      case 'private': return 'default'
-      case 'team': return 'blue'
-      case 'specific_users': return 'green'
-      default: return 'default'
-    }
-  }
-
-  return (
-    <div ref={setNodeRef} style={style} {...attributes}>
-      <Card
-        size="small"
-        style={{
-          marginBottom: 12,
-          cursor: 'grab',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-          maxWidth: 300,
-          width: '100%',
-        }}
-        {...listeners}
-      >
-        <Flex justify="space-between" align="center">
-          <Text
-            strong
-            style={{ fontSize: 14, flex: 1, cursor: 'pointer' }}
-            onClick={(e) => {
-              e.stopPropagation()
-              onClick()
-            }}
-          >
-            {ticket.has_unread_replies && (
-              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
-            )}
-            {ticket.title || 'Untitled'}
-          </Text>
-          <Dropdown
-            menu={{
-              items: [
-                { key: 'edit', label: 'Edit', icon: <EditOutlined />, onClick: () => onEdit(ticket) },
-                { key: 'delete', label: 'Delete', icon: <DeleteOutlined />, danger: true, onClick: () => Modal.confirm({ title: 'Delete ticket?', okText: 'Delete', okButtonProps: { danger: true }, onOk: () => onDelete(ticket.id) }) },
-              ],
-            }}
-            trigger={['click']}
-          >
-            <Button type="text" size="large" icon={<MoreOutlined />} onClick={(e) => e.stopPropagation()} />
-          </Dropdown>
-        </Flex>
-
-        <Flex gap={5} wrap="wrap" style={{ maxWidth: '100%', marginBottom: 8 }}>
-          {ticket.visibility && ticket.visibility !== 'team' && (
-            <Tag color={getVisibilityColor(ticket.visibility)} style={{ fontSize: 11 }}>
-              {ticket.visibility === 'specific_users' ? 'Specific Users' : ticket.visibility.toUpperCase()}
-            </Tag>
-          )}
-          {ticket.team_name && <Tag color="blue" style={{ fontSize: 11 }}>Team {ticket.team_name}</Tag>}
-          {ticket.type && (
-            <Tag color={ticket.type.color} style={{ fontSize: 11 }}>{ticket.type.title}</Tag>
-          )}
-          {ticket.priority && (
-            <Tag color={ticket.priority.color} style={{ fontSize: 11 }}>{ticket.priority.title}</Tag>
-          )}
-          {ticket.company && (
-            <Tag
-              color={ticket.company.color ? undefined : 'cyan'}
-              style={{ fontSize: 11, ...(ticket.company.color ? { backgroundColor: ticket.company.color, borderColor: ticket.company.color, color: '#fff' } : {}) }}
-            >
-              {ticket.company.name}
-            </Tag>
-          )}
-          {ticket.tags && ticket.tags.length > 0 && (
-            <Flex gap={4} wrap="wrap">
-              {ticket.tags.map((t) => (
-                <Tag
-                  key={t.id}
-                  color={t.color ? undefined : 'default'}
-                  style={{ fontSize: 11, ...(t.color ? { backgroundColor: t.color, borderColor: t.color, color: '#fff' } : {}) }}
-                >
-                  {t.name}
-                </Tag>
-              ))}
-            </Flex>
-          )}
-        </Flex>
-
-        {Number(ticket.checklist_total) > 0 && (
-          <Tag color="green" style={{ fontSize: 11, marginBottom: 8 }}>
-            Checklist: {ticket.checklist_completed ?? 0}/{ticket.checklist_total}
-          </Tag>
-        )}
-
-        {ticket.assignees && ticket.assignees.length > 0 && (
-          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Avatar.Group size="small" maxCount={3}>
-              {ticket.assignees.map((a) => (
-                <Tooltip key={a.id} title={a.user_name}>
-                  <Avatar size="small" icon={<UserOutlined />} />
-                </Tooltip>
-              ))}
-            </Avatar.Group>
-          </div>
-        )}
-
-        {ticket.due_date && (
-          <div style={{ marginTop: 8 }}>
-            <Tag
-              color={dayjs(ticket.due_date).isBefore(dayjs()) && ticket.status !== 'completed' && ticket.status !== 'cancel' ? 'error' : 'default'}
-              style={{ fontSize: 11 }}
-            >
-              Due Date: <DateDisplay date={ticket.due_date} />
-            </Tag>
-          </div>
-        )}
-
-        {ticket.by_label && (
-          <div style={{ marginTop: 8, fontSize: 11, color: '#8c8c8c' }}>
-            By {ticket.by_label}
-          </div>
-        )}
-      </Card>
-    </div>
-  )
-}
-
-function TicketKanbanColumn({
-  column,
-  tickets,
-  onTicketClick,
-  onEdit,
-  onDelete,
-  basePath,
-}: {
-  column: KanbanColumnType
-  tickets: TicketRecord[]
-  onTicketClick: (t: TicketRecord) => void
-  onEdit: (t: TicketRecord) => void
-  onDelete: (id: number) => void
-  basePath?: string
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: column.id })
-
-  return (
-    <div style={{ minWidth: 320, flexShrink: 0, marginRight: 16 }}>
-      <Card
-        style={{
-          height: 'calc(100vh - 280px)',
-          minHeight: 400,
-          display: 'flex',
-          flexDirection: 'column',
-          background: '#fafafa',
-          border: isOver ? `2px solid ${column.color}` : undefined,
-        }}
-        headStyle={{ backgroundColor: column.color }}
-        bodyStyle={{ flex: 1, overflow: 'auto', padding: 0, position: 'relative' }}
-        title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Space>
-              <Text strong>{column.title}</Text>
-              <Badge count={tickets.length} style={{ backgroundColor: column.color }} />
-            </Space>
-          </div>
-        }
-      >
-        <div
-          ref={setNodeRef}
-          style={{
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            minHeight: '100%',
-            padding: 16,
-            overflow: 'auto',
-          }}
-        >
-          <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-            {tickets.length === 0 ? (
-              <div style={{ minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Empty description={`No ${column.title}`} image={Empty.PRESENTED_IMAGE_SIMPLE} />
-              </div>
-            ) : (
-              tickets.map((ticket) => (
-                <TicketKanbanCard
-                  key={ticket.id}
-                  ticket={ticket}
-                  onClick={() => onTicketClick(ticket)}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  basePath={basePath}
-                />
-              ))
-            )}
-          </SortableContext>
-        </div>
-      </Card>
-    </div>
-  )
+  return res.json()
 }
 
 export default function TabTickets({ companyData, currentUser, basePath }: TabTicketsProps) {
   const router = useRouter()
-  const supabase = createClient()
   const [tickets, setTickets] = useState<TicketRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [statuses, setStatuses] = useState<StatusOption[]>([])
   const [types, setTypes] = useState<TypeOption[]>([])
   const [priorities, setPriorities] = useState<TypeOption[]>([])
   const [allTags, setAllTags] = useState<Array<{ id: string; name: string }>>([])
-  const [filterStatus, setFilterStatus] = useState<string[]>(DEFAULT_KANBAN_COLUMNS.map((c) => c.id))
+  const [filterStatus, setFilterStatus] = useState<string[]>([])
   const [filterTypeId, setFilterTypeId] = useState<number | undefined>(undefined)
   const [filterSearch, setFilterSearch] = useState('')
-  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('kanban')
-  const [statusColumns, setStatusColumns] = useState<KanbanColumnType[]>(DEFAULT_KANBAN_COLUMNS)
-  const [allStatusColumns, setAllStatusColumns] = useState<KanbanColumnType[]>(DEFAULT_ALL_STATUS_COLUMNS)
-  const [allStatuses, setAllStatuses] = useState<Array<{ slug: string; title: string }>>(
-    DEFAULT_ALL_STATUS_COLUMNS.map((c) => ({ slug: c.id, title: c.title }))
-  )
   const [modalVisible, setModalVisible] = useState(false)
   const [editingTicket, setEditingTicket] = useState<TicketRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
-  const [activeId, setActiveId] = useState<number | null>(null)
   const [form] = Form.useForm()
   const [syncingEmail, setSyncingEmail] = useState(false)
 
@@ -403,74 +130,12 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     if (!companyData?.id) return
     setLoading(true)
     try {
-        const { data: ticketsData, error } = await supabase
-        .from('tickets')
-        .select(`
-          id,
-          title,
-          description,
-          status,
-          type_id,
-          priority_id,
-          company_id,
-          due_date,
-          created_at,
-          updated_at,
-          last_read_at,
-          visibility,
-          creator:users!todos_created_by_fkey(id, full_name, email),
-          type:ticket_types(id, title, slug, color),
-          priority:ticket_priorities(id, title, slug, color),
-          company:companies(id, name, color, email),
-          team:teams(id, name)
-        `)
-        .eq('company_id', companyData.id)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      const ticketIds = (ticketsData || []).map((t: any) => t.id)
-      const assigneesByTicket: Record<number, Array<{ id: string; user_name?: string }>> = {}
-      const tagsByTicket: Record<number, Array<{ id: string; name: string; slug: string; color?: string }>> = {}
-      const checklistByTicket: Record<number, { completed: number; total: number }> = {}
-      const latestRepliesByTicket: Record<number, string> = {}
-
-      if (ticketIds.length > 0) {
-        const [assigneesRes, tagsRes, latestRepliesRes] = await Promise.all([
-          supabase.from('todo_assignees').select('todo_id, id, user:users!todo_assignees_user_id_fkey(id, full_name, email)').in('todo_id', ticketIds),
-          supabase.from('ticket_tags').select('ticket_id, tag_id, tags(id, name, slug, color)').in('ticket_id', ticketIds),
-          supabase.from('todo_comments').select('todo_id, created_at').eq('visibility', 'reply').in('todo_id', ticketIds),
-        ])
-        ;(assigneesRes.data || []).forEach((row: any) => {
-          if (!assigneesByTicket[row.todo_id]) assigneesByTicket[row.todo_id] = []
-          assigneesByTicket[row.todo_id].push({
-            id: row.id,
-            user_name: row.user?.full_name || row.user?.email || 'Unknown',
-          })
-        })
-        ;(tagsRes.data || []).forEach((row: any) => {
-          if (!row.tags) return
-          if (!tagsByTicket[row.ticket_id]) tagsByTicket[row.ticket_id] = []
-          tagsByTicket[row.ticket_id].push(row.tags)
-        })
-        ;(latestRepliesRes.data || []).forEach((r: any) => {
-          const cur = latestRepliesByTicket[r.todo_id]
-          if (!cur || r.created_at > cur) latestRepliesByTicket[r.todo_id] = r.created_at
-        })
-        for (const tid of ticketIds) {
-          const { data: checklistData } = await supabase.from('todo_checklist').select('is_completed').eq('todo_id', tid)
-          const total = checklistData?.length ?? 0
-          const completed = checklistData?.filter((x: any) => x.is_completed).length ?? 0
-          checklistByTicket[tid] = { completed, total }
-        }
-      }
-
-      const list = (ticketsData || []).map((t: any) => {
-        const cb = checklistByTicket[t.id] ?? { completed: 0, total: 0 }
-        const latestReplyAt = latestRepliesByTicket[t.id]
-        const lastReadAt = t.last_read_at
-        const hasUnread = !!latestReplyAt && (!lastReadAt || latestReplyAt > lastReadAt)
-        return {
+      const data = await apiFetch<TicketRecord[]>(
+        `/api/tickets?company_id=${encodeURIComponent(companyData.id)}`
+      )
+      const list = Array.isArray(data) ? data : []
+      setTickets(
+        list.map((t: any) => ({
           id: t.id,
           title: t.title,
           description: t.description,
@@ -481,21 +146,19 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
           due_date: t.due_date,
           created_at: t.created_at,
           updated_at: t.updated_at,
-          visibility: t.visibility,
-          creator_name: t.creator?.full_name || t.creator?.email || 'Unknown',
-          by_label: t.company?.name || t.creator?.full_name || t.creator?.email || 'Unknown',
-          team_name: t.team?.name || null,
-          type: t.type || null,
-          priority: t.priority || null,
-          company: t.company || null,
-          assignees: assigneesByTicket[t.id] || [],
-          tags: tagsByTicket[t.id] || [],
-          checklist_completed: cb.completed,
-          has_unread_replies: hasUnread,
-          checklist_total: cb.total,
-        }
-      })
-      setTickets(list)
+          creator_name: t.creator_name,
+          by_label: t.by_label,
+          team_name: t.team_name,
+          type: t.type,
+          priority: t.priority,
+          company: t.company,
+          assignees: t.assignees || [],
+          tags: t.tags || [],
+          checklist_completed: t.checklist_completed ?? 0,
+          checklist_total: t.checklist_total ?? 0,
+          has_unread_replies: t.has_unread_replies,
+        }))
+      )
     } catch {
       setTickets([])
     } finally {
@@ -503,73 +166,25 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     }
   }
 
-  const fetchStatuses = async () => {
+  const fetchLookup = async () => {
     try {
-      const { data, error } = await supabase
-        .from('todo_statuses')
-        .select('slug, title, customer_title, color, show_in_kanban, sort_order')
-        .order('sort_order', { ascending: true })
-      if (error) throw error
-      const list = (data || []) as Array<{ slug: string; title: string; customer_title?: string | null; color?: string; show_in_kanban?: boolean }>
-      const displayTitle = (s: { title: string; customer_title?: string | null }) =>
-        basePath && s.customer_title ? s.customer_title : s.title
-      setStatuses(list.map((s) => ({ slug: s.slug, title: displayTitle(s) })))
-      const kanbanCols = list.filter((s) => s.show_in_kanban !== false).map((s) => ({
-        id: s.slug,
-        title: displayTitle(s),
-        color: s.color || '#d9d9d9',
-      }))
-      const allCols = list.map((s) => ({
-        id: s.slug,
-        title: displayTitle(s),
-        color: s.color || '#d9d9d9',
-      }))
-      if (kanbanCols.length > 0) {
-        setStatusColumns(kanbanCols)
-        setFilterStatus(kanbanCols.map((c) => c.id))
+      const data = await apiFetch<{
+        statuses: Array<{ slug: string; title: string; color?: string }>
+        ticketTypes: TypeOption[]
+        ticketPriorities: TypeOption[]
+        tags: Array<{ id: string; name: string }>
+      }>('/api/tickets/lookup')
+      setStatuses(data.statuses || [])
+      setTypes(data.ticketTypes || [])
+      setPriorities(data.ticketPriorities || [])
+      setAllTags(data.tags || [])
+      if (data.statuses?.length && filterStatus.length === 0) {
+        setFilterStatus(data.statuses.map((s) => s.slug))
       }
-      if (allCols.length > 0) setAllStatusColumns(allCols)
-      setAllStatuses(list.map((s) => ({ slug: s.slug, title: displayTitle(s) })))
     } catch {
       setStatuses([])
-    }
-  }
-
-  const fetchTypes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('ticket_types')
-        .select('id, title, slug, color')
-        .order('sort_order', { ascending: true })
-      if (error) throw error
-      setTypes((data || []) as TypeOption[])
-    } catch {
       setTypes([])
-    }
-  }
-
-  const fetchPriorities = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('ticket_priorities')
-        .select('id, title, slug, color')
-        .order('sort_order', { ascending: true })
-      if (error) throw error
-      setPriorities((data || []) as TypeOption[])
-    } catch {
       setPriorities([])
-    }
-  }
-
-  const fetchTags = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('tags')
-        .select('id, name, slug')
-        .order('name')
-      if (error) throw error
-      setAllTags((data || []) as Array<{ id: string; name: string }>)
-    } catch {
       setAllTags([])
     }
   }
@@ -579,27 +194,17 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
   }, [companyData?.id])
 
   useEffect(() => {
-    fetchStatuses()
-    fetchTypes()
-    fetchPriorities()
-    fetchTags()
-  }, [basePath])
+    fetchLookup()
+  }, [])
 
   const hasActiveFilters =
-    filterStatus.length > 0 ||
-    filterTypeId != null ||
-    filterSearch.trim() !== ''
+    filterStatus.length > 0 || filterTypeId != null || filterSearch.trim() !== ''
 
   const clearFilters = () => {
-    setFilterStatus(statusColumns.map((c) => c.id))
+    setFilterStatus(statuses.map((s) => s.slug))
     setFilterTypeId(undefined)
     setFilterSearch('')
   }
-
-  const columnsToShow = useMemo(
-    () => (filterStatus.length > 0 ? allStatusColumns.filter((c) => filterStatus.includes(c.id)) : statusColumns),
-    [filterStatus, allStatusColumns, statusColumns]
-  )
 
   const filteredTickets = useMemo(() => {
     return tickets.filter((t) => {
@@ -607,47 +212,12 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       if (filterTypeId != null && t.type_id !== filterTypeId) return false
       if (filterSearch.trim()) {
         const q = filterSearch.toLowerCase()
-        if (!t.title?.toLowerCase().includes(q) && !(t.description || '').toLowerCase().includes(q)) return false
+        if (!t.title?.toLowerCase().includes(q) && !(t.description || '').toLowerCase().includes(q))
+          return false
       }
       return true
     })
   }, [tickets, filterStatus, filterTypeId, filterSearch])
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  )
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as number)
-  }
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event
-    setActiveId(null)
-    if (!over) return
-
-    const ticketId = active.id as number
-    let newStatus = over.id as string
-    if (!columnsToShow.some((c) => c.id === newStatus)) {
-      const ticket = filteredTickets.find((t) => t.id === Number(newStatus))
-      if (ticket) newStatus = ticket.status
-      else return
-    }
-
-    setTickets((prev) =>
-      prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t))
-    )
-
-    try {
-      const { error } = await supabase
-        .from('tickets')
-        .update({ status: newStatus })
-        .eq('id', ticketId)
-      if (error) throw error
-    } catch {
-      fetchTickets()
-    }
-  }
 
   const handleCreate = () => {
     setEditingTicket(null)
@@ -660,7 +230,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     setModalVisible(true)
   }
 
-  const handleEdit = async (ticket: TicketRecord) => {
+  const handleEdit = (ticket: TicketRecord) => {
     setEditingTicket(ticket)
     form.setFieldsValue({
       title: ticket.title,
@@ -671,21 +241,17 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       company_id: companyData.id,
       due_date: ticket.due_date ? dayjs(ticket.due_date) : null,
     })
-    const { data: tagRows } = await supabase
-      .from('ticket_tags')
-      .select('tag_id')
-      .eq('ticket_id', ticket.id)
-    setSelectedTagIds((tagRows || []).map((r: any) => r.tag_id))
+    setSelectedTagIds(ticket.tags?.map((t) => t.id) || [])
     setModalVisible(true)
   }
 
   const handleDelete = async (ticketId: number) => {
     try {
-      await supabase.from('todo_assignees').delete().eq('todo_id', ticketId)
-      await supabase.from('tickets').delete().eq('id', ticketId)
+      await apiFetch(`/api/tickets/${ticketId}`, { method: 'DELETE' })
+      message.success('Ticket deleted')
       fetchTickets()
-    } catch {
-      fetchTickets()
+    } catch (err: unknown) {
+      message.error((err as Error).message || 'Failed to delete')
     }
   }
 
@@ -702,44 +268,40 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
         company_id: companyData.id,
         due_date: values.due_date ? values.due_date.format('YYYY-MM-DD') : null,
         visibility: 'private',
+        tag_ids: selectedTagIds,
       }
 
       if (editingTicket) {
-        await supabase.from('tickets').update(payload).eq('id', editingTicket.id)
-        if (!basePath) {
-          await supabase.from('ticket_tags').delete().eq('ticket_id', editingTicket.id)
-          if (selectedTagIds.length > 0) {
-            await supabase.from('ticket_tags').insert(
-              selectedTagIds.map((tagId) => ({ ticket_id: editingTicket.id, tag_id: tagId }))
-            )
-          }
-        }
+        await apiFetch(`/api/tickets/${editingTicket.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        message.success('Ticket updated')
       } else {
-        const { data: inserted, error } = await supabase
-          .from('tickets')
-          .insert({ ...payload, created_by: currentUser.id, created_via: 'portal' })
-          .select()
-          .single()
-        if (error) throw error
-        if (!basePath && inserted && selectedTagIds.length > 0) {
-          await supabase.from('ticket_tags').insert(
-            selectedTagIds.map((tagId) => ({ ticket_id: inserted.id, tag_id: tagId }))
-          )
-        }
+        await apiFetch('/api/tickets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        message.success('Ticket created')
       }
 
       setModalVisible(false)
       form.resetFields()
       setSelectedTagIds([])
       fetchTickets()
-    } catch (e: any) {
-      console.error(e)
+    } catch (err: unknown) {
+      message.error((err as Error).message || 'Failed to save')
     } finally {
       setSaving(false)
     }
   }
 
-  const activeTicket = activeId ? filteredTickets.find((t) => t.id === activeId) : null
+  const getStatusLabel = (status: string) => {
+    const s = statuses.find((x) => x.slug === status)
+    return s?.title || status.replace('_', ' ')
+  }
 
   const columns: ColumnsType<TicketRecord> = [
     {
@@ -748,7 +310,12 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       key: 'id',
       width: 72,
       render: (id: number) => (
-        <Button type="link" size="small" onClick={() => router.push(ticketDetailUrl(id))} style={{ padding: 0 }}>
+        <Button
+          type="link"
+          size="small"
+          onClick={() => router.push(ticketDetailUrl(id))}
+          style={{ padding: 0 }}
+        >
           #{id}
         </Button>
       ),
@@ -764,7 +331,18 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
           onClick={() => router.push(ticketDetailUrl(record.id))}
         >
           {record.has_unread_replies && (
-            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
+            <span
+              style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: '#ff4d4f',
+                marginRight: 6,
+                verticalAlign: 'middle',
+              }}
+              title="Unread replies"
+            />
           )}
           {title}
         </Button>
@@ -776,12 +354,11 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       key: 'status',
       width: 120,
       render: (status: string) => {
-        const col = allStatusColumns.find((c) => c.id === status)
-        const label = col ? col.title : status.replace('_', ' ')
-        const color = col?.color ? undefined : status === 'completed' ? 'green' : status === 'in_progress' ? 'blue' : 'default'
+        const s = statuses.find((x) => x.slug === status)
+        const color = s?.color ? undefined : status === 'completed' ? 'green' : status === 'in_progress' ? 'blue' : 'default'
         return (
-          <Tag color={color} style={col?.color ? { backgroundColor: col.color, borderColor: col.color, color: '#fff' } : undefined}>
-            {label}
+          <Tag color={color} style={s?.color ? { backgroundColor: s.color, borderColor: s.color, color: '#fff' } : undefined}>
+            {getStatusLabel(status)}
           </Tag>
         )
       },
@@ -831,6 +408,34 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
           '—'
         ),
     },
+    {
+      title: '',
+      key: 'actions',
+      width: 120,
+      render: (_, record) => (
+        <Space>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+            Edit
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => {
+              Modal.confirm({
+                title: 'Delete ticket?',
+                okText: 'Delete',
+                okButtonProps: { danger: true },
+                onOk: () => handleDelete(record.id),
+              })
+            }}
+          >
+            Delete
+          </Button>
+        </Space>
+      ),
+    },
   ]
 
   return (
@@ -855,7 +460,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
                 value={filterStatus}
                 onChange={(v) => setFilterStatus(v ?? [])}
                 style={{ minWidth: 180 }}
-                options={allStatuses.map((s) => ({ value: s.slug, label: s.title }))}
+                options={statuses.map((s) => ({ value: s.slug, label: s.title }))}
                 maxTagCount="responsive"
               />
               <Select
@@ -890,83 +495,37 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
             )}
           </Col>
           <Col>
-            <Space>
-              <Segmented
-                value={viewMode}
-                onChange={(v) => setViewMode(v as 'table' | 'kanban')}
-                options={[
-                  { value: 'kanban', label: <><AppstoreOutlined /> Kanban</> },
-                  { value: 'table', label: <><UnorderedListOutlined /> Table</> },
-                ]}
-              />
-              {currentUser && (
-                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                  Create Ticket
-                </Button>
-              )}
-            </Space>
+            {currentUser && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                Create Ticket
+              </Button>
+            )}
           </Col>
         </Row>
 
         <Spin spinning={loading}>
-          {viewMode === 'table' ? (
-            <Table
-              size="small"
-              columns={columns}
-              dataSource={filteredTickets}
-              rowKey="id"
-              pagination={{
-                pageSize: 10,
-                showSizeChanger: true,
-                showTotal: (total) => `Total ${total} tickets`,
-              }}
-              locale={{ emptyText: 'No tickets for this company' }}
-            />
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCorners}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'nowrap',
-                  overflowX: 'auto',
-                  overflowY: 'hidden',
-                  paddingBottom: 8,
-                  margin: -4,
-                }}
-              >
-                {columnsToShow.map((column) => (
-                  <TicketKanbanColumn
-                    key={column.id}
-                    column={column}
-                    tickets={filteredTickets.filter((t) => t.status === column.id)}
-                    onTicketClick={(t) => router.push(ticketDetailUrl(t.id))}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    basePath={basePath}
-                  />
-                ))}
-              </div>
-              <DragOverlay>
-                {activeTicket ? (
-                  <Card size="small" style={{ width: 280, boxShadow: '0 4px 8px rgba(0,0,0,0.2)' }} bodyStyle={{ padding: 12 }}>
-                    <Text strong>{activeTicket.title}</Text>
-                  </Card>
-                ) : null}
-              </DragOverlay>
-            </DndContext>
-          )}
+          <Table
+            size="small"
+            columns={columns}
+            dataSource={filteredTickets}
+            rowKey="id"
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              showTotal: (total) => `Total ${total} tickets`,
+            }}
+            locale={{ emptyText: 'No tickets for this company' }}
+          />
         </Spin>
       </Space>
 
       <Modal
         title={editingTicket ? 'Edit Ticket' : 'Create Ticket'}
         open={modalVisible}
-        onCancel={() => { setModalVisible(false); form.resetFields() }}
+        onCancel={() => {
+          setModalVisible(false)
+          form.resetFields()
+        }}
         footer={null}
         width={600}
       >
@@ -980,7 +539,9 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
           <Form.Item name="status" label="Status" rules={[{ required: true }]}>
             <Select>
               {statuses.map((s) => (
-                <Option key={s.slug} value={s.slug}>{s.title}</Option>
+                <Option key={s.slug} value={s.slug}>
+                  {s.title}
+                </Option>
               ))}
             </Select>
           </Form.Item>
@@ -989,7 +550,15 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
               {types.map((t) => (
                 <Option key={t.id} value={t.id}>
                   <Space>
-                    <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, backgroundColor: t.color }} />
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 10,
+                        height: 10,
+                        borderRadius: 2,
+                        backgroundColor: t.color,
+                      }}
+                    />
                     {t.title}
                   </Space>
                 </Option>
@@ -1001,7 +570,15 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
               {priorities.map((p) => (
                 <Option key={p.id} value={p.id}>
                   <Space>
-                    <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, backgroundColor: p.color }} />
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 10,
+                        height: 10,
+                        borderRadius: 2,
+                        backgroundColor: p.color,
+                      }}
+                    />
                     {p.title}
                   </Space>
                 </Option>
@@ -1018,7 +595,9 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
                 allowClear
               >
                 {allTags.map((t) => (
-                  <Option key={t.id} value={t.id}>{t.name}</Option>
+                  <Option key={t.id} value={t.id}>
+                    {t.name}
+                  </Option>
                 ))}
               </Select>
             </Form.Item>
@@ -1031,7 +610,14 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
               <Button type="primary" htmlType="submit" loading={saving}>
                 {editingTicket ? 'Update' : 'Create'}
               </Button>
-              <Button onClick={() => { setModalVisible(false); form.resetFields() }}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  setModalVisible(false)
+                  form.resetFields()
+                }}
+              >
+                Cancel
+              </Button>
             </Space>
           </Form.Item>
         </Form>

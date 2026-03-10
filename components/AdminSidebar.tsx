@@ -1,37 +1,45 @@
 'use client'
 
-import { Layout, Menu, Avatar, Dropdown, Typography, Space } from 'antd'
+import Image from 'next/image'
+import { Layout, Menu, Avatar, Dropdown, Typography } from 'antd'
 import {
     DashboardOutlined,
     UserOutlined,
     LogoutOutlined,
     LockOutlined,
-    FileTextOutlined,
+    HomeOutlined,
+    InfoCircleOutlined,
     TeamOutlined,
     SettingOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
-    DatabaseOutlined,
-    FormOutlined,
-    GlobalOutlined,
     CheckSquareOutlined,
-    PictureOutlined,
-    RobotOutlined,
     TagOutlined,
     AppstoreOutlined,
-    ApiOutlined,
     MailOutlined,
+    ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client'
-import { User } from '@supabase/supabase-js'
+import { signOut } from 'next-auth/react'
 import { useState, useEffect } from 'react'
 
 const { Sider } = Layout
 const { Text } = Typography
 
+const SIDEBAR_BG = '#4a148c'
+const ACTIVE_BG = '#f0f0f0'
+const ACTIVE_TEXT = '#333333'
+
+interface SessionUser {
+  id: string
+  email?: string | null
+  name?: string | null
+  image?: string | null
+  user_metadata?: { full_name?: string | null; avatar_url?: string | null }
+}
+
 interface AdminSidebarProps {
-  user: User
+  user: SessionUser
   collapsed: boolean
   onCollapse: (collapsed: boolean) => void
 }
@@ -39,7 +47,6 @@ interface AdminSidebarProps {
 export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const supabase = createClient()
   const [openKeys, setOpenKeys] = useState<string[]>([])
 
   // Set open keys after mount to avoid hydration mismatch
@@ -47,7 +54,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     if (pathname) {
       if (pathname.startsWith('/company-data-templates') || pathname.startsWith('/company-content-templates') || pathname.startsWith('/company-ai-system-templates')) {
         setOpenKeys(['templates'])
-      } else if (pathname.startsWith('/ticket-statuses') || pathname.startsWith('/ticket-types') || pathname.startsWith('/tags')) {
+      } else       if (pathname.startsWith('/ticket-statuses') || pathname.startsWith('/ticket-types') || pathname.startsWith('/tags') || pathname.startsWith('/automation-rules')) {
         setOpenKeys(['ticket-attributes'])
       } else if (pathname.startsWith('/content-planner')) {
         setOpenKeys(['content-planner'])
@@ -55,11 +62,17 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     }
   }, [pathname])
 
-  // Determine which menu items should be selected
-  const selectedKeys = pathname ? [pathname] : []
+  // Determine which menu items should be selected (match parent routes: /tickets/2 -> /tickets)
+  const selectedKeys = pathname
+    ? [
+        ['/dashboard', '/users', '/companies', '/tickets', '/teams', '/email-integration'].find((k) =>
+          pathname === k || (k !== '/dashboard' && pathname.startsWith(k + '/'))
+        ) || pathname,
+      ].filter(Boolean)
+    : []
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await signOut({ callbackUrl: '/login' })
     router.push('/login')
     router.refresh()
   }
@@ -105,72 +118,77 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           icon: <TagOutlined />,
           label: 'Tags',
         },
-      ],
-    },
-    {
-      key: 'content-planner',
-      icon: <FileTextOutlined />,
-      label: 'Content Planner',
-      children: [
         {
-          key: '/content-planner/channel',
-          icon: <SettingOutlined />,
-          label: 'Channels',
-        },
-        {
-          key: '/content-planner/intents',
-          icon: <SettingOutlined />,
-          label: 'Intents',
-        },
-        {
-          key: '/content-planner/topic-type',
-          icon: <SettingOutlined />,
-          label: 'Topic Types',
+          key: '/automation-rules',
+          icon: <ThunderboltOutlined />,
+          label: 'Automation Rules',
         },
       ],
     },
-    {
-      key: '/screenshots',
-      icon: <PictureOutlined />,
-      label: 'Screenshots',
-    },
+    // {
+    //   key: 'content-planner',
+    //   icon: <FileTextOutlined />,
+    //   label: 'Content Planner',
+    //   children: [
+    //     {
+    //       key: '/content-planner/channel',
+    //       icon: <SettingOutlined />,
+    //       label: 'Channels',
+    //     },
+    //     {
+    //       key: '/content-planner/intents',
+    //       icon: <SettingOutlined />,
+    //       label: 'Intents',
+    //     },
+    //     {
+    //       key: '/content-planner/topic-type',
+    //       icon: <SettingOutlined />,
+    //       label: 'Topic Types',
+    //     },
+    //   ],
+    // },
+    // {
+    //   key: '/screenshots',
+    //   icon: <PictureOutlined />,
+    //   label: 'Screenshots',
+    // },
     {
       key: '/teams',
       icon: <TeamOutlined />,
       label: 'Teams',
     },
-    {
-      key: 'templates',
-      icon: <FormOutlined />,
-      label: 'Templates',
-      children: [
-        {
-          key: '/company-data-templates',
-          icon: <DatabaseOutlined />,
-          label: 'Data Templates',
-        },
-        {
-          key: '/company-content-templates',
-          icon: <FileTextOutlined />,
-          label: 'Content Templates',
-        },
-        {
-          key: '/company-ai-system-templates',
-          icon: <RobotOutlined />,
-          label: 'AI System Templates',
-        },
-      ],
-    },
-    {
-      key: '/crawl-sessions',
-      icon: <GlobalOutlined />,
-      label: 'Crawling',
-    },
-    {
-      key: '/freshdesk-test',
-      icon: <ApiOutlined />,
-      label: 'Freshdesk API Test',
-    },
+    // {
+    //   key: 'templates',
+    //   icon: <FormOutlined />,
+    //   label: 'Templates',
+    //   children: [
+    //     {
+    //       key: '/company-data-templates',
+    //       icon: <DatabaseOutlined />,
+    //       label: 'Data Templates',
+    //     },
+    //     {
+    //       key: '/company-content-templates',
+    //       icon: <FileTextOutlined />,
+    //       label: 'Content Templates',
+    //     },
+    //     {
+    //       key: '/company-ai-system-templates',
+    //       icon: <RobotOutlined />,
+    //       label: 'AI System Templates',
+    //     },
+    //   ],
+    // },
+    // {
+    //   key: '/crawl-sessions',
+    //   icon: <GlobalOutlined />,
+    //   label: 'Crawling',
+    // },
+    // {
+    //   key: '/freshdesk-test',
+    //   icon: <ApiOutlined />,
+    //   label: 'Freshdesk API Test',
+    // },
     {
       key: '/email-integration',
       icon: <MailOutlined />,
@@ -209,6 +227,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       collapsible
       collapsed={collapsed}
       width={250}
+      className="admin-sidebar-deskteam"
       style={{
         overflow: 'auto',
         height: '100vh',
@@ -216,7 +235,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         left: 0,
         top: 0,
         bottom: 0,
-        background: '#001529',
+        background: SIDEBAR_BG,
       }}
     >
       <div
@@ -226,15 +245,19 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'space-between',
           padding: collapsed ? '0 16px' : '0 24px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
         }}
       >
         {!collapsed && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <DashboardOutlined style={{ fontSize: 24, color: '#667eea' }} />
-            <Text strong style={{ color: '#fff', fontSize: 16 }}>
-              {process.env.NEXT_PUBLIC_APP_NAME}
-            </Text>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Image
+              src="/deskteam360-logo-white%201.png"
+              alt="DeskTeam360"
+              height={36}
+              width={1000}
+              style={{ flexShrink: 0, objectFit: 'contain', width: '100%', height: '100%' }}
+            />
+            
           </div>
         )}
         <div
@@ -256,7 +279,11 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         openKeys={openKeys}
         onOpenChange={setOpenKeys}
         items={menuItems}
-        style={{ borderRight: 0, marginTop: 8 }}
+        style={{
+          borderRight: 0,
+          marginTop: 16,
+          background: 'transparent',
+        }}
         onClick={({ key }) => {
           if (key && typeof key === 'string' && !key.startsWith('templates')) {
             router.push(key)
@@ -271,8 +298,8 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           left: 0,
           right: 0,
           padding: '16px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-          background: '#001529',
+          borderTop: '1px solid rgba(255, 255, 255, 0.15)',
+          background: SIDEBAR_BG,
         }}
       >
         <Dropdown
@@ -299,7 +326,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           >
             <Avatar
               icon={<UserOutlined />}
-              src={user.user_metadata?.avatar_url}
+              src={user.image ?? user.user_metadata?.avatar_url}
               size={collapsed ? 'default' : 40}
             />
             {!collapsed && (
@@ -315,7 +342,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {user.user_metadata?.full_name || 'User'}
+                  {user.name ?? user.user_metadata?.full_name ?? 'User'}
                 </Text>
                 <Text
                   style={{

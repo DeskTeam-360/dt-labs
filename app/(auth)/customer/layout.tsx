@@ -1,31 +1,26 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db, users } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 
 export default async function CustomerLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  const session = await auth()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session?.user) {
     redirect('/login')
   }
 
-  // Fetch user's company_id from users table
-  const { data: userData } = await supabase
-    .from('users')
-    .select('company_id')
-    .eq('id', user.id)
-    .single()
+  const [userRow] = await db
+    .select({ companyId: users.companyId })
+    .from(users)
+    .where(eq(users.id, session.user.id!))
+    .limit(1)
 
-  if (!userData?.company_id) {
+  if (!userRow?.companyId) {
     redirect('/dashboard')
   }
 

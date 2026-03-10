@@ -16,8 +16,6 @@ import {
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -25,7 +23,16 @@ const { Content } = Layout
 const { Title } = Typography
 
 interface TicketTypesContentProps {
-  user: User
+  user: { id: string; email?: string | null; user_metadata?: { full_name?: string | null } }
+}
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: 'include' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string })?.error || res.statusText || 'Request failed')
+  }
+  return res.json()
 }
 
 interface TicketTypeRecord {
@@ -88,20 +95,14 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
   const [modalVisible, setModalVisible] = useState(false)
   const [editingType, setEditingType] = useState<TicketTypeRecord | null>(null)
   const [form] = Form.useForm()
-  const supabase = createClient()
 
   const fetchTypes = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('ticket_types')
-        .select('*')
-        .order('sort_order', { ascending: true })
-
-      if (error) throw error
-      setTypes((data || []) as TicketTypeRecord[])
-    } catch (error: any) {
-      message.error(error.message || 'Failed to fetch ticket types')
+      const data = await apiFetch<TicketTypeRecord[]>('/api/ticket-types')
+      setTypes(data || [])
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to fetch ticket types')
     } finally {
       setLoading(false)
     }
@@ -134,12 +135,11 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
 
   const handleDelete = async (id: number) => {
     try {
-      const { error } = await supabase.from('ticket_types').delete().eq('id', id)
-      if (error) throw error
+      await apiFetch(`/api/ticket-types/${id}`, { method: 'DELETE' })
       message.success('Type deleted')
       fetchTypes()
-    } catch (error: any) {
-      message.error(error.message || 'Failed to delete type')
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to delete type')
     }
   }
 
@@ -150,32 +150,35 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
     }
   }
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: Record<string, unknown>) => {
     try {
       const payload = {
-        title: values.title.trim(),
-        slug: values.slug.trim().toLowerCase().replace(/\s+/g, '_'),
-        color: values.color || '#000000',
+        title: String(values.title || '').trim(),
+        slug: String(values.slug || '').trim().toLowerCase().replace(/\s+/g, '_'),
+        color: (values.color as string) || '#000000',
         sort_order: Number(values.sort_order) ?? 0,
       }
 
       if (editingType) {
-        const { error } = await supabase
-          .from('ticket_types')
-          .update(payload)
-          .eq('id', editingType.id)
-        if (error) throw error
+        await apiFetch(`/api/ticket-types/${editingType.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
         message.success('Type updated')
       } else {
-        const { error } = await supabase.from('ticket_types').insert(payload)
-        if (error) throw error
+        await apiFetch('/api/ticket-types', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
         message.success('Type created')
       }
       setModalVisible(false)
       form.resetFields()
       fetchTypes()
-    } catch (error: any) {
-      message.error(error.message || 'Failed to save type')
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to save type')
     }
   }
 

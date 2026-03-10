@@ -1,11 +1,7 @@
-import { createBrowserClient } from "@supabase/ssr";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
-
-export const createClient = () =>
-  createBrowserClient(
-    supabaseUrl!,
-    supabaseKey!,
-  );
+/** @deprecated Supabase is no longer used - project migrated to PostgreSQL. Remove imports and use API/fetch instead. */
+export function createClient(): never {
+  throw new Error(
+    'Supabase is no longer used. This component needs to be migrated to use PostgreSQL API. Use fetch() to /api/* endpoints instead.'
+  )
+}
 
