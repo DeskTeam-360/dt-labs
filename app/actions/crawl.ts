@@ -1,7 +1,14 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { auth } from '@/auth'
 import { cookies } from 'next/headers'
+import {
+  db,
+  companyWebsites,
+  crawlSessions,
+  crawlPages,
+} from '@/lib/db'
+import { eq, and, desc, asc } from 'drizzle-orm'
 
 interface StartCrawlParams {
   company_id?: string
@@ -14,22 +21,57 @@ interface StartCrawlParams {
   max_pages?: number
 }
 
+function toSnakeSession(s: typeof crawlSessions.$inferSelect) {
+  return {
+    id: s.id,
+    company_website_id: s.companyWebsiteId,
+    status: s.status,
+    total_pages: s.totalPages,
+    crawled_pages: s.crawledPages,
+    failed_pages: s.failedPages,
+    uncrawled_pages: s.uncrawledPages,
+    broken_pages: s.brokenPages,
+    error_message: s.errorMessage,
+    max_depth: s.maxDepth,
+    max_pages: s.maxPages,
+    started_at: s.startedAt?.toISOString() ?? null,
+    completed_at: s.completedAt?.toISOString() ?? null,
+    created_at: s.createdAt?.toISOString() ?? '',
+    updated_at: s.updatedAt?.toISOString() ?? '',
+  }
+}
+
+function toSnakePage(p: typeof crawlPages.$inferSelect) {
+  return {
+    id: p.id,
+    crawl_session_id: p.crawlSessionId,
+    url: p.url,
+    title: p.title,
+    description: p.description,
+    depth: p.depth,
+    status: p.status,
+    http_status_code: p.httpStatusCode,
+    content_type: p.contentType,
+    heading_hierarchy: p.headingHierarchy,
+    meta_tags: p.metaTags,
+    links: p.links,
+    crawled_at: p.crawledAt?.toISOString() ?? null,
+    created_at: p.createdAt?.toISOString() ?? '',
+    updated_at: p.updatedAt?.toISOString() ?? '',
+  }
+}
+
 /**
  * Server action to create a company website and start a crawl session
  */
 export async function startCrawl(params: StartCrawlParams) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const session = await auth()
+    if (!session?.user) {
       return { error: 'Unauthorized', success: false }
     }
+
+    const cookieStore = await cookies()
 
     const {
       company_id,
@@ -55,29 +97,27 @@ export async function startCrawl(params: StartCrawlParams) {
 
       // If setting as primary, unset other primary websites for this company
       if (is_primary) {
-        await supabase
-          .from('company_websites')
-          .update({ is_primary: false })
-          .eq('company_id', company_id)
-          .eq('is_primary', true)
+        await db
+          .update(companyWebsites)
+          .set({ isPrimary: false })
+          .where(
+            and(
+              eq(companyWebsites.companyId, company_id),
+              eq(companyWebsites.isPrimary, true)
+            )
+          )
       }
 
-      // Create company website
-      const { data: websiteData, error: websiteError } = await supabase
-        .from('company_websites')
-        .insert({
-          company_id,
+      const [websiteData] = await db
+        .insert(companyWebsites)
+        .values({
+          companyId: company_id,
           url,
           title: title || null,
           description: description || null,
-          is_primary: is_primary || false,
+          isPrimary: is_primary || false,
         })
-        .select()
-        .single()
-
-      if (websiteError) {
-        return { error: websiteError.message, success: false }
-      }
+        .returning()
 
       if (!websiteData) {
         return { error: 'Failed to create company website', success: false }
@@ -86,13 +126,13 @@ export async function startCrawl(params: StartCrawlParams) {
       websiteId = websiteData.id
     } else {
       // Verify the company_website_id exists
-      const { data: existingWebsite, error: checkError } = await supabase
-        .from('company_websites')
-        .select('id')
-        .eq('id', websiteId)
-        .single()
+      const [existingWebsite] = await db
+        .select({ id: companyWebsites.id })
+        .from(companyWebsites)
+        .where(eq(companyWebsites.id, websiteId))
+        .limit(1)
 
-      if (checkError || !existingWebsite) {
+      if (!existingWebsite) {
         return { error: 'Invalid company_website_id', success: false }
       }
     }
@@ -132,28 +172,18 @@ export async function startCrawl(params: StartCrawlParams) {
  */
 export async function getCrawlSessions(company_website_id: string) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const session = await auth()
+    if (!session?.user) {
       return { error: 'Unauthorized', success: false }
     }
 
-    const { data, error } = await supabase
-      .from('crawl_sessions')
-      .select('*')
-      .eq('company_website_id', company_website_id)
-      .order('created_at', { ascending: false })
+    const rows = await db
+      .select()
+      .from(crawlSessions)
+      .where(eq(crawlSessions.companyWebsiteId, company_website_id))
+      .orderBy(desc(crawlSessions.createdAt))
 
-    if (error) {
-      return { error: error.message, success: false }
-    }
-
+    const data = rows.map(toSnakeSession)
     return { data, success: true }
   } catch (error: any) {
     return { error: error.message || 'Failed to fetch crawl sessions', success: false }
@@ -165,32 +195,20 @@ export async function getCrawlSessions(company_website_id: string) {
  */
 export async function getCrawlPages(crawl_session_id: string) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const session = await auth()
+    if (!session?.user) {
       return { error: 'Unauthorized', success: false }
     }
 
-    const { data, error } = await supabase
-      .from('crawl_pages')
-      .select('*')
-      .eq('crawl_session_id', crawl_session_id)
-      .order('depth', { ascending: true })
-      .order('crawled_at', { ascending: true })
+    const rows = await db
+      .select()
+      .from(crawlPages)
+      .where(eq(crawlPages.crawlSessionId, crawl_session_id))
+      .orderBy(asc(crawlPages.depth), asc(crawlPages.crawledAt))
 
-    if (error) {
-      return { error: error.message, success: false }
-    }
-
+    const data = rows.map(toSnakePage)
     return { data, success: true }
   } catch (error: any) {
     return { error: error.message || 'Failed to fetch crawl pages', success: false }
   }
 }
-

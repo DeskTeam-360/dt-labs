@@ -9,13 +9,5 @@ export default async function ContentPlannerIntentsPage() {
     redirect('/login')
   }
 
-  return (
-    <ContentPlannerIntentsContent
-      user={{
-        id: session.user.id!,
-        email: session.user.email ?? null,
-        user_metadata: { full_name: session.user.name },
-      }}
-    />
-  )
+  return <ContentPlannerIntentsContent user={session.user} />
 }

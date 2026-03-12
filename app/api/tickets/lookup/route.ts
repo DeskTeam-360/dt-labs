@@ -29,7 +29,7 @@ export async function GET() {
       db.select({ id: ticketPriorities.id, title: ticketPriorities.title, slug: ticketPriorities.slug, color: ticketPriorities.color, sortOrder: ticketPriorities.sortOrder }).from(ticketPriorities).orderBy(asc(ticketPriorities.sortOrder)),
       db.select({ id: companies.id, name: companies.name, color: companies.color, email: companies.email }).from(companies).orderBy(asc(companies.name)),
       db.select({ id: tags.id, name: tags.name, slug: tags.slug, color: tags.color }).from(tags).orderBy(asc(tags.name)),
-      db.select({ id: ticketStatuses.id, slug: ticketStatuses.slug, title: ticketStatuses.title, color: ticketStatuses.color, showInKanban: ticketStatuses.showInKanban, sortOrder: ticketStatuses.sortOrder }).from(ticketStatuses).orderBy(asc(ticketStatuses.sortOrder)),
+      db.select({ id: ticketStatuses.id, slug: ticketStatuses.slug, title: ticketStatuses.title, customerTitle: ticketStatuses.customerTitle, color: ticketStatuses.color, showInKanban: ticketStatuses.showInKanban, sortOrder: ticketStatuses.sortOrder }).from(ticketStatuses).orderBy(asc(ticketStatuses.sortOrder)),
       db.select({ teamId: teamMembers.teamId }).from(teamMembers).where(eq(teamMembers.userId, userId)),
     ])
 
@@ -46,6 +46,7 @@ export async function GET() {
       id: s.id,
       slug: s.slug,
       title: s.title,
+      customer_title: s.customerTitle ?? undefined,
       color: s.color,
       show_in_kanban: s.showInKanban,
       sort_order: s.sortOrder,

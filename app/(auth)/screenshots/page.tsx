@@ -53,13 +53,7 @@ export default async function ScreenshotsPage() {
 
   return (
     <ScreenshotsContent
-      user={{
-        id: session.user.id!,
-        email: session.user.email ?? undefined,
-        name: session.user.name ?? undefined,
-        image: session.user.image ?? undefined,
-        user_metadata: { full_name: session.user.name },
-      }}
+      user={session.user}
       screenshots={screenshotsData}
       tickets={ticketsData}
     />

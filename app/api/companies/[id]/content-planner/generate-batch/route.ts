@@ -1,6 +1,14 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
+import {
+  db,
+  companies,
+  companyKnowledgeBases,
+  contentPlannerChannels,
+  contentPlannerIntents,
+  companyContentPlanners,
+} from '@/lib/db'
+import { eq, and, asc, desc } from 'drizzle-orm'
 
 const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini'
 
@@ -54,16 +62,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-    const { id: companyId } = await params
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await auth()
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const { id: companyId } = await params
 
     const body = await request.json().catch(() => ({}))
     const gbpPerWeek = Math.max(0, typeof body?.gbp_per_week === 'number' ? body.gbp_per_week : Number(body?.gbp_per_week) || 0)
@@ -81,24 +85,19 @@ export async function POST(
     today.setHours(0, 0, 0, 0)
     const publishDates = generatePublishDates(total, preferredDays, today)
 
-    const { data: channels } = await supabase
-      .from('content_planner_channels')
-      .select('id, title')
+    const channelsRows = await db.select({ id: contentPlannerChannels.id, title: contentPlannerChannels.title }).from(contentPlannerChannels)
 
     const channelByTitle: Record<string, string> = {}
-    ;(channels || []).forEach((c: { id: string; title: string }) => {
+    channelsRows.forEach((c) => {
       channelByTitle[c.title.toLowerCase()] = c.id
     })
 
-    const gbpChannelId = channelByTitle['gbp'] ?? (channels?.[0] as { id: string })?.id
-    const socialChannelId = channelByTitle['social'] ?? (channels?.[0] as { id: string })?.id
-    const blogChannelId = channelByTitle['blog'] ?? (channels?.[0] as { id: string })?.id
+    const gbpChannelId = channelByTitle['gbp'] ?? channelsRows[0]?.id
+    const socialChannelId = channelByTitle['social'] ?? channelsRows[0]?.id
+    const blogChannelId = channelByTitle['blog'] ?? channelsRows[0]?.id
 
-    const { data: intentRows } = await supabase
-      .from('content_planner_intents')
-      .select('id, title')
-      .order('title')
-    const intents = ((intentRows || []) as { id: string; title: string }[])
+    const intentRows = await db.select({ id: contentPlannerIntents.id, title: contentPlannerIntents.title }).from(contentPlannerIntents).orderBy(asc(contentPlannerIntents.title))
+    const intents = intentRows
     const intentByTitle: Record<string, string> = {}
     intents.forEach((i) => { intentByTitle[i.title.toLowerCase()] = i.id })
     const intentTitles = intents.map((i) => i.title).join(', ')
@@ -118,28 +117,20 @@ export async function POST(
 
     const apiKey = process.env.OPENAI_API_KEY
     if (apiKey) {
-      const { data: company } = await supabase
-        .from('companies')
-        .select('name')
-        .eq('id', companyId)
-        .single()
-      const companyName = (company as { name?: string } | null)?.name ?? 'Company'
-      const { data: companyInfo } = await supabase
-        .from('companies')
-        .select('name, description, address, city, state, zip, country, phone, email, website')
-        .eq('id', companyId)
-        .single()
+      const [companyRow] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1)
+      const companyName = companyRow?.name ?? 'Company'
+      const [companyInfoRow] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+      const companyInfo = companyInfoRow ? { name: companyInfoRow.name, email: companyInfoRow.email } : null
 
-      const { data: knowledgeBases } = await supabase
-        .from('company_knowledge_bases')
-        .select('id, content')
-        .eq('company_id', companyId)
-        .eq('type', 'company_info')
-        .order('updated_at', { ascending: false })
+      const knowledgeBasesRows = await db
+        .select({ id: companyKnowledgeBases.id, content: companyKnowledgeBases.content })
+        .from(companyKnowledgeBases)
+        .where(and(eq(companyKnowledgeBases.companyId, companyId), eq(companyKnowledgeBases.type, 'company_info')))
+        .orderBy(desc(companyKnowledgeBases.updatedAt))
 
       const knowledgeBaseText =
-        (knowledgeBases && knowledgeBases.length > 0)
-          ? knowledgeBases
+        (knowledgeBasesRows && knowledgeBasesRows.length > 0)
+          ? knowledgeBasesRows
               .map((kb: { id: string; content: string | null }) => (kb.content || '').trim())
               .filter(Boolean)
               .join('\n\n---\n\n')
@@ -216,32 +207,28 @@ Return ONLY valid JSON array, no markdown or explanation. Example format:
         })
       }
       return {
-        company_id: companyId,
-        channel_id: item.channel_id,
-        publish_date: publishDates[i],
+        companyId,
+        channelId: item.channel_id,
+        publishDate: new Date(publishDates[i]),
         status: 'draft',
-        cta_dynamic: true,
+        ctaDynamic: true,
         topic: meta?.topic ?? null,
-        topic_description: null,
-        topic_type_id: null,
+        topicDescription: null,
+        topicTypeId: null,
         hashtags: null,
-        primary_keyword: meta?.primary_keyword ?? null,
-        secondary_keywords: meta?.secondary_keywords ?? null,
+        primaryKeyword: meta?.primary_keyword ?? null,
+        secondaryKeywords: meta?.secondary_keywords ?? null,
         intents: intentIds,
         location: meta?.location ?? null,
       }
     })
 
-    const { data: inserted, error } = await supabase
-      .from('company_content_planners')
-      .insert(rows)
-      .select('id')
+    const inserted = await db
+      .insert(companyContentPlanners)
+      .values(rows)
+      .returning({ id: companyContentPlanners.id })
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ created: inserted?.length ?? 0, ids: (inserted || []).map((r: { id: string }) => r.id) })
+    return NextResponse.json({ created: inserted?.length ?? 0, ids: (inserted || []).map((r) => r.id) })
   } catch (error: unknown) {
     const err = error as { message?: string }
     return NextResponse.json(

@@ -4,7 +4,6 @@ import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Table, Tabs
 import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, ReloadOutlined, GlobalOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
 import { createClient } from '@/utils/supabase/client'
@@ -15,7 +14,7 @@ const { Content } = Layout
 const { Title, Text } = Typography
 
 interface CrawlSessionDetailContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
   crawlSession: any
 }
 

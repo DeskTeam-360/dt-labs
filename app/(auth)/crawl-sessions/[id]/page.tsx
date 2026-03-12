@@ -4,10 +4,6 @@ import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import CrawlSessionDetailContent from '@/components/CrawlSessionDetailContent'
 
-function toSessionUser(u: { id: string; email?: string | null; name?: string | null; image?: string | null }) {
-  return { id: u.id, email: u.email ?? undefined, user_metadata: { full_name: u.name, avatar_url: u.image } }
-}
-
 export default async function CrawlSessionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user) redirect('/login')
@@ -50,6 +46,6 @@ export default async function CrawlSessionDetailPage({ params }: { params: Promi
     },
   }
 
-  return <CrawlSessionDetailContent user={toSessionUser(session.user)} crawlSession={crawlSession} />
+  return <CrawlSessionDetailContent user={session.user} crawlSession={crawlSession} />
 }
 

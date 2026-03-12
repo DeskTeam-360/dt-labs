@@ -1,8 +1,14 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db } from '@/lib/db'
+import {
+  aiTokenUsage,
+  companyKnowledgeBases,
+} from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-const OPENAI_EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small'
+const OPENAI_EMBEDDING_MODEL =
+  process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small'
 const EMBEDDING_DIMENSION = 1536
 
 function stripHtml(html: string): string {
@@ -14,16 +20,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-    const { id } = await params
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await auth()
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const { id } = await params
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
@@ -33,14 +35,17 @@ export async function POST(
       )
     }
 
-    const { data: row, error: fetchError } = await supabase
-      .from('company_knowledge_bases')
-      .select('id, content')
-      .eq('id', id)
-      .single()
+    const [row] = await db
+      .select({ id: companyKnowledgeBases.id, content: companyKnowledgeBases.content })
+      .from(companyKnowledgeBases)
+      .where(eq(companyKnowledgeBases.id, id))
+      .limit(1)
 
-    if (fetchError || !row) {
-      return NextResponse.json({ error: 'Knowledge base entry not found' }, { status: 404 })
+    if (!row) {
+      return NextResponse.json(
+        { error: 'Knowledge base entry not found' },
+        { status: 404 }
+      )
     }
 
     const text = row.content ? stripHtml(row.content) : ''
@@ -74,36 +79,34 @@ export async function POST(
     const resJson = await openaiRes.json()
     const embedding = resJson?.data?.[0]?.embedding as number[] | undefined
     const totalTokens = resJson?.usage?.total_tokens ?? 0
-    if (!embedding || !Array.isArray(embedding) || embedding.length !== EMBEDDING_DIMENSION) {
+    if (
+      !embedding ||
+      !Array.isArray(embedding) ||
+      embedding.length !== EMBEDDING_DIMENSION
+    ) {
       return NextResponse.json(
         {
           error: 'Invalid embedding response',
-          detail: embedding ? `length ${embedding.length}, expected ${EMBEDDING_DIMENSION}` : 'no embedding in response',
+          detail: embedding
+            ? `length ${embedding.length}, expected ${EMBEDDING_DIMENSION}`
+            : 'no embedding in response',
         },
         { status: 502 }
       )
     }
 
-    const { error: updateError } = await supabase
-      .from('company_knowledge_bases')
-      .update({ embedding })
-      .eq('id', id)
+    await db
+      .update(companyKnowledgeBases)
+      .set({ embedding: embedding as unknown })
+      .where(eq(companyKnowledgeBases.id, id))
 
-    if (updateError) {
-      return NextResponse.json(
-        { error: updateError.message || 'Failed to save embedding' },
-        { status: 500 }
-      )
-    }
-
-    await supabase.from('ai_token_usage').insert({
-      user_id: user.id,
-      used_for: 'knowledge_base_embed',
-      ai_model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
-      content_text: null,
-      prompt_tokens: totalTokens,
-      completion_tokens: 0,
-      total_tokens: totalTokens,
+    await db.insert(aiTokenUsage).values({
+      userId: session.user.id,
+      usedFor: 'knowledge_base_embed',
+      aiModel: OPENAI_EMBEDDING_MODEL,
+      promptTokens: totalTokens,
+      completionTokens: 0,
+      totalTokens: totalTokens,
     })
 
     return NextResponse.json({ success: true })

@@ -53,6 +53,7 @@ export interface TicketStatusRecord {
   id: number
   slug: string
   title: string
+  customer_title?: string
   color: string
   show_in_kanban: boolean
   sort_order: number

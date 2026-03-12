@@ -15,7 +15,6 @@ import {
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
-import { User } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import type { ColumnsType } from 'antd/es/table'
@@ -25,7 +24,7 @@ const { Title } = Typography
 const { TextArea } = Input
 
 interface ContentPlannerIntentsContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
 }
 
 interface IntentRecord {

@@ -220,7 +220,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
       const data = await apiFetch<{ id: string; ticket_id: number; user_id: string; start_time: string; ticket?: { id: number; title: string } } | null>(
         `/api/users/time-tracker?user_id=${user.id}&active_only=1`
       )
-      setActiveTracker(data)
+      setActiveTracker(data as { id: number; ticket_id: number; user_id: string; start_time: string; ticket?: { id: number; title: string } } | null)
     } catch {
       setActiveTracker(null)
     }
@@ -540,62 +540,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
             </Card>
           </Col>
           <Col xs={24} lg={8}>
-            <Card
-              title={
-                <Space>
-                  <CloudUploadOutlined />
-                  <span>Test iDrive Connection</span>
-                </Space>
-              }
-              style={{ marginBottom: 16 }}
-            >
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <div>
-                  <input
-                    ref={idriveTestInputRef}
-                    type="file"
-                    accept="*/*"
-                    style={{ display: 'none' }}
-                    onChange={handleIdriveTest}
-                  />
-                  <Button
-                    type="dashed"
-                    icon={<CloudUploadOutlined />}
-                    onClick={() => idriveTestInputRef.current?.click()}
-                    loading={idriveTestLoading}
-                    block
-                  >
-                    Upload file to test iDrive
-                  </Button>
-                </div>
-                {idriveTestResult && (
-                  <div
-                    style={{
-                      padding: 12,
-                      borderRadius: 6,
-                      background: idriveTestResult.ok ? '#f6ffed' : '#fff2f0',
-                      border: `1px solid ${idriveTestResult.ok ? '#b7eb8f' : '#ffccc7'}`,
-                    }}
-                  >
-                    {idriveTestResult.ok ? (
-                      <>
-                        <Text type="success" strong>Connection OK</Text>
-                        {idriveTestResult.url && (
-                          <div style={{ marginTop: 8 }}>
-                            <Text type="secondary" style={{ fontSize: 12 }}>URL: </Text>
-                            <a href={idriveTestResult.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>
-                              {idriveTestResult.url}
-                            </a>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <Text type="danger">Error: {idriveTestResult.error}</Text>
-                    )}
-                  </div>
-                )}
-              </Space>
-            </Card>
+            
             <Card title="Account Information" style={{ height: '100%' }}>
               <Space orientation="vertical" style={{ width: '100%' }}>
                 <div>

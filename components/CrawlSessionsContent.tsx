@@ -4,7 +4,6 @@ import { Layout, Table, Button, Space, Typography, Card, Tag, Modal, Form, Input
 import { PlusOutlined, EyeOutlined, DeleteOutlined, ReloadOutlined, PlayCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, GlobalOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
@@ -17,7 +16,7 @@ const { Option } = Select
 const { TextArea } = Input
 
 interface CrawlSessionsContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
 }
 
 interface CrawlSessionRecord {

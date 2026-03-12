@@ -24,8 +24,6 @@ import {
   DatabaseOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
 import type { ColumnsType } from 'antd/es/table'
@@ -35,7 +33,7 @@ const { Title, Text } = Typography
 const { TextArea } = Input
 
 interface CompanyDataTemplatesContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
 }
 
 interface DataTemplateRecord {
@@ -62,20 +60,14 @@ export default function CompanyDataTemplatesContent({
   const [editingTemplate, setEditingTemplate] =
     useState<DataTemplateRecord | null>(null)
   const [form] = Form.useForm()
-  const supabase = createClient()
 
   const fetchTemplates = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('company_data_templates')
-        .select('*')
-        .order('group', { ascending: true })
-        .order('title', { ascending: true })
-
-      if (error) throw error
-
-      setTemplates(data || [])
+      const res = await fetch('/api/company-data-templates', { credentials: 'include' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as any)?.error || 'Failed to fetch')
+      const json = await res.json()
+      setTemplates(json.data || [])
     } catch (error: any) {
       message.error(error.message || 'Failed to fetch data templates')
     } finally {
@@ -108,12 +100,11 @@ export default function CompanyDataTemplatesContent({
 
   const handleDelete = async (templateId: string) => {
     try {
-      const { error } = await supabase
-        .from('company_data_templates')
-        .delete()
-        .eq('id', templateId)
-
-      if (error) throw error
+      const res = await fetch(`/api/company-data-templates/${templateId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as any)?.error || 'Failed to delete')
 
       message.success('Data template deleted successfully')
       fetchTemplates()
@@ -125,33 +116,34 @@ export default function CompanyDataTemplatesContent({
   const handleSubmit = async (values: any) => {
     try {
       if (editingTemplate) {
-        // Update existing template
-        const { error } = await supabase
-          .from('company_data_templates')
-          .update({
+        const res = await fetch(`/api/company-data-templates/${editingTemplate.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
             title: values.title,
             group: values.group || null,
             is_active: values.is_active,
-          })
-          .eq('id', editingTemplate.id)
-
-        if (error) throw error
+          }),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({})) as any)?.error || 'Failed to update')
 
         message.success('Data template updated successfully')
         setModalVisible(false)
         form.resetFields()
         fetchTemplates()
       } else {
-        // Create new template
-        const { error } = await supabase
-          .from('company_data_templates')
-          .insert({
+        const res = await fetch('/api/company-data-templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
             title: values.title,
             group: values.group || null,
             is_active: values.is_active,
-          })
-
-        if (error) throw error
+          }),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({})) as any)?.error || 'Failed to create')
 
         message.success('Data template created successfully')
         setModalVisible(false)

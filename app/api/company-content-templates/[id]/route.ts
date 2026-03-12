@@ -1,6 +1,7 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
+import { db, companyContentTemplates } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 
 // GET - Get content template by ID
 export async function GET(
@@ -8,32 +9,36 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-    const { id } = await params
-
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const session = await auth()
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data, error } = await supabase
-      .from('company_content_templates')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const { id } = await params
 
-    if (error || !data) {
+    const [row] = await db
+      .select()
+      .from(companyContentTemplates)
+      .where(eq(companyContentTemplates.id, id))
+      .limit(1)
+
+    if (!row) {
       return NextResponse.json(
         { error: 'Content template not found' },
         { status: 404 }
       )
     }
 
+    const data = {
+      id: row.id,
+      title: row.title,
+      content: row.content,
+      description: row.description,
+      type: row.type,
+      fields: row.fields,
+      created_at: row.createdAt?.toISOString(),
+      updated_at: row.updatedAt?.toISOString(),
+    }
     return NextResponse.json({ data })
   } catch (error: any) {
     return NextResponse.json(
@@ -49,19 +54,12 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-    const { id } = await params
-
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const session = await auth()
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const { title, content, description, type, fields } = body
 
@@ -72,17 +70,26 @@ export async function PUT(
     if (type !== undefined) updateData.type = type || null
     if (fields !== undefined) updateData.fields = Array.isArray(fields) && fields.length ? fields : null
 
-    const { data, error } = await supabase
-      .from('company_content_templates')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single()
+    const [updated] = await db
+      .update(companyContentTemplates)
+      .set(updateData as Record<string, unknown>)
+      .where(eq(companyContentTemplates.id, id))
+      .returning()
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+    if (!updated) {
+      return NextResponse.json({ error: 'Content template not found' }, { status: 404 })
     }
 
+    const data = {
+      id: updated.id,
+      title: updated.title,
+      content: updated.content,
+      description: updated.description,
+      type: updated.type,
+      fields: updated.fields,
+      created_at: updated.createdAt?.toISOString(),
+      updated_at: updated.updatedAt?.toISOString(),
+    }
     return NextResponse.json({ data, success: true })
   } catch (error: any) {
     return NextResponse.json(
@@ -98,26 +105,20 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-    const { id } = await params
-
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const session = await auth()
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { error } = await supabase
-      .from('company_content_templates')
-      .delete()
-      .eq('id', id)
+    const { id } = await params
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+    const [deleted] = await db
+      .delete(companyContentTemplates)
+      .where(eq(companyContentTemplates.id, id))
+      .returning({ id: companyContentTemplates.id })
+
+    if (!deleted) {
+      return NextResponse.json({ error: 'Content template not found' }, { status: 404 })
     }
 
     return NextResponse.json({
@@ -131,4 +132,3 @@ export async function DELETE(
     )
   }
 }
-

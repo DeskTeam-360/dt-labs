@@ -229,7 +229,7 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     file_path: r.filePath,
     file_url: r.fileUrl || (r.filePath ? getPublicUrl(r.filePath) : ''),
     file_size: r.fileSize ?? 0,
-    mime_type: r.mimeType,
+    mime_type: r.mimeType ?? '',
     ticket_id: r.ticketId,
     title: r.title,
     description: r.description,

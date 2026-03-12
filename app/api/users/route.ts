@@ -1,16 +1,33 @@
 import { auth } from '@/auth'
-import { db, users, companies } from '@/lib/db'
+import { db, users, companies, companyUsers } from '@/lib/db'
 import { eq, desc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-/** GET /api/users - List users with company */
+/** GET /api/users - List users with company. When customer: only users in same company */
 export async function GET() {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const rows = await db
+  const userId = session.user.id!
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+
+  let companyId: string | null = null
+  if (role === 'customer') {
+    const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
+    companyId = userRow?.companyId ?? null
+    if (!companyId) {
+      const [cu] = await db.select({ companyId: companyUsers.companyId }).from(companyUsers).where(eq(companyUsers.userId, userId)).limit(1)
+      companyId = cu?.companyId ?? null
+    }
+  }
+
+  if (role === 'customer' && !companyId) {
+    return NextResponse.json([])
+  }
+
+  let query = db
     .select({
       user: users,
       company: companies,
@@ -18,6 +35,12 @@ export async function GET() {
     .from(users)
     .leftJoin(companies, eq(users.companyId, companies.id))
     .orderBy(desc(users.createdAt))
+
+  if (role === 'customer' && companyId) {
+    query = query.where(eq(users.companyId, companyId)) as typeof query
+  }
+
+  const rows = await query
 
   const result = rows.map((r) => {
     const u = r.user

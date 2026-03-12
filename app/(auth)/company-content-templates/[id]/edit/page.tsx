@@ -4,10 +4,6 @@ import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import ContentTemplateForm from '@/components/ContentTemplateForm'
 
-function toSessionUser(u: { id: string; email?: string | null; name?: string | null; image?: string | null }) {
-  return { id: u.id, email: u.email ?? undefined, user_metadata: { full_name: u.name, avatar_url: u.image } }
-}
-
 export default async function EditContentTemplatePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user) redirect('/login')
@@ -28,6 +24,6 @@ export default async function EditContentTemplatePage({ params }: { params: Prom
     updated_at: row.updatedAt.toISOString(),
   }
 
-  return <ContentTemplateForm user={toSessionUser(session.user)} template={template} />
+  return <ContentTemplateForm user={session.user} template={template} />
 }
 

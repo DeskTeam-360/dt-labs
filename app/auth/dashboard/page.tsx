@@ -2,13 +2,13 @@ import { auth } from '@/auth'
 import { db, users, teams, tickets } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import DashboardContent from '@/components/DashboardContent'
+import CustomerDashboardContent from '@/components/CustomerDashboardContent'
 
 function toSessionUser(user: { id: string; email?: string | null; name?: string | null; image?: string | null }) {
   return {
-    id: user.id,
+    ...user,
     email: user.email ?? undefined,
     user_metadata: { full_name: user.name },
-    ...user,
   }
 }
 
@@ -18,6 +18,17 @@ export default async function AuthDashboardPage() {
 
   if (!user) {
     return null
+  }
+
+  const role = (user as { role?: string }).role
+
+  if (role === 'customer') {
+    return (
+      <CustomerDashboardContent
+        user={toSessionUser(user) as any}
+        withSidebar
+      />
+    )
   }
 
   let usersCount = 0
@@ -46,8 +57,8 @@ export default async function AuthDashboardPage() {
       stats={{
         totalUsers: usersCount,
         totalTeams: teamsCount,
-        completedTodos: completedTodosCount,
-        totalTodos: totalTodosCount,
+        completedTickets: completedTodosCount,
+        totalTickets: totalTodosCount,
       }}
     />
   )

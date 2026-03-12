@@ -39,3 +39,43 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ data })
 }
+
+/** POST /api/company-data-templates - create */
+export async function POST(request: Request) {
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await request.json()
+  const { title, group, is_active } = body
+
+  if (!title?.trim()) {
+    return NextResponse.json({ error: 'title is required' }, { status: 400 })
+  }
+
+  const id = String(title).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 255) || `dt-${Date.now()}`
+
+  const [row] = await db
+    .insert(companyDataTemplates)
+    .values({
+      id,
+      title: String(title).trim(),
+      group: group?.trim() || null,
+      isActive: is_active ?? true,
+    })
+    .returning()
+
+  if (!row) {
+    return NextResponse.json({ error: 'Failed to create' }, { status: 500 })
+  }
+
+  return NextResponse.json({
+    id: row.id,
+    title: row.title,
+    group: row.group,
+    is_active: row.isActive ?? true,
+    created_at: row.createdAt?.toISOString() ?? '',
+    updated_at: row.updatedAt?.toISOString() ?? '',
+  }, { status: 201 })
+}

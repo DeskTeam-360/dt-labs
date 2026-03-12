@@ -19,7 +19,6 @@ import {
 import { ArrowLeftOutlined, PlayCircleOutlined, SaveOutlined, PictureOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import CustomerNavbar from './CustomerNavbar'
@@ -48,7 +47,7 @@ const CTA_TYPE_OPTIONS = [
 ]
 
 interface ContentPlannerDetailContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
   companyData: { id: string; name?: string }
   plannerData: any
   intents: { id: string; title: string }[]

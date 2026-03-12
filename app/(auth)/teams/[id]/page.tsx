@@ -4,10 +4,6 @@ import { eq, asc } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import TeamDetailContent from '@/components/TeamDetailContent'
 
-function toSessionUser(u: { id: string; email?: string | null; name?: string | null; image?: string | null }) {
-  return { id: u.id, email: u.email ?? undefined, user_metadata: { full_name: u.name, avatar_url: u.image } }
-}
-
 export default async function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user) redirect('/login')
@@ -34,7 +30,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
     id: m.member.id,
     team_id: m.member.teamId,
     user_id: m.member.userId,
-    role: m.member.role,
+    role: m.member.role ?? 'member',
     joined_at: m.member.joinedAt.toISOString(),
     user_name: m.user?.fullName || m.user?.email || 'Unknown',
     user_email: m.user?.email || '',
@@ -51,5 +47,5 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
     members,
   }
 
-  return <TeamDetailContent user={toSessionUser(session.user)} team={team} />
+  return <TeamDetailContent user={session.user} team={team} />
 }

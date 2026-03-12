@@ -2,25 +2,29 @@ import { auth } from '@/auth'
 import { db, users, teams, tickets } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import DashboardContent from '@/components/DashboardContent'
-
-/** Session user shape for compatibility with components that expected Supabase User */
-function toSessionUser(user: { id: string; email?: string | null; name?: string | null; image?: string | null }) {
-  return {
-    id: user.id,
-    email: user.email ?? undefined,
-    user_metadata: { full_name: user.name },
-    ...user,
-  }
-}
+import CustomerDashboardContent from '@/components/CustomerDashboardContent'
 
 export default async function DashboardPage() {
   const session = await auth()
   const user = session?.user
 
   if (!user) {
-    return null // Middleware akan redirect ke login
+    return null
   }
 
+  const role = (user as { role?: string }).role
+
+  // Customer: show customer dashboard (My Tickets, Priority, Time Spent, etc.) with sidebar
+  if (role === 'customer') {
+    return (
+      <CustomerDashboardContent
+        user={user}
+        withSidebar
+      />
+    )
+  }
+
+  // Admin / other roles: show admin dashboard
   let usersCount = 0
   let teamsCount = 0
   let completedTicketsCount = 0
@@ -43,7 +47,7 @@ export default async function DashboardPage() {
 
   return (
     <DashboardContent
-      user={toSessionUser(user) as any}
+      user={user}
       stats={{
         totalUsers: usersCount,
         totalTeams: teamsCount,

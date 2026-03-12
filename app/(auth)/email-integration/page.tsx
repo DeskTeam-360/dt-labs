@@ -30,20 +30,16 @@ export default async function EmailIntegrationPage() {
         id: integrationRow.id,
         provider: integrationRow.provider,
         email_address: integrationRow.emailAddress,
-        is_active: integrationRow.isActive,
+        is_active: integrationRow.isActive ?? false,
         expires_at: integrationRow.expiresAt ? new Date(integrationRow.expiresAt).toISOString() : null,
-        created_at: integrationRow.createdAt ? new Date(integrationRow.createdAt).toISOString() : null,
+        created_at: integrationRow.createdAt ? new Date(integrationRow.createdAt).toISOString() : '',
         last_sync_at: integrationRow.lastSyncAt ? new Date(integrationRow.lastSyncAt).toISOString() : null,
       }
     : null
 
   return (
     <EmailIntegrationContent
-      user={{
-        id: session.user.id!,
-        email: session.user.email ?? null,
-        user_metadata: { full_name: session.user.name },
-      }}
+      user={session.user}
       integration={integration}
     />
   )

@@ -17,7 +17,6 @@ import {
 import { ArrowLeftOutlined, SaveOutlined, CopyOutlined } from '@ant-design/icons'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 
@@ -26,7 +25,7 @@ const { Title, Text } = Typography
 const { TextArea } = Input
 
 interface ContentTemplateFormProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
   template?: {
     id: string
     title: string

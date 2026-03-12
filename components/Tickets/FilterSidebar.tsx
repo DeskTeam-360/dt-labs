@@ -45,6 +45,8 @@ interface FilterSidebarProps {
   filteredCount: number
   totalCount: number
   onClearFilters: () => void
+  /** When true, show only Status, Type, Date Range, Search */
+  isCustomer?: boolean
 }
 
 export default function FilterSidebar({
@@ -75,6 +77,7 @@ export default function FilterSidebar({
   filteredCount,
   totalCount,
   onClearFilters,
+  isCustomer = false,
 }: FilterSidebarProps) {
   return (
     <Sider
@@ -153,68 +156,72 @@ export default function FilterSidebar({
                 ))}
               </Select>
             </div>
-            <div>
-              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Visibility</Text>
-              <Select
-                mode="multiple"
-                placeholder="All visibility"
-                allowClear
-                style={{ width: '100%' }}
-                value={filterVisibility}
-                onChange={(v) => onFilterVisibilityChange(v ?? [])}
-                options={VISIBILITY_OPTIONS}
-                maxTagCount="responsive"
-              />
-            </div>
-            <div>
-              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Team</Text>
-              <Select
-                mode="multiple"
-                placeholder="All teams"
-                allowClear
-                style={{ width: '100%' }}
-                value={filterTeamIds}
-                onChange={(v) => onFilterTeamIdsChange(v ?? [])}
-                maxTagCount="responsive"
-              >
-                {teams.map((t) => (
-                  <Option key={t.id} value={t.id}>{t.name}</Option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Company</Text>
-              <Select
-                mode="multiple"
-                placeholder="All companies"
-                allowClear
-                style={{ width: '100%' }}
-                value={filterCompanyIds}
-                onChange={(v) => onFilterCompanyIdsChange(v ?? [])}
-                maxTagCount="responsive"
-              >
-                {companies.map((c) => (
-                  <Option key={c.id} value={c.id}>{c.name}</Option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Tags</Text>
-              <Select
-                mode="multiple"
-                placeholder="All tags"
-                allowClear
-                style={{ width: '100%' }}
-                value={filterTagIds}
-                onChange={onFilterTagIdsChange}
-                optionLabelProp="label"
-                maxTagCount="responsive"
-              >
-                {allTags.map((t) => (
-                  <Option key={t.id} value={t.id} label={t.name}>{t.name}</Option>
-                ))}
-              </Select>
-            </div>
+            {!isCustomer && (
+              <>
+                <div>
+                  <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Visibility</Text>
+                  <Select
+                    mode="multiple"
+                    placeholder="All visibility"
+                    allowClear
+                    style={{ width: '100%' }}
+                    value={filterVisibility}
+                    onChange={(v) => onFilterVisibilityChange(v ?? [])}
+                    options={VISIBILITY_OPTIONS}
+                    maxTagCount="responsive"
+                  />
+                </div>
+                <div>
+                  <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Team</Text>
+                  <Select
+                    mode="multiple"
+                    placeholder="All teams"
+                    allowClear
+                    style={{ width: '100%' }}
+                    value={filterTeamIds}
+                    onChange={(v) => onFilterTeamIdsChange(v ?? [])}
+                    maxTagCount="responsive"
+                  >
+                    {teams.map((t) => (
+                      <Option key={t.id} value={t.id}>{t.name}</Option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Company</Text>
+                  <Select
+                    mode="multiple"
+                    placeholder="All companies"
+                    allowClear
+                    style={{ width: '100%' }}
+                    value={filterCompanyIds}
+                    onChange={(v) => onFilterCompanyIdsChange(v ?? [])}
+                    maxTagCount="responsive"
+                  >
+                    {companies.map((c) => (
+                      <Option key={c.id} value={c.id}>{c.name}</Option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Tags</Text>
+                  <Select
+                    mode="multiple"
+                    placeholder="All tags"
+                    allowClear
+                    style={{ width: '100%' }}
+                    value={filterTagIds}
+                    onChange={onFilterTagIdsChange}
+                    optionLabelProp="label"
+                    maxTagCount="responsive"
+                  >
+                    {allTags.map((t) => (
+                      <Option key={t.id} value={t.id} label={t.name}>{t.name}</Option>
+                    ))}
+                  </Select>
+                </div>
+              </>
+            )}
             <div>
               <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Date range</Text>
               <DatePicker.RangePicker

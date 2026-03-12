@@ -23,8 +23,6 @@ import {
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
 import type { ColumnsType } from 'antd/es/table'
@@ -33,7 +31,7 @@ const { Content } = Layout
 const { Title, Text } = Typography
 
 interface CompanyContentTemplatesContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
 }
 
 interface ContentTemplateRecord {
@@ -58,7 +56,6 @@ export default function CompanyContentTemplatesContent({
   const [previewVisible, setPreviewVisible] = useState(false)
   const [previewContent, setPreviewContent] = useState<string>('')
   const [previewTitle, setPreviewTitle] = useState<string>('')
-  const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
@@ -67,14 +64,10 @@ export default function CompanyContentTemplatesContent({
   const fetchTemplates = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('company_content_templates')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      setTemplates(data || [])
+      const res = await fetch('/api/company-content-templates', { credentials: 'include' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error || 'Failed to fetch')
+      const json = await res.json()
+      setTemplates(json?.data || [])
     } catch (error: any) {
       message.error(error.message || 'Failed to fetch content templates')
     } finally {
@@ -102,13 +95,11 @@ export default function CompanyContentTemplatesContent({
 
   const handleDelete = async (templateId: string) => {
     try {
-      const { error } = await supabase
-        .from('company_content_templates')
-        .delete()
-        .eq('id', templateId)
-
-      if (error) throw error
-
+      const res = await fetch(`/api/company-content-templates/${templateId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error || 'Failed to delete')
       message.success('Content template deleted successfully')
       fetchTemplates()
     } catch (error: any) {

@@ -21,8 +21,6 @@ import {
   RobotOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
 import type { ColumnsType } from 'antd/es/table'
@@ -32,7 +30,7 @@ const { Title, Text } = Typography
 const { TextArea } = Input
 
 interface CompanyAISystemTemplatesContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
 }
 
 interface AISystemTemplateRecord {
@@ -55,17 +53,13 @@ export default function CompanyAISystemTemplatesContent({
   const [editingTemplate, setEditingTemplate] =
     useState<AISystemTemplateRecord | null>(null)
   const [form] = Form.useForm()
-  const supabase = createClient()
 
   const fetchTemplates = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('company_ai_system_template')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
+      const res = await fetch('/api/company-ai-system-templates', { credentials: 'include' })
+      if (!res.ok) throw new Error(await res.json().then((r: any) => r.error || 'Failed to fetch'))
+      const data = await res.json()
       setTemplates(data || [])
     } catch (error: any) {
       message.error(error.message || 'Failed to fetch AI system templates')
@@ -100,12 +94,11 @@ export default function CompanyAISystemTemplatesContent({
 
   const handleDelete = async (templateId: string) => {
     try {
-      const { error } = await supabase
-        .from('company_ai_system_template')
-        .delete()
-        .eq('id', templateId)
-
-      if (error) throw error
+      const res = await fetch(`/api/company-ai-system-templates/${templateId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error(await res.json().then((r: any) => r.error || 'Failed to delete'))
       message.success('AI system template deleted')
       fetchTemplates()
     } catch (error: any) {
@@ -116,27 +109,30 @@ export default function CompanyAISystemTemplatesContent({
   const handleSubmit = async (values: { title: string; content: string; format?: string }) => {
     try {
       if (editingTemplate) {
-        const { error } = await supabase
-          .from('company_ai_system_template')
-          .update({
+        const res = await fetch(`/api/company-ai-system-templates/${editingTemplate.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
             title: values.title,
             content: values.content ?? '',
             format: values.format?.trim() || null,
-          })
-          .eq('id', editingTemplate.id)
-
-        if (error) throw error
+          }),
+        })
+        if (!res.ok) throw new Error(await res.json().then((r: any) => r.error || 'Failed to update'))
         message.success('AI system template updated')
       } else {
-        const { error } = await supabase
-          .from('company_ai_system_template')
-          .insert({
+        const res = await fetch('/api/company-ai-system-templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
             title: values.title,
             content: values.content ?? '',
             format: values.format?.trim() || null,
-          })
-
-        if (error) throw error
+          }),
+        })
+        if (!res.ok) throw new Error(await res.json().then((r: any) => r.error || 'Failed to create'))
         message.success('AI system template created')
       }
       setModalVisible(false)

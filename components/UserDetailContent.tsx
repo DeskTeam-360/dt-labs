@@ -25,11 +25,12 @@ const { TextArea } = Input
 const { RangePicker } = DatePicker
 
 interface UserDetailContentProps {
-  user: { id: string; email?: string | null; name?: string | null }
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
   userData: any
 }
 
 export default function UserDetailContent({ user: currentUser, userData: initialUserData }: UserDetailContentProps) {
+  const isCustomer = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'customer'
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -236,11 +237,11 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const handleSubmit = async (values: any) => {
     setLoading(true)
     try {
-      // Parse JSON fields
+      // Parse JSON fields (only when not customer)
       let permissions = null
       let metadata = null
       
-      if (values.permissions) {
+      if (!isCustomer && values.permissions) {
         try {
           permissions = JSON.parse(values.permissions)
         } catch (e) {
@@ -250,7 +251,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
         }
       }
       
-      if (values.metadata) {
+      if (!isCustomer && values.metadata) {
         try {
           metadata = JSON.parse(values.metadata)
         } catch (e) {
@@ -262,9 +263,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
 
       const updateData: any = {
         full_name: values.full_name,
-        role: values.role,
         status: values.status,
-        company_id: values.company_id || null,
         avatar_url: avatarUrl,
         phone: values.phone || null,
         department: values.department || null,
@@ -273,9 +272,13 @@ export default function UserDetailContent({ user: currentUser, userData: initial
         timezone: values.timezone || 'UTC',
         locale: values.locale || 'en',
         is_email_verified: values.is_email_verified || false,
-        permissions: permissions,
-        metadata: metadata,
         updated_at: new Date().toISOString(),
+      }
+      if (!isCustomer) {
+        updateData.role = values.role
+        updateData.company_id = values.company_id || null
+        updateData.permissions = permissions
+        updateData.metadata = metadata
       }
 
       await apiFetch(`/api/users/${userData.id}`, {
@@ -397,14 +400,16 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                 <Space size="middle">
                   {isEditing ? (
                     <>
-                      <Form.Item name="role" style={{ margin: 0 }}>
-                        <Select style={{ width: 120 }}>
-                          <Option value="admin">Admin</Option>
-                          <Option value="manager">Manager</Option>
-                          <Option value="user">User</Option>
-                          <Option value="guest">Guest</Option>
-                        </Select>
-                      </Form.Item>
+                      {!isCustomer && (
+                        <Form.Item name="role" style={{ margin: 0 }}>
+                          <Select style={{ width: 120 }}>
+                            <Option value="admin">Admin</Option>
+                            <Option value="manager">Manager</Option>
+                            <Option value="user">User</Option>
+                            <Option value="guest">Guest</Option>
+                          </Select>
+                        </Form.Item>
+                      )}
                       <Form.Item name="status" style={{ margin: 0 }}>
                         <Select style={{ width: 120 }}>
                           <Option value="active">Active</Option>
@@ -416,9 +421,11 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                     </>
                   ) : (
                     <>
-                      <Tag color={getRoleColor(userData.role)} style={{ fontSize: 14, padding: '4px 12px' }}>
-                        {userData.role?.toUpperCase()}
-                      </Tag>
+                      {!isCustomer && (
+                        <Tag color={getRoleColor(userData.role)} style={{ fontSize: 14, padding: '4px 12px' }}>
+                          {userData.role?.toUpperCase()}
+                        </Tag>
+                      )}
                       <Tag color={getStatusColor(userData.status)} style={{ fontSize: 14, padding: '4px 12px' }}>
                         {userData.status?.toUpperCase()}
                       </Tag>
@@ -587,19 +594,21 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                       <Form.Item name="is_email_verified" label="Email Verified" valuePropName="checked">
                         <Switch />
                       </Form.Item>
-                      <Form.Item
-                        name="role"
-                        label="Role"
-                        rules={[{ required: true, message: 'Please select role!' }]}
-                      >
-                        <Select>
-                          <Option value="admin">Admin</Option>
-                          <Option value="manager">Manager</Option>
-                          <Option value="user">User</Option>
-                          <Option value="customer">Customer</Option>
-                          <Option value="guest">Guest</Option>
-                        </Select>
-                      </Form.Item>
+                      {!isCustomer && (
+                        <Form.Item
+                          name="role"
+                          label="Role"
+                          rules={[{ required: true, message: 'Please select role!' }]}
+                        >
+                          <Select>
+                            <Option value="admin">Admin</Option>
+                            <Option value="manager">Manager</Option>
+                            <Option value="user">User</Option>
+                            <Option value="customer">Customer</Option>
+                            <Option value="guest">Guest</Option>
+                          </Select>
+                        </Form.Item>
+                      )}
                       <Form.Item
                         name="status"
                         label="Status"
@@ -612,13 +621,15 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           <Option value="pending">Pending</Option>
                         </Select>
                       </Form.Item>
-                      <Form.Item name="company_id" label="Company">
-                        <Select placeholder="Select Company (optional)" allowClear style={{ width: '100%' }}>
-                          {companies.map((c) => (
-                            <Option key={c.id} value={c.id}>{c.name}</Option>
-                          ))}
-                        </Select>
-                      </Form.Item>
+                      {!isCustomer && (
+                        <Form.Item name="company_id" label="Company">
+                          <Select placeholder="Select Company (optional)" allowClear style={{ width: '100%' }}>
+                            {companies.map((c) => (
+                              <Option key={c.id} value={c.id}>{c.name}</Option>
+                            ))}
+                          </Select>
+                        </Form.Item>
+                      )}
                     </Space>
                   ) : (
                     <Descriptions column={1} bordered>
@@ -627,19 +638,23 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           {userData.is_email_verified ? 'Yes' : 'No'}
                         </Tag>
                       </Descriptions.Item>
-                      <Descriptions.Item label="Role">
-                        <Tag color={getRoleColor(userData.role)}>
-                          {userData.role?.toUpperCase()}
-                        </Tag>
-                      </Descriptions.Item>
+                      {!isCustomer && (
+                        <Descriptions.Item label="Role">
+                          <Tag color={getRoleColor(userData.role)}>
+                            {userData.role?.toUpperCase()}
+                          </Tag>
+                        </Descriptions.Item>
+                      )}
                       <Descriptions.Item label="Status">
                         <Tag color={getStatusColor(userData.status)}>
                           {userData.status?.toUpperCase()}
                         </Tag>
                       </Descriptions.Item>
-                      <Descriptions.Item label="Company">
-                        <Text>{userData.company?.name ?? '—'}</Text>
-                      </Descriptions.Item>
+                      {!isCustomer && (
+                        <Descriptions.Item label="Company">
+                          <Text>{userData.company?.name ?? '—'}</Text>
+                        </Descriptions.Item>
+                      )}
                     </Descriptions>
                   )}
                 </Card>
@@ -717,6 +732,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
               </Col>
             </Row>
 
+            {!isCustomer && (
             <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
               <Col xs={24} lg={12}>
                 <Card title={<><SafetyOutlined /> Permissions</>} size="small">
@@ -772,10 +788,11 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                 </Card>
               </Col>
             </Row>
+            )}
             </Form>
                   ),
                 },
-                {
+                ...(isCustomer ? [] : [{
                   key: 'time-tracker',
                   label: (
                     <span>
@@ -970,7 +987,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                     </Card>
                     </div>
                   ),
-                },
+                }]),
               ]}
             />
           </Card>

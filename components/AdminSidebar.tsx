@@ -36,6 +36,7 @@ interface SessionUser {
   name?: string | null
   image?: string | null
   user_metadata?: { full_name?: string | null; avatar_url?: string | null }
+  role?: string
 }
 
 interface AdminSidebarProps {
@@ -45,6 +46,7 @@ interface AdminSidebarProps {
 }
 
 export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSidebarProps) {
+  const isCustomer = (user.role ?? '').toLowerCase() === 'customer'
   const router = useRouter()
   const pathname = usePathname()
   const [openKeys, setOpenKeys] = useState<string[]>([])
@@ -194,7 +196,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       icon: <MailOutlined />,
       label: 'Email Integration',
     },
-  ]
+  ].filter((item) => (isCustomer ? !['ticket-attributes', '/teams', '/email-integration'].includes(item.key) : true))
 
   const accountMenuItems = [
     {

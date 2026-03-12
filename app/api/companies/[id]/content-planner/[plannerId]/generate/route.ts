@@ -1,6 +1,15 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
+import {
+  db,
+  companyContentPlanners,
+  contentPlannerChannels,
+  contentPlannerTopicTypes,
+  companyAiSystemTemplate,
+  contentPlannerIntents,
+  aiTokenUsage,
+} from '@/lib/db'
+import { eq, and, inArray } from 'drizzle-orm'
 
 const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini'
 
@@ -9,16 +18,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string; plannerId: string }> }
 ) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-    const { id: companyId, plannerId } = await params
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await auth()
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const userId = session.user.id!
+
+    const { id: companyId, plannerId } = await params
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
@@ -28,38 +34,28 @@ export async function POST(
       )
     }
 
-    const { data: planner, error: plannerError } = await supabase
-      .from('company_content_planners')
-      .select(`
-        id,
-        company_id,
-        topic,
-        topic_description,
-        topic_type_id,
-        hashtags,
-        primary_keyword,
-        secondary_keywords,
-        intents,
-        location,
-        cta_dynamic,
-        cta_type,
-        cta_text,
-        insight,
-        channel:content_planner_channels(id, title, company_ai_system_template_id),
-        topic_type:content_planner_topic_types(id, title)
-      `)
-      .eq('id', plannerId)
-      .eq('company_id', companyId)
-      .single()
+    const [plannerRow] = await db
+      .select({
+        planner: companyContentPlanners,
+        channelId: contentPlannerChannels.id,
+        channelTitle: contentPlannerChannels.title,
+        channelTemplateId: contentPlannerChannels.companyAiSystemTemplateId,
+        topicTypeTitle: contentPlannerTopicTypes.title,
+      })
+      .from(companyContentPlanners)
+      .leftJoin(contentPlannerChannels, eq(companyContentPlanners.channelId, contentPlannerChannels.id))
+      .leftJoin(contentPlannerTopicTypes, eq(companyContentPlanners.topicTypeId, contentPlannerTopicTypes.id))
+      .where(and(eq(companyContentPlanners.id, plannerId), eq(companyContentPlanners.companyId, companyId)))
+      .limit(1)
 
-    if (plannerError || !planner) {
+    if (!plannerRow?.planner) {
       return NextResponse.json({ error: 'Content planner not found' }, { status: 404 })
     }
 
-    const plannerAny = planner as any
-    const channelTitle = plannerAny?.channel?.title ?? ''
-    const topicTypeTitle = plannerAny?.topic_type?.title ?? ''
-    const defaultTemplateId = plannerAny?.channel?.company_ai_system_template_id ?? null
+    const p = plannerRow.planner
+    const channelTitle = plannerRow.channelTitle ?? ''
+    const topicTypeTitle = plannerRow.topicTypeTitle ?? ''
+    const defaultTemplateId = plannerRow.channelTemplateId ?? null
 
     if (!defaultTemplateId) {
       return NextResponse.json(
@@ -70,13 +66,13 @@ export async function POST(
       )
     }
 
-    const { data: templateRow, error: templateError } = await supabase
-      .from('company_ai_system_template')
-      .select('id, title, content, format')
-      .eq('id', defaultTemplateId)
-      .single()
+    const [templateRow] = await db
+      .select({ id: companyAiSystemTemplate.id, title: companyAiSystemTemplate.title, content: companyAiSystemTemplate.content, format: companyAiSystemTemplate.format })
+      .from(companyAiSystemTemplate)
+      .where(eq(companyAiSystemTemplate.id, defaultTemplateId))
+      .limit(1)
 
-    if (templateError || !templateRow?.content) {
+    if (!templateRow?.content) {
       return NextResponse.json(
         { error: 'Default AI template for this channel not found or has no content.' },
         { status: 400 }
@@ -84,13 +80,27 @@ export async function POST(
     }
 
     let intentTitles = ''
-    if (Array.isArray(plannerAny?.intents) && plannerAny.intents.length > 0) {
-      const { data: intentRows } = await supabase
-        .from('content_planner_intents')
-        .select('id, title')
-        .in('id', plannerAny.intents)
-      intentTitles = (intentRows || []).map((r: { title: string }) => r.title).join(', ')
+    const intentsArr = p.intents
+    if (Array.isArray(intentsArr) && intentsArr.length > 0) {
+      const intentRows = await db
+        .select({ title: contentPlannerIntents.title })
+        .from(contentPlannerIntents)
+        .where(inArray(contentPlannerIntents.id, intentsArr))
+      intentTitles = intentRows.map((r) => r.title).join(', ')
     }
+
+    const plannerAny = {
+      ...p,
+      channel: { title: channelTitle, company_ai_system_template_id: defaultTemplateId },
+      topic_type: { title: topicTypeTitle },
+      cta_dynamic: p.ctaDynamic,
+      cta_type: p.ctaType,
+      cta_text: p.ctaText,
+      topic_description: p.topicDescription,
+      primary_keyword: p.primaryKeyword,
+      secondary_keywords: p.secondaryKeywords,
+      intents: intentsArr,
+    } as any
 
     const ctaTypeDisplay = plannerAny?.cta_dynamic
       ? 'Dynamic (determine based on intent and channel)'
@@ -226,31 +236,25 @@ export async function POST(
       aiContentResults.content_text = contentText
     }
 
-    const { error: updateError } = await supabase
-      .from('company_content_planners')
-      .update({
-        ai_content_results: aiContentResults,
+    await db
+      .update(companyContentPlanners)
+      .set({
+        aiContentResults: aiContentResults,
         status: 'ai_generated',
       })
-      .eq('id', plannerId)
+      .where(eq(companyContentPlanners.id, plannerId))
 
-    if (updateError) {
-      return NextResponse.json({ error: 'Failed to save AI content' }, { status: 500 })
-    }
-
-    const totalTokens = totalChatTokens
-    await supabase.from('ai_token_usage').insert({
-      user_id: user.id,
-      used_for: 'content_planner_generate',
-      ai_model: OPENAI_CHAT_MODEL,
-      ai_version: null,
-      content_text: contentText,
-      prompt_id: defaultTemplateId,
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: totalTokens,
-      company_id: companyId,
-      company_content_planner_id: plannerId,
+    await db.insert(aiTokenUsage).values({
+      userId,
+      usedFor: 'content_planner_generate',
+      aiModel: OPENAI_CHAT_MODEL,
+      contentText,
+      promptId: defaultTemplateId,
+      promptTokens,
+      completionTokens,
+      totalTokens: totalChatTokens,
+      companyId,
+      companyContentPlannerId: plannerId,
     })
 
     const result: { content: string; output_json?: Record<string, unknown> } = {

@@ -1,7 +1,6 @@
 'use client'
 
 import { Layout, Card, Button, Typography, Space, Tag, message } from 'antd'
-import { User } from '@supabase/supabase-js'
 import { MailOutlined, CheckCircleOutlined, DisconnectOutlined, SyncOutlined } from '@ant-design/icons'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -22,7 +21,7 @@ interface Integration {
 }
 
 interface EmailIntegrationContentProps {
-  user: User
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
   integration: Integration | null
 }
 

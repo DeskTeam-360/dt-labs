@@ -12,10 +12,11 @@ import TicketFormModal from './Tickets/TicketFormModal'
 import { useTicketsData } from './Tickets/useTicketsData'
 
 interface TicketsContentProps {
-  user: { id: string; email?: string | null; name?: string | null }
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
 }
 
 export default function TicketsContent({ user: currentUser }: TicketsContentProps) {
+  const isCustomer = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'customer'
   const {
     collapsed,
     setCollapsed,
@@ -73,7 +74,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     activeId,
     columnsToShow,
     tickets,
-  } = useTicketsData(currentUser.id)
+  } = useTicketsData(currentUser.id, isCustomer)
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -96,6 +97,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             onViewModeChange={setViewMode}
             onCreateClick={handleCreate}
             loading={loading}
+            isCustomer={isCustomer}
           />
 
           {loading ? (
@@ -103,7 +105,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               <Spin size="large" tip="Loading tasks..." />
             </div>
           ) : viewMode === 'card' ? (
-            <TicketsCardView tickets={filteredTickets} onEdit={handleEdit} onDelete={handleDelete} />
+            <TicketsCardView tickets={filteredTickets} allStatusColumns={allStatusColumns} onEdit={handleEdit} onDelete={handleDelete} />
           ) : viewMode === 'list' ? (
             <TicketsListView
               tickets={filteredTickets}
@@ -112,7 +114,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               onEdit={handleEdit}
               onDelete={handleDelete}
             />
-          ) : viewMode === 'roundrobin' ? (
+          ) : viewMode === 'roundrobin' && !isCustomer ? (
             <TicketsRoundRobinView
               tickets={filteredTickets}
               statusColumns={allStatusColumns}
@@ -161,6 +163,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         filteredCount={filteredTickets.length}
         totalCount={filteredTickets.length}
         onClearFilters={clearFilters}
+        isCustomer={isCustomer}
       />
 
       <TicketFormModal

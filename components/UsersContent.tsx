@@ -25,7 +25,7 @@ const { Option } = Select
 const { TextArea } = Input
 
 interface UsersContentProps {
-  user: User
+  user: User & { role?: string }
 }
 
 interface UserRecord {
@@ -52,6 +52,7 @@ interface UserRecord {
 }
 
 export default function UsersContent({ user: currentUser }: UsersContentProps) {
+  const isCustomer = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'customer'
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [users, setUsers] = useState<UserRecord[]>([])
@@ -199,25 +200,30 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       }
 
       if (editingUser) {
-        await apiFetch(`/api/users/${editingUser.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            full_name: values.full_name,
+        const patchBody: Record<string, unknown> = {
+          full_name: values.full_name,
+          status: values.status,
+          avatar_url: avatarUrl,
+          phone: values.phone || null,
+          timezone: values.timezone || 'UTC',
+          locale: values.locale || 'en',
+          is_email_verified: values.is_email_verified || false,
+        }
+        if (!isCustomer) {
+          Object.assign(patchBody, {
             role: values.role,
-            status: values.status,
             company_id: values.company_id || null,
-            avatar_url: avatarUrl,
-            phone: values.phone || null,
             department: values.department || null,
             position: values.position || null,
             bio: values.bio || null,
-            timezone: values.timezone || 'UTC',
-            locale: values.locale || 'en',
-            is_email_verified: values.is_email_verified || false,
             permissions,
             metadata,
-          }),
+          })
+        }
+        await apiFetch(`/api/users/${editingUser.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patchBody),
         })
 
         message.success('User updated successfully')
@@ -231,38 +237,39 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
           email: values.email,
           password: values.password,
           full_name: values.full_name,
-          role: values.role,
+          role: isCustomer ? 'user' : values.role,
           status: values.status,
         })
 
         if (result.error) {
           message.error(result.error)
-        } else {
+        } else if (result.data) {
           // Update additional fields after creation
           const updateData: any = {
             phone: values.phone || null,
-            department: values.department || null,
-            position: values.position || null,
-            bio: values.bio || null,
             timezone: values.timezone || 'UTC',
             locale: values.locale || 'en',
             is_email_verified: values.is_email_verified || false,
-            company_id: values.company_id || null,
-            permissions: permissions,
-            metadata: metadata,
           }
-
+          if (!isCustomer) {
+            Object.assign(updateData, {
+              department: values.department || null,
+              position: values.position || null,
+              bio: values.bio || null,
+              company_id: values.company_id || null,
+              permissions: permissions,
+              metadata: metadata,
+            })
+          }
           if (avatarUrl) {
             updateData.avatar_url = avatarUrl
           }
 
-          if (result.data) {
-            await apiFetch(`/api/users/${result.data.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(updateData),
-            })
-          }
+          await apiFetch(`/api/users/${result.data.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData),
+          })
 
           message.success('User created successfully')
           setModalVisible(false)
@@ -276,7 +283,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     }
   }
 
-  const columns: ColumnsType<UserRecord> = [
+  const baseColumns: ColumnsType<UserRecord> = [
     {
       title: 'User',
       key: 'user',
@@ -413,6 +420,16 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     },
   ]
 
+  const columns = useMemo(
+    () =>
+      isCustomer
+        ? baseColumns.filter(
+            (c) => !['role', 'company', 'department', 'position'].includes(String(c.key))
+          )
+        : baseColumns,
+    [isCustomer]
+  )
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
@@ -545,19 +562,21 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 <Input placeholder="Full Name" />
               </Form.Item>
 
-              <Form.Item
-                name="role"
-                label="Role"
-                rules={[{ required: true, message: 'Please select role!' }]}
-              >
-                <Select placeholder="Select Role">
-                  <Option value="admin">Admin</Option>
-                  <Option value="manager">Manager</Option>
-                  <Option value="user">User</Option>
-                  <Option value="customer">Customer</Option>
-                  <Option value="guest">Guest</Option>
-                </Select>
-              </Form.Item>
+              {!isCustomer && (
+                <Form.Item
+                  name="role"
+                  label="Role"
+                  rules={[{ required: true, message: 'Please select role!' }]}
+                >
+                  <Select placeholder="Select Role">
+                    <Option value="admin">Admin</Option>
+                    <Option value="manager">Manager</Option>
+                    <Option value="user">User</Option>
+                    <Option value="customer">Customer</Option>
+                    <Option value="guest">Guest</Option>
+                  </Select>
+                </Form.Item>
+              )}
 
               <Form.Item
                 name="status"
@@ -572,13 +591,15 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 </Select>
               </Form.Item>
 
-              <Form.Item name="company_id" label="Company">
-                <Select placeholder="Select Company (optional)" allowClear>
-                  {companies.map((c) => (
-                    <Option key={c.id} value={c.id}>{c.name}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
+              {!isCustomer && (
+                <Form.Item name="company_id" label="Company">
+                  <Select placeholder="Select Company (optional)" allowClear>
+                    {companies.map((c) => (
+                      <Option key={c.id} value={c.id}>{c.name}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              )}
 
               <Form.Item
                 name="phone"
@@ -587,26 +608,28 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 <Input placeholder="Phone Number" />
               </Form.Item>
 
-              <Form.Item
-                name="department"
-                label="Department"
-              >
-                <Input placeholder="Department" />
-              </Form.Item>
-
-              <Form.Item
-                name="position"
-                label="Position"
-              >
-                <Input placeholder="Position/Job Title" />
-              </Form.Item>
-
-              <Form.Item
-                name="bio"
-                label="Bio"
-              >
-                <TextArea rows={3} placeholder="Bio/Description" />
-              </Form.Item>
+              {!isCustomer && (
+                <>
+                  <Form.Item
+                    name="department"
+                    label="Department"
+                  >
+                    <Input placeholder="Department" />
+                  </Form.Item>
+                  <Form.Item
+                    name="position"
+                    label="Position"
+                  >
+                    <Input placeholder="Position/Job Title" />
+                  </Form.Item>
+                  <Form.Item
+                    name="bio"
+                    label="Bio"
+                  >
+                    <TextArea rows={3} placeholder="Bio/Description" />
+                  </Form.Item>
+                </>
+              )}
 
               <Form.Item
                 name="timezone"
@@ -652,21 +675,24 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 </Form.Item>
               )}
 
-              <Form.Item
-                name="permissions"
-                label="Permissions (JSON)"
-                tooltip="Enter permissions as JSON object, e.g. {'read': true, 'write': false}"
-              >
-                <TextArea rows={4} placeholder='{"read": true, "write": false}' />
-              </Form.Item>
-
-              <Form.Item
-                name="metadata"
-                label="Metadata (JSON)"
-                tooltip="Enter additional metadata as JSON object"
-              >
-                <TextArea rows={4} placeholder='{"key": "value"}' />
-              </Form.Item>
+              {!isCustomer && (
+                <>
+                  <Form.Item
+                    name="permissions"
+                    label="Permissions (JSON)"
+                    tooltip="Enter permissions as JSON object, e.g. {'read': true, 'write': false}"
+                  >
+                    <TextArea rows={4} placeholder='{"read": true, "write": false}' />
+                  </Form.Item>
+                  <Form.Item
+                    name="metadata"
+                    label="Metadata (JSON)"
+                    tooltip="Enter additional metadata as JSON object"
+                  >
+                    <TextArea rows={4} placeholder='{"key": "value"}' />
+                  </Form.Item>
+                </>
+              )}
 
               <Form.Item>
                 <Space>

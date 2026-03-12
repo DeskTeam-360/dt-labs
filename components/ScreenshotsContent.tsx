@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import AdminSidebar from './AdminSidebar'
 import dayjs, { Dayjs } from 'dayjs'
 
-type SessionUser = { id: string; email?: string; user_metadata?: { full_name?: string } }
+type SessionUser = { id: string; email?: string | null; name?: string | null }
 
 const { Content } = Layout
 const { Title, Text } = Typography

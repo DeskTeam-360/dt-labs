@@ -34,7 +34,7 @@ const ACTION_LABELS: Record<ActionType, string> = {
 
 interface ActionBuilderProps {
   value?: AutomationActions | null
-  onChange: (value: AutomationActions) => void
+  onChange?: (value: AutomationActions) => void
 }
 
 async function fetchLookup() {
@@ -43,7 +43,7 @@ async function fetchLookup() {
   return res.json() as Promise<LookupData>
 }
 
-export default function ActionBuilder({ value, onChange }: ActionBuilderProps) {
+export default function ActionBuilder({ value, onChange = () => {} }: ActionBuilderProps) {
   const [lookup, setLookup] = useState<LookupData | null>(null)
 
   useEffect(() => {

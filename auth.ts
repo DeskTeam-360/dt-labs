@@ -42,6 +42,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             email: user.email,
             name: user.fullName || user.email,
             image: user.avatarUrl || undefined,
+            role: user.role,
           }
         } catch (err) {
           console.error('[Auth] authorize error:', err)
@@ -55,6 +56,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id
         token.email = user.email
+        token.role = (user as { role?: string }).role
       }
       return token
     },
@@ -62,6 +64,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string
         session.user.email = token.email as string
+        ;(session.user as { role?: string }).role = token.role as string
       }
       return session
     },

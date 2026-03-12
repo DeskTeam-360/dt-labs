@@ -109,9 +109,15 @@ const getInitialFilterState = () => {
   }
 }
 
+function getInitialViewModeCustomer(isCustomer: boolean, stored: StoredFilter | null): 'kanban' | 'list' | 'card' | 'roundrobin' {
+  const storedMode = stored?.viewMode as 'kanban' | 'list' | 'card' | 'roundrobin'
+  if (isCustomer && storedMode === 'roundrobin') return 'kanban'
+  return storedMode || 'kanban'
+}
+
 const initialState = getInitialFilterState()
 
-export function useTicketsData(currentUserId: string) {
+export function useTicketsData(currentUserId: string, isCustomer = false) {
   const [collapsed, setCollapsed] = useState(true)
   const [tickets, setTickets] = useState<TicketRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -139,7 +145,11 @@ export function useTicketsData(currentUserId: string) {
   const [filterDateRange, setFilterDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(initialState.filterDateRange)
   const [filterSearch, setFilterSearch] = useState(initialState.filterSearch)
   const [filterSidebarCollapsed, setFilterSidebarCollapsed] = useState(initialState.filterSidebarCollapsed)
-  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'card' | 'roundrobin'>(initialState.viewMode)
+  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'card' | 'roundrobin'>(() => {
+    const stored = initialState.viewMode
+    if (isCustomer && stored === 'roundrobin') return 'kanban'
+    return stored
+  })
   const [newTicketAttachments, setNewTicketAttachments] = useState<NewTicketAttachment[]>([])
   const [attachmentUploading, setAttachmentUploading] = useState(false)
 
@@ -174,12 +184,14 @@ export function useTicketsData(currentUserId: string) {
 
   const fetchTickets = useCallback(async () => {
     const params = new URLSearchParams()
-    if (filterCompanyIds.length > 0) params.set('company_ids', filterCompanyIds.join(','))
+    if (!isCustomer) {
+      if (filterCompanyIds.length > 0) params.set('company_ids', filterCompanyIds.join(','))
+      if (filterTagIds.length > 0) params.set('tag_ids', filterTagIds.join(','))
+      if (filterVisibility.length > 0) params.set('visibility', filterVisibility.join(','))
+      if (filterTeamIds.length > 0) params.set('team_ids', filterTeamIds.join(','))
+    }
     if (filterStatus.length > 0) params.set('status', filterStatus.join(','))
     if (filterTypeIds.length > 0) params.set('type_ids', filterTypeIds.join(','))
-    if (filterTagIds.length > 0) params.set('tag_ids', filterTagIds.join(','))
-    if (filterVisibility.length > 0) params.set('visibility', filterVisibility.join(','))
-    if (filterTeamIds.length > 0) params.set('team_ids', filterTeamIds.join(','))
     if (filterDateRange?.[0] && filterDateRange?.[1]) {
       params.set('date_from', filterDateRange[0].startOf('day').toISOString())
       params.set('date_to', filterDateRange[1].endOf('day').toISOString())
@@ -200,6 +212,7 @@ export function useTicketsData(currentUserId: string) {
       setLoading(false)
     }
   }, [
+    isCustomer,
     filterCompanyIds,
     filterStatus,
     filterTypeIds,
@@ -238,17 +251,23 @@ export function useTicketsData(currentUserId: string) {
 
       const list = data.statuses || []
       if (list.length > 0) {
+        const statusTitle = (s: { slug: string; title: string; customer_title?: string; color: string }) =>
+          isCustomer && s.customer_title ? s.customer_title : s.title
         const kanbanSlugs = list.filter((s) => s.show_in_kanban).map((s) => s.slug)
-        setStatusColumns(list.filter((s) => s.show_in_kanban).map((s) => ({ id: s.slug, title: s.title, color: s.color })))
-        setAllStatusColumns(list.map((s) => ({ id: s.slug, title: s.title, color: s.color })))
-        setAllStatuses(list.map((s) => ({ slug: s.slug, title: s.title })))
-        if (stored?.filterStatus?.length) {
+        setStatusColumns(list.filter((s) => s.show_in_kanban).map((s) => ({ id: s.slug, title: statusTitle(s), color: s.color })))
+        setAllStatusColumns(list.map((s) => ({ id: s.slug, title: statusTitle(s), color: s.color })))
+        setAllStatuses(list.map((s) => ({ slug: s.slug, title: statusTitle(s) })))
+        const hasStoredStatusPreference = stored && ('filterStatus' in stored && Array.isArray(stored.filterStatus) && stored.filterStatus.length > 0)
+        let resolvedStatus: string[]
+        if (hasStoredStatusPreference && stored?.filterStatus?.length) {
           const validSlugs = new Set(list.map((s) => s.slug))
-          const intersection = stored.filterStatus.filter((slug) => validSlugs.has(slug))
-          setFilterStatus(intersection.length > 0 ? intersection : kanbanSlugs)
+          const intersection = stored.filterStatus.filter((slug: string) => validSlugs.has(slug))
+          resolvedStatus = intersection.length > 0 ? intersection : kanbanSlugs
         } else {
-          setFilterStatus(kanbanSlugs)
+          resolvedStatus = kanbanSlugs
         }
+        setFilterStatus(resolvedStatus)
+        saveFiltersToStorage({ ...(stored || {}), filterStatus: resolvedStatus.length ? resolvedStatus : null } as StoredFilter)
       }
     } catch (error) {
       console.error('Failed to fetch lookup data:', error)
@@ -257,7 +276,7 @@ export function useTicketsData(currentUserId: string) {
 
   useEffect(() => {
     fetchLookup()
-  }, [])
+  }, [isCustomer])
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {

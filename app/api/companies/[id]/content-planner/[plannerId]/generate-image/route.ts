@@ -28,9 +28,9 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}))
-    let imagePrompt =
-      typeof body?.image_prompt === 'string' ? body.image_prompt.trim() : '' ||
-      typeof body?.image_recommendation === 'string' ? body.image_recommendation.trim() : ''
+    const fromPrompt = typeof body?.image_prompt === 'string' ? body.image_prompt.trim() : ''
+    const fromRec = typeof body?.image_recommendation === 'string' ? body.image_recommendation.trim() : ''
+    let imagePrompt = fromPrompt || fromRec
 
     if (!imagePrompt) {
       const [planner] = await db.select({ aiContentResults: companyContentPlanners.aiContentResults })

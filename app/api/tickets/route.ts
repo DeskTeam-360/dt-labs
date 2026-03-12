@@ -7,6 +7,7 @@ import {
   ticketTypes,
   ticketPriorities,
   companies,
+  companyUsers,
   ticketAssignees,
   ticketChecklist,
   ticketTags,
@@ -22,21 +23,41 @@ import { NextResponse } from 'next/server'
 const DEFAULT_LIMIT = 500
 const MAX_LIMIT = 1000
 
-/** GET /api/tickets - List tickets with related data (server-side filtering) */
+/** GET /api/tickets - List tickets with related data (server-side filtering). Customer: only tickets of their company */
 export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const userId = session.user.id!
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+
+  // Customer: hanya ticket yang company-nya sama
+  let forcedCompanyIds: string[] = []
+  if (role === 'customer') {
+    const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
+    let companyId = userRow?.companyId ?? null
+    if (!companyId) {
+      const [cu] = await db.select({ companyId: companyUsers.companyId }).from(companyUsers).where(eq(companyUsers.userId, userId)).limit(1)
+      companyId = cu?.companyId ?? null
+    }
+    if (!companyId) {
+      return NextResponse.json([])
+    }
+    forcedCompanyIds = [companyId]
+  }
+
   const url = new URL(request.url)
   const companyIdParam = url.searchParams.get('company_id')
   const companyIdsParam = url.searchParams.get('company_ids')
-  const companyIds = companyIdsParam
-    ? companyIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
-    : companyIdParam
-      ? [companyIdParam.trim()]
-      : []
+  const companyIds = forcedCompanyIds.length > 0
+    ? forcedCompanyIds
+    : companyIdsParam
+      ? companyIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
+      : companyIdParam
+        ? [companyIdParam.trim()]
+        : []
   const statusParam = url.searchParams.get('status')
   const typeIdParam = url.searchParams.get('type_id')
   const typeIdsParam = url.searchParams.get('type_ids')

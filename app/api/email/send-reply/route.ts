@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const ticketUrl = `${baseUrl}/customer/tickets/${ticketId}`
+    const ticketUrl = `${baseUrl}/tickets/${ticketId}`
     const portalFooter = `<p style="margin-top:24px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#666;">To view ticket details, please visit our portal: <a href="${ticketUrl}">${ticketUrl}</a></p>`
     const bodyHtml = (commentBody.trim().includes('<')
       ? commentBody.trim()

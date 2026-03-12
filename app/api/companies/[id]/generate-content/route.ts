@@ -1,6 +1,13 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
+import {
+  db,
+  companyAiSystemTemplate,
+  companyKnowledgeBases,
+  companyContentGenerationHistory,
+  aiTokenUsage,
+} from '@/lib/db'
+import { eq, and } from 'drizzle-orm'
 
 const OPENAI_EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small'
 const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini'
@@ -16,16 +23,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-    const { id: companyId } = await params
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await auth()
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const { id: companyId } = await params
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
@@ -46,13 +49,13 @@ export async function POST(
     }
 
     // Load AI system template (system prompt)
-    const { data: templateRow, error: templateError } = await supabase
-      .from('company_ai_system_template')
-      .select('id, title, content')
-      .eq('id', templateId)
-      .single()
+    const [templateRow] = await db
+      .select({ id: companyAiSystemTemplate.id, title: companyAiSystemTemplate.title, content: companyAiSystemTemplate.content })
+      .from(companyAiSystemTemplate)
+      .where(eq(companyAiSystemTemplate.id, templateId))
+      .limit(1)
 
-    if (templateError || !templateRow) {
+    if (!templateRow) {
       return NextResponse.json(
         { error: 'AI system template not found' },
         { status: 404 }
@@ -97,27 +100,22 @@ export async function POST(
       )
     }
 
-    // 2) Search company knowledge base by similarity
-    const { data: matches, error: rpcError } = await supabase.rpc('search_company_knowledge_bases', {
-      p_company_id: companyId,
-      p_query_embedding: queryEmbedding,
-      p_match_count: DEFAULT_MATCH_COUNT,
-    })
-
-    if (rpcError) {
-      return NextResponse.json(
-        {
-          error: rpcError.message || 'Knowledge base search failed',
-          detail: rpcError.details ?? rpcError.hint ?? null,
-          code: rpcError.code ?? null,
-        },
-        { status: 500 }
-      )
+    // 2) Search company knowledge base (fallback: fetch by company, no vector similarity)
+    let matches: Array<{ content?: string | null }> = []
+    try {
+      const kbRows = await db
+        .select({ content: companyKnowledgeBases.content })
+        .from(companyKnowledgeBases)
+        .where(eq(companyKnowledgeBases.companyId, companyId))
+        .limit(DEFAULT_MATCH_COUNT)
+      matches = kbRows
+    } catch {
+      matches = []
     }
 
     const contextParts = (matches || [])
       .filter((m: { content?: string | null }) => m?.content)
-      .map((m: { content: string }) => stripHtml(m.content))
+      .map((m: { content?: string | null }) => stripHtml(m.content ?? ''))
     const context = contextParts.length > 0
       ? contextParts.join('\n\n---\n\n')
       : 'No references from knowledge base for this company. Use general knowledge and the requested format.'
@@ -178,30 +176,28 @@ export async function POST(
     const contentForHistory = JSON.stringify(result)
     const promptForHistory = prompt ? prompt : `Template: ${templateRow.title ?? templateId}`
     let historyError: string | null = null
-    const { error: insertError } = await supabase
-      .from('company_content_generation_history')
-      .insert({
-        company_id: companyId,
+    try {
+      await db.insert(companyContentGenerationHistory).values({
+        companyId,
         prompt: promptForHistory,
         content: contentForHistory,
-        created_by: user.id,
+        createdBy: session.user.id,
       })
-
-    if (insertError) {
-      historyError = insertError.message || String(insertError)
-      console.error('Failed to save generation history:', insertError)
+    } catch (err) {
+      historyError = err instanceof Error ? err.message : String(err)
+      console.error('Failed to save generation history:', err)
     }
 
-    await supabase.from('ai_token_usage').insert({
-      user_id: user.id,
-      used_for: 'company_generate_content',
-      ai_model: OPENAI_CHAT_MODEL,
-      content_text: contentForHistory,
-      prompt_id: templateId,
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: totalTokens,
-      company_id: companyId,
+    await db.insert(aiTokenUsage).values({
+      userId: session.user.id,
+      usedFor: 'company_generate_content',
+      aiModel: OPENAI_CHAT_MODEL,
+      contentText: contentForHistory,
+      promptId: templateId,
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      companyId,
     })
 
     return NextResponse.json({ result, historyError })

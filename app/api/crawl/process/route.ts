@@ -1,5 +1,5 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 
 // Vercel serverless function configuration
@@ -9,15 +9,9 @@ export const runtime = 'nodejs'
 // POST - Process crawl (called internally or via webhook)
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
+    const session = await auth()
 
-    // Check authentication
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -30,9 +24,9 @@ export async function POST(request: Request) {
 
     // Import and call the crawl process function
     const { startCrawlProcess } = await import('../utils')
-    
+
     // Start the crawl process
-    await startCrawlProcess(supabase, crawl_session_id, company_website_id, max_depth, max_pages)
+    await startCrawlProcess(db, crawl_session_id, company_website_id, max_depth, max_pages)
 
     return NextResponse.json({ success: true, message: 'Crawl process completed' })
   } catch (error: any) {
