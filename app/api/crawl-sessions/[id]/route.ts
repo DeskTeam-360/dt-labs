@@ -1,8 +1,71 @@
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { crawlSessions } from '@/lib/db'
+import { crawlSessions, companyWebsites, companies } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+/** GET /api/crawl-sessions/[id] - Get single crawl session with company_websites */
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { id } = await params
+
+  const [row] = await db
+    .select({
+      session: crawlSessions,
+      websiteId: companyWebsites.id,
+      websiteUrl: companyWebsites.url,
+      websiteTitle: companyWebsites.title,
+      websiteCompanyId: companyWebsites.companyId,
+      companyId: companies.id,
+      companyName: companies.name,
+    })
+    .from(crawlSessions)
+    .leftJoin(companyWebsites, eq(crawlSessions.companyWebsiteId, companyWebsites.id))
+    .leftJoin(companies, eq(companyWebsites.companyId, companies.id))
+    .where(eq(crawlSessions.id, id))
+    .limit(1)
+
+  if (!row?.session) {
+    return NextResponse.json({ error: 'Crawl session not found' }, { status: 404 })
+  }
+
+  const s = row.session
+  const data = {
+    id: s.id,
+    company_website_id: s.companyWebsiteId,
+    status: s.status,
+    total_pages: s.totalPages,
+    crawled_pages: s.crawledPages,
+    failed_pages: s.failedPages,
+    uncrawled_pages: s.uncrawledPages,
+    broken_pages: s.brokenPages,
+    error_message: s.errorMessage,
+    max_depth: s.maxDepth,
+    max_pages: s.maxPages,
+    started_at: s.startedAt ? new Date(s.startedAt).toISOString() : null,
+    completed_at: s.completedAt ? new Date(s.completedAt).toISOString() : null,
+    created_at: s.createdAt ? new Date(s.createdAt).toISOString() : '',
+    updated_at: s.updatedAt ? new Date(s.updatedAt).toISOString() : '',
+    company_websites: row.websiteId
+      ? {
+          id: row.websiteId,
+          company_id: row.websiteCompanyId,
+          url: row.websiteUrl,
+          title: row.websiteTitle,
+          companies: row.companyId ? { id: row.companyId, name: row.companyName } : null,
+        }
+      : null,
+  }
+
+  return NextResponse.json(data)
+}
 
 /** DELETE /api/crawl-sessions/[id] */
 export async function DELETE(

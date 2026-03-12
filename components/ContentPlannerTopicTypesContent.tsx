@@ -15,7 +15,6 @@ import {
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -43,17 +42,14 @@ export default function ContentPlannerTopicTypesContent({ user: currentUser }: C
   const [editingTopicType, setEditingTopicType] = useState<TopicTypeRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
-  const supabase = createClient()
 
   const fetchTopicTypes = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('content_planner_topic_types')
-        .select('*')
-        .order('title', { ascending: true })
-      if (error) throw error
-      setTopicTypes((data || []) as TopicTypeRecord[])
+      const res = await fetch('/api/content-planner/topic-types', { credentials: 'include' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Gagal memuat topic types')
+      setTopicTypes((Array.isArray(json) ? json : json.data || []) as TopicTypeRecord[])
     } catch (e: unknown) {
       const err = e as { message?: string }
       message.error(err?.message ?? 'Gagal memuat topic types')
@@ -83,8 +79,8 @@ export default function ContentPlannerTopicTypesContent({ user: currentUser }: C
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from('content_planner_topic_types').delete().eq('id', id)
-      if (error) throw error
+      const res = await fetch(`/api/content-planner/topic-types/${id}`, { method: 'DELETE', credentials: 'include' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
       message.success('Topic type dihapus')
       fetchTopicTypes()
     } catch (e: unknown) {
@@ -101,15 +97,22 @@ export default function ContentPlannerTopicTypesContent({ user: currentUser }: C
         description: values.description?.trim() || null,
       }
       if (editingTopicType) {
-        const { error } = await supabase
-          .from('content_planner_topic_types')
-          .update(payload)
-          .eq('id', editingTopicType.id)
-        if (error) throw error
+        const res = await fetch(`/api/content-planner/topic-types/${editingTopicType.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
         message.success('Topic type diperbarui')
       } else {
-        const { error } = await supabase.from('content_planner_topic_types').insert(payload)
-        if (error) throw error
+        const res = await fetch('/api/content-planner/topic-types', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
         message.success('Topic type ditambah')
       }
       setModalVisible(false)

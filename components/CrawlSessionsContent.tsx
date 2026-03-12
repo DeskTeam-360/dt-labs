@@ -4,7 +4,6 @@ import { Layout, Table, Button, Space, Typography, Card, Tag, Modal, Form, Input
 import { PlusOutlined, EyeOutlined, DeleteOutlined, ReloadOutlined, PlayCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, GlobalOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
 import { startCrawl } from '@/app/actions/crawl'
@@ -70,31 +69,14 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
   const [companies, setCompanies] = useState<any[]>([])
   const [companyWebsites, setCompanyWebsites] = useState<CompanyWebsiteRecord[]>([])
   const [loadingWebsites, setLoadingWebsites] = useState(false)
-  const supabase = createClient()
 
   const fetchCrawlSessions = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('crawl_sessions')
-        .select(`
-          *,
-          company_websites (
-            id,
-            company_id,
-            url,
-            title,
-            companies (
-              id,
-              name
-            )
-          )
-        `)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      setCrawlSessions(data || [])
+      const res = await fetch('/api/crawl-sessions', { credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch crawl sessions')
+      setCrawlSessions(Array.isArray(data) ? data : [])
     } catch (error: any) {
       message.error(error.message || 'Failed to fetch crawl sessions')
     } finally {
@@ -104,14 +86,10 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
 
   const fetchCompanies = async () => {
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .order('name', { ascending: true })
-
-      if (error) throw error
-
-      setCompanies(data || [])
+      const res = await fetch('/api/companies', { credentials: 'include' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to fetch companies')
+      setCompanies(json.data || [])
     } catch (error: any) {
       console.error('Error fetching companies:', error)
     }
@@ -125,22 +103,15 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
 
     setLoadingWebsites(true)
     try {
-      const { data, error } = await supabase
-        .from('company_websites')
-        .select(`
-          *,
-          companies (
-            id,
-            name
-          )
-        `)
-        .eq('company_id', companyId)
-        .order('is_primary', { ascending: false })
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      setCompanyWebsites(data || [])
+      const res = await fetch(`/api/companies/${companyId}`, { credentials: 'include' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to fetch company websites')
+      const companyData = json.data
+      const websites = (companyData?.company_websites || []).map((w: any) => ({
+        ...w,
+        companies: companyData ? { id: companyData.id, name: companyData.name } : null,
+      }))
+      setCompanyWebsites(websites)
     } catch (error: any) {
       message.error('Failed to fetch company websites')
       console.error('Error fetching company websites:', error)
@@ -191,13 +162,8 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('crawl_sessions')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-
+      const res = await fetch(`/api/crawl-sessions/${id}`, { method: 'DELETE', credentials: 'include' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed to delete')
       message.success('Crawl session deleted successfully')
       fetchCrawlSessions()
     } catch (error: any) {

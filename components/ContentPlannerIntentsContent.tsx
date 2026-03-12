@@ -15,7 +15,6 @@ import {
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -43,16 +42,13 @@ export default function ContentPlannerIntentsContent({ user: currentUser }: Cont
   const [editingIntent, setEditingIntent] = useState<IntentRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
-  const supabase = createClient()
 
   const fetchIntents = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('content_planner_intents')
-        .select('*')
-        .order('title', { ascending: true })
-      if (error) throw error
+      const res = await fetch('/api/content-planner/intents', { credentials: 'include' })
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data = await res.json()
       setIntents((data || []) as IntentRecord[])
     } catch (e: unknown) {
       const err = e as { message?: string }
@@ -83,8 +79,8 @@ export default function ContentPlannerIntentsContent({ user: currentUser }: Cont
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from('content_planner_intents').delete().eq('id', id)
-      if (error) throw error
+      const res = await fetch(`/api/content-planner/intents/${id}`, { method: 'DELETE', credentials: 'include' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
       message.success('Intent dihapus')
       fetchIntents()
     } catch (e: unknown) {
@@ -101,15 +97,22 @@ export default function ContentPlannerIntentsContent({ user: currentUser }: Cont
         description: values.description?.trim() || null,
       }
       if (editingIntent) {
-        const { error } = await supabase
-          .from('content_planner_intents')
-          .update(payload)
-          .eq('id', editingIntent.id)
-        if (error) throw error
+        const res = await fetch(`/api/content-planner/intents/${editingIntent.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
         message.success('Intent diperbarui')
       } else {
-        const { error } = await supabase.from('content_planner_intents').insert(payload)
-        if (error) throw error
+        const res = await fetch('/api/content-planner/intents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
         message.success('Intent ditambah')
       }
       setModalVisible(false)

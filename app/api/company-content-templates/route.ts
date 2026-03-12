@@ -29,3 +29,46 @@ export async function GET() {
 
   return NextResponse.json({ data })
 }
+
+/** POST /api/company-content-templates - create */
+export async function POST(request: Request) {
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await request.json()
+  const { title, content, description, type, fields } = body
+
+  if (!title?.trim()) {
+    return NextResponse.json({ error: 'title is required' }, { status: 400 })
+  }
+
+  const [row] = await db
+    .insert(companyContentTemplates)
+    .values({
+      title: String(title).trim(),
+      content: content ?? null,
+      description: description?.trim() || null,
+      type: type?.trim() || null,
+      fields: Array.isArray(fields) && fields.length ? fields : null,
+    })
+    .returning()
+
+  if (!row) {
+    return NextResponse.json({ error: 'Failed to create' }, { status: 500 })
+  }
+
+  return NextResponse.json({
+    data: {
+      id: row.id,
+      title: row.title,
+      content: row.content,
+      description: row.description,
+      type: row.type,
+      fields: row.fields,
+      created_at: row.createdAt?.toISOString() ?? '',
+      updated_at: row.updatedAt?.toISOString() ?? '',
+    },
+  }, { status: 201 })
+}

@@ -22,7 +22,7 @@ const { Header } = Layout
 const { Text } = Typography
 
 interface CustomerNavbarProps {
-  user: { id: string; email?: string | null; name?: string | null }
+  user: { id: string; email?: string | null; name?: string | null; image?: string | null }
 }
 
 const PORTAL_TITLE = 'Deskteam360 Portal'
@@ -177,11 +177,11 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
           >
             <Avatar
               icon={<UserOutlined />}
-              src={user?.user_metadata?.avatar_url}
+              src={user?.image ?? undefined}
               size={36}
             />
             <Flex vertical gap={0} style={{ lineHeight: 1, color: '#fff' }}>
-                <strong>{user?.user_metadata?.full_name || 'User'}</strong>
+                <strong>{user?.name || 'User'}</strong>
               
                 {user?.email}
               

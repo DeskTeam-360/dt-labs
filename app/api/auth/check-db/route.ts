@@ -1,6 +1,6 @@
 /**
  * GET /api/auth/check-db - Debug koneksi database
- * Untuk development: tampilkan error dari DB/Supabase
+ * Untuk development: tampilkan error dari DB
  */
 import { NextResponse } from 'next/server'
 import postgres from 'postgres'
@@ -64,7 +64,7 @@ export async function GET() {
         detail: cause?.message,
         hint:
           code === 'ETIMEDOUT' || code === 'ECONNREFUSED'
-            ? 'Cek DATABASE_URL di .env (localhost vs Supabase). Pastikan DB berjalan.'
+            ? 'Cek DATABASE_URL di .env (localhost). Pastikan DB berjalan.'
             : code === 'ENOTFOUND'
               ? 'Host tidak ditemukan. Password di URL mungkin salah parse (gunakan %40 untuk @, %23 untuk #)'
               : undefined,

@@ -55,6 +55,7 @@ function toSnakePage(p: typeof crawlPages.$inferSelect) {
     heading_hierarchy: p.headingHierarchy,
     meta_tags: p.metaTags,
     links: p.links,
+    error_message: p.errorMessage,
     crawled_at: p.crawledAt?.toISOString() ?? null,
     created_at: p.createdAt?.toISOString() ?? '',
     updated_at: p.updatedAt?.toISOString() ?? '',

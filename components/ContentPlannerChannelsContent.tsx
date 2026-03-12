@@ -16,7 +16,6 @@ import {
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -47,21 +46,14 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
   const [editingChannel, setEditingChannel] = useState<ChannelRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
-  const supabase = createClient()
 
   const fetchChannels = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('content_planner_channels')
-        .select(`
-          *,
-          company_ai_system_template(id, title)
-        `)
-        .order('title', { ascending: true })
-
-      if (error) throw error
-      setChannels((data || []) as ChannelRecord[])
+      const res = await fetch('/api/content-planner/channels', { credentials: 'include' })
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data = await res.json()
+      setChannels(data || [])
     } catch (e: unknown) {
       const err = e as { message?: string }
       message.error(err?.message ?? 'Gagal memuat channels')
@@ -72,11 +64,11 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
 
   const fetchAiTemplates = async () => {
     try {
-      const { data, error } = await supabase
-        .from('company_ai_system_template')
-        .select('id, title')
-        .order('title')
-      if (!error) setAiTemplates(data || [])
+      const res = await fetch('/api/content-planner/lookup', { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setAiTemplates(data.aiTemplates || [])
+      }
     } catch {
       // ignore
     }
@@ -105,8 +97,11 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from('content_planner_channels').delete().eq('id', id)
-      if (error) throw error
+      const res = await fetch(`/api/content-planner/channels/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
       message.success('Channel dihapus')
       fetchChannels()
     } catch (e: unknown) {
@@ -125,15 +120,22 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
       }
 
       if (editingChannel) {
-        const { error } = await supabase
-          .from('content_planner_channels')
-          .update(payload)
-          .eq('id', editingChannel.id)
-        if (error) throw error
+        const res = await fetch(`/api/content-planner/channels/${editingChannel.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
         message.success('Channel diperbarui')
       } else {
-        const { error } = await supabase.from('content_planner_channels').insert(payload)
-        if (error) throw error
+        const res = await fetch('/api/content-planner/channels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
         message.success('Channel ditambah')
       }
       setModalVisible(false)

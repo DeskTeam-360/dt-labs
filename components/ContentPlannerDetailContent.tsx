@@ -19,7 +19,6 @@ import {
 import { ArrowLeftOutlined, PlayCircleOutlined, SaveOutlined, PictureOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 import CustomerNavbar from './CustomerNavbar'
 import dayjs from 'dayjs'
@@ -128,7 +127,6 @@ export default function ContentPlannerDetailContent({
   }, [plannerData?.channel?.company_ai_system_template_id])
   const [ragPrompt, setRagPrompt] = useState('')
   const [form] = Form.useForm()
-  const supabase = createClient()
 
   const handleSave = async () => {
     try {
@@ -153,12 +151,13 @@ export default function ContentPlannerDetailContent({
       }
 
       setSaving(true)
-      const { error } = await supabase
-        .from('company_content_planners')
-        .update(payload)
-        .eq('id', plannerData.id)
-
-      if (error) throw error
+      const res = await fetch(`/api/companies/${companyData.id}/content-planner/${plannerData.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed to update')
       message.success('Content planner updated')
       router.refresh()
     } catch (e: unknown) {
@@ -230,15 +229,16 @@ export default function ContentPlannerDetailContent({
         ...(plannerData.ai_content_results || {}),
         content_text_edited: aiContentText,
       }
-      const { error } = await supabase
-        .from('company_content_planners')
-        .update({
+      const res = await fetch(`/api/companies/${companyData.id}/content-planner/${plannerData.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
           ai_content_results: updatedAiResults,
           status: 'human_reviewed',
-        })
-        .eq('id', plannerData.id)
-
-      if (error) throw error
+        }),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed to save')
       message.success('Content saved')
       router.refresh()
     } catch (e: unknown) {
@@ -251,12 +251,11 @@ export default function ContentPlannerDetailContent({
 
   const handleDelete = async () => {
     try {
-      const { error } = await supabase
-        .from('company_content_planners')
-        .delete()
-        .eq('id', plannerData.id)
-
-      if (error) throw error
+      const res = await fetch(`/api/companies/${companyData.id}/content-planner/${plannerData.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed to delete')
       message.success('Deleted')
       router.push(variant === 'customer' ? '/customer' : `/companies/${companyData.id}`)
     } catch (e: unknown) {

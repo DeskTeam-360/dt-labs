@@ -6,7 +6,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
-import { createClient } from '@/utils/supabase/client'
 import { getCrawlPages } from '@/app/actions/crawl'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -44,7 +43,6 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
   const [loading, setLoading] = useState(false)
   const [mainPagePreview, setMainPagePreview] = useState<CrawlPageRecord | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const supabase = createClient()
 
   const getHeadingColor = (level: number) => {
     const colors: { [key: number]: string } = {
@@ -936,14 +934,9 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
 
   const fetchSessionData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('crawl_sessions')
-        .select('*')
-        .eq('id', crawlSession.id)
-        .single()
-
-      if (!error && data) {
-        // Update local state if needed
+      const res = await fetch(`/api/crawl-sessions/${crawlSession.id}`, { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
         if (data.status !== crawlSession.status) {
           router.refresh()
         }
@@ -961,7 +954,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       if (result.error) {
         message.error(result.error)
       } else {
-        const pages = result.data || []
+        const pages = (result.data || []) as CrawlPageRecord[]
         setCrawlPages(pages)
         
         // Find main page (depth 0 or URL matching company website URL)

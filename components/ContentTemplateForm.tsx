@@ -17,7 +17,6 @@ import {
 import { ArrowLeftOutlined, SaveOutlined, CopyOutlined } from '@ant-design/icons'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client'
 import AdminSidebar from './AdminSidebar'
 
 const { Content } = Layout
@@ -56,7 +55,6 @@ export default function ContentTemplateForm({
   const [contentValue, setContentValue] = useState('')
   const [form] = Form.useForm()
   const contentTextAreaRef = useRef<any>(null)
-  const supabase = createClient()
 
   const isEditMode = !!template
 
@@ -89,18 +87,12 @@ export default function ContentTemplateForm({
   const fetchDataTemplates = async () => {
     setLoadingTemplates(true)
     try {
-      const { data, error } = await supabase
-        .from('company_data_templates')
-        .select('*')
-        .eq('is_active', true)
-        .order('group', { ascending: true })
-        .order('title', { ascending: true })
-
-      if (error) throw error
-
-      setDataTemplates(data || [])
+      const res = await fetch('/api/company-data-templates?is_active=true', { credentials: 'include' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to load data templates')
+      setDataTemplates(json.data || [])
     } catch (error: any) {
-      message.error('Failed to load data templates')
+      message.error(error?.message || 'Failed to load data templates')
     } finally {
       setLoadingTemplates(false)
     }
@@ -303,35 +295,38 @@ export default function ContentTemplateForm({
       const typeVal = values.type ? String(values.type).trim() || null : null
 
       if (isEditMode && template) {
-        // Update existing template
-        const { error } = await supabase
-          .from('company_content_templates')
-          .update({
+        const res = await fetch(`/api/company-content-templates/${template.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
             title: values.title,
             content: submitContent,
             description: values.description || null,
             type: typeVal,
             fields: fieldsArr.length > 0 ? fieldsArr : null,
-          })
-          .eq('id', template.id)
-
-        if (error) throw error
+          }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(json.error || 'Failed to update')
 
         message.success('Content template updated successfully')
         router.push('/company-content-templates')
       } else {
-        // Create new template
-        const { error } = await supabase
-          .from('company_content_templates')
-          .insert({
+        const res = await fetch('/api/company-content-templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
             title: values.title,
             content: submitContent,
             description: values.description || null,
             type: typeVal,
             fields: fieldsArr.length > 0 ? fieldsArr : null,
-          })
-
-        if (error) throw error
+          }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(json.error || 'Failed to create')
 
         message.success('Content template created successfully')
         router.push('/company-content-templates')

@@ -1,5 +1,5 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { db, apiTokens } from '@/lib/db'
+import { eq, and } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -11,36 +11,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Token is required' }, { status: 400 })
     }
 
-    // Use admin client to check token (bypass RLS)
-    const { createAdminClient } = await import('@/utils/supabase/admin')
-    const supabase = createAdminClient()
+    const [tokenRow] = await db
+      .select({ id: apiTokens.id, userId: apiTokens.userId, expiresAt: apiTokens.expiresAt })
+      .from(apiTokens)
+      .where(and(eq(apiTokens.token, token), eq(apiTokens.isActive, true)))
+      .limit(1)
 
-    // Find token in database
-    const { data: tokenData, error } = await supabase
-      .from('api_tokens')
-      .select('*, user_id')
-      .eq('token', token)
-      .eq('is_active', true)
-      .single()
-
-    if (error || !tokenData) {
+    if (!tokenRow) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    // Check if token is expired
-    if (tokenData.expires_at && new Date(tokenData.expires_at) < new Date()) {
+    if (tokenRow.expiresAt && new Date(tokenRow.expiresAt) < new Date()) {
       return NextResponse.json({ error: 'Token expired' }, { status: 401 })
     }
 
-    // Update last_used_at
-    await supabase
-      .from('api_tokens')
-      .update({ last_used_at: new Date().toISOString() })
-      .eq('id', tokenData.id)
+    await db
+      .update(apiTokens)
+      .set({ lastUsedAt: new Date() })
+      .where(eq(apiTokens.id, tokenRow.id))
 
     return NextResponse.json({
       valid: true,
-      user_id: tokenData.user_id,
+      user_id: tokenRow.userId,
     })
   } catch (error: any) {
     console.error('Failed to validate token:', error)
