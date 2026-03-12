@@ -24,7 +24,6 @@ import {
 import { PlusOutlined, EditOutlined, PlayCircleOutlined, CloudDownloadOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client'
 import DateDisplay from '../DateDisplay'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -83,7 +82,6 @@ interface ContentPlannerRecord {
 
 export default function TabContentPlanner({ companyData, basePath }: TabContentPlannerProps) {
   const router = useRouter()
-  const supabase = createClient()
   const [planners, setPlanners] = useState<ContentPlannerRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [intents, setIntents] = useState<{ id: string; title: string }[]>([])
@@ -141,18 +139,9 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
     if (!companyData?.id) return
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('company_content_planners')
-        .select(`
-          *,
-          channel:content_planner_channels(id, title),
-          topic_type:content_planner_topic_types(id, title)
-        `)
-        .eq('company_id', companyData.id)
-        .order('publish_date', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
+      const res = await fetch(`/api/companies/${companyData.id}/content-planner`, { credentials: 'include' })
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data = await res.json()
       setPlanners((data || []) as ContentPlannerRecord[])
     } catch (e: unknown) {
       const err = e as { message?: string }
@@ -165,16 +154,13 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
 
   const fetchLookups = async () => {
     try {
-      const [intentsRes, topicTypesRes, channelsRes, templatesRes] = await Promise.all([
-        supabase.from('content_planner_intents').select('id, title').order('title'),
-        supabase.from('content_planner_topic_types').select('id, title').order('title'),
-        supabase.from('content_planner_channels').select('id, title, company_ai_system_template_id').order('title'),
-        supabase.from('company_ai_system_template').select('id, title').order('title'),
-      ])
-      setIntents(intentsRes.data || [])
-      setTopicTypes(topicTypesRes.data || [])
-      setChannels(channelsRes.data || [])
-      setAiTemplates(templatesRes.data || [])
+      const res = await fetch('/api/content-planner/lookup', { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json()
+      setIntents(data.intents || [])
+      setTopicTypes(data.topicTypes || [])
+      setChannels(data.channels || [])
+      setAiTemplates(data.aiTemplates || [])
     } catch {
       // ignore
     }
@@ -183,11 +169,13 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
   const handleChannelTemplateChange = async (channelId: string, templateId: string | null) => {
     setUpdatingChannelTemplate(channelId)
     try {
-      const { error } = await supabase
-        .from('content_planner_channels')
-        .update({ company_ai_system_template_id: templateId || null })
-        .eq('id', channelId)
-      if (error) throw error
+      const res = await fetch(`/api/content-planner/channels/${channelId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ company_ai_system_template_id: templateId }),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed to update')
       message.success('Default template updated')
       setChannels((prev) =>
         prev.map((c) =>
@@ -316,12 +304,11 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
   const handleDelete = async (record: ContentPlannerRecord, e?: React.MouseEvent) => {
     e?.stopPropagation()
     try {
-      const { error } = await supabase
-        .from('company_content_planners')
-        .delete()
-        .eq('id', record.id)
-        .eq('company_id', companyData.id)
-      if (error) throw error
+      const res = await fetch(`/api/companies/${companyData.id}/content-planner/${record.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed to delete')
       message.success('Deleted')
       setSelectedRowKeys((prev) => prev.filter((k) => k !== record.id))
       fetchPlanners()
@@ -335,12 +322,12 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
     if (selectedRowKeys.length === 0) return
     setBulkDeleting(true)
     try {
-      const { error } = await supabase
-        .from('company_content_planners')
-        .delete()
-        .eq('company_id', companyData.id)
-        .in('id', selectedRowKeys)
-      if (error) throw error
+      const ids = selectedRowKeys.map(String).join(',')
+      const res = await fetch(`/api/companies/${companyData.id}/content-planner?ids=${encodeURIComponent(ids)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Bulk delete failed')
       message.success(`Deleted ${selectedRowKeys.length} item(s)`)
       setSelectedRowKeys([])
       fetchPlanners()
@@ -473,33 +460,22 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
       cache[key] = found.id
       return found.id
     }
-    const { data: inserted, error } = await supabase
-      .from('content_planner_channels')
-      .insert({ title: displayTitle })
-      .select('id')
-      .single()
-    if (inserted?.id) {
-      cache[key] = inserted.id
-      setChannels((prev) => [...prev, { id: inserted.id, title: displayTitle, company_ai_system_template_id: null }])
-      return inserted.id
+    const res = await fetch('/api/content-planner/channels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ title: displayTitle }),
+    })
+    const data = await res.json().catch(() => ({})) as { id?: string; title?: string }
+    if (data?.id) {
+      cache[key] = data.id
+      setChannels((prev) => [...prev, { id: data.id!, title: displayTitle, company_ai_system_template_id: null }])
+      return data.id
     }
-    if (error) {
-      const { data: existing } = await supabase
-        .from('content_planner_channels')
-        .select('id, title')
-        .ilike('title', displayTitle)
-        .limit(1)
-        .maybeSingle()
-      if (existing?.id) {
-        cache[key] = existing.id
-        setChannels((prev) => {
-          if (prev.some((c) => c.id === existing.id)) return prev
-          return [...prev, { id: existing.id, title: existing.title ?? displayTitle, company_ai_system_template_id: null }]
-        })
-        return existing.id
-      }
-      console.error('Failed to create channel:', displayTitle, error)
-      message.warning(`Channel "${displayTitle}" tidak bisa dibuat: ${error.message}`)
+    if (!res.ok) {
+      const err = (data as { error?: string })?.error ?? 'Failed to create channel'
+      console.error('Failed to create channel:', displayTitle, err)
+      message.warning(`Channel "${displayTitle}" tidak bisa dibuat: ${err}`)
     }
     return null
   }
@@ -559,8 +535,13 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
           insight,
         }
 
-        const { error } = await supabase.from('company_content_planners').insert(payload)
-        if (!error) created++
+        const res = await fetch(`/api/companies/${companyData.id}/content-planner`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        })
+        if (res.ok) created++
       }
       const newChannelsCount = Object.keys(channelCache).length - initialCacheKeys
       if (newChannelsCount > 0) {
@@ -602,8 +583,13 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
       }
 
       setSaving(true)
-      const { error } = await supabase.from('company_content_planners').insert(payload)
-      if (error) throw error
+      const res = await fetch(`/api/companies/${companyData.id}/content-planner`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed to create')
       message.success('Content planner created')
       setModalVisible(false)
       form.resetFields()

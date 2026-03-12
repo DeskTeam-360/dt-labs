@@ -1,72 +1,73 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { auth } from '@/auth'
+import { db, users, companies, companyDatas, companyDataTemplates, companyWebsites } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 
-const COMPANY_SELECT = `
-  *,
-  company_datas (
-    id,
-    value,
-    created_at,
-    updated_at,
-    company_data_templates (
-      id,
-      title,
-      group
-    )
-  ),
-  company_users (
-    user_id,
-    created_at,
-    users (
-      id,
-      full_name,
-      email
-    )
-  ),
-  company_websites (
-    id,
-    url,
-    title,
-    description,
-    is_primary,
-    created_at,
-    updated_at
-  )
-`
-
 export async function getCustomerCompanyData() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  const session = await auth()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session?.user?.id) {
     redirect('/login')
   }
 
-  const { data: userData } = await supabase
-    .from('users')
-    .select('company_id')
-    .eq('id', user.id)
-    .single()
+  const [userRow] = await db
+    .select({ companyId: users.companyId })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1)
 
-  const companyId = userData?.company_id
+  const companyId = userRow?.companyId
   if (!companyId) {
     redirect('/dashboard')
   }
 
-  const { data: companyData, error } = await supabase
-    .from('companies')
-    .select(COMPANY_SELECT)
-    .eq('id', companyId)
-    .single()
-
-  if (error || !companyData) {
+  const [companyRow] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+  if (!companyRow) {
     redirect('/dashboard')
   }
 
-  return { user, companyData }
+  const [companyDatasRows, companyWebsitesRows] = await Promise.all([
+    db
+      .select({
+        data: companyDatas,
+        template: companyDataTemplates,
+      })
+      .from(companyDatas)
+      .leftJoin(companyDataTemplates, eq(companyDatas.dataTemplateId, companyDataTemplates.id))
+      .where(eq(companyDatas.companyId, companyId)),
+    db.select().from(companyWebsites).where(eq(companyWebsites.companyId, companyId)),
+  ])
+
+  const companyData = {
+    id: companyRow.id,
+    name: companyRow.name,
+    email: companyRow.email,
+    color: companyRow.color,
+    is_active: companyRow.isActive ?? true,
+    created_at: companyRow.createdAt ? new Date(companyRow.createdAt).toISOString() : '',
+    updated_at: companyRow.updatedAt ? new Date(companyRow.updatedAt).toISOString() : '',
+    company_datas: companyDatasRows.map((r) => ({
+      id: r.data.id,
+      company_id: r.data.companyId,
+      data_template_id: r.data.dataTemplateId,
+      value: r.data.value,
+      created_at: r.data.createdAt ? new Date(r.data.createdAt).toISOString() : '',
+      updated_at: r.data.updatedAt ? new Date(r.data.updatedAt).toISOString() : '',
+      company_data_templates: r.template
+        ? { id: r.template.id, title: r.template.title, group: r.template.group }
+        : null,
+    })),
+    company_users: [],
+    company_websites: companyWebsitesRows.map((r) => ({
+      id: r.id,
+      url: r.url,
+      title: r.title,
+      description: r.description,
+      is_primary: r.isPrimary ?? false,
+      created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
+      updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
+    })),
+  }
+
+  return { user: session.user, companyData }
 }

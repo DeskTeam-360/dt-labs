@@ -5,7 +5,6 @@ import { MailOutlined, CheckCircleOutlined, DisconnectOutlined, SyncOutlined } f
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import AdminSidebar from './AdminSidebar'
-import { createClient } from '@/utils/supabase/client'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -89,20 +88,9 @@ export default function EmailIntegrationContent({
     if (!integration?.id) return
     setDisconnecting(true)
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('email_integrations')
-        .update({
-          access_token: null,
-          refresh_token: null,
-          expires_at: null,
-          is_active: false,
-          email_address: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', integration.id)
-
-      if (error) throw error
+      const res = await fetch('/api/email/disconnect', { method: 'POST', credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to disconnect')
       message.success('Disconnected from Google')
       setIntegration(null)
       router.refresh()

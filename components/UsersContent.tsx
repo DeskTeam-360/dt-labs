@@ -25,7 +25,7 @@ const { Option } = Select
 const { TextArea } = Input
 
 interface UsersContentProps {
-  user: User & { role?: string }
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
 }
 
 interface UserRecord {
