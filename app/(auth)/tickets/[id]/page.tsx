@@ -27,6 +27,9 @@ export default async function TicketDetailPage({
     redirect('/tickets')
   }
 
+  const role = (session.user as { role?: string }).role
+  const isCustomer = role === 'customer'
+
   return (
     <TicketDetailContent
       user={session.user}
@@ -36,6 +39,7 @@ export default async function TicketDetailPage({
       attributes={data.attributes}
       screenshots={data.screenshots}
       tags={data.tags}
+      variant={isCustomer ? 'customer' : 'admin'}
     />
   )
 }

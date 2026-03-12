@@ -196,7 +196,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       icon: <MailOutlined />,
       label: 'Email Integration',
     },
-  ].filter((item) => (isCustomer ? !['ticket-attributes', '/teams', '/email-integration'].includes(item.key) : true))
+  ].filter((item) => (isCustomer ? !['ticket-attributes', '/teams', '/email-integration', '/companies'].includes(item.key) : true))
 
   const accountMenuItems = [
     {

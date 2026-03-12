@@ -37,9 +37,9 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 import AdminSidebar from './AdminSidebar'
-import CustomerNavbar from './CustomerNavbar'
 import DateDisplay from './DateDisplay'
 import { TabGeneral, TabAssignees, TabScreenshots } from './TicketDetail'
+import TabGeneralCustomer from './TicketDetail/TabGeneralCustomer'
 import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
 import dayjs from 'dayjs'
 
@@ -908,22 +908,18 @@ export default function TicketDetailContent({
 
     return (
         <Layout style={{ minHeight: '100vh' }}>
-            {isCustomer ? (
-                <CustomerNavbar user={currentUser} />
-            ) : (
-                <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
-            )}
-            <Layout style={{ marginLeft: isCustomer ? 0 : (collapsed ? 80 : 250), transition: 'margin-left 0.2s' }}>
+            <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
+            <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
                 <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
                     <Card style={{  margin: '0 auto' }}>
                         <Flex gap={16} align='center' style={{ marginBottom: 24 }}>
                             <Button
                                 icon={<ArrowLeftOutlined />}
-                                onClick={() => router.push('/tickets')}
+                                onClick={() => router.push(isCustomer ? '/customer' : '/tickets')}
                             >
                                 Back to {isCustomer ? 'Portal' : 'Tickets'}
                             </Button>
-                            {isCustomer && (
+                            {/* {isCustomer && (
                                 <Button
                                     icon={<SyncOutlined />}
                                     onClick={handleSyncEmail}
@@ -931,7 +927,7 @@ export default function TicketDetailContent({
                                 >
                                     Sync Email
                                 </Button>
-                            )}
+                            )} */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{ flex: 1 }}>
                                     <Title level={2} >
@@ -944,6 +940,41 @@ export default function TicketDetailContent({
                             
                         <Divider />
 
+                        {isCustomer ? (
+                            <TabGeneralCustomer
+                                ticketData={ticketData}
+                                ticketAttachments={descriptionAttachmentsFromDb}
+                                statusOptions={allStatusesForSelect}
+                                typeOptions={ticketTypes}
+                                priorityOptions={ticketPriorities}
+                                onTypeChange={handleTypeChange}
+                                onPriorityChange={handlePriorityChange}
+                                typeChanging={typeChanging}
+                                priorityChanging={priorityChanging}
+                                totalTimeSeconds={totalTimeSeconds}
+                                activeTimeTracker={activeTimeTracker}
+                                currentTime={currentTime}
+                                formatTime={formatTime}
+                                comments={comments}
+                                currentUserId={currentUser.id}
+                                editingComment={editingComment}
+                                editingCommentValue={editingCommentValue}
+                                onEditComment={(id, value) => {
+                                    setEditingComment(id)
+                                    setEditingCommentValue(value)
+                                }}
+                                onEditingCommentValueChange={setEditingCommentValue}
+                                onSaveEditComment={handleUpdateComment}
+                                onCancelEditComment={() => {
+                                    setEditingComment(null)
+                                    setEditingCommentValue('')
+                                }}
+                                onDeleteComment={handleDeleteComment}
+                                canDeleteComment={canDeleteComment}
+                                onAddComment={handleAddComment}
+                                addCommentLoading={loading}
+                            />
+                        ) : (
                         <Tabs
                             defaultActiveKey="general"
                             items={[
@@ -972,7 +1003,7 @@ export default function TicketDetailContent({
                                             selectedTagIds={selectedTagIds}
                                             onTagsChange={handleTagsChange}
                                             tagsChanging={tagsChanging}
-                                            canEditCompanyAndTags={variant !== 'customer'}
+                                            canEditCompanyAndTags
                                             onDueDateChange={handleDueDateChange}
                                             dueDateChanging={dueDateChanging}
                                             visibilityOptions={VISIBILITY_OPTIONS}
@@ -987,9 +1018,9 @@ export default function TicketDetailContent({
                                             selectedAssigneeIds={(optimisticAssignees ?? (ticketData.assignees || []).map((a: any) => a.user_id || a.user?.id).filter(Boolean)).map((id: string) => String(id))}
                                             onAssigneesChange={handleAssigneesChange}
                                             assigneesChanging={assigneesChanging}
-                                            canEditAssignees={variant !== 'customer'}
+                                            canEditAssignees
                                             shortNote={ticketData.short_note}
-                                            onShortNoteChange={variant === 'admin' ? handleShortNoteChange : undefined}
+                                            onShortNoteChange={handleShortNoteChange}
                                             shortNoteChanging={shortNoteChanging}
                                             totalTimeSeconds={totalTimeSeconds}
                                             activeTimeTracker={activeTimeTracker}
@@ -1023,7 +1054,7 @@ export default function TicketDetailContent({
                                             addCommentLoading={loading}
                                             commentVisibility={commentVisibility}
                                             onCommentVisibilityChange={setCommentVisibility}
-                                            showNoteOption={variant === 'admin'}
+                                            showNoteOption
                                             attributes={attributes}
                                             newAttributeKey={newAttributeKey}
                                             newAttributeValue={newAttributeValue}
@@ -1064,6 +1095,7 @@ export default function TicketDetailContent({
                                 },
                             ]}
                         />
+                        )}
                     </Card>
 
                    
