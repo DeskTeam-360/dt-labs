@@ -16,9 +16,11 @@ import {
 import { eq, inArray, asc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-/** GET /api/customer/dashboard - Stats for customer dashboard */
-export async function GET() {
+/** GET /api/customer/dashboard - Stats for customer dashboard. Add ?debug=1 to see why Urgent ETA might be missing. */
+export async function GET(request: Request) {
   const session = await auth()
+  const { searchParams } = new URL(request.url)
+  const debug = searchParams.get('debug') === '1'
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -44,6 +46,7 @@ export async function GET() {
       status_counts: [],
       recent_tickets: [],
       last_due_date: null,
+      urgent_due_date: null,
     })
   }
 
@@ -66,7 +69,7 @@ export async function GET() {
   })
   const ticketsByType = Object.values(typeCounts)
 
-  const allPriorities = await db.select({ id: ticketPriorities.id, title: ticketPriorities.title, color: ticketPriorities.color, sortOrder: ticketPriorities.sortOrder }).from(ticketPriorities).orderBy(ticketPriorities.sortOrder)
+  const allPriorities = await db.select({ id: ticketPriorities.id, slug: ticketPriorities.slug, title: ticketPriorities.title, color: ticketPriorities.color, sortOrder: ticketPriorities.sortOrder }).from(ticketPriorities).orderBy(ticketPriorities.sortOrder)
   const pCounts: Record<number, number> = {}
   myTickets.forEach((t) => { pCounts[t.priorityId ?? 0] = (pCounts[t.priorityId ?? 0] ?? 0) + 1 })
   const priorityCounts = allPriorities.map((p) => ({ priority_title: p.title, count: pCounts[p.id] ?? 0, color: p.color ?? '#000' }))
@@ -96,8 +99,26 @@ export async function GET() {
   myTickets.forEach((t) => { sCounts[t.status ?? 'unknown'] = (sCounts[t.status ?? 'unknown'] ?? 0) + 1 })
   const statusCounts = statusRows.map((s) => ({ status_title: s.customerTitle ?? s.title, count: sCounts[s.slug] ?? 0, color: s.color ?? '#000' }))
 
-  const recentIds = myTickets.sort((a, b) => (b.updatedAt ? new Date(b.updatedAt).getTime() : 0) - (a.updatedAt ? new Date(a.updatedAt).getTime() : 0)).slice(0, 10).map((t) => t.id)
-  let recentTickets: Array<{ id: number; title: string; due_date: string | null; updated_at: string; status_title: string; status_color: string; priority_title: string; priority_color: string; assignee_name: string | null; company_name: string | null }> = []
+  // recent_tickets: 5 tickets, urutkan priority (urgent dulu) lalu due_date (terdekat dulu)
+  // Urutan eksplisit: urgent/critical=0, high=1, medium=2, low=3. Fallback: sortOrder dari DB (rendah=tinggi).
+  const slugToRank: Record<string, number> = { urgent: 0, critical: 0, high: 1, medium: 2, low: 3 }
+  const minSortOrder = Math.min(...allPriorities.map((x) => x.sortOrder ?? 999))
+  const priorityRankMap: Record<number, number> = {}
+  allPriorities.forEach((p) => {
+    const slug = (p.slug ?? '').toLowerCase().trim()
+    const rank = slug in slugToRank ? slugToRank[slug] : ((p.sortOrder ?? 999) - minSortOrder)
+    priorityRankMap[p.id] = rank
+  })
+  const sortedForRecent = [...myTickets].sort((a, b) => {
+    const pa = a.priorityId != null ? (priorityRankMap[Number(a.priorityId)] ?? 999) : 999
+    const pb = b.priorityId != null ? (priorityRankMap[Number(b.priorityId)] ?? 999) : 999
+    if (pa !== pb) return pa - pb // priority dulu (urgent=0 paling atas)
+    const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity
+    const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
+    return da - db // due_date terdekat dulu
+  })
+  const recentIds = sortedForRecent.slice(0, 5).map((t) => t.id)
+  let recentTickets: Array<{ id: number; title: string; due_date: string | null; updated_at: string; status_title: string; customer_title: string; status_color: string; priority_title: string; priority_color: string; assignee_name: string | null; company_name: string | null }> = []
 
   if (recentIds.length > 0) {
     const rows = await db.select({ ticket: tickets, company: companies, priority: ticketPriorities, statusRow: ticketStatuses }).from(tickets).leftJoin(companies, eq(tickets.companyId, companies.id)).leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id)).leftJoin(ticketStatuses, eq(tickets.status, ticketStatuses.slug)).where(inArray(tickets.id, recentIds))
@@ -121,6 +142,7 @@ export async function GET() {
       due_date: r.ticket.dueDate ? new Date(r.ticket.dueDate).toISOString() : null,
       updated_at: r.ticket.updatedAt ? new Date(r.ticket.updatedAt).toISOString() : '',
       status_title: r.statusRow?.customerTitle ?? r.statusRow?.title ?? r.ticket.status,
+      customer_title: r.statusRow?.customerTitle ?? 'Unknown',
       status_color: r.statusRow?.color ?? '#000',
       priority_title: r.priority?.title ?? 'N/A',
       priority_color: r.priority?.color ?? '#000',
@@ -130,12 +152,36 @@ export async function GET() {
     })).sort((a, b) => (orderMap[a.id] ?? 999) - (orderMap[b.id] ?? 999))
   }
 
-  const dueDates = myTickets.map((t) => t.dueDate).filter((d) => d != null) as (Date | string)[]
-  const lastDueDate = dueDates.length > 0
-    ? new Date(Math.max(...dueDates.map((d) => new Date(d).getTime()))).toISOString()
-    : null
+  // ETA: due_date terdekat, jika ada beberapa dengan tanggal sama → ambil yang prioritas tertinggi (urgent dulu)
+  const ticketsWithDue = myTickets.filter((t) => t.dueDate != null)
+  let lastDueDate: string | null = null
+  if (ticketsWithDue.length > 0) {
+    const minDueTime = Math.min(...ticketsWithDue.map((t) => new Date(t.dueDate!).getTime()))
+    const atMinDue = ticketsWithDue.filter((t) => new Date(t.dueDate!).getTime() === minDueTime)
+    const byPriority = [...atMinDue].sort((a, b) => {
+      const pa = a.priorityId != null ? (priorityRankMap[Number(a.priorityId)] ?? 999) : 999
+      const pb = b.priorityId != null ? (priorityRankMap[Number(b.priorityId)] ?? 999) : 999
+      return pa - pb
+    })
+    lastDueDate = byPriority[0]!.dueDate ? new Date(byPriority[0].dueDate).toISOString() : null
+  }
 
-  return NextResponse.json({
+  // Urgent ETA: due_date terdekat dari ticket dengan prioritas urgent (match slug/title atau sortOrder tertinggi)
+  const urgentPriority =
+    allPriorities.find((p) => p.slug?.toLowerCase() === 'urgent' || p.title?.toLowerCase() === 'urgent') ??
+    allPriorities.find((p) => (p.sortOrder ?? 999) === Math.min(...allPriorities.map((x) => x.sortOrder ?? 999)))
+  const urgentPriorityId = urgentPriority ? Number(urgentPriority.id) : null
+  const urgentTicketsWithDue = urgentPriorityId != null
+    ? myTickets.filter((t) => Number(t.priorityId) === urgentPriorityId && t.dueDate != null)
+    : []
+  let urgentDueDate: string | null = null
+  if (urgentTicketsWithDue.length > 0) {
+    const minUrgentTime = Math.min(...urgentTicketsWithDue.map((t) => new Date(t.dueDate!).getTime()))
+    const urgentMinTicket = urgentTicketsWithDue.find((t) => new Date(t.dueDate!).getTime() === minUrgentTime)
+    urgentDueDate = urgentMinTicket?.dueDate ? new Date(urgentMinTicket.dueDate).toISOString() : null
+  }
+
+  const payload: Record<string, unknown> = {
     company_id: companyId,
     my_tickets_count: myTickets.length,
     tickets_by_type: ticketsByType,
@@ -145,5 +191,23 @@ export async function GET() {
     status_counts: statusCounts,
     recent_tickets: recentTickets,
     last_due_date: lastDueDate,
-  })
+    urgent_due_date: urgentDueDate,
+  }
+
+  if (debug) {
+    payload._debug = {
+      urgent_priority_id: urgentPriorityId,
+      urgent_priority_slug: urgentPriority?.slug,
+      urgent_priority_title: urgentPriority?.title,
+      all_priorities: allPriorities.map((p) => ({ id: p.id, slug: p.slug, title: p.title })),
+      urgent_tickets_with_due_count: urgentTicketsWithDue.length,
+      my_tickets_sample: myTickets.slice(0, 5).map((t) => ({
+        id: t.id,
+        priorityId: t.priorityId,
+        dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : null,
+      })),
+    }
+  }
+
+  return NextResponse.json(payload)
 }

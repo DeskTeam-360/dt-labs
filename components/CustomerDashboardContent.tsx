@@ -48,12 +48,14 @@ interface DashboardData {
   total_time_seconds: number
   status_counts: Array<{ status_title: string; count: number; color: string }>
   last_due_date: string | null
+  urgent_due_date: string | null
   recent_tickets: Array<{
     id: number
     title: string
     due_date: string | null
     updated_at: string
     status_title: string
+    customer_title: string
     status_color: string
     priority_title: string
     priority_color: string
@@ -85,8 +87,6 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
   const [collapsed, setCollapsed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<DashboardData | null>(null)
-  const [currentDay, setCurrentDay] = useState(dayjs().date())
-  const [currentEta, setCurrentEta] = useState(dayjs().add(10, 'day').format('MMM DD, YYYY'))
 
   const fetchStats = async () => {
     setLoading(true)
@@ -163,7 +163,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
 
 
                     {barChartData.length > 0 ? (
-                      <div style={{ height: 220 }}>
+                      <div style={{ height: 300 }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={barChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" />
@@ -188,13 +188,15 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                 <Col xs={24} lg={12} style={{ padding: 16, borderRadius: 8 }}>
                   <div style={{ background: "#F4F5FF", padding: 16, borderRadius: 8, height: '100%' }}>
                     {/* Last Due Date - My Ticket */}
-                    <div style={{ marginBottom: 16, display: 'flex', position: 'absolute', top: 16, right: 40, alignItems: 'center', gap: 8, background: "#FFE0E5", padding: '8px 16px', borderRadius: "0 0 10px 10px " }}>
+                    <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', position: 'absolute', top: 16, right: 40, gap: 4, background: "#FFE0E5", padding: '8px 16px', borderRadius: "0 0 10px 10px " }}>
                       <Text type="danger" style={{ fontWeight: 700 }}>
-
-                        <ClockCircleOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Current ETA:   {data?.last_due_date ? dayjs(data.last_due_date).format('MMM DD, YYYY') : 'N/A'}
+                        <ClockCircleOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Most Closest ETA: {data?.last_due_date ? dayjs(data.last_due_date).format('MMM DD, YYYY') : 'N/A'}
+                      </Text>
+                      <Text type="danger" style={{ fontWeight: 700 }}>
+                        <FlagOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Urgent ETA: {data?.urgent_due_date ? dayjs(data.urgent_due_date).format('MMM DD, YYYY') : 'N/A'}
                       </Text>
                     </div>
-                    <br /><br />
+                    <br /><br /><br />
                     {(data?.priority_counts?.length ?? 0) > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         {data!.priority_counts.map((p, i) => (
@@ -252,9 +254,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
 
           {/* Time Spent - Donut */}
           <Col xs={24} lg={10}>
-            <Card
-
-            >
+            <Card>
               <Flex justify="space-between" align="center">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <span style={{ fontWeight: 600, fontSize: 16 }}>Time Spent</span>
@@ -334,9 +334,12 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
           </Col>
 
           {/* Tickets Status */}
-          <Col xs={24} lg={14} style={{ height: '100%' }}>
-            <Card style={{ height: '100%' }}>
-              <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>Assigned and need action</Text>
+          <Col xs={24} lg={14}>
+            <Card>
+              <Flex justify="space-between" style={{ marginBottom: 16 }} align="center">
+                <span style={{ fontWeight: 600, fontSize: 16 }}>Assigned and need action</span>
+                  
+              </Flex>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {(data?.status_counts?.length ?? 0) > 0 && (
                   <Row gutter={[16, 12]}>
@@ -362,7 +365,9 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
 
           {/* Knowledge Base */}
           <Col xs={24} lg={12}>
-            <Card title="Knowledge base">
+            <Card >
+            <span style={{ fontWeight: 600, fontSize: 16 }}>Knowledge base</span>
+              <br />  
               <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>How can we help you today?</Text>
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Select placeholder="General" style={{ width: '100%' }} allowClear options={[{ label: 'General', value: 'general' }, { label: 'Requests', value: 'requests' }]} />
@@ -380,14 +385,16 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
 
           {/* Check Tickets Status */}
           <Col xs={24} lg={12}>
-            <Card
-              title="Check Tickets Status"
-              extra={
+            <Card>
+              <Flex justify="space-between" align="center">
+               <span style={{ fontWeight: 600, fontSize: 16 }}>Check Tickets Status</span>
+              
                 <Button type="primary" icon={<PlusOutlined />} onClick={() => router.push('/tickets?new=1')}>
                   New Ticket
                 </Button>
-              }
-            >
+                </Flex>
+              
+              
               <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>Preview Tickets list</Text>
               {(data?.recent_tickets?.length ?? 0) > 0 ? (
                 <Flex vertical justify="center" align="center" gap={12}>
@@ -406,21 +413,33 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                     >
                       <Flex vertical justify="left" align="left" gap={0}>
                         <Text strong style={{ flex: 1, fontSize: 16, fontWeight: 700, color: '#1f2937', lineHeight: 1.4 }}>
-                          {t.title}
+                        #{t.id} {t.title}
                         </Text>
                         <Text style={{ fontSize: 13, color: '#1890ff', display: 'block', }}>
                           by {t.assignee_name || t.company_name || 'Unassigned'}
                         </Text>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-                          {t.due_date && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
-                              <FlagOutlined style={{ fontSize: 12 }} />
-                              Due {dayjs(t.due_date).format('MMM DD, YYYY').toUpperCase()}
-                            </span>
-                          )}
+                          {t.due_date && (() => {
+                            const today = dayjs().startOf('day');
+                            const dueDay = dayjs(t.due_date).startOf('day');
+                            let color = '#9ca3af'; // default gray
+                            if (dueDay.isBefore(today)) {
+                              color = '#ff4d4f'; // red (overdue)
+                            } else if (dueDay.isSame(today)) {
+                              color = '#ff4d4f'; // red (today/H)
+                            } else if (dueDay.diff(today, 'day') < 1) {
+                              color = '#faad14'; // yellow (less than 1 day)
+                            }
+                            return (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color, fontWeight: 700 }}>
+                                <FlagOutlined style={{ fontSize: 12 }} />
+                                Due {dayjs(t.due_date).format('MMM DD, YYYY')}
+                              </span>
+                            )
+                          })()}
                           <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
                             <ClockCircleOutlined style={{ fontSize: 12 }} />
-                            Updated {dayjs(t.updated_at).format('MMM DD, YYYY').toUpperCase()}
+                            Last Updated {dayjs(t.updated_at).format('MMM DD, YYYY')}
                           </span>
                         </div>
                       </Flex>
@@ -462,7 +481,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                             color: '#fff',
                           }}
                         >
-                          {t.status_title}
+                          {t.customer_title ?? t.status_title}
                         </span>
                         <Dropdown
                           menu={{

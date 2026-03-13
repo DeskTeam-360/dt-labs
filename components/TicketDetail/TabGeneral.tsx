@@ -300,11 +300,11 @@ export default function TabGeneral({
                       <Flex vertical style={{ flex: 1, minWidth: 0 }}>
                         <Flex justify="space-between" align="center" wrap="wrap" gap="small">
                           <Space>
-                            <Text strong>
-                              {isCustomer
-                                ? (ticketData.company?.name || ticketData.company?.email || 'Customer')
-                                : (comment.user?.full_name || comment.user?.email || 'Unknown')}
-                            </Text>
+                          <Text strong>
+                            {isCustomer
+                              ? (ticketData.company?.name || 'Customer') + ' - ' + (comment.user?.full_name || comment.user?.email || 'Unknown')
+                              : (comment.user?.full_name || comment.user?.email || 'Unknown')}
+                          </Text>
                             <Tag color={isCustomer ? 'cyan' : 'gold'}>
                               {isCustomer ? 'Customer' : 'Agent'}
                             </Tag>
@@ -349,6 +349,7 @@ export default function TabGeneral({
                           )}
                         </Flex>
                         <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 4 }}>
+                        
                           {editingComment === comment.id ? (
                             <Flex vertical gap={40} style={{ width: '100%' }}>
                               <CommentWysiwyg
