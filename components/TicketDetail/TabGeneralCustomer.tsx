@@ -161,12 +161,12 @@ export default function TabGeneralCustomer({
                         <Space>
                           <Text strong>
                             {isCustomer
-                              ? (ticketData.company?.name || ticketData.company?.email || 'Customer')
+                              ? (ticketData.company?.name || 'Customer') + ' - ' + (comment.user?.full_name || comment.user?.email || 'Unknown')
                               : (comment.user?.full_name || comment.user?.email || 'Unknown')}
                           </Text>
-                          <Tag color={isCustomer ? 'cyan' : 'gold'}>
+                          {/* <Tag color={isCustomer ? 'cyan' : 'gold'}>
                             {isCustomer ? 'Customer' : 'Agent'}
-                          </Tag>
+                          </Tag> */}
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             <DateDisplay date={comment.created_at} />
                           </Text>

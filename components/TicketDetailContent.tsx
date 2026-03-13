@@ -915,7 +915,7 @@ export default function TicketDetailContent({
                         <Flex gap={16} align='center' style={{ marginBottom: 24 }}>
                             <Button
                                 icon={<ArrowLeftOutlined />}
-                                onClick={() => router.push(isCustomer ? '/customer' : '/tickets')}
+                                onClick={() => router.push(isCustomer ? '/tickets' : '/tickets')}
                             >
                                 Back to {isCustomer ? 'Portal' : 'Tickets'}
                             </Button>

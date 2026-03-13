@@ -278,7 +278,7 @@ export default function ContentPlannerDetailContent({
           <Space style={{ marginBottom: 24 }}>
             <Button
               icon={<ArrowLeftOutlined />}
-              onClick={() => router.push(isCustomer ? '/customer' : `/companies/${companyData.id}`)}
+              onClick={() => router.push(isCustomer ? '/tickets' : `/companies/${companyData.id}`)}
             >
               Back to {isCustomer ? 'Portal' : (companyData.name || 'Company')}
             </Button>
