@@ -6,6 +6,7 @@ import {
   ticketTypes,
   ticketPriorities,
   companies,
+  companyUsers,
   tags,
   ticketStatuses,
   teamMembers,
@@ -21,7 +22,8 @@ export async function GET() {
   }
 
   const userId = session.user.id!
-  const [teamsData, usersData, ticketTypesData, ticketPrioritiesData, companiesData, tagsData, statusesData, userTeamRows] =
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+  const [teamsData, usersData, ticketTypesData, ticketPrioritiesData, companiesData, tagsData, statusesData, userTeamRows, userCompanyRow] =
     await Promise.all([
       db.select({ id: teams.id, name: teams.name }).from(teams).orderBy(asc(teams.name)),
       db.select({ id: users.id, fullName: users.fullName, email: users.email }).from(users).orderBy(asc(users.fullName)),
@@ -31,10 +33,18 @@ export async function GET() {
       db.select({ id: tags.id, name: tags.name, slug: tags.slug, color: tags.color }).from(tags).orderBy(asc(tags.name)),
       db.select({ id: ticketStatuses.id, slug: ticketStatuses.slug, title: ticketStatuses.title, customerTitle: ticketStatuses.customerTitle, color: ticketStatuses.color, showInKanban: ticketStatuses.showInKanban, sortOrder: ticketStatuses.sortOrder }).from(ticketStatuses).orderBy(asc(ticketStatuses.sortOrder)),
       db.select({ teamId: teamMembers.teamId }).from(teamMembers).where(eq(teamMembers.userId, userId)),
+      role === 'customer'
+        ? Promise.all([
+            db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1),
+            db.select({ companyId: companyUsers.companyId }).from(companyUsers).where(eq(companyUsers.userId, userId)).limit(1),
+          ]).then(([ur, cu]) => (ur[0]?.companyId ?? cu[0]?.companyId ?? null))
+        : Promise.resolve(null as string | null),
     ])
 
+  const userCompanyId = typeof userCompanyRow === 'string' ? userCompanyRow : null
   const userTeamIds = userTeamRows.map((r) => r.teamId)
   return NextResponse.json({
+    userCompanyId,
     userTeamIds,
     teams: teamsData,
     users: usersData.map((u) => ({ id: u.id, full_name: u.fullName, email: u.email })),

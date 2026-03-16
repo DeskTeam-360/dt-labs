@@ -154,10 +154,22 @@ export default function TicketsListView({
           width: 200,
           sorter: (a: TicketRecord, b: TicketRecord) =>
             new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime(),
-          render: (due_date: string | null) =>
-            due_date ? (
-              // Only show tanggal (date), no hour/minute
-              new Date(due_date).toLocaleDateString()
+          render: (_: unknown, record: TicketRecord) =>
+            record.due_date ? (
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: 11,
+                  color:
+                    new Date(record.due_date) < new Date() &&
+                    record.status !== 'completed' &&
+                    record.status !== 'cancel'
+                      ? '#ff4d4f'
+                      : '#8c8c8c',
+                }}
+              >
+                {new Date(record.due_date).toLocaleDateString()}
+              </span>
             ) : '—',
         },
         {

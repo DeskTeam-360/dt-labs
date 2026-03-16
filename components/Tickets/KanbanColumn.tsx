@@ -1,10 +1,12 @@
 'use client'
 
+import { useMemo } from 'react'
 import { Card, Empty, Badge, Typography } from 'antd'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import KanbanCard from './KanbanCard'
-import type { TicketRecord, StatusColumn } from './types'
+import type { TicketRecord, StatusColumn, TicketSortField, TicketSortOrder } from './types'
+import { sortTickets } from './types'
 
 const { Text } = Typography
 
@@ -13,6 +15,9 @@ interface KanbanColumnProps {
   tickets: TicketRecord[]
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
+  sortBy?: TicketSortField
+  sortOrder?: TicketSortOrder
+  allPriorities?: Array<{ id: number }>
 }
 
 export default function KanbanColumn({
@@ -20,8 +25,14 @@ export default function KanbanColumn({
   tickets,
   onEdit,
   onDelete,
+  sortBy = 'updated_at',
+  sortOrder = 'desc',
+  allPriorities = [],
 }: KanbanColumnProps) {
-  const columnTickets = tickets.filter((t) => t.status === column.id)
+  const columnTickets = useMemo(() => {
+    const filtered = tickets.filter((t) => t.status === column.id)
+    return sortTickets(filtered, sortBy, sortOrder, allPriorities)
+  }, [tickets, column.id, sortBy, sortOrder, allPriorities])
 
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,

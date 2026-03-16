@@ -12,7 +12,7 @@ import {
   closestCorners,
 } from '@dnd-kit/core'
 import KanbanColumn from './KanbanColumn'
-import type { TicketRecord, StatusColumn } from './types'
+import type { TicketRecord, StatusColumn, TicketSortField, TicketSortOrder } from './types'
 
 const { Text } = Typography
 
@@ -24,6 +24,9 @@ interface TicketsKanbanViewProps {
   onDragEnd: (event: DragEndEvent) => void | Promise<void>
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
+  sortBy?: TicketSortField
+  sortOrder?: TicketSortOrder
+  allPriorities?: Array<{ id: number }>
 }
 
 export default function TicketsKanbanView({
@@ -34,6 +37,9 @@ export default function TicketsKanbanView({
   onDragEnd,
   onEdit,
   onDelete,
+  sortBy = 'updated_at',
+  sortOrder = 'desc',
+  allPriorities = [],
 }: TicketsKanbanViewProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -69,6 +75,9 @@ export default function TicketsKanbanView({
             tickets={tickets}
             onEdit={onEdit}
             onDelete={onDelete}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            allPriorities={allPriorities}
           />
         ))}
       </div>

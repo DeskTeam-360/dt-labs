@@ -297,6 +297,19 @@ export async function POST(request: Request) {
   /** created_via: 'portal' (admin app) | 'website' (embed/widget) | 'app' (mobile/external) - for automation conditions */
   const createdVia = bodyCreatedVia || 'portal'
 
+  const userId = session.user.id!
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+  let resolvedCompanyId = company_id || null
+  if (role === 'customer' && !resolvedCompanyId) {
+    const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
+    let cid = userRow?.companyId ?? null
+    if (!cid) {
+      const [cu] = await db.select({ companyId: companyUsers.companyId }).from(companyUsers).where(eq(companyUsers.userId, userId)).limit(1)
+      cid = cu?.companyId ?? null
+    }
+    resolvedCompanyId = cid
+  }
+
   const [newTicket] = await db
     .insert(tickets)
     .values({
@@ -308,7 +321,7 @@ export async function POST(request: Request) {
       teamId: team_id || null,
       typeId: type_id ?? null,
       priorityId: priority_id ?? null,
-      companyId: company_id || null,
+      companyId: resolvedCompanyId,
       dueDate: due_date ? new Date(due_date) : null,
       createdBy: session.user.id,
       createdVia,

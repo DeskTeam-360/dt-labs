@@ -24,6 +24,8 @@ interface StoredFilter {
   filterSearch?: string | null
   viewMode?: 'kanban' | 'list' | 'card' | 'roundrobin'
   filterSidebarCollapsed?: boolean
+  sortBy?: TicketSortField | null
+  sortOrder?: TicketSortOrder | null
 }
 
 function loadFiltersFromStorage(): StoredFilter | null {
@@ -54,6 +56,8 @@ import {
   DEFAULT_ALL_STATUSES,
   DEFAULT_ALL_STATUS_COLUMNS,
   type StatusColumn,
+  type TicketSortField,
+  type TicketSortOrder,
 } from './types'
 import type { TicketStatusRecord } from './types'
 
@@ -106,6 +110,8 @@ const getInitialFilterState = () => {
     filterSearch: stored?.filterSearch ?? '',
     filterSidebarCollapsed: stored?.filterSidebarCollapsed ?? true,
     viewMode: (stored?.viewMode as 'kanban' | 'list' | 'card' | 'roundrobin') || 'kanban',
+    sortBy: (stored?.sortBy as TicketSortField) || 'updated_at',
+    sortOrder: (stored?.sortOrder as TicketSortOrder) || 'desc',
   }
 }
 
@@ -145,6 +151,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   const [filterDateRange, setFilterDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(initialState.filterDateRange)
   const [filterSearch, setFilterSearch] = useState(initialState.filterSearch)
   const [filterSidebarCollapsed, setFilterSidebarCollapsed] = useState(initialState.filterSidebarCollapsed)
+  const [sortBy, setSortBy] = useState<TicketSortField>(initialState.sortBy)
+  const [sortOrder, setSortOrder] = useState<TicketSortOrder>(initialState.sortOrder)
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'card' | 'roundrobin'>(() => {
     const stored = initialState.viewMode
     if (isCustomer && stored === 'roundrobin') return 'kanban'
@@ -223,10 +231,13 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterSearch,
   ])
 
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null)
+
   const fetchLookup = async () => {
     try {
       const data = await apiFetch<{
         userTeamIds?: string[]
+        userCompanyId?: string | null
         teams: Team[]
         users: UserRecord[]
         ticketTypes: Array<{ id: number; title: string; slug: string; color: string }>
@@ -242,6 +253,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       setTicketPriorities(data.ticketPriorities || [])
       setCompanies(data.companies || [])
       setAllTags(data.tags || [])
+      setUserCompanyId(data.userCompanyId ?? null)
 
       const stored = loadFiltersFromStorage()
       const hasStoredTeamPreference = stored && ('filterTeamIds' in stored || 'filterTeamId' in stored)
@@ -309,6 +321,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       filterSearch: filterSearch || null,
       viewMode: viewMode,
       filterSidebarCollapsed: filterSidebarCollapsed,
+      sortBy: sortBy || null,
+      sortOrder: sortOrder || null,
     })
   }, [
     filterStatus,
@@ -321,6 +335,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterSearch,
     viewMode,
     filterSidebarCollapsed,
+    sortBy,
+    sortOrder,
   ])
 
   const handleDragStart: TicketsDragStartHandler = (event) => {
@@ -368,10 +384,14 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setSelectedTagIds([])
     setNewTicketAttachments([])
     form.resetFields()
-    form.setFieldsValue({
+    const baseValues: Record<string, unknown> = {
       status: allStatuses[0]?.slug ?? 'to_do',
       visibility: 'private',
-    })
+    }
+    if (isCustomer && userCompanyId) {
+      baseValues.company_id = userCompanyId
+    }
+    form.setFieldsValue(baseValues)
     setModalVisible(true)
   }
 
@@ -429,26 +449,33 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
   const handleSubmit = async (values: Record<string, unknown>) => {
     try {
-      if (values.visibility === 'specific_users' && selectedAssignees.length === 0) {
+      const effectiveValues = { ...values }
+      if (isCustomer && !editingTicket) {
+        effectiveValues.status = allStatuses[0]?.slug ?? 'to_do'
+        effectiveValues.visibility = 'private'
+        effectiveValues.company_id = userCompanyId ?? null
+      }
+
+      if (effectiveValues.visibility === 'specific_users' && selectedAssignees.length === 0) {
         message.error('Please select at least one user for specific users visibility')
         return
       }
 
-      if (values.visibility === 'team' && !values.team_id) {
+      if (effectiveValues.visibility === 'team' && !effectiveValues.team_id) {
         message.error('Please select a team for team visibility')
         return
       }
 
       const ticketPayload: Record<string, unknown> = {
-        title: values.title,
-        short_note: values.short_note || null,
-        status: values.status,
-        visibility: values.visibility,
-        team_id: values.team_id || null,
-        type_id: values.type_id ?? null,
-        priority_id: values.priority_id ?? null,
-        company_id: values.company_id ?? null,
-        due_date: values.due_date ? (values.due_date as dayjs.Dayjs).toISOString() : null,
+        title: effectiveValues.title,
+        short_note: effectiveValues.short_note || null,
+        status: effectiveValues.status,
+        visibility: effectiveValues.visibility,
+        team_id: effectiveValues.team_id || null,
+        type_id: effectiveValues.type_id ?? null,
+        priority_id: effectiveValues.priority_id ?? null,
+        company_id: effectiveValues.company_id ?? null,
+        due_date: effectiveValues.due_date ? (effectiveValues.due_date as dayjs.Dayjs).toISOString() : null,
       }
 
       if (editingTicket) {
@@ -517,19 +544,19 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
         message.success('Ticket created successfully')
 
-        const typeId = values.type_id as number | undefined
-        const priorityId = values.priority_id as number | undefined
-        const companyId = values.company_id as string | undefined
-        const teamId = values.team_id as string | undefined
+        const typeId = effectiveValues.type_id as number | undefined
+        const priorityId = effectiveValues.priority_id as number | undefined
+        const companyId = effectiveValues.company_id as string | undefined
+        const teamId = effectiveValues.team_id as string | undefined
         const newRecord: TicketRecord = {
           id: newTicket.id,
-          title: values.title as string,
-          description: (values.description as string) || null,
-          short_note: (values.short_note as string) || null,
+          title: effectiveValues.title as string,
+          description: (effectiveValues.description as string) || null,
+          short_note: (effectiveValues.short_note as string) || null,
           created_by: currentUserId,
-          due_date: values.due_date ? (values.due_date as dayjs.Dayjs).toISOString() : null,
-          status: values.status as TicketRecord['status'],
-          visibility: values.visibility as TicketRecord['visibility'],
+          due_date: effectiveValues.due_date ? (effectiveValues.due_date as dayjs.Dayjs).toISOString() : null,
+          status: effectiveValues.status as TicketRecord['status'],
+          visibility: effectiveValues.visibility as TicketRecord['visibility'],
           team_id: teamId ?? null,
           type_id: typeId ?? null,
           priority_id: priorityId ?? null,
@@ -543,7 +570,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
           company: companyId ? companies.find((c) => c.id === companyId) ?? null : null,
           tags: allTags.filter((t) => selectedTagIds.includes(t.id)),
           assignees:
-            values.visibility === 'specific_users'
+            effectiveValues.visibility === 'specific_users'
               ? selectedAssignees.map((userId) => ({
                   id: `temp-${userId}`,
                   user_id: userId,
@@ -630,6 +657,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setFilterSidebarCollapsed,
     viewMode,
     setViewMode,
+    sortBy,
+    setSortBy,
+    sortOrder,
+    setSortOrder,
     hasActiveFilters,
     clearFilters,
     handleCreate,

@@ -45,6 +45,8 @@ interface TicketFormModalProps {
   attachmentUploading?: boolean
   onSubmit: (values: Record<string, unknown>) => Promise<void>
   onCancel: () => void
+  /** When true, show simplified form: Title, Description, Priority, Type only */
+  isCustomer?: boolean
 }
 
 export default function TicketFormModal({
@@ -72,14 +74,17 @@ export default function TicketFormModal({
   attachmentUploading = false,
   onSubmit,
   onCancel,
+  isCustomer = false,
 }: TicketFormModalProps) {
+  const showSimplifiedForm = isCustomer && !editingTicket
+
   return (
     <Modal
       title={editingTicket ? 'Edit Ticket' : 'Create Ticket'}
       open={open}
       onCancel={onCancel}
       footer={null}
-      width={700}
+      width={showSimplifiedForm ? 720 : 960}
     >
       <Form form={form} layout="vertical" onFinish={onSubmit}>
         <Form.Item
@@ -92,15 +97,17 @@ export default function TicketFormModal({
 
         {!editingTicket && (
           <Form.Item name="description" label="Description">
-            <CommentWysiwyg ticketId={undefined} placeholder="Ticket Description" height="160px" />
+            <CommentWysiwyg ticketId={undefined} placeholder="Ticket Description" height={showSimplifiedForm ? '280px' : '320px'} />
           </Form.Item>
         )}
 
-        <Form.Item name="short_note" label="Short Note" style={{ marginTop: 50 }}>
-          <Input.TextArea placeholder="Short note (optional)" rows={2} allowClear />
-        </Form.Item>
+        {!showSimplifiedForm && (
+          <Form.Item name="short_note" label="Short Note" style={{ marginTop: 50 }}>
+            <Input.TextArea placeholder="Short note (optional)" rows={2} allowClear />
+          </Form.Item>
+        )}
 
-        {!editingTicket && (
+        {!editingTicket && !showSimplifiedForm && (
           <Form.Item label="Attachments">
             <Flex vertical style={{ width: '100%' }}>
               {ticketAttachmentsFromDb
@@ -150,83 +157,81 @@ export default function TicketFormModal({
           </Form.Item>
         )}
 
-    
         <Row gutter={24}>
-          <Col span={12}>
-          <Form.Item name="status" label="Status" rules={[{ required: true }]}>
-          <Select>
-            {allStatuses.map((s) => (
-              <Option key={s.slug} value={s.slug}>
-                {s.title}
-              </Option>
-            ))}
-          </Select>
-        </Form.Item>
-
+          {!showSimplifiedForm && (
+            <Col span={12}>
+              <Form.Item name="status" label="Status" rules={[{ required: true }]}>
+                <Select>
+                  {allStatuses.map((s) => (
+                    <Option key={s.slug} value={s.slug}>
+                      {s.title}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          )}
+          <Col span={showSimplifiedForm ? 24 : 12} style={{ marginTop: 20 }}>
+            <Form.Item name="type_id" label="Type">
+              <Select placeholder="Select type" allowClear>
+                {ticketTypes.map((t) => (
+                  <Option key={t.id} value={t.id}>
+                    <Space>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          width: 12,
+                          height: 12,
+                          borderRadius: 2,
+                          backgroundColor: t.color,
+                        }}
+                      />
+                      {t.title}
+                    </Space>
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
           </Col>
-          <Col span={12}>
-          <Form.Item name="type_id" label="Type">
-          <Select placeholder="Select type" allowClear>
-            {ticketTypes.map((t) => (
-              <Option key={t.id} value={t.id}>
-                <Space>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: 12,
-                      height: 12,
-                      borderRadius: 2,
-                      backgroundColor: t.color,
-                    }}
-                  />
-                  {t.title}
-                </Space>
-              </Option>
-            ))}
-          </Select>
-        </Form.Item>  
-          </Col>
-          <Col span={12}>
-          <Form.Item name="company_id" label="Company">
-          <Select placeholder="Select company" allowClear>
-            {companies.map((c) => (
-              <Option key={c.id} value={c.id}>
-                {c.name}
-              </Option>
-            ))}
-          </Select>
-        </Form.Item>
-          </Col>
-          <Col span={12}>
-          <Form.Item name="priority_id" label="Priority">
-          <Select placeholder="Select priority" allowClear>
-            {ticketPriorities.map((p) => (
-              <Option key={p.id} value={p.id}>
-                <Space>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: 12,
-                      height: 12,
-                      borderRadius: 2,
-                      backgroundColor: p.color,
-                    }}
-                  />
-                  {p.title}
-                </Space>
-              </Option>
-            ))}
-          </Select>
-        </Form.Item>
+          {!showSimplifiedForm && (
+            <Col span={12}>
+              <Form.Item name="company_id" label="Company">
+                <Select placeholder="Select company" allowClear>
+                  {companies.map((c) => (
+                    <Option key={c.id} value={c.id}>
+                      {c.name}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          )}
+          <Col span={showSimplifiedForm ? 24 : 12}>
+            <Form.Item name="priority_id" label="Priority">
+              <Select placeholder="Select priority" allowClear>
+                {ticketPriorities.map((p) => (
+                  <Option key={p.id} value={p.id}>
+                    <Space>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          width: 12,
+                          height: 12,
+                          borderRadius: 2,
+                          backgroundColor: p.color,
+                        }}
+                      />
+                      {p.title}
+                    </Space>
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
           </Col>
         </Row>
 
-        
-
-       
-
-      
-
+        {!showSimplifiedForm && (
+          <>
         <Form.Item label="Tags">
           <Select
             mode="multiple"
@@ -328,6 +333,8 @@ export default function TicketFormModal({
             placeholder="Select Due Date"
           />
         </Form.Item>
+          </>
+        )}
 
         <Form.Item>
           <Space>

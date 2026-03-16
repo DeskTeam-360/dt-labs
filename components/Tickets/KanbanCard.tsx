@@ -158,7 +158,7 @@ export default function KanbanCard({ ticket, onEdit, onDelete }: KanbanCardProps
         <Flex justify="space-between" align="center" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.06)' }} wrap="wrap" gap={8}>
           <Flex gap={10} align="center" wrap="wrap" style={{ flex: 1, minWidth: 0 }}>
             {ticket.due_date && (
-              <Flex align="center" gap={4} style={{ fontSize: 11, color: dayjs(ticket.due_date).isBefore(dayjs()) && ticket.status !== 'completed' && ticket.status !== 'cancel' ? '#ff4d4f' : '#8c8c8c' }}>
+              <Flex align="center" gap={4} style={{ fontWeight: 700,fontSize: 11, color: dayjs(ticket.due_date).isBefore(dayjs()) && ticket.status !== 'completed' && ticket.status !== 'cancel' ? '#ff4d4f' : '#8c8c8c' }}>
                 <FlagOutlined />
                 <span>Due <DateDisplay date={ticket.due_date} format="date-only" /></span>
               </Flex>

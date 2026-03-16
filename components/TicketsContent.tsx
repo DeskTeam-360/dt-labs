@@ -53,6 +53,10 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     setFilterSidebarCollapsed,
     viewMode,
     setViewMode,
+    sortBy,
+    setSortBy,
+    sortOrder,
+    setSortOrder,
     selectedAssignees,
     setSelectedAssignees,
     selectedTagIds,
@@ -98,6 +102,10 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             onCreateClick={handleCreate}
             loading={loading}
             isCustomer={isCustomer}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSortByChange={setSortBy}
+            onSortOrderChange={setSortOrder}
           />
 
           {loading ? (
@@ -105,7 +113,15 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               <Spin size="large" tip="Loading tasks..." />
             </div>
           ) : viewMode === 'card' ? (
-            <TicketsCardView tickets={filteredTickets} allStatusColumns={allStatusColumns} onEdit={handleEdit} onDelete={handleDelete} />
+            <TicketsCardView
+              tickets={filteredTickets}
+              allStatusColumns={allStatusColumns}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              allPriorities={ticketPriorities}
+            />
           ) : viewMode === 'list' ? (
             <TicketsListView
               tickets={filteredTickets}
@@ -130,6 +146,9 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               onDragEnd={handleDragEnd}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              allPriorities={ticketPriorities}
             />
           )}
         </div>
@@ -191,6 +210,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         attachmentUploading={attachmentUploading}
         onSubmit={handleSubmit}
         onCancel={handleModalCancel}
+        isCustomer={isCustomer}
       />
     </Layout>
   )

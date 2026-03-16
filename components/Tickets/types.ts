@@ -126,3 +126,50 @@ export function getVisibilityColor(visibility: string): string {
       return 'default'
   }
 }
+
+export type TicketSortField = 'id' | 'title' | 'priority' | 'due_date' | 'updated_at' | 'created_at' | 'company'
+export type TicketSortOrder = 'asc' | 'desc'
+
+/** Sort tickets by field and order. Uses allPriorities for priority field order. */
+export function sortTickets(
+  tickets: TicketRecord[],
+  sortBy: TicketSortField,
+  sortOrder: TicketSortOrder,
+  allPriorities?: Array<{ id: number }>
+): TicketRecord[] {
+  const dir = sortOrder === 'asc' ? 1 : -1
+  const getPriorityOrder = (r: TicketRecord) => {
+    if (!r.priority || !allPriorities?.length) return 999
+    const idx = allPriorities.findIndex((p) => p.id === r.priority!.id)
+    return idx >= 0 ? idx : 999
+  }
+  return [...tickets].sort((a, b) => {
+    let cmp = 0
+    switch (sortBy) {
+      case 'id':
+        cmp = a.id - b.id
+        break
+      case 'title':
+        cmp = (a.title || '').localeCompare(b.title || '')
+        break
+      case 'priority':
+        cmp = getPriorityOrder(a) - getPriorityOrder(b)
+        break
+      case 'due_date':
+        cmp = new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
+        break
+      case 'updated_at':
+        cmp = new Date(a.updated_at || 0).getTime() - new Date(b.updated_at || 0).getTime()
+        break
+      case 'created_at':
+        cmp = new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+        break
+      case 'company':
+        cmp = (a.company?.name || '').localeCompare(b.company?.name || '')
+        break
+      default:
+        cmp = a.id - b.id
+    }
+    return cmp * dir
+  })
+}
