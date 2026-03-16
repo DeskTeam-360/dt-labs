@@ -232,15 +232,6 @@ export default function FilterSidebar({
                 placeholder={['Start', 'End']}
               />
             </div>
-            <div>
-              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Search</Text>
-              <Input
-                placeholder="Title or description..."
-                allowClear
-                value={filterSearch}
-                onChange={(e) => onFilterSearchChange(e.target.value)}
-              />
-            </div>
             {hasActiveFilters && (
               <>
                 <Button type="link" size="small" onClick={onClearFilters} style={{ padding: 0, color: '#1890ff' }}>

@@ -91,7 +91,7 @@ const getInitialFilterState = () => {
               : [])
         : [],
     filterTagIds: (stored?.filterTagIds && stored.filterTagIds.length) ? stored.filterTagIds : [],
-    filterVisibility: (stored?.filterVisibility && stored.filterVisibility.length) ? stored.filterVisibility : ['team'],
+    filterVisibility: (stored?.filterVisibility && stored.filterVisibility.length) ? stored.filterVisibility : ['public'],
     filterTeamIds:
       (stored?.filterTeamIds && stored.filterTeamIds.length) || (stored?.filterTeamId != null)
         ? (stored?.filterTeamIds && stored.filterTeamIds.length

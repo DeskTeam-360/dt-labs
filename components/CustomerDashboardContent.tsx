@@ -1,6 +1,6 @@
 'use client'
 
-import { Layout, Card, Row, Col, Typography, Spin, Button, Select, Space, Flex, Dropdown, Modal, message } from 'antd'
+import { Layout, Card, Row, Col, Typography, Spin, Button, Select, Space, Flex, Dropdown, Modal, message, Tooltip } from 'antd'
 import {
   ClockCircleOutlined,
   PlusOutlined,
@@ -20,7 +20,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -49,6 +49,8 @@ interface DashboardData {
   status_counts: Array<{ status_title: string; count: number; color: string }>
   last_due_date: string | null
   urgent_due_date: string | null
+  last_due_ticket?: { id: number; title: string } | null
+  urgent_due_ticket?: { id: number; title: string } | null
   recent_tickets: Array<{
     id: number
     title: string
@@ -73,6 +75,15 @@ interface CustomerDashboardContentProps {
 
 const { Content } = Layout
 
+interface KnowledgeBaseArticle {
+  id: string
+  title: string
+  status: string
+  description: string
+  category: string
+  sort_order: number
+}
+
 const FAQ_ITEMS = [
   'How do I submit a new request?',
   'What kind of requests can I send?',
@@ -87,6 +98,9 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
   const [collapsed, setCollapsed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<DashboardData | null>(null)
+  const [kbArticles, setKbArticles] = useState<KnowledgeBaseArticle[]>([])
+  const [kbCategory, setKbCategory] = useState<string>('')
+  const [kbDetailModal, setKbDetailModal] = useState<KnowledgeBaseArticle | null>(null)
 
   const fetchStats = async () => {
     setLoading(true)
@@ -105,6 +119,26 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
   useEffect(() => {
     fetchStats()
   }, [])
+
+  const fetchKbArticles = async () => {
+    try {
+      const res = await fetch('/api/knowledge-base-articles?published=true', { credentials: 'include' })
+      if (!res.ok) return
+      const json = await res.json()
+      setKbArticles(json || [])
+    } catch {
+      setKbArticles([])
+    }
+  }
+
+  useEffect(() => {
+    fetchKbArticles()
+  }, [])
+
+  const filteredKbArticles = useMemo(() => {
+    if (!kbCategory) return kbArticles
+    return kbArticles.filter((a) => a.category === kbCategory)
+  }, [kbArticles, kbCategory])
 
   const barChartData = useMemo(() => {
     if (!data?.tickets_by_type?.length) return []
@@ -169,7 +203,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" />
                             <YAxis allowDecimals={false} />
-                            <Tooltip />
+                            <RechartsTooltip />
                             <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                               {barChartData.map((entry, idx) => (
                                 <Cell key={idx} fill={entry.fill} />
@@ -189,12 +223,24 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                   <div style={{ background: "#F4F5FF", padding: 16, borderRadius: 8, height: '100%' }}>
                     {/* Last Due Date - My Ticket */}
                     <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', position: 'absolute', top: 16, right: 40, gap: 4, background: "#FFE0E5", padding: '8px 16px', borderRadius: "0 0 10px 10px " }}>
-                      <Text type="danger" style={{ fontWeight: 700 }}>
-                        <ClockCircleOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Most Closest ETA: {data?.last_due_date ? dayjs(data.last_due_date).format('MMM DD, YYYY') : 'N/A'}
-                      </Text>
-                      <Text type="danger" style={{ fontWeight: 700 }}>
-                        <FlagOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Urgent ETA: {data?.urgent_due_date ? dayjs(data.urgent_due_date).format('MMM DD, YYYY') : 'N/A'}
-                      </Text>
+                      <Tooltip title={data?.last_due_ticket ? `#${data.last_due_ticket.id} ${data.last_due_ticket.title}` : undefined}>
+                        <Text
+                          type="danger"
+                          style={{ fontWeight: 700, cursor: data?.last_due_ticket ? 'pointer' : 'default' }}
+                          onClick={() => data?.last_due_ticket && router.push(`/tickets/${data.last_due_ticket!.id}`)}
+                        >
+                          <ClockCircleOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Most Closest ETA: {data?.last_due_date ? dayjs(data.last_due_date).format('MMM DD, YYYY') : 'N/A'}
+                        </Text>
+                      </Tooltip>
+                      <Tooltip title={data?.urgent_due_ticket ? `#${data.urgent_due_ticket.id} ${data.urgent_due_ticket.title}` : undefined}>
+                        <Text
+                          type="danger"
+                          style={{ fontWeight: 700, cursor: data?.urgent_due_ticket ? 'pointer' : 'default' }}
+                          onClick={() => data?.urgent_due_ticket && router.push(`/tickets/${data.urgent_due_ticket!.id}`)}
+                        >
+                          <FlagOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Urgent ETA: {data?.urgent_due_date ? dayjs(data.urgent_due_date).format('MMM DD, YYYY') : 'N/A'}
+                        </Text>
+                      </Tooltip>
                     </div>
                     <br /><br /><br />
                     {(data?.priority_counts?.length ?? 0) > 0 ? (
@@ -292,7 +338,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                             <Cell key={idx} fill={entry.fill} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v: number | undefined) => formatTime(v ?? 0)} />
+                        <RechartsTooltip formatter={(v: number | undefined) => formatTime(v ?? 0)} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -365,23 +411,64 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
 
           {/* Knowledge Base */}
           <Col xs={24} lg={12}>
-            <Card >
-            <span style={{ fontWeight: 600, fontSize: 16 }}>Knowledge base</span>
-              <br />  
+            <Card>
+              <span style={{ fontWeight: 600, fontSize: 16 }}>Knowledge base</span>
+              <br />
               <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>How can we help you today?</Text>
               <Space direction="vertical" style={{ width: '100%' }}>
-                <Select placeholder="General" style={{ width: '100%' }} allowClear options={[{ label: 'General', value: 'general' }, { label: 'Requests', value: 'requests' }]} />
+                <Select
+                  placeholder="Filter by category"
+                  style={{ width: '100%' }}
+                  allowClear
+                  value={kbCategory || undefined}
+                  onChange={(v) => setKbCategory(v ?? '')}
+                  options={[
+                    { label: 'General', value: 'general' },
+                    { label: 'Requests', value: 'requests' },
+                  ]}
+                />
               </Space>
               <div style={{ marginTop: 16 }}>
-                {FAQ_ITEMS.map((q, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, cursor: 'pointer' }}>
-                    <QuestionCircleOutlined style={{ color: '#1890ff', marginTop: 2 }} />
-                    <Text>{q}</Text>
-                  </div>
-                ))}
+                {filteredKbArticles.length > 0 ? (
+                  filteredKbArticles.map((art) => (
+                    <div
+                      key={art.id}
+                      style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, cursor: 'pointer' }}
+                      onClick={() => setKbDetailModal(art)}
+                    >
+                      <QuestionCircleOutlined style={{ color: '#1890ff', marginTop: 2 }} />
+                      <Text>{art.title}</Text>
+                    </div>
+                  ))
+                ) : (
+                  FAQ_ITEMS.map((q, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, cursor: 'default' }}>
+                      <QuestionCircleOutlined style={{ color: '#1890ff', marginTop: 2 }} />
+                      <Text>{q}</Text>
+                    </div>
+                  ))
+                )}
               </div>
             </Card>
           </Col>
+          <Modal
+            title={kbDetailModal?.title}
+            open={!!kbDetailModal}
+            onCancel={() => setKbDetailModal(null)}
+            footer={null}
+            width={960}
+            styles={{ body: { maxHeight: '80vh', overflowY: 'auto' } }}
+          >
+            {kbDetailModal && (
+              <div
+                className="kb-article-content"
+                style={{ lineHeight: 1.6 }}
+                dangerouslySetInnerHTML={{
+                  __html: kbDetailModal.description || '<p class="text-secondary">No description.</p>',
+                }}
+              />
+            )}
+          </Modal>
 
           {/* Check Tickets Status */}
           <Col xs={24} lg={12}>

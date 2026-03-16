@@ -41,7 +41,7 @@ export default function TicketsCardView({
   return (
     <Row gutter={24} style={{ width: '100%', paddingRight: 24, paddingLeft: 24 }}>
       {sortedTickets.map((ticket) => (
-        <Col span={24} md={24} lg={24} xl={24} style={{ padding:12 }} key={ticket.id}>
+        <Col span={24} md={24} lg={24} xl={24} style={{ marginBottom:12 }} key={ticket.id}>
           <CardViewCard ticket={ticket} allStatusColumns={allStatusColumns} onEdit={onEdit} onDelete={onDelete} />
         </Col>
       ))}

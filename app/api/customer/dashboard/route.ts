@@ -47,6 +47,8 @@ export async function GET(request: Request) {
       recent_tickets: [],
       last_due_date: null,
       urgent_due_date: null,
+      last_due_ticket: null,
+      urgent_due_ticket: null,
     })
   }
 
@@ -155,6 +157,7 @@ export async function GET(request: Request) {
   // ETA: due_date terdekat, jika ada beberapa dengan tanggal sama → ambil yang prioritas tertinggi (urgent dulu)
   const ticketsWithDue = myTickets.filter((t) => t.dueDate != null)
   let lastDueDate: string | null = null
+  let lastDueTicket: { id: number; title: string } | null = null
   if (ticketsWithDue.length > 0) {
     const minDueTime = Math.min(...ticketsWithDue.map((t) => new Date(t.dueDate!).getTime()))
     const atMinDue = ticketsWithDue.filter((t) => new Date(t.dueDate!).getTime() === minDueTime)
@@ -163,7 +166,11 @@ export async function GET(request: Request) {
       const pb = b.priorityId != null ? (priorityRankMap[Number(b.priorityId)] ?? 999) : 999
       return pa - pb
     })
-    lastDueDate = byPriority[0]!.dueDate ? new Date(byPriority[0].dueDate).toISOString() : null
+    const t0 = byPriority[0]
+    if (t0) {
+      lastDueDate = t0.dueDate ? new Date(t0.dueDate).toISOString() : null
+      lastDueTicket = { id: t0.id, title: t0.title ?? 'Untitled' }
+    }
   }
 
   // Urgent ETA: due_date terdekat dari ticket dengan prioritas urgent (match slug/title atau sortOrder tertinggi)
@@ -175,10 +182,14 @@ export async function GET(request: Request) {
     ? myTickets.filter((t) => Number(t.priorityId) === urgentPriorityId && t.dueDate != null)
     : []
   let urgentDueDate: string | null = null
+  let urgentDueTicket: { id: number; title: string } | null = null
   if (urgentTicketsWithDue.length > 0) {
     const minUrgentTime = Math.min(...urgentTicketsWithDue.map((t) => new Date(t.dueDate!).getTime()))
     const urgentMinTicket = urgentTicketsWithDue.find((t) => new Date(t.dueDate!).getTime() === minUrgentTime)
-    urgentDueDate = urgentMinTicket?.dueDate ? new Date(urgentMinTicket.dueDate).toISOString() : null
+    if (urgentMinTicket) {
+      urgentDueDate = urgentMinTicket.dueDate ? new Date(urgentMinTicket.dueDate).toISOString() : null
+      urgentDueTicket = { id: urgentMinTicket.id, title: urgentMinTicket.title ?? 'Untitled' }
+    }
   }
 
   const payload: Record<string, unknown> = {
@@ -192,6 +203,8 @@ export async function GET(request: Request) {
     recent_tickets: recentTickets,
     last_due_date: lastDueDate,
     urgent_due_date: urgentDueDate,
+    last_due_ticket: lastDueTicket,
+    urgent_due_ticket: urgentDueTicket,
   }
 
   if (debug) {

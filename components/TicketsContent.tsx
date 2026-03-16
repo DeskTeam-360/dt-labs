@@ -106,6 +106,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             sortOrder={sortOrder}
             onSortByChange={setSortBy}
             onSortOrderChange={setSortOrder}
+            filterSearch={filterSearch}
+            onFilterSearchChange={setFilterSearch}
           />
 
           {loading ? (

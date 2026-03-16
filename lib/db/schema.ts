@@ -412,6 +412,18 @@ export const companyKnowledgeBases = pgTable('company_knowledge_bases',
   (t) => [unique('company_knowledge_bases_company_template_key').on(t.companyId, t.contentTemplateId)]
 )
 
+// ============ Knowledge Base Articles (edukasi customer) ============
+export const knowledgeBaseArticles = pgTable('knowledge_base_articles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 500 }).notNull(),
+  status: varchar('status', { length: 50 }).notNull().default('draft'),
+  description: text('description'),
+  category: varchar('category', { length: 100 }).default('general'),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
 export const companyContentGenerationHistory = pgTable('company_content_generation_history', {
   id: uuid('id').primaryKey().defaultRandom(),
   companyId: uuid('company_id').notNull(),

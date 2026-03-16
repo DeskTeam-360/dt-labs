@@ -26,36 +26,137 @@ body {
 }
 
 /* Admin sidebar - DeskTeam360 style: purple bg, active item light gray with rounded right */
-.admin-sidebar-deskteam.ant-layout-sider {
+.admin-sidebar-deskteam-2.ant-layout-sider {
   background: #2B1251 !important;
   border-radius: 0px 30px 0px 0px !important;
 }
-.admin-sidebar-deskteam .ant-menu-dark {
+.admin-sidebar-deskteam-2 .ant-menu-dark {
   background: transparent !important;
 }
-.admin-sidebar-deskteam .ant-menu-dark .ant-menu-item,
-.admin-sidebar-deskteam .ant-menu-dark .ant-menu-submenu-title {
-  color: rgba(255, 255, 255, 0.9) !important;
+.admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item,
+.admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-submenu-title {
+  color: #f0f2f5 !important;
 }
-.admin-sidebar-deskteam .ant-menu-dark .ant-menu-item:hover,
-.admin-sidebar-deskteam .ant-menu-dark .ant-menu-submenu-title:hover {
+.admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item:hover,
+.admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-submenu-title:hover {
   color: #fff !important;
   background: rgba(255, 255, 255, 0.1) !important;
 }
-.admin-sidebar-deskteam .ant-menu-dark .ant-menu-item-selected {
-  background: rgb(240, 242, 245) !important;
-  color: #333 !important;
-  border-radius: 50px 0 0 50px;
-  margin: 4px 0 4px 8px;
-  width: calc(100% - 8px) !important;
-  border-radius: 50px 0 0 50px;
+
+
+.admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected {
+  background: #f0f2f5 !important;
+  color: #35165c !important;
+  border-radius: 40px 0 0 40px;
+  position: relative;
+  margin: 10px 8px 10px 0 !important;
+  width: calc(100%) !important;
+  overflow: visible !important;
 }
-.admin-sidebar-deskteam .ant-menu-dark .ant-menu-item-selected .anticon {
-  color: #333 !important;
+.admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected .anticon {
+  color: #35165c !important;
 }
-.admin-sidebar-deskteam .ant-menu-dark .ant-menu-submenu .ant-menu-item-selected {
-  margin-left: 10px;
-  width: 100%;
-  margin-top: 8px;
-  margin-bottom: 8px;
+/* cekungan atas */
+.admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected::before {
+  content: "";
+  position: absolute;
+  top: -30px;
+  right: 0;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border-bottom-right-radius: 30px;
+  box-shadow: 15px 15px 0 #e9e9e9;
+  pointer-events: none;
 }
+/* cekungan bawah */
+.admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected::after {
+  content: "";
+  position: absolute;
+  bottom: -30px;
+  right: 0;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border-top-right-radius: 30px;
+  box-shadow: 15px -15px 0 #e9e9e9;
+  pointer-events: none;
+}
+.admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-submenu .ant-menu-item-selected {
+  margin-left: 10px !important;
+  width: 100% !important;
+  margin-top: 8px !important;
+  margin-bottom: 8px !important;
+}
+.admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-submenu .ant-menu-item-selected .anticon {
+  color: #35165c !important;
+}
+
+/* Admin sidebar - inline styles (menggantikan injeksi JS di AdminSidebar.tsx) */
+.admin-sidebar-deskteam .ant-menu-item-selected,
+.admin-sidebar-deskteam li.ant-menu-item-selected,
+.admin-sidebar-deskteam [class*="item-selected"],
+.admin-sidebar-deskteam [class*="ant-menu-item"][class*="selected"],
+.admin-sidebar-deskteam li[aria-selected="true"] {
+  background: #f0f2f5 !important;
+  color: #35165c !important;
+  border-radius: 40px 0 0 40px !important;
+  position: relative !important;
+  margin: 10px 8px 10px 0 !important;
+  width: calc(100%) !important;
+  overflow: visible !important;
+}
+.admin-sidebar-deskteam .ant-menu-item-selected .anticon,
+.admin-sidebar-deskteam li.ant-menu-item-selected .anticon,
+.admin-sidebar-deskteam [class*="item-selected"] .anticon {
+  color: #35165c !important;
+}
+.admin-sidebar-deskteam .ant-menu-item-selected::before,
+.admin-sidebar-deskteam li.ant-menu-item-selected::before,
+.admin-sidebar-deskteam [class*="item-selected"]::before {
+  content: "" !important;
+  position: absolute !important;
+  top: -50px !important;
+  right: 0 !important;
+  width: 50px !important;
+  height: 50px !important;
+  background: transparent !important;
+  border-bottom-right-radius: 30px !important;
+  box-shadow: 15px 15px 0 #f0f2f5 !important;
+  pointer-events: none !important;
+}
+/* cekungan bawah */
+.admin-sidebar-deskteam .ant-menu-item-selected::after,
+.admin-sidebar-deskteam li.ant-menu-item-selected::after,
+.admin-sidebar-deskteam [class*="item-selected"]::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 40px !important;
+  right: 0 !important;
+  width: 50px !important;
+  height: 50px !important;
+  background: transparent !important;
+  border-top-right-radius: 30px !important;
+  box-shadow: 15px -15px 0 #f0f2f5 !important;
+  pointer-events: none !important;
+}
+
+
+.ant-segmented-group{
+  gap: 10px !important;
+}
+
+/* Knowledge base article HTML content (WYSIWYG) */
+.kb-article-content {
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+.kb-article-content p { margin: 0 0 0.75em; }
+.kb-article-content p:last-child { margin-bottom: 0; }
+.kb-article-content h1, .kb-article-content h2, .kb-article-content h3 { margin: 1em 0 0.5em; font-weight: 600; }
+.kb-article-content ul, .kb-article-content ol { margin: 0.5em 0; padding-left: 1.5em; }
+.kb-article-content li { margin-bottom: 0.25em; }
+.kb-article-content a { color: #1890ff; text-decoration: none; }
+.kb-article-content a:hover { text-decoration: underline; }
+.kb-article-content strong { font-weight: 600; }
+.kb-article-content img { max-width: 100%; height: auto; }

@@ -26,9 +26,7 @@ import { useState, useEffect } from 'react'
 const { Sider } = Layout
 const { Text } = Typography
 
-const SIDEBAR_BG = '#4a148c'
-const ACTIVE_BG = '#f0f0f0'
-const ACTIVE_TEXT = '#333333'
+const SIDEBAR_BG = '#2b1252'
 
 interface SessionUser {
   id: string
@@ -63,21 +61,6 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       }
     }
   }, [pathname])
-
-  // Determine which menu items should be selected (match parent routes: /tickets/2 -> /tickets)
-  const selectedKeys = pathname
-    ? [
-        ['/dashboard', '/users', '/companies', '/tickets', '/teams', '/email-integration'].find((k) =>
-          pathname === k || (k !== '/dashboard' && pathname.startsWith(k + '/'))
-        ) || pathname,
-      ].filter(Boolean)
-    : []
-
-  const handleLogout = async () => {
-    await signOut({ callbackUrl: '/login' })
-    router.push('/login')
-    router.refresh()
-  }
 
   const menuItems = [
     {
@@ -127,76 +110,37 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         },
       ],
     },
-    // {
-    //   key: 'content-planner',
-    //   icon: <FileTextOutlined />,
-    //   label: 'Content Planner',
-    //   children: [
-    //     {
-    //       key: '/content-planner/channel',
-    //       icon: <SettingOutlined />,
-    //       label: 'Channels',
-    //     },
-    //     {
-    //       key: '/content-planner/intents',
-    //       icon: <SettingOutlined />,
-    //       label: 'Intents',
-    //     },
-    //     {
-    //       key: '/content-planner/topic-type',
-    //       icon: <SettingOutlined />,
-    //       label: 'Topic Types',
-    //     },
-    //   ],
-    // },
-    // {
-    //   key: '/screenshots',
-    //   icon: <PictureOutlined />,
-    //   label: 'Screenshots',
-    // },
     {
       key: '/teams',
       icon: <TeamOutlined />,
       label: 'Teams',
     },
-    // {
-    //   key: 'templates',
-    //   icon: <FormOutlined />,
-    //   label: 'Templates',
-    //   children: [
-    //     {
-    //       key: '/company-data-templates',
-    //       icon: <DatabaseOutlined />,
-    //       label: 'Data Templates',
-    //     },
-    //     {
-    //       key: '/company-content-templates',
-    //       icon: <FileTextOutlined />,
-    //       label: 'Content Templates',
-    //     },
-    //     {
-    //       key: '/company-ai-system-templates',
-    //       icon: <RobotOutlined />,
-    //       label: 'AI System Templates',
-    //     },
-    //   ],
-    // },
-    // {
-    //   key: '/crawl-sessions',
-    //   icon: <GlobalOutlined />,
-    //   label: 'Crawling',
-    // },
-    // {
-    //   key: '/freshdesk-test',
-    //   icon: <ApiOutlined />,
-    //   label: 'Freshdesk API Test',
-    // },
     {
       key: '/email-integration',
       icon: <MailOutlined />,
       label: 'Email Integration',
     },
-  ].filter((item) => (isCustomer ? !['ticket-attributes', '/teams', '/email-integration', '/companies'].includes(item.key) : true))
+    {
+      key: '/knowledge-base',
+      icon: <InfoCircleOutlined />,
+      label: 'Knowledge Base',
+    },
+  ].filter((item) => (isCustomer ? !['ticket-attributes', '/teams', '/email-integration', '/companies', '/knowledge-base'].includes(item.key) : true))
+
+  // Determine which menu items should be selected (match parent routes: /tickets/2 -> /tickets)
+  const selectedKeys = pathname
+    ? [
+        ['/dashboard', '/users', '/companies', '/tickets', '/teams', '/email-integration', '/knowledge-base'].find((k) =>
+          pathname === k || (k !== '/dashboard' && pathname.startsWith(k + '/'))
+        ) || pathname,
+      ].filter(Boolean)
+    : []
+
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/login' })
+    router.push('/login')
+    router.refresh()
+  }
 
   const accountMenuItems = [
     {
@@ -238,6 +182,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         top: 0,
         bottom: 0,
         background: SIDEBAR_BG,
+        paddingLeft: 5,
       }}
     >
       <div
@@ -277,6 +222,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       <Menu
         theme="dark"
         mode="inline"
+        className="admin-sidebar-menu"
         selectedKeys={selectedKeys}
         openKeys={openKeys}
         onOpenChange={setOpenKeys}
