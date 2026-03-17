@@ -1,6 +1,6 @@
 'use client'
 
-import { Layout, Card, Button, Typography, Space, Tag, message } from 'antd'
+import { Layout, Card, Button, Typography, Space, Tag, message, Collapse } from 'antd'
 import { MailOutlined, CheckCircleOutlined, DisconnectOutlined, SyncOutlined } from '@ant-design/icons'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -34,6 +34,7 @@ export default function EmailIntegrationContent({
   const [integration, setIntegration] = useState<Integration | null>(initialIntegration)
   const [disconnecting, setDisconnecting] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [lastDebug, setLastDebug] = useState<{ skippedDetails?: { email: string; subject: string; reason: string }[] } | null>(null)
 
   useEffect(() => {
     const success = searchParams.get('success')
@@ -77,10 +78,18 @@ export default function EmailIntegrationContent({
       if (data.createdCount > 0) parts.push(`${data.createdCount} new ticket(s)`)
       let msg = parts.length > 0 ? `Synced: ${parts.join(', ')}` : 'Inbox synced. No new emails found.'
       if (parts.length === 0 && data.totalFromGmail !== undefined) {
-        if (data.totalFromGmail === 0) msg = 'Inbox synced. No emails in Gmail (last 2 days).'
+        if (data.totalFromGmail === 0) msg = 'Inbox synced. No emails in Gmail .'
         else if (data.newToProcess === 0) msg = `Inbox synced. ${data.totalFromGmail} email(s) in inbox, all already processed.`
       }
       message.success(msg)
+      if (data._debug) {
+        setLastDebug(data._debug)
+        if (data._debug.skippedDetails?.length) {
+          console.log('[Email Sync Debug]', data._debug)
+        }
+      } else {
+        setLastDebug(null)
+      }
       router.refresh()
     } catch (err: unknown) {
       message.error(err instanceof Error ? err.message : 'Failed to sync inbox')
@@ -169,6 +178,26 @@ export default function EmailIntegrationContent({
               <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
                 Requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.local. Add callback URL to Google Cloud Console OAuth credentials: <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>{typeof window !== 'undefined' ? `${window.location.origin}/api/email/google/callback` : 'https://yoursite.com/api/email/google/callback'}</code>
               </Text>
+
+              {lastDebug?.skippedDetails?.length ? (
+                <Collapse
+                  size="small"
+                  items={[{
+                    key: '1',
+                    label: `Debug: ${lastDebug.skippedDetails.length} email(s) skipped - klik untuk detail`,
+                    children: (
+                      <div style={{ maxHeight: 200, overflow: 'auto', fontSize: 12 }}>
+                        {lastDebug.skippedDetails.map((d, i) => (
+                          <div key={i} style={{ marginBottom: 8, padding: 4, background: '#fafafa', borderRadius: 4 }}>
+                            <strong>{d.email}</strong> — {d.reason}
+                            {d.subject && <div style={{ color: '#666', marginTop: 2 }}>Subject: {d.subject.slice(0, 60)}{d.subject.length > 60 ? '...' : ''}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    ),
+                  }]}
+                />
+              ) : null}
             </Space>
           </Card>
         </Content>

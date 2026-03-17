@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 // import { Geist, Geist_Mono } from "next/font/google";
 import AntdProvider from "@/components/AntdProvider";
+import { auth } from "@/auth";
 import "./globals.css";
 
 // const geistSans = Geist({
@@ -18,17 +19,18 @@ export const metadata: Metadata = {
   description: process.env.NEXT_PUBLIC_APP_DESCRIPTION,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth()
   return (
     <html lang="en">
       <body
         // className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AntdProvider>
+        <AntdProvider session={session}>
           {children}
         </AntdProvider>
       </body>

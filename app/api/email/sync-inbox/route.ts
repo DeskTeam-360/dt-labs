@@ -202,14 +202,13 @@ export async function POST(request: NextRequest) {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
-    // Always look back at least 2 days to avoid missing emails (and to limit processing load).
-    const twoDaysAgo = Math.floor((Date.now() - 2 * 24 * 60 * 60 * 1000) / 1000)
+    // Fetch only since last sync (atau 2 hari untuk first sync)
     const lastSyncAt = integration.lastSyncAt ? new Date(integration.lastSyncAt) : null
+    const twoDaysAgo = Math.floor((Date.now() - 2 * 24 * 60 * 60 * 1000) / 1000)
     const sinceSeconds = lastSyncAt
-      ? Math.min(Math.floor(lastSyncAt.getTime() / 1000), twoDaysAgo)
+      ? Math.floor(lastSyncAt.getTime() / 1000)
       : twoDaysAgo
-    // newer_than is more reliable across timezones than after: (Unix timestamp)
-    const searchQuery = `is:inbox newer_than:2d`
+    const searchQuery = `is:inbox after:${sinceSeconds}`
 
     // Paginate to fetch all matching messages (Gmail defaults to max 50 per page)
     const messages: { id: string }[] = []
@@ -238,6 +237,14 @@ export async function POST(request: NextRequest) {
     let createdCount = 0
     let skippedClaimFailed = 0
     let skippedCompanyMismatch = 0
+    const debugLog: { email: string; subject: string; reason: string }[] = []
+    const isDebug = process.env.NODE_ENV === 'development'
+
+    if (isDebug) {
+      const alreadyCount = messages.filter((m) => alreadyProcessed.has(m.id)).length
+      console.log('[Sync] Gmail query:', searchQuery)
+      console.log('[Sync] totalFromGmail:', messages.length, '| alreadyInDb:', alreadyCount, '| toProcess:', messages.length - alreadyCount)
+    }
 
     const fetched: { msg: any; id: string; threadId: string | null }[] = []
     for (const msgRef of messages) {
@@ -268,7 +275,10 @@ export async function POST(request: NextRequest) {
       const subject = getHeader('Subject')
 
       const senderEmail = parseEmailFromHeader(from)
-      if (!senderEmail) continue
+      if (!senderEmail) {
+        if (isDebug) debugLog.push({ email: from || '(no from)', subject: subject || '', reason: 'SKIP: no sender email parsed' })
+        continue
+      }
 
       const body = getMessageBody(msg.payload || {}).trim()
       const rfcMessageId = getHeader('Message-ID')?.trim() || null
@@ -299,6 +309,11 @@ export async function POST(request: NextRequest) {
           })
         } catch (retryErr) {
           skippedClaimFailed++
+          if (isDebug) {
+            debugLog.push({ email: senderEmail, subject: subject || '', reason: 'SKIP: insert email_messages failed (duplicate?)' })
+            console.log('[Sync] SKIP insert_failed:', senderEmail, subject?.slice(0, 50),'Where: ', retryErr
+          )
+          }
           continue
         }
       }
@@ -311,6 +326,10 @@ export async function POST(request: NextRequest) {
 
       if (skipRow) {
         alreadyProcessed.add(gmailMessageId)
+        if (isDebug) {
+          debugLog.push({ email: senderEmail, subject: subject || '', reason: 'SKIP: in email_skip_list' })
+          console.log('[Sync] SKIP skip_list:', senderEmail, subject?.slice(0, 50))
+        }
         continue
       }
 
@@ -366,6 +385,10 @@ export async function POST(request: NextRequest) {
 
         if (!companyEmail || (senderEmail !== companyEmail && normalizeForMatch(senderEmail) !== normalizeForMatch(companyEmail))) {
           skippedCompanyMismatch++
+          if (isDebug) {
+            debugLog.push({ email: senderEmail, subject: subject || '', reason: `SKIP: company_mismatch (ticket company email: ${companyEmail || 'null'})` })
+            console.log('[Sync] SKIP company_mismatch:', senderEmail, 'ticket company:', companyEmail)
+          }
           continue
         }
 
@@ -520,6 +543,14 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        if (!ticketCompanyId) {
+          if (isDebug) {
+            debugLog.push({ email: senderEmail, subject: subject || '', reason: 'SKIP: no company match for sender domain/email' })
+            console.log('[Sync] SKIP no_company:', senderEmail, 'domain:', senderDomain)
+          }
+          continue
+        }
+
         if (!existingTicketId && ticketCompanyId) {
           const normSubj = normalizeSubject(subject)
           const since = new Date(Date.now() - 48 * 60 * 60 * 1000)
@@ -570,6 +601,11 @@ export async function POST(request: NextRequest) {
               authorType: 'customer',
               ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
             })
+            if (isDebug) {
+              debugLog.push({ email: senderEmail, subject: subject || '', reason: `OK: reply added to ticket #${ticketId}` })
+            }
+          } else if (isDebug) {
+            debugLog.push({ email: senderEmail, subject: subject || '', reason: `SKIP: reply sender mismatch (ticket #${ticketId})` })
           }
           await db.update(emailMessages).set({ ticketId }).where(eq(emailMessages.gmailMessageId, gmailMessageId))
         } else {
@@ -578,6 +614,10 @@ export async function POST(request: NextRequest) {
           const emailAgeDays = internalDateMs > 0 ? (Date.now() - internalDateMs) / (24 * 60 * 60 * 1000) : 0
           if (internalDateMs > 0 && emailAgeDays > 7) {
             alreadyProcessed.add(gmailMessageId)
+            if (isDebug) {
+              debugLog.push({ email: senderEmail, subject: subject || '', reason: `SKIP: email_age > 7 days (${emailAgeDays.toFixed(1)} days)` })
+              console.log('[Sync] SKIP age_over_7d:', senderEmail, `${emailAgeDays.toFixed(1)} days`)
+            }
             continue
           }
 
@@ -609,6 +649,10 @@ export async function POST(request: NextRequest) {
             await db.update(tickets).set({ gmailThreadId: truncateVarchar(msgThreadId, 255), updatedAt: new Date() }).where(eq(tickets.id, ticketId))
           }
           createdCount++
+          if (isDebug) {
+            debugLog.push({ email: senderEmail, subject: title, reason: `OK: new_ticket #${newTicket.id} company=${ticketCompanyId}` })
+            console.log('[Sync] CREATED ticket #' + newTicket.id, senderEmail, title?.slice(0, 40))
+          }
 
           try {
             await runAutomationRules('ticket_created', {
@@ -639,6 +683,10 @@ export async function POST(request: NextRequest) {
       .set({ lastSyncAt: new Date(), updatedAt: new Date() })
       .where(eq(emailIntegrations.id, integration.id))
 
+    if (isDebug) {
+      console.log('[Sync] DONE | added:', addedCount, 'created:', createdCount, 'skipped:', skippedClaimFailed + skippedCompanyMismatch, 'debugLog:', debugLog.length)
+    }
+
     return NextResponse.json({
       success: true,
       addedCount,
@@ -646,8 +694,12 @@ export async function POST(request: NextRequest) {
       lastSyncAt: new Date().toISOString(),
       totalFromGmail: messages.length,
       newToProcess: fetched.length,
-      ...(process.env.NODE_ENV === 'development' && {
-        _debug: { skippedClaimFailed, skippedCompanyMismatch },
+      ...(isDebug && {
+        _debug: {
+          skippedClaimFailed,
+          skippedCompanyMismatch,
+          skippedDetails: debugLog,
+        },
       }),
     })
   } catch (err: any) {
