@@ -75,7 +75,12 @@ export default function EmailIntegrationContent({
       const parts = []
       if (data.addedCount > 0) parts.push(`${data.addedCount} reply(ies) as comments`)
       if (data.createdCount > 0) parts.push(`${data.createdCount} new ticket(s)`)
-      message.success(parts.length > 0 ? `Synced: ${parts.join(', ')}` : 'Inbox synced. No new emails found.')
+      let msg = parts.length > 0 ? `Synced: ${parts.join(', ')}` : 'Inbox synced. No new emails found.'
+      if (parts.length === 0 && data.totalFromGmail !== undefined) {
+        if (data.totalFromGmail === 0) msg = 'Inbox synced. No emails in Gmail (last 2 days).'
+        else if (data.newToProcess === 0) msg = `Inbox synced. ${data.totalFromGmail} email(s) in inbox, all already processed.`
+      }
+      message.success(msg)
       router.refresh()
     } catch (err: unknown) {
       message.error(err instanceof Error ? err.message : 'Failed to sync inbox')

@@ -208,7 +208,8 @@ export async function POST(request: NextRequest) {
     const sinceSeconds = lastSyncAt
       ? Math.min(Math.floor(lastSyncAt.getTime() / 1000), twoDaysAgo)
       : twoDaysAgo
-    const searchQuery = `is:inbox after:${sinceSeconds}`
+    // newer_than is more reliable across timezones than after: (Unix timestamp)
+    const searchQuery = `is:inbox newer_than:2d`
 
     // Paginate to fetch all matching messages (Gmail defaults to max 50 per page)
     const messages: { id: string }[] = []
@@ -643,6 +644,8 @@ export async function POST(request: NextRequest) {
       addedCount,
       createdCount,
       lastSyncAt: new Date().toISOString(),
+      totalFromGmail: messages.length,
+      newToProcess: fetched.length,
       ...(process.env.NODE_ENV === 'development' && {
         _debug: { skippedClaimFailed, skippedCompanyMismatch },
       }),
