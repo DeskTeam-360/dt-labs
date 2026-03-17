@@ -202,19 +202,31 @@ export async function POST(request: NextRequest) {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
+    // Always look back at least 2 days to avoid missing emails (and to limit processing load).
+    const twoDaysAgo = Math.floor((Date.now() - 2 * 24 * 60 * 60 * 1000) / 1000)
     const lastSyncAt = integration.lastSyncAt ? new Date(integration.lastSyncAt) : null
     const sinceSeconds = lastSyncAt
-      ? Math.floor(lastSyncAt.getTime() / 1000)
-      : Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000)
+      ? Math.min(Math.floor(lastSyncAt.getTime() / 1000), twoDaysAgo)
+      : twoDaysAgo
     const searchQuery = `is:inbox after:${sinceSeconds}`
 
-    const listRes = await gmail.users.messages.list({
-      userId: 'me',
-      q: searchQuery,
-      maxResults: 50,
-    })
-
-    const messages = listRes.data.messages || []
+    // Paginate to fetch all matching messages (Gmail defaults to max 50 per page)
+    const messages: { id: string }[] = []
+    let pageToken: string | undefined = undefined
+    while (true) {
+      const listRes = await gmail.users.messages.list({
+        userId: 'me',
+        q: searchQuery,
+        maxResults: 100,
+        pageToken,
+      }) as { data: { messages?: { id?: string }[]; nextPageToken?: string | null } }
+      const batch = (listRes.data.messages || []).filter(
+        (m: { id?: string }): m is { id: string } => !!m?.id
+      )
+      messages.push(...batch)
+      pageToken = listRes.data.nextPageToken ?? undefined
+      if (!pageToken) break
+    }
     const alreadyProcessed = new Set<string>()
     const threadToTicketThisRun = new Map<string, number>()
 
@@ -448,26 +460,34 @@ export async function POST(request: NextRequest) {
           if (company?.id) {
             const password = randomPassword()
             const passwordHash = await bcrypt.hash(password, 10)
-            const [upsertedUser] = await db
-              .insert(users)
-              .values({
-                email: truncateVarchar(senderEmail, 255),
-                fullName: truncateVarchar(displayName, 255),
-                companyId: company.id,
-                role: 'customer',
-                passwordHash,
-              })
-              .onConflictDoUpdate({
-                target: users.email,
-                set: {
+            // Use select-then-insert/update to avoid ON CONFLICT (works when users.email UNIQUE constraint is missing)
+            const [byEmail] = await db
+              .select({ id: users.id })
+              .from(users)
+              .where(eq(users.email, truncateVarchar(senderEmail, 255)))
+              .limit(1)
+            if (byEmail) {
+              await db
+                .update(users)
+                .set({
                   fullName: truncateVarchar(displayName, 255),
                   companyId: company.id,
                   updatedAt: new Date(),
-                },
-              })
-              .returning({ id: users.id })
-            if (upsertedUser) {
-              creatorUserId = upsertedUser.id
+                })
+                .where(eq(users.id, byEmail.id))
+              creatorUserId = byEmail.id
+            } else {
+              const [inserted] = await db
+                .insert(users)
+                .values({
+                  email: truncateVarchar(senderEmail, 255),
+                  fullName: truncateVarchar(displayName, 255),
+                  companyId: company.id,
+                  role: 'customer',
+                  passwordHash,
+                })
+                .returning({ id: users.id })
+              if (inserted) creatorUserId = inserted.id
             }
           }
         }
