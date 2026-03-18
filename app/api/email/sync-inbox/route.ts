@@ -10,6 +10,7 @@ import {
   users,
 } from '@/lib/db'
 import { runAutomationRules } from '@/lib/automation-engine'
+import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import { eq, and, ilike, not, isNull, desc, gte, or, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { NextRequest, NextResponse } from 'next/server'
@@ -601,6 +602,14 @@ export async function POST(request: NextRequest) {
               authorType: 'customer',
               ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
             })
+            sendAutomationLog({
+              event: 'email_reply_added',
+              ticket_id: ticketId,
+              email: senderEmail,
+              subject: subject || '',
+              message: commentBody?.slice(0, 200) || '',
+              detail: `company=${extTicket?.companyId ?? ''}`,
+            }).catch(() => {})
             if (isDebug) {
               debugLog.push({ email: senderEmail, subject: subject || '', reason: `OK: reply added to ticket #${ticketId}` })
             }
@@ -653,6 +662,14 @@ export async function POST(request: NextRequest) {
             debugLog.push({ email: senderEmail, subject: title, reason: `OK: new_ticket #${newTicket.id} company=${ticketCompanyId}` })
             console.log('[Sync] CREATED ticket #' + newTicket.id, senderEmail, title?.slice(0, 40))
           }
+          sendAutomationLog({
+            event: 'email_ticket_created',
+            ticket_id: ticketId,
+            email: senderEmail,
+            subject: title,
+            message: body?.slice(0, 200) || '',
+            detail: `company=${ticketCompanyId}`,
+          }).catch(() => {})
 
           try {
             await runAutomationRules('ticket_created', {
@@ -668,6 +685,13 @@ export async function POST(request: NextRequest) {
             })
           } catch (autoErr) {
             console.error('Automation rules error:', autoErr)
+            sendAutomationLog({
+              event: 'automation_error',
+              ticket_id: ticketId,
+              email: senderEmail,
+              message: String(autoErr),
+              detail: 'ticket_created',
+            }).catch(() => {})
           }
 
           await db.update(emailMessages).set({ ticketId }).where(eq(emailMessages.gmailMessageId, gmailMessageId))
