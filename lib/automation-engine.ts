@@ -2,6 +2,7 @@
  * Automation rules engine: evaluate conditions and apply actions when tickets are created/updated.
  */
 import { db } from '@/lib/db'
+import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import {
   automationRules,
   tickets,
@@ -128,6 +129,14 @@ export async function runAutomationRules(
     const companyMatch = !rule.companyId || rule.companyId === ctx.company_id
     if (!companyMatch) continue
     if (!evalConditions(cond, ctx)) continue
+
+    sendAutomationLog({
+      event: 'automation_matched',
+      ticket_id: ctx.id,
+      email: ctx.sender_email ?? '',
+      subject: ctx.title ?? '',
+      detail: `rule=${rule.name ?? rule.id} event=${eventType}`,
+    }).catch(() => {})
 
     const actions = (rule.actions || {}) as AutomationActions
     const updates: Record<string, unknown> = {}
