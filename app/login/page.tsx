@@ -159,17 +159,7 @@ export default function LoginPage() {
             </Button>
           </Form.Item>
 
-          <Form.Item style={{ marginBottom: 0 }}>
-            <Button
-              type="link"
-              block
-              loading={dbCheckLoading}
-              onClick={checkDb}
-              style={{ padding: 0, fontSize: 12 }}
-            >
-              Cek koneksi DB
-            </Button>
-          </Form.Item>
+      
 
           {dbError && (
             <Alert

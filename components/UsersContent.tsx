@@ -1,6 +1,6 @@
 'use client'
 
-import { Layout, Table, Button, Space, Typography, Card, Tag, Avatar, Modal, Form, Input, Select, message, Popconfirm, Tooltip, Upload, Switch, InputNumber } from 'antd'
+import { Layout, Table, Button, Space, Typography, Card, Tag, Avatar, Modal, Form, Input, Select, message, Popconfirm, Tooltip, Upload, Switch, InputNumber, Col, Row } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, UploadOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -46,13 +46,12 @@ interface UserRecord {
   bio: string | null
   timezone: string | null
   locale: string | null
-  permissions: any
   is_email_verified: boolean | null
-  metadata: any
 }
 
 export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const isCustomer = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'customer'
+  const isAdmin = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'admin'
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [users, setUsers] = useState<UserRecord[]>([])
@@ -63,20 +62,29 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [searchText, setSearchText] = useState('')
+  const [filterRole, setFilterRole] = useState<string | undefined>(undefined)
+  const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined)
   const [form] = Form.useForm()
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
+  const selectedRole = Form.useWatch('role', form)
 
   const filteredUsers = useMemo(() => {
-    if (!searchText.trim()) return users
-    const q = searchText.trim().toLowerCase()
-    return users.filter(
-      (u) =>
-        (u.full_name || '').toLowerCase().includes(q) ||
-        (u.email || '').toLowerCase().includes(q) ||
-        (u.company?.name || '').toLowerCase().includes(q) ||
-        (u.department || '').toLowerCase().includes(q) ||
-        (u.position || '').toLowerCase().includes(q)
-    )
-  }, [users, searchText])
+    return users.filter((u) => {
+      if (searchText.trim()) {
+        const q = searchText.trim().toLowerCase()
+        const matchesSearch =
+          (u.full_name || '').toLowerCase().includes(q) ||
+          (u.email || '').toLowerCase().includes(q) ||
+          (u.company?.name || '').toLowerCase().includes(q) ||
+          (u.department || '').toLowerCase().includes(q) ||
+          (u.position || '').toLowerCase().includes(q)
+        if (!matchesSearch) return false
+      }
+      if (filterRole && u.role !== filterRole) return false
+      if (filterStatus && u.status !== filterStatus) return false
+      return true
+    })
+  }, [users, searchText, filterRole, filterStatus])
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -109,7 +117,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     setAvatarUrl(null)
     form.resetFields()
     form.setFieldsValue({
-      role: 'user',
+      role: 'staff',
       status: 'active',
       timezone: 'UTC',
       locale: 'en',
@@ -134,8 +142,6 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       timezone: record.timezone || 'UTC',
       locale: record.locale || 'en',
       is_email_verified: record.is_email_verified || false,
-      permissions: record.permissions ? JSON.stringify(record.permissions, null, 2) : '',
-      metadata: record.metadata ? JSON.stringify(record.metadata, null, 2) : '',
     })
     setModalVisible(true)
   }
@@ -149,7 +155,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     setUploading(true)
     try {
       const result = await uploadAvatar(file, editingUser.id)
-      
+
       if (result.error || !result.url) {
         message.error(result.error || 'Failed to upload avatar. Please check storage bucket permissions.')
         console.error('Upload error details:', result.error)
@@ -177,28 +183,6 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
 
   const handleSubmit = async (values: any) => {
     try {
-      // Parse JSON fields
-      let permissions = null
-      let metadata = null
-      
-      if (values.permissions) {
-        try {
-          permissions = JSON.parse(values.permissions)
-        } catch (e) {
-          message.error('Invalid JSON format for permissions')
-          return
-        }
-      }
-      
-      if (values.metadata) {
-        try {
-          metadata = JSON.parse(values.metadata)
-        } catch (e) {
-          message.error('Invalid JSON format for metadata')
-          return
-        }
-      }
-
       if (editingUser) {
         const patchBody: Record<string, unknown> = {
           full_name: values.full_name,
@@ -216,9 +200,10 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
             department: values.department || null,
             position: values.position || null,
             bio: values.bio || null,
-            permissions,
-            metadata,
           })
+        }
+        if (isAdmin && values.newPassword?.trim()) {
+          patchBody.password = values.newPassword
         }
         await apiFetch(`/api/users/${editingUser.id}`, {
           method: 'PATCH',
@@ -257,8 +242,6 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               position: values.position || null,
               bio: values.bio || null,
               company_id: values.company_id || null,
-              permissions: permissions,
-              metadata: metadata,
             })
           }
           if (avatarUrl) {
@@ -387,7 +370,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
             <Button
               type="default"
               icon={<EyeOutlined />}
-              size="small"
+
               onClick={() => router.push(`/users/${record.id}`)}
             />
           </Tooltip>
@@ -395,7 +378,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
             <Button
               type="primary"
               icon={<EditOutlined />}
-              size="small"
+
               onClick={() => handleEdit(record)}
             />
           </Tooltip>
@@ -411,7 +394,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 type="primary"
                 danger
                 icon={<DeleteOutlined />}
-                size="small"
+
               />
             </Tooltip>
           </Popconfirm>
@@ -424,8 +407,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     () =>
       isCustomer
         ? baseColumns.filter(
-            (c) => !['role', 'company', 'department', 'position'].includes(String(c.key))
-          )
+          (c) => !['role', 'company', 'department', 'position'].includes(String(c.key))
+        )
         : baseColumns,
     [isCustomer]
   )
@@ -433,28 +416,64 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
-      
+
       <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
         <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
               <Title level={2} style={{ margin: 0 }}>Users Management</Title>
-              <Space>
+              <Space wrap>
                 <Input
                   placeholder="Search by name, email, company..."
                   prefix={<SearchOutlined />}
                   allowClear
                   value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
+                  onChange={(e) => {
+                    setSearchText(e.target.value)
+                    setPagination((p) => ({ ...p, current: 1 }))
+                  }}
                   style={{ width: 260 }}
                 />
+                {!isCustomer && (
+                  <Select
+                    placeholder="Filter by Role"
+                    allowClear
+                    value={filterRole}
+                    onChange={(v) => {
+                      setFilterRole(v)
+                      setPagination((p) => ({ ...p, current: 1 }))
+                    }}
+                    style={{ width: 140 }}
+                  >
+                    <Option value="admin">Admin</Option>
+                    <Option value="manager">Manager</Option>
+                    <Option value="user">User</Option>
+                    <Option value="customer">Customer</Option>
+                    <Option value="guest">Guest</Option>
+                  </Select>
+                )}
+                <Select
+                  placeholder="Filter by Status"
+                  allowClear
+                  value={filterStatus}
+                  onChange={(v) => {
+                    setFilterStatus(v)
+                    setPagination((p) => ({ ...p, current: 1 }))
+                  }}
+                  style={{ width: 150 }}
+                >
+                  <Option value="active">Active</Option>
+                  <Option value="inactive">Inactive</Option>
+                  <Option value="suspended">Suspended</Option>
+                  <Option value="pending">Pending</Option>
+                </Select>
                 <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleCreate}
-              >
-                Add User
-              </Button>
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={handleCreate}
+                >
+                  Add User
+                </Button>
               </Space>
             </div>
 
@@ -464,9 +483,12 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               rowKey="id"
               loading={loading}
               pagination={{
-                pageSize: 10,
+                current: pagination.current,
+                pageSize: pagination.pageSize,
                 showSizeChanger: true,
+                pageSizeOptions: ['10', '20', '50', '100'],
                 showTotal: (total) => `Total ${total} users`,
+                onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
               }}
             />
           </Card>
@@ -526,20 +548,33 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 </Form.Item>
               )}
 
-              <Form.Item
-                name="email"
-                label="Email"
-                rules={[
-                  { required: true, message: 'Please enter email!' },
-                  { type: 'email', message: 'Invalid email!' }
-                ]}
-              >
-                <Input
-                  prefix={<UserOutlined />}
-                  placeholder="Email"
-                  disabled={!!editingUser}
-                />
-              </Form.Item>
+              <Row gutter={24}>
+                <Col span={12}>
+                  <Form.Item
+                    name="full_name"
+                    label="Full Name"
+                    rules={[{ required: true, message: 'Please enter full name!' }]}
+                  >
+                    <Input placeholder="Full Name" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="email"
+                    label="Email"
+                    rules={[
+                      { required: true, message: 'Please enter email!' },
+                      { type: 'email', message: 'Invalid email!' }
+                    ]}
+                  >
+                    <Input
+                      prefix={<UserOutlined />}
+                      placeholder="Email"
+                      disabled={!!editingUser}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
 
               {!editingUser && (
                 <Form.Item
@@ -554,116 +589,170 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 </Form.Item>
               )}
 
-              <Form.Item
-                name="full_name"
-                label="Full Name"
-                rules={[{ required: true, message: 'Please enter full name!' }]}
-              >
-                <Input placeholder="Full Name" />
-              </Form.Item>
-
-              {!isCustomer && (
-                <Form.Item
-                  name="role"
-                  label="Role"
-                  rules={[{ required: true, message: 'Please select role!' }]}
-                >
-                  <Select placeholder="Select Role">
-                    <Option value="admin">Admin</Option>
-                    <Option value="manager">Manager</Option>
-                    <Option value="user">User</Option>
-                    <Option value="customer">Customer</Option>
-                    <Option value="guest">Guest</Option>
-                  </Select>
-                </Form.Item>
-              )}
-
-              <Form.Item
-                name="status"
-                label="Status"
-                rules={[{ required: true, message: 'Please select status!' }]}
-              >
-                <Select placeholder="Select Status">
-                  <Option value="active">Active</Option>
-                  <Option value="inactive">Inactive</Option>
-                  <Option value="suspended">Suspended</Option>
-                  <Option value="pending">Pending</Option>
-                </Select>
-              </Form.Item>
-
-              {!isCustomer && (
-                <Form.Item name="company_id" label="Company">
-                  <Select placeholder="Select Company (optional)" allowClear>
-                    {companies.map((c) => (
-                      <Option key={c.id} value={c.id}>{c.name}</Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              )}
-
-              <Form.Item
-                name="phone"
-                label="Phone"
-              >
-                <Input placeholder="Phone Number" />
-              </Form.Item>
-
-              {!isCustomer && (
+              {editingUser && isAdmin && (
                 <>
                   <Form.Item
-                    name="department"
-                    label="Department"
+                    name="newPassword"
+                    label="New Password (optional)"
+                    rules={[
+                      { min: 6, message: 'Password must be at least 6 characters!' },
+                    ]}
                   >
-                    <Input placeholder="Department" />
+                    <Input.Password placeholder="Leave blank to keep current password" />
                   </Form.Item>
                   <Form.Item
-                    name="position"
-                    label="Position"
+                    name="confirmPassword"
+                    label="Confirm New Password"
+                    dependencies={['newPassword']}
+                    rules={[
+                      ({ getFieldValue }) => ({
+                        validator(_, value) {
+                          const pwd = getFieldValue('newPassword')
+                          if (!pwd) return Promise.resolve()
+                          if (!value || pwd === value) return Promise.resolve()
+                          return Promise.reject(new Error('Passwords do not match!'))
+                        },
+                      }),
+                    ]}
                   >
-                    <Input placeholder="Position/Job Title" />
-                  </Form.Item>
-                  <Form.Item
-                    name="bio"
-                    label="Bio"
-                  >
-                    <TextArea rows={3} placeholder="Bio/Description" />
+                    <Input.Password placeholder="Confirm new password" />
                   </Form.Item>
                 </>
               )}
 
-              <Form.Item
-                name="timezone"
-                label="Timezone"
-              >
-                <Select placeholder="Select Timezone" showSearch>
-                  <Option value="UTC">UTC</Option>
-                  <Option value="America/New_York">America/New_York (EST)</Option>
-                  <Option value="America/Chicago">America/Chicago (CST)</Option>
-                  <Option value="America/Denver">America/Denver (MST)</Option>
-                  <Option value="America/Los_Angeles">America/Los_Angeles (PST)</Option>
-                  <Option value="Europe/London">Europe/London (GMT)</Option>
-                  <Option value="Europe/Paris">Europe/Paris (CET)</Option>
-                  <Option value="Asia/Tokyo">Asia/Tokyo (JST)</Option>
-                  <Option value="Asia/Shanghai">Asia/Shanghai (CST)</Option>
-                  <Option value="Asia/Jakarta">Asia/Jakarta (WIB)</Option>
-                  <Option value="Asia/Singapore">Asia/Singapore (SGT)</Option>
-                </Select>
-              </Form.Item>
 
-              <Form.Item
-                name="locale"
-                label="Locale"
-              >
-                <Select placeholder="Select Locale">
-                  <Option value="en">English (en)</Option>
-                  <Option value="id">Indonesian (id)</Option>
-                  <Option value="es">Spanish (es)</Option>
-                  <Option value="fr">French (fr)</Option>
-                  <Option value="de">German (de)</Option>
-                  <Option value="ja">Japanese (ja)</Option>
-                  <Option value="zh">Chinese (zh)</Option>
-                </Select>
-              </Form.Item>
+
+              {!isCustomer && (
+                <>
+                  <Row gutter={24}>
+                    <Col span={12}>
+                      <Form.Item
+                        name="role"
+                        label="Role"
+                        rules={[{ required: true, message: 'Please select role!' }]}
+                      >
+                        <Select placeholder="Select Role">
+                          <Option value="admin">Admin</Option>
+                          <Option value="manager">Manager</Option>
+                          <Option value="staff">Staff</Option>
+                          <Option value="customer">Customer</Option>
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+
+                      <Form.Item
+                        name="status"
+                        label="Status"
+                        rules={[{ required: true, message: 'Please select status!' }]}
+                      >
+                        <Select placeholder="Select Status">
+                          <Option value="active">Active</Option>
+                          <Option value="inactive">Inactive</Option>
+                          <Option value="suspended">Suspended</Option>
+                          <Option value="pending">Pending</Option>
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  {(selectedRole === 'customer') && (
+                    <Form.Item name="company_id" label="Company">
+                      <Select placeholder="Select Company (optional)" allowClear>
+                        {companies.map((c) => (
+                          <Option key={c.id} value={c.id}>{c.name}</Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  )}
+                  {(selectedRole !== 'customer') && (
+                    <Row gutter={24}>
+                      <Col span={12}>
+                        <Form.Item
+                          name="department"
+                          label="Department"
+                        >
+                          <Select placeholder="Select Department" allowClear>
+                            <Option value="Management">Management</Option>
+                            <Option value="Account Manager">Account Manager</Option>
+                            <Option value="Production">Production</Option>
+                          </Select>
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item
+                          name="position"
+                          label="Position"
+                        >
+                          <Select placeholder="Select Position" allowClear>
+                            <Option value="Frontend">Frontend</Option>
+                            <Option value="Desinger">Desinger</Option>
+                            <Option value="Backend (Mjolnir)">Backend (Mjolnir)</Option>
+                            <Option value="Account Specialist">Account Specialist</Option>
+                            <Option value="HR">HR</Option>
+                            <Option value="CEO">CEO</Option>
+                            <Option value="Production Director">Production Director</Option>
+                            <Option value="Project Director">Project Director</Option>
+                            <Option value="Project Manager">Project Manager</Option>
+                            <Option value="Video Specialist">Video Specialist</Option>
+                            <Option value="Intake Person">Intake Person</Option>
+                          </Select>
+                        </Form.Item>
+                      </Col>
+                      <Col span={24}>
+                        <Form.Item
+                          name="bio"
+                          label="Bio"
+                        >
+                          <TextArea rows={3} placeholder="Bio/Description" />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+
+                  )}
+                </>
+              )}
+
+
+
+
+              <Row gutter={24}>
+                <Col span={12}>
+                  <Form.Item
+                    name="timezone"
+                    label="Timezone"
+                  >
+                    <Select placeholder="Select Timezone" showSearch>
+                      <Option value="UTC">UTC</Option>
+                      <Option value="America/New_York">America/New_York (EST)</Option>
+                      <Option value="America/Chicago">America/Chicago (CST)</Option>
+                      <Option value="America/Denver">America/Denver (MST)</Option>
+                      <Option value="America/Los_Angeles">America/Los_Angeles (PST)</Option>
+                      <Option value="Europe/London">Europe/London (GMT)</Option>
+                      <Option value="Europe/Paris">Europe/Paris (CET)</Option>
+                      <Option value="Asia/Tokyo">Asia/Tokyo (JST)</Option>
+                      <Option value="Asia/Shanghai">Asia/Shanghai (CST)</Option>
+                      <Option value="Asia/Jakarta">Asia/Jakarta (WIB)</Option>
+                      <Option value="Asia/Singapore">Asia/Singapore (SGT)</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="locale"
+                    label="Locale"
+                  >
+                    <Select placeholder="Select Locale">
+                      <Option value="en">English (en)</Option>
+                      <Option value="id">Indonesian (id)</Option>
+                      <Option value="es">Spanish (es)</Option>
+                      <Option value="fr">French (fr)</Option>
+                      <Option value="de">German (de)</Option>
+                      <Option value="ja">Japanese (ja)</Option>
+                      <Option value="zh">Chinese (zh)</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
 
               {editingUser && (
                 <Form.Item
@@ -673,25 +762,6 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 >
                   <Switch />
                 </Form.Item>
-              )}
-
-              {!isCustomer && (
-                <>
-                  <Form.Item
-                    name="permissions"
-                    label="Permissions (JSON)"
-                    tooltip="Enter permissions as JSON object, e.g. {'read': true, 'write': false}"
-                  >
-                    <TextArea rows={4} placeholder='{"read": true, "write": false}' />
-                  </Form.Item>
-                  <Form.Item
-                    name="metadata"
-                    label="Metadata (JSON)"
-                    tooltip="Enter additional metadata as JSON object"
-                  >
-                    <TextArea rows={4} placeholder='{"key": "value"}' />
-                  </Form.Item>
-                </>
               )}
 
               <Form.Item>

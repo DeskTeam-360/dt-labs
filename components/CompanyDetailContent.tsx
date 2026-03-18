@@ -1034,15 +1034,9 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
                 <Form.Item name="name" label="Company name" rules={[{ required: true, message: 'Company name is required' }]}>
                   <Input placeholder="Company name" />
                 </Form.Item>
-                <Form.Item name="email" label="Email (untuk reply ticket)">
+                <Form.Item name="email" label="Email">
                   <Input type="email" placeholder="support@company.com" />
                 </Form.Item>
-                {/* <Form.Item name="color" label="Signature Color (hex)" initialValue="#000000">
-                  <ColorPickerInput />
-                </Form.Item> */}
-                {/* <Form.Item name="is_active" label="Active" valuePropName="checked">
-                  <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
-                </Form.Item> */}
               </Form>
             </Modal>
 

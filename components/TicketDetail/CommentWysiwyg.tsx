@@ -37,7 +37,7 @@ export default function CommentWysiwyg({
   value = '',
   onChange,
   placeholder = 'Add a comment...',
-  height = '200px',
+  height = '100px',
   ticketId,
 }: CommentWysiwygProps) {
   const [mounted, setMounted] = useState(false)
@@ -93,9 +93,9 @@ export default function CommentWysiwyg({
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
-          rows={10}
+          rows={height ? parseInt(height.replace('px', '')) / 20 : 10}
           readOnly
-          style={{ minHeight: 200, resize: 'none', pointerEvents: 'none' }}
+          style={{ minHeight: height ? parseInt(height.replace('px', '')) : 200, resize: 'none', pointerEvents: 'none' }}
         />
       </div>
     )
@@ -108,7 +108,7 @@ export default function CommentWysiwyg({
     placeholder,
     modules,
     formats: QUILL_FORMATS,
-    style: { height },
+    style: { height: height ? parseInt(height.replace('px', '')) : 200 },
     ref: quillRef,
   }
   return (

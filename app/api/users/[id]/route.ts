@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { db, users, companies } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import bcrypt from 'bcryptjs'
 import { NextResponse } from 'next/server'
 
 /** GET /api/users/[id] - Get user detail */
@@ -47,9 +48,7 @@ export async function GET(
     bio: u.bio,
     timezone: u.timezone,
     locale: u.locale,
-    permissions: u.permissions,
     is_email_verified: u.isEmailVerified,
-    metadata: u.metadata,
   })
 }
 
@@ -65,6 +64,8 @@ export async function PATCH(
 
   const { id } = await params
   const body = await request.json()
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+  const isAdmin = role === 'admin'
 
   const updateData: Record<string, unknown> = {}
   if (body.full_name !== undefined) updateData.fullName = body.full_name
@@ -79,8 +80,14 @@ export async function PATCH(
   if (body.timezone !== undefined) updateData.timezone = body.timezone || 'UTC'
   if (body.locale !== undefined) updateData.locale = body.locale || 'en'
   if (body.is_email_verified !== undefined) updateData.isEmailVerified = body.is_email_verified
-  if (body.permissions !== undefined) updateData.permissions = body.permissions
-  if (body.metadata !== undefined) updateData.metadata = body.metadata
+
+  // Admin can change any user's password
+  if (isAdmin && body.password) {
+    if (body.password.length < 6) {
+      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 })
+    }
+    updateData.passwordHash = await bcrypt.hash(body.password, 10)
+  }
 
   await db.update(users).set({ ...updateData, updatedAt: new Date() }).where(eq(users.id, id))
 

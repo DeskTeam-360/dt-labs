@@ -232,9 +232,13 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           marginTop: 16,
           background: 'transparent',
         }}
-        onClick={({ key }) => {
-          if (key && typeof key === 'string' && !key.startsWith('templates')) {
-            router.push(key)
+        onClick={({ key, domEvent }) => {
+          if (key && typeof key === 'string' && key.startsWith('/')) {
+            if (domEvent.ctrlKey || domEvent.metaKey || domEvent.button === 1) {
+              window.open(key, '_blank', 'noopener,noreferrer')
+            } else {
+              router.push(key)
+            }
           }
         }}
       />

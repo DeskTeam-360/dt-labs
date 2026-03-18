@@ -84,7 +84,8 @@ export default function TicketFormModal({
       open={open}
       onCancel={onCancel}
       footer={null}
-      width={showSimplifiedForm ? 720 : 960}
+      width={showSimplifiedForm ? 720 : 1200}
+      centered
     >
       <Form form={form} layout="vertical" onFinish={onSubmit}>
         <Form.Item
@@ -97,16 +98,16 @@ export default function TicketFormModal({
 
         {!editingTicket && (
           <Form.Item name="description" label="Description">
-            <CommentWysiwyg ticketId={undefined} placeholder="Ticket Description" height={showSimplifiedForm ? '280px' : '320px'} />
+            <CommentWysiwyg ticketId={undefined} placeholder="Ticket Description" height={showSimplifiedForm ? '150px' : '150px'} />
           </Form.Item>
         )}
 
-        {!showSimplifiedForm && (
+        {editingTicket && !showSimplifiedForm && (
           <Form.Item name="short_note" label="Short Note" style={{ marginTop: 50 }}>
             <Input.TextArea placeholder="Short note (optional)" rows={2} allowClear />
           </Form.Item>
         )}
-
+        <br />
         {!editingTicket && !showSimplifiedForm && (
           <Form.Item label="Attachments">
             <Flex vertical style={{ width: '100%' }}>
@@ -159,7 +160,7 @@ export default function TicketFormModal({
 
         <Row gutter={24}>
           {!showSimplifiedForm && (
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item name="status" label="Status" rules={[{ required: true }]}>
                 <Select>
                   {allStatuses.map((s) => (
@@ -171,7 +172,7 @@ export default function TicketFormModal({
               </Form.Item>
             </Col>
           )}
-          <Col span={showSimplifiedForm ? 24 : 12} style={{ marginTop: 20 }}>
+          <Col span={8} >
             <Form.Item name="type_id" label="Type">
               <Select placeholder="Select type" allowClear>
                 {ticketTypes.map((t) => (
@@ -193,21 +194,13 @@ export default function TicketFormModal({
               </Select>
             </Form.Item>
           </Col>
-          {!showSimplifiedForm && (
-            <Col span={12}>
-              <Form.Item name="company_id" label="Company">
-                <Select placeholder="Select company" allowClear>
-                  {companies.map((c) => (
-                    <Option key={c.id} value={c.id}>
-                      {c.name}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          )}
-          <Col span={showSimplifiedForm ? 24 : 12}>
-            <Form.Item name="priority_id" label="Priority">
+
+          <Col span={8}>
+            <Form.Item
+              name="priority_id"
+              label="Priority"
+              rules={[{ required: true, message: 'Please select priority!' }]}
+            >
               <Select placeholder="Select priority" allowClear>
                 {ticketPriorities.map((p) => (
                   <Option key={p.id} value={p.id}>
@@ -228,111 +221,126 @@ export default function TicketFormModal({
               </Select>
             </Form.Item>
           </Col>
+          {!showSimplifiedForm && (
+            <>
+              <Col span={12}>
+                <Form.Item name="company_id" label="Company">
+                  <Select placeholder="Select company" allowClear>
+                    {companies.map((c) => (
+                      <Option key={c.id} value={c.id}>
+                        {c.name}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Tags">
+                  <Select
+                    mode="multiple"
+                    placeholder="Select tags"
+                    value={selectedTagIds}
+                    onChange={onSelectedTagIdsChange}
+                    optionLabelProp="label"
+                    allowClear
+                  >
+                    {allTags.map((t) => (
+                      <Option key={t.id} value={t.id} label={t.name}>
+                        {t.name}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </>
+          )}
         </Row>
 
         {!showSimplifiedForm && (
           <>
-        <Form.Item label="Tags">
-          <Select
-            mode="multiple"
-            placeholder="Select tags"
-            value={selectedTagIds}
-            onChange={onSelectedTagIdsChange}
-            optionLabelProp="label"
-            allowClear
-          >
-            {allTags.map((t) => (
-              <Option key={t.id} value={t.id} label={t.name}>
-                {t.name}
-              </Option>
-            ))}
-          </Select>
-        </Form.Item>
 
-        <Form.Item name="visibility" label="Visibility" rules={[{ required: true }]}>
-          <Select
-            onChange={(value) => {
-              if (value !== 'specific_users') {
-                onSelectedAssigneesChange([])
-              }
-            }}
-          >
-            <Option value="private">Private</Option>
-            <Option value="team">Team</Option>
-            <Option value="specific_users">Specific Users</Option>
-            <Option value="public">Public</Option>
-          </Select>
-        </Form.Item>
 
-        <Form.Item
-          noStyle
-          shouldUpdate={(prevValues, currentValues) =>
-            prevValues.visibility !== currentValues.visibility
-          }
-        >
-          {({ getFieldValue }) =>
-            getFieldValue('visibility') === 'team' ? (
-              <Form.Item name="team_id" label="Team" rules={[{ required: true }]}>
-                <Select placeholder="Select Team">
-                  {teams.map((team) => (
-                    <Option key={team.id} value={team.id}>
-                      {team.name}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            ) : null
-          }
-        </Form.Item>
-
-        <Form.Item
-          noStyle
-          shouldUpdate={(prevValues, currentValues) =>
-            prevValues.visibility !== currentValues.visibility
-          }
-        >
-          {({ getFieldValue }) =>
-            getFieldValue('visibility') === 'specific_users' ? (
-              <Form.Item
-                label="Assign To Users"
-                required
-                validateStatus={
-                  getFieldValue('visibility') === 'specific_users' && selectedAssignees.length === 0
-                    ? 'error'
-                    : ''
-                }
-                help={
-                  getFieldValue('visibility') === 'specific_users' && selectedAssignees.length === 0
-                    ? 'Please select at least one user!'
-                    : ''
-                }
+            <Form.Item name="visibility" label="Visibility" rules={[{ required: true }]}>
+              <Select
+                onChange={(value) => {
+                  if (value !== 'specific_users') {
+                    onSelectedAssigneesChange([])
+                  }
+                }}
               >
-                <Select
-                  mode="multiple"
-                  placeholder="Select Users"
-                  value={selectedAssignees}
-                  onChange={onSelectedAssigneesChange}
-                  optionLabelProp="label"
-                >
-                  {users.map((user) => (
-                    <Option key={user.id} value={user.id} label={user.full_name || user.email}>
-                      {user.full_name || user.email}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            ) : null
-          }
-        </Form.Item>
+                <Option value="public">Public</Option>
+                <Option value="team">Team</Option>
+                <Option value="specific_users">Specific Users</Option>
 
-        <Form.Item name="due_date" label="Due Date">
-          <DatePicker
-            style={{ width: '100%' }}
-            showTime
-            format="YYYY-MM-DD HH:mm"
-            placeholder="Select Due Date"
-          />
-        </Form.Item>
+              </Select>
+            </Form.Item>
+
+            <Form.Item
+              noStyle
+              shouldUpdate={(prevValues, currentValues) =>
+                prevValues.visibility !== currentValues.visibility
+              }
+            >
+              {({ getFieldValue }) =>
+                (getFieldValue('visibility') === 'team' || getFieldValue('visibility') === 'public') ? (
+                  <Form.Item
+                    name="team_id"
+                    label="Team"
+                    rules={[{ required: getFieldValue('visibility') === 'team', message: 'Please select team!' }]}
+                  >
+                    <Select placeholder="Select Team">
+                      {teams.map((team) => (
+                        <Option key={team.id} value={team.id}>
+                          {team.name}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                ) : null
+              }
+            </Form.Item>
+
+            <Form.Item
+              noStyle
+              shouldUpdate={(prevValues, currentValues) =>
+                prevValues.visibility !== currentValues.visibility
+              }
+            >
+              {({ getFieldValue }) =>
+                getFieldValue('visibility') === 'specific_users' ? (
+                  <Form.Item
+                    label="Assign To Users"
+                    required
+                    validateStatus={
+                      getFieldValue('visibility') === 'specific_users' && selectedAssignees.length === 0
+                        ? 'error'
+                        : ''
+                    }
+                    help={
+                      getFieldValue('visibility') === 'specific_users' && selectedAssignees.length === 0
+                        ? 'Please select at least one user!'
+                        : ''
+                    }
+                  >
+                    <Select
+                      mode="multiple"
+                      placeholder="Select Users"
+                      value={selectedAssignees}
+                      onChange={onSelectedAssigneesChange}
+                      optionLabelProp="label"
+                    >
+                      {users.map((user) => (
+                        <Option key={user.id} value={user.id} label={user.full_name || user.email}>
+                          {user.full_name || user.email}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                ) : null
+              }
+            </Form.Item>
+
+
           </>
         )}
 

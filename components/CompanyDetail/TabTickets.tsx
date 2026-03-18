@@ -47,6 +47,7 @@ interface TicketRecord {
   title: string
   description: string | null
   status: string
+  visibility?: 'private' | 'team' | 'specific_users' | 'public'
   type_id: number | null
   priority_id: number | null
   company_id: string | null
@@ -225,6 +226,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     form.resetFields()
     form.setFieldsValue({
       status: statuses[0]?.slug ?? 'to_do',
+      visibility: 'public',
       company_id: companyData.id,
     })
     setModalVisible(true)
@@ -236,6 +238,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       title: ticket.title,
       description: ticket.description || '',
       status: ticket.status,
+      visibility: ticket.visibility,
       type_id: ticket.type_id ?? undefined,
       priority_id: ticket.priority_id ?? undefined,
       company_id: companyData.id,
@@ -267,7 +270,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
         priority_id: values.priority_id ?? null,
         company_id: companyData.id,
         due_date: values.due_date ? values.due_date.format('YYYY-MM-DD') : null,
-        visibility: 'private',
+        visibility: editingTicket ? (values.visibility ?? editingTicket.visibility ?? 'public') : (values.visibility ?? 'public'),
         tag_ids: selectedTagIds,
       }
 
@@ -528,13 +531,14 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
         }}
         footer={null}
         width={600}
+        centered
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Title is required' }]}>
             <Input placeholder="Ticket title" />
           </Form.Item>
           <Form.Item name="description" label="Description">
-            <CommentWysiwyg ticketId={editingTicket?.id} placeholder="Description" height="120px" />
+            <CommentWysiwyg ticketId={editingTicket?.id} placeholder="Description" height="50px" />
           </Form.Item>
           <Form.Item name="status" label="Status" rules={[{ required: true }]}>
             <Select>
@@ -565,7 +569,11 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
               ))}
             </Select>
           </Form.Item>
-          <Form.Item name="priority_id" label="Priority">
+          <Form.Item
+            name="priority_id"
+            label="Priority"
+            rules={[{ required: true, message: 'Please select priority!' }]}
+          >
             <Select placeholder="Select priority" allowClear>
               {priorities.map((p) => (
                 <Option key={p.id} value={p.id}>

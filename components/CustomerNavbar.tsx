@@ -140,17 +140,35 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
             width: '100%',
           }}
           items={[
-            { key: 'dashboard', icon: <HomeOutlined />, label: 'Dashboard', onClick: () => router.push('/customer') },
-            { key: 'info', icon: <InfoCircleOutlined />, label: 'Info', onClick: () => router.push('/customer/info') },
-            { key: 'users', icon: <TeamOutlined />, label: 'Users', onClick: () => router.push('/customer/users') },
-            { key: 'tickets', icon: <CheckSquareOutlined />, label: 'Tickets', onClick: () => router.push('/customer/tickets') },
-            { key: 'data-form', icon: <DatabaseOutlined />, label: 'Company Data', onClick: () => router.push('/customer/data-form') },
-            { key: 'content-planner', icon: <FileTextOutlined />, label: 'Content Planner', onClick: () => router.push('/customer/content-planner') },
-            // { key: 'generate', icon: <FileTextOutlined />, label: 'Generate', onClick: () => router.push('/customer/generate') },
-            // { key: 'knowledge-base', icon: <FileTextOutlined />, label: 'Knowledge Base', onClick: () => router.push('/customer/knowledge-base') },
-            { key: 'websites', icon: <GlobalOutlined />, label: 'Websites', onClick: () => router.push('/customer/websites') },
-            { key: 'crawling', icon: <GlobalOutlined />, label: 'Crawling', onClick: () => router.push('/customer/crawling') },
+            { key: 'dashboard', icon: <HomeOutlined />, label: 'Dashboard' },
+            { key: 'info', icon: <InfoCircleOutlined />, label: 'Info' },
+            { key: 'users', icon: <TeamOutlined />, label: 'Users' },
+            { key: 'tickets', icon: <CheckSquareOutlined />, label: 'Tickets' },
+            { key: 'data-form', icon: <DatabaseOutlined />, label: 'Company Data' },
+            { key: 'content-planner', icon: <FileTextOutlined />, label: 'Content Planner' },
+            { key: 'websites', icon: <GlobalOutlined />, label: 'Websites' },
+            { key: 'crawling', icon: <GlobalOutlined />, label: 'Crawling' },
           ]}
+          onClick={({ key, domEvent }) => {
+            const pathMap: Record<string, string> = {
+              dashboard: '/customer',
+              info: '/customer/info',
+              users: '/customer/users',
+              tickets: '/customer/tickets',
+              'data-form': '/customer/data-form',
+              'content-planner': '/customer/content-planner',
+              websites: '/customer/websites',
+              crawling: '/customer/crawling',
+            }
+            const path = pathMap[key as string]
+            if (path) {
+              if (domEvent.ctrlKey || domEvent.metaKey || domEvent.button === 1) {
+                window.open(path, '_blank', 'noopener,noreferrer')
+              } else {
+                router.push(path)
+              }
+            }
+          }}
         />
 
         <Dropdown

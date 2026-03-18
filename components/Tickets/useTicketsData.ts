@@ -386,7 +386,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     form.resetFields()
     const baseValues: Record<string, unknown> = {
       status: allStatuses[0]?.slug ?? 'to_do',
-      visibility: 'private',
+      visibility: 'public',
     }
     if (isCustomer && userCompanyId) {
       baseValues.company_id = userCompanyId
@@ -452,7 +452,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       const effectiveValues = { ...values }
       if (isCustomer && !editingTicket) {
         effectiveValues.status = allStatuses[0]?.slug ?? 'to_do'
-        effectiveValues.visibility = 'private'
+        effectiveValues.visibility = 'public'
         effectiveValues.company_id = userCompanyId ?? null
       }
 

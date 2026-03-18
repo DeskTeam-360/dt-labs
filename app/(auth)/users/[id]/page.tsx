@@ -46,9 +46,7 @@ export default async function UserDetailPage({
     bio: u.bio,
     timezone: u.timezone,
     locale: u.locale,
-    permissions: u.permissions,
     is_email_verified: u.isEmailVerified,
-    metadata: u.metadata,
   }
 
   return <UserDetailContent user={session.user} userData={userData} />

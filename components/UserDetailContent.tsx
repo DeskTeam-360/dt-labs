@@ -1,7 +1,7 @@
 'use client'
 
 import { Layout, Card, Descriptions, Avatar, Tag, Typography, Button, Space, Row, Col, Divider, Form, Input, Select, Switch, Modal, message, Upload, Tabs, Table, DatePicker, Radio, Statistic } from 'antd'
-import { ArrowLeftOutlined, UserOutlined, MailOutlined, PhoneOutlined, BankOutlined, IdcardOutlined, GlobalOutlined, TranslationOutlined, CalendarOutlined, ClockCircleOutlined, EditOutlined, SaveOutlined, CloseOutlined, UploadOutlined, SafetyOutlined, DatabaseOutlined, HistoryOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, UserOutlined, MailOutlined, PhoneOutlined, BankOutlined, IdcardOutlined, GlobalOutlined, TranslationOutlined, CalendarOutlined, ClockCircleOutlined, EditOutlined, SaveOutlined, CloseOutlined, UploadOutlined, HistoryOutlined, LockOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import { useState, useEffect, useCallback } from 'react'
@@ -30,15 +30,18 @@ interface UserDetailContentProps {
 }
 
 export default function UserDetailContent({ user: currentUser, userData: initialUserData }: UserDetailContentProps) {
-  const isCustomer = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'customer'
+  const isViewerCustomer = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'customer'
+  const isAdmin = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'admin'
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [userData, setUserData] = useState(initialUserData)
+  const isCustomer = ((userData?.role ?? '').toLowerCase() === 'customer')
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(userData.avatar_url)
   const [form] = Form.useForm()
+  const selectedRole = Form.useWatch('role', form)
   const [timeTrackerData, setTimeTrackerData] = useState<any[]>([])
   const [allTimeTrackerData, setAllTimeTrackerData] = useState<any[]>([])
   const [timeTrackerLoading, setTimeTrackerLoading] = useState(false)
@@ -50,6 +53,10 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     thisMonth: 0,
   })
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
+  const [resetPwdModalOpen, setResetPwdModalOpen] = useState(false)
+  const [resetPwdLoading, setResetPwdLoading] = useState(false)
+  const [resetPwdForm] = Form.useForm()
+  const [activeTabKey, setActiveTabKey] = useState('general')
 
   useEffect(() => {
     setUserData(initialUserData)
@@ -173,6 +180,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     const colorMap: Record<string, string> = {
       admin: 'red',
       manager: 'blue',
+      staff: 'green',
       user: 'green',
       customer: 'purple',
       guest: 'default',
@@ -204,13 +212,12 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       timezone: userData.timezone || 'UTC',
       locale: userData.locale || 'en',
       is_email_verified: userData.is_email_verified || false,
-      permissions: userData.permissions ? JSON.stringify(userData.permissions, null, 2) : '',
-      metadata: userData.metadata ? JSON.stringify(userData.metadata, null, 2) : '',
     })
   }
 
   const handleCancel = () => {
     setIsEditing(false)
+    setActiveTabKey('general')
     form.resetFields()
     setAvatarUrl(userData.avatar_url)
   }
@@ -237,48 +244,24 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const handleSubmit = async (values: any) => {
     setLoading(true)
     try {
-      // Parse JSON fields (only when not customer)
-      let permissions = null
-      let metadata = null
-      
-      if (!isCustomer && values.permissions) {
-        try {
-          permissions = JSON.parse(values.permissions)
-        } catch (e) {
-          message.error('Invalid JSON format for permissions')
-          setLoading(false)
-          return
-        }
-      }
-      
-      if (!isCustomer && values.metadata) {
-        try {
-          metadata = JSON.parse(values.metadata)
-        } catch (e) {
-          message.error('Invalid JSON format for metadata')
-          setLoading(false)
-          return
-        }
-      }
-
       const updateData: any = {
         full_name: values.full_name,
         status: values.status,
         avatar_url: avatarUrl,
         phone: values.phone || null,
-        department: values.department || null,
-        position: values.position || null,
-        bio: values.bio || null,
         timezone: values.timezone || 'UTC',
         locale: values.locale || 'en',
         is_email_verified: values.is_email_verified || false,
         updated_at: new Date().toISOString(),
       }
-      if (!isCustomer) {
+      if (!isViewerCustomer) {
         updateData.role = values.role
-        updateData.company_id = values.company_id || null
-        updateData.permissions = permissions
-        updateData.metadata = metadata
+        updateData.company_id = selectedRole === 'customer' ? (values.company_id || null) : null
+        if (selectedRole !== 'customer') {
+          updateData.department = values.department || null
+          updateData.position = values.position || null
+          updateData.bio = values.bio || null
+        }
       }
 
       await apiFetch(`/api/users/${userData.id}`, {
@@ -287,17 +270,36 @@ export default function UserDetailContent({ user: currentUser, userData: initial
         body: JSON.stringify(updateData),
       })
 
-      setUserData((prev: any) => ({
-        ...prev,
-        ...updateData,
-        avatar_url: avatarUrl ?? prev.avatar_url,
-      }))
       setIsEditing(false)
+      setActiveTabKey('general')
       message.success('User updated successfully')
+      router.refresh()
     } catch (error: any) {
       message.error(error.message || 'Failed to update user')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResetPassword = async (values: { newPassword: string; confirmPassword: string }) => {
+    if (values.newPassword !== values.confirmPassword) {
+      message.error('Passwords do not match!')
+      return
+    }
+    setResetPwdLoading(true)
+    try {
+      await apiFetch(`/api/users/${userData.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: values.newPassword }),
+      })
+      message.success('Password changed successfully')
+      setResetPwdModalOpen(false)
+      resetPwdForm.resetFields()
+    } catch (error: any) {
+      message.error(error.message || 'Failed to change password')
+    } finally {
+      setResetPwdLoading(false)
     }
   }
 
@@ -316,13 +318,26 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                 Back to Users
               </Button>
               {!isEditing ? (
-                <Button
-                  type="primary"
-                  icon={<EditOutlined />}
-                  onClick={handleEdit}
-                >
-                  Edit User
-                </Button>
+                <Space>
+                  <Button
+                    type="primary"
+                    icon={<EditOutlined />}
+                    onClick={handleEdit}
+                  >
+                    Edit User
+                  </Button>
+                  {isAdmin && (
+                    <Button
+                      icon={<LockOutlined />}
+                      onClick={() => {
+                        resetPwdForm.resetFields()
+                        setResetPwdModalOpen(true)
+                      }}
+                    >
+                      Reset Password
+                    </Button>
+                  )}
+                </Space>
               ) : (
                 <Space>
                   <Button
@@ -344,6 +359,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
               )}
             </Space>
 
+            <Form form={form} layout="vertical" onFinish={handleSubmit}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
               <div style={{ position: 'relative', display: 'inline-block' }}>
                 <Avatar
@@ -352,6 +368,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                   src={avatarUrl || userData.avatar_url}
                   style={{ marginBottom: 16 }}
                 />
+                <br/> 
                 {isEditing && (
                   <Upload
                     beforeUpload={(file) => {
@@ -371,18 +388,20 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                     showUploadList={false}
                     accept="image/*"
                   >
+                    
                     <Button
                       type="primary"
                       icon={<UploadOutlined />}
                       loading={uploading}
                       disabled={uploading}
-                      style={{ position: 'absolute', bottom: 0, right: 0 }}
+                   
                     >
                       {uploading ? 'Uploading...' : 'Upload'}
                     </Button>
                   </Upload>
                 )}
               </div>
+              <br/><br/>  
               <div>
                 {isEditing ? (
                   <Form.Item
@@ -405,8 +424,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           <Select style={{ width: 120 }}>
                             <Option value="admin">Admin</Option>
                             <Option value="manager">Manager</Option>
-                            <Option value="user">User</Option>
-                            <Option value="guest">Guest</Option>
+                            <Option value="staff">Staff</Option>
+                            {/* <Option value="customer">Customer</Option> */}
                           </Select>
                         </Form.Item>
                       )}
@@ -437,9 +456,11 @@ export default function UserDetailContent({ user: currentUser, userData: initial
 
             <Divider />
 
-            <Tabs 
-              defaultActiveKey="general" 
+            <Tabs
+              activeKey={activeTabKey}
+              onChange={setActiveTabKey}
               size="large"
+              renderTabBar={isCustomer ? () => <div style={{ display: 'none' }} /> : undefined}
               items={[
                 {
                   key: 'general',
@@ -450,7 +471,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                     </span>
                   ),
                   children: (
-                    <Form form={form} layout="vertical" onFinish={handleSubmit}>
+                    <>
               <Row gutter={[24, 24]}>
                 <Col xs={24} lg={12}>
                   <Card title="Basic Information" size="small">
@@ -507,12 +528,32 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                   <Card title="Work Information" size="small">
                     {isEditing ? (
                       <Space orientation="vertical" style={{ width: '100%' }} size="middle">
-                        <Form.Item name="department" label="Department">
-                          <Input prefix={<BankOutlined />} placeholder="Department" />
-                        </Form.Item>
-                        <Form.Item name="position" label="Position">
-                          <Input prefix={<IdcardOutlined />} placeholder="Position/Job Title" />
-                        </Form.Item>
+                        {!isCustomer && selectedRole !== 'customer' && (
+                          <>
+                            <Form.Item name="department" label="Department">
+                              <Select placeholder="Select Department" allowClear>
+                                <Option value="Management">Management</Option>
+                                <Option value="Account Manager">Account Manager</Option>
+                                <Option value="Production">Production</Option>
+                              </Select>
+                            </Form.Item>
+                            <Form.Item name="position" label="Position">
+                              <Select placeholder="Select Position" allowClear>
+                                <Option value="Frontend">Frontend</Option>
+                                <Option value="Desinger">Desinger</Option>
+                                <Option value="Backend (Mjolnir)">Backend (Mjolnir)</Option>
+                                <Option value="Account Specialist">Account Specialist</Option>
+                                <Option value="HR">HR</Option>
+                                <Option value="CEO">CEO</Option>
+                                <Option value="Production Director">Production Director</Option>
+                                <Option value="Project Director">Project Director</Option>
+                                <Option value="Project Manager">Project Manager</Option>
+                                <Option value="Video Specialist">Video Specialist</Option>
+                                <Option value="Intake Person">Intake Person</Option>
+                              </Select>
+                            </Form.Item>
+                          </>
+                        )}
                         <Form.Item name="timezone" label="Timezone">
                           <Select prefix={<GlobalOutlined />} placeholder="Select Timezone" showSearch>
                             <Option value="UTC">UTC</Option>
@@ -542,18 +583,22 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                       </Space>
                     ) : (
                       <Descriptions column={1} bordered>
-                        <Descriptions.Item label="Department">
-                          <Space>
-                            <BankOutlined />
-                            <Text>{userData.department || 'N/A'}</Text>
-                          </Space>
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Position">
-                          <Space>
-                            <IdcardOutlined />
-                            <Text>{userData.position || 'N/A'}</Text>
-                          </Space>
-                        </Descriptions.Item>
+                        {!isCustomer && userData.role !== 'customer' && (
+                          <>
+                            <Descriptions.Item label="Department">
+                              <Space>
+                                <BankOutlined />
+                                <Text>{userData.department || 'N/A'}</Text>
+                              </Space>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Position">
+                              <Space>
+                                <IdcardOutlined />
+                                <Text>{userData.position || 'N/A'}</Text>
+                              </Space>
+                            </Descriptions.Item>
+                          </>
+                        )}
                         <Descriptions.Item label="Timezone">
                           <Space>
                             <GlobalOutlined />
@@ -572,19 +617,21 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                 </Col>
               </Row>
 
-              <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
-                <Col xs={24}>
-                  <Card title="Bio" size="small">
-                    {isEditing ? (
-                      <Form.Item name="bio">
-                        <TextArea rows={4} placeholder="Bio/Description" />
-                      </Form.Item>
-                    ) : (
-                      <Text>{userData.bio || 'No bio available'}</Text>
-                    )}
-                  </Card>
-                </Col>
-              </Row>
+              {!isCustomer && (isEditing ? selectedRole !== 'customer' : userData.role !== 'customer') && (
+                <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+                  <Col xs={24}>
+                    <Card title="Bio" size="small">
+                      {isEditing ? (
+                        <Form.Item name="bio">
+                          <TextArea rows={4} placeholder="Bio/Description" />
+                        </Form.Item>
+                      ) : (
+                        <Text>{userData.bio || 'No bio available'}</Text>
+                      )}
+                    </Card>
+                  </Col>
+                </Row>
+              )}
 
             <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
               <Col xs={24} lg={12}>
@@ -603,9 +650,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           <Select>
                             <Option value="admin">Admin</Option>
                             <Option value="manager">Manager</Option>
-                            <Option value="user">User</Option>
+                            <Option value="staff">Staff</Option>
                             <Option value="customer">Customer</Option>
-                            <Option value="guest">Guest</Option>
                           </Select>
                         </Form.Item>
                       )}
@@ -621,7 +667,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           <Option value="pending">Pending</Option>
                         </Select>
                       </Form.Item>
-                      {!isCustomer && (
+                      {!isCustomer && selectedRole === 'customer' && (
                         <Form.Item name="company_id" label="Company">
                           <Select placeholder="Select Company (optional)" allowClear style={{ width: '100%' }}>
                             {companies.map((c) => (
@@ -731,68 +777,10 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                 </Card>
               </Col>
             </Row>
-
-            {!isCustomer && (
-            <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
-              <Col xs={24} lg={12}>
-                <Card title={<><SafetyOutlined /> Permissions</>} size="small">
-                  {isEditing ? (
-                    <Form.Item
-                      name="permissions"
-                      tooltip="Enter permissions as JSON object, e.g. {'read': true, 'write': false}"
-                    >
-                      <TextArea rows={6} placeholder='{"read": true, "write": false}' />
-                    </Form.Item>
-                  ) : (
-                    <Text>
-                      <pre style={{ 
-                        background: '#f5f5f5', 
-                        padding: 12, 
-                        borderRadius: 4,
-                        overflow: 'auto',
-                        maxHeight: 200
-                      }}>
-                        {userData.permissions 
-                          ? JSON.stringify(userData.permissions, null, 2)
-                          : 'No permissions set'}
-                      </pre>
-                    </Text>
-                  )}
-                </Card>
-              </Col>
-
-              <Col xs={24} lg={12}>
-                <Card title={<><DatabaseOutlined /> Metadata</>} size="small">
-                  {isEditing ? (
-                    <Form.Item
-                      name="metadata"
-                      tooltip="Enter additional metadata as JSON object"
-                    >
-                      <TextArea rows={6} placeholder='{"key": "value"}' />
-                    </Form.Item>
-                  ) : (
-                    <Text>
-                      <pre style={{ 
-                        background: '#f5f5f5', 
-                        padding: 12, 
-                        borderRadius: 4,
-                        overflow: 'auto',
-                        maxHeight: 200
-                      }}>
-                        {userData.metadata 
-                          ? JSON.stringify(userData.metadata, null, 2)
-                          : 'No metadata set'}
-                      </pre>
-                    </Text>
-                  )}
-                </Card>
-              </Col>
-            </Row>
-            )}
-            </Form>
+                    </>
                   ),
                 },
-                ...(isCustomer ? [] : [{
+                {
                   key: 'time-tracker',
                   label: (
                     <span>
@@ -987,10 +975,69 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                     </Card>
                     </div>
                   ),
-                }]),
+                },
               ]}
             />
+            </Form>
           </Card>
+
+          <Modal
+            title="Reset Password"
+            open={resetPwdModalOpen}
+            onCancel={() => {
+              setResetPwdModalOpen(false)
+              resetPwdForm.resetFields()
+            }}
+            footer={null}
+          >
+            <Form
+              form={resetPwdForm}
+              layout="vertical"
+              onFinish={handleResetPassword}
+            >
+              <Form.Item
+                name="newPassword"
+                label="New Password"
+                rules={[
+                  { required: true, message: 'Please enter new password!' },
+                  { min: 6, message: 'Password must be at least 6 characters!' },
+                ]}
+              >
+                <Input.Password placeholder="New password" />
+              </Form.Item>
+              <Form.Item
+                name="confirmPassword"
+                label="Confirm Password"
+                rules={[
+                  { required: true, message: 'Please confirm password!' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || getFieldValue('newPassword') === value) return Promise.resolve()
+                      return Promise.reject(new Error('Passwords do not match!'))
+                    },
+                  }),
+                ]}
+              >
+                <Input.Password placeholder="Confirm password" />
+              </Form.Item>
+              <Form.Item>
+                <Space>
+                  <Button type="primary" htmlType="submit" loading={resetPwdLoading}>
+                    Change Password
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setResetPwdModalOpen(false)
+                      resetPwdForm.resetFields()
+                    }}
+                    disabled={resetPwdLoading}
+                  >
+                    Cancel
+                  </Button>
+                </Space>
+              </Form.Item>
+            </Form>
+          </Modal>
         </Content>
       </Layout>
     </Layout>

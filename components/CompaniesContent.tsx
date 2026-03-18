@@ -1,6 +1,6 @@
 'use client'
 
-import { Layout, Table, Button, Space, Typography, Card, Tag, Modal, Form, Input, Switch, message, Popconfirm, Tooltip } from 'antd'
+import { Layout, Table, Button, Space, Typography, Card, Tag, Modal, Form, Input, Switch, message, Popconfirm, Tooltip, Select } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -19,6 +19,7 @@ import type { ColumnsType } from 'antd/es/table'
 
 const { Content } = Layout
 const { Title } = Typography
+const { Option } = Select
 
 interface CompaniesContentProps {
   user: { id: string; email?: string | null; name?: string | null }
@@ -77,17 +78,23 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
   const [modalVisible, setModalVisible] = useState(false)
   const [editingCompany, setEditingCompany] = useState<CompanyRecord | null>(null)
   const [searchText, setSearchText] = useState('')
+  const [filterStatus, setFilterStatus] = useState<boolean | undefined>(undefined)
   const [form] = Form.useForm()
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
 
   const filteredCompanies = useMemo(() => {
-    if (!searchText.trim()) return companies
-    const q = searchText.trim().toLowerCase()
-    return companies.filter(
-      (c) =>
-        (c.name || '').toLowerCase().includes(q) ||
-        (c.email || '').toLowerCase().includes(q)
-    )
-  }, [companies, searchText])
+    return companies.filter((c) => {
+      if (searchText.trim()) {
+        const q = searchText.trim().toLowerCase()
+        const matchesSearch =
+          (c.name || '').toLowerCase().includes(q) ||
+          (c.email || '').toLowerCase().includes(q)
+        if (!matchesSearch) return false
+      }
+      if (filterStatus !== undefined && c.is_active !== filterStatus) return false
+      return true
+    })
+  }, [companies, searchText, filterStatus])
 
   const fetchCompanies = async () => {
     setLoading(true)
@@ -242,9 +249,19 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
               type="default"
               icon={<EyeOutlined />}
               onClick={() => router.push(`/companies/${record.id}`)}
-            > Details</Button> 
+            >
+              Details
+            </Button>
           </Tooltip>
-          
+          <Tooltip title="Edit">
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+            >
+              Edit
+            </Button>
+          </Tooltip>
           <Popconfirm
             title="Delete Company"
             description="Are you sure you want to delete this company?"
@@ -257,7 +274,9 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 type="primary"
                 danger
                 icon={<DeleteOutlined />}
-              > Delete</Button>
+              >
+                Delete
+              </Button>
             </Tooltip>
           </Popconfirm>
         </Space>
@@ -274,15 +293,31 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
               <Title level={2} style={{ margin: 0 }}>Companies Management</Title>
-              <Space>
+              <Space wrap>
                 <Input
                   placeholder="Search by name or email..."
                   prefix={<SearchOutlined />}
                   allowClear
                   value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
+                  onChange={(e) => {
+                    setSearchText(e.target.value)
+                    setPagination((p) => ({ ...p, current: 1 }))
+                  }}
                   style={{ width: 260 }}
                 />
+                <Select
+                  placeholder="Filter by Status"
+                  allowClear
+                  value={filterStatus}
+                  onChange={(v) => {
+                    setFilterStatus(v)
+                    setPagination((p) => ({ ...p, current: 1 }))
+                  }}
+                  style={{ width: 150 }}
+                >
+                  <Option value={true}>Active</Option>
+                  <Option value={false}>Inactive</Option>
+                </Select>
                 <Button
                 type="primary"
                 icon={<PlusOutlined />}
@@ -299,9 +334,12 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
               rowKey="id"
               loading={loading}
               pagination={{
-                pageSize: 10,
+                current: pagination.current,
+                pageSize: pagination.pageSize,
                 showSizeChanger: true,
+                pageSizeOptions: ['10', '20', '50', '100'],
                 showTotal: (total) => `Total ${total} companies`,
+                onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
               }}
             />
           </Card>
@@ -331,7 +369,8 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
 
               <Form.Item
                 name="email"
-                label="Email (untuk reply ticket)"
+                label="Email"
+                rules={[{ type: 'email', message: 'Invalid email!', required: true }]}
               >
                 <Input type="email" placeholder="support@company.com" />
               </Form.Item>
