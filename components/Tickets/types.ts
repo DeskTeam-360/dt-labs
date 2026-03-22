@@ -117,13 +117,12 @@ export function getVisibilityColor(visibility: string): string {
   case 'public':
     return 'green'
   case 'private':
-      return 'default'
-    case 'team':
-      return 'blue'
-    case 'specific_users':
-      return 'lime'
-    default:
-      return 'default'
+  case 'specific_users':
+    return 'default'
+  case 'team':
+    return 'blue'
+  default:
+    return 'default'
   }
 }
 

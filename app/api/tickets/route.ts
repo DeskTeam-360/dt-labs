@@ -14,6 +14,7 @@ import {
   tags,
   ticketComments,
   ticketAttachments,
+  teamMembers,
 } from '@/lib/db'
 import { runAutomationRules } from '@/lib/automation-engine'
 import { eq, inArray, desc, and, or, ilike, gte, lte } from 'drizzle-orm'
@@ -88,12 +89,34 @@ export async function GET(request: Request) {
       ? [teamIdParam.trim()]
       : []
 
-  const conditions: ReturnType<typeof eq>[] = []
+  /**
+   * Visibility access: user can only see tickets they have access to.
+   * - public: everyone
+   * - private: only creator
+   * - specific_users: only assignees (filter shows as "Private")
+   * - team: only members of ticket's team (ticket must have team_id)
+   */
+  const visibilityAccess = or(
+    eq(tickets.visibility, 'public'),
+    and(eq(tickets.visibility, 'private'), eq(tickets.createdBy, userId)),
+    sql`(${tickets.visibility} = 'specific_users' AND ${tickets.id} IN (SELECT ticket_id FROM ticket_assignees WHERE user_id = ${userId}))`,
+    sql`(${tickets.visibility} = 'team' AND ${tickets.teamId} IN (SELECT team_id FROM team_members WHERE user_id = ${userId}))`
+  )!
+
+  /** When filter visibility=private (or old specific_users), include both - Private filter shows tickets for creator/assignees */
+  let visibilityFilterValues = visibilityValues
+  if (visibilityValues.includes('private') || visibilityValues.includes('specific_users')) {
+    visibilityFilterValues = visibilityFilterValues.filter((v) => v !== 'private' && v !== 'specific_users')
+    if (!visibilityFilterValues.includes('specific_users')) visibilityFilterValues.push('specific_users')
+    if (!visibilityFilterValues.includes('private')) visibilityFilterValues.push('private')
+  }
+
+  const conditions: ReturnType<typeof eq>[] = [visibilityAccess]
   if (companyIds.length > 0) conditions.push(inArray(tickets.companyId, companyIds))
   if (statusSlugs.length > 0) conditions.push(inArray(tickets.status, statusSlugs))
   if (typeIds.length > 0) conditions.push(inArray(tickets.typeId, typeIds))
   if (teamIds.length > 0) conditions.push(inArray(tickets.teamId, teamIds))
-  if (visibilityValues.length > 0) conditions.push(inArray(tickets.visibility, visibilityValues))
+  if (visibilityFilterValues.length > 0) conditions.push(inArray(tickets.visibility, visibilityFilterValues))
   if (dateFrom) {
     const d = new Date(dateFrom)
     if (!isNaN(d.getTime())) conditions.push(gte(tickets.createdAt, d))
