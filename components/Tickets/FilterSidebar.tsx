@@ -10,10 +10,10 @@ import type { Dayjs } from 'dayjs'
 const { Text } = Typography
 const { Option } = Select
 
+/** Private = tickets only visible to creator or assignees (includes former specific_users). Team = only team members. Public = everyone. */
 const VISIBILITY_OPTIONS = [
   { value: 'private', label: 'Private' },
   { value: 'team', label: 'Team' },
-  { value: 'specific_users', label: 'Specific Users' },
   { value: 'public', label: 'Public' },
 ]
 

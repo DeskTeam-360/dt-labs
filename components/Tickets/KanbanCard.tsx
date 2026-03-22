@@ -62,7 +62,7 @@ export default function KanbanCard({ ticket, onEdit, onDelete }: KanbanCardProps
             )}
             {ticket.visibility !== 'team' && (
               <Tag color={getVisibilityColor(ticket.visibility as string)} style={{ border:'1px solid', fontSize: 11, margin: 0, borderRadius: 9999 }}>
-                {ticket.visibility === 'specific_users' ? 'Specific Users' : ticket.visibility === 'public' ? 'Public' : ticket.visibility.toUpperCase()}
+                {ticket.visibility === 'specific_users' || ticket.visibility === 'private' ? 'Private' : ticket.visibility === 'public' ? 'Public' : ticket.visibility.toUpperCase()}
               </Tag>
             )}
             {ticket.team_name && <Tag color="blue" style={{ border:'1px solid', fontSize: 11, margin: 0, borderRadius: 9999 }}>Team {ticket.team_name}</Tag>}
