@@ -162,7 +162,8 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
             }
             const path = pathMap[key as string]
             if (path) {
-              if (domEvent.ctrlKey || domEvent.metaKey || domEvent.button === 1) {
+              const isMiddleClick = 'button' in domEvent && domEvent.button === 1
+              if (domEvent.ctrlKey || domEvent.metaKey || isMiddleClick) {
                 window.open(path, '_blank', 'noopener,noreferrer')
               } else {
                 router.push(path)
