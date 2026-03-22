@@ -234,7 +234,8 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         }}
         onClick={({ key, domEvent }) => {
           if (key && typeof key === 'string' && key.startsWith('/')) {
-            if (domEvent.ctrlKey || domEvent.metaKey || domEvent.button === 1) {
+            const isMiddleClick = 'button' in domEvent && domEvent.button === 1
+            if (domEvent.ctrlKey || domEvent.metaKey || isMiddleClick) {
               window.open(key, '_blank', 'noopener,noreferrer')
             } else {
               router.push(key)
