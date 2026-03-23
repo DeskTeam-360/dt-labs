@@ -24,6 +24,8 @@ interface Comment {
   author_type?: 'customer' | 'agent'
   user?: { id: string; full_name: string | null; email: string; avatar_url?: string | null }
   comment_attachments?: CommentAttachment[] | null
+  cc_emails?: string[]
+  bcc_emails?: string[]
 }
 
 interface StatusOption {
@@ -228,11 +230,18 @@ export default function TabGeneralCustomer({
                         ) : (
                           <Paragraph style={{ margin: 0 }}>{comment.comment}</Paragraph>
                         )}
-                        {comment.cc_emails?.length ? (
+                       
+                        {(comment.cc_emails?.length || comment.bcc_emails?.length) ? (
                           <Flex gap={12} wrap="wrap" style={{ marginTop: 6, fontSize: 12, color: '#666' }}>
-                            <span>CC: {comment.cc_emails.join(', ')}</span>
+                            {comment.cc_emails?.length ? (
+                              <span>CC: {comment.cc_emails.join(', ')}</span>
+                            ) : null}
+                            {comment.bcc_emails?.length ? (
+                              <span>BCC: {comment.bcc_emails.join(', ')}</span>
+                            ) : null}
                           </Flex>
                         ) : null}
+
                         {comment.comment_attachments?.length ? (
                           <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
                             {comment.comment_attachments.map((att) => (
