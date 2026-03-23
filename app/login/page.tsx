@@ -70,8 +70,9 @@ export default function LoginPage() {
 
       if (result?.ok) {
         message.success('Login successful!')
-        router.push('/dashboard')
-        router.refresh()
+        // Full page navigation agar cookie session ikut terkirim (penting untuk Vercel/serverless)
+        window.location.href = '/dashboard'
+        return
       }
     } catch {
       try {
