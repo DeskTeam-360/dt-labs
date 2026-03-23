@@ -66,12 +66,17 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
         .from(ticketAssignees)
         .leftJoin(users, eq(ticketAssignees.userId, users.id))
         .where(eq(ticketAssignees.ticketId, ticketId)),
-      db
-        .select()
-        .from(ticketChecklist)
-        .where(eq(ticketChecklist.ticketId, ticketId))
-        .orderBy(asc(ticketChecklist.orderIndex))
-        .catch(() => [] as Awaited<ReturnType<typeof db.select>>),
+      (async () => {
+        try {
+          return await db
+            .select()
+            .from(ticketChecklist)
+            .where(eq(ticketChecklist.ticketId, ticketId))
+            .orderBy(asc(ticketChecklist.orderIndex))
+        } catch {
+          return []
+        }
+      })(),
       db
         .select({
           comment: ticketComments,
@@ -81,12 +86,17 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
         .leftJoin(users, eq(ticketComments.userId, users.id))
         .where(eq(ticketComments.ticketId, ticketId))
         .orderBy(asc(ticketComments.createdAt)),
-      db
-        .select()
-        .from(ticketAttributs)
-        .where(eq(ticketAttributs.ticketId, ticketId))
-        .orderBy(asc(ticketAttributs.metaKey))
-        .catch(() => [] as Awaited<ReturnType<typeof db.select>>),
+      (async () => {
+        try {
+          return await db
+            .select()
+            .from(ticketAttributs)
+            .where(eq(ticketAttributs.ticketId, ticketId))
+            .orderBy(asc(ticketAttributs.metaKey))
+        } catch {
+          return []
+        }
+      })(),
       db
         .select()
         .from(screenshots)
@@ -101,7 +111,16 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
         .from(ticketTags)
         .leftJoin(tags, eq(ticketTags.tagId, tags.id))
         .where(eq(ticketTags.ticketId, ticketId)),
-      db.select({ email: ticketCcRecipients.email }).from(ticketCcRecipients).where(eq(ticketCcRecipients.ticketId, ticketId)).catch(() => [] as { email: string }[]),
+      (async () => {
+        try {
+          return await db
+            .select({ email: ticketCcRecipients.email })
+            .from(ticketCcRecipients)
+            .where(eq(ticketCcRecipients.ticketId, ticketId))
+        } catch {
+          return []
+        }
+      })(),
     ])
 
   // Get comment attachments for each comment
