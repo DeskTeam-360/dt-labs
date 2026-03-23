@@ -86,13 +86,26 @@ export default function TicketsRoundRobinView({
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', }}>
             <Flex align="center" gap={4} justify="center" style={{ width: '100%' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div
+              <a
+                href={`/tickets/${ticket.id}`}
                 role="button"
                 tabIndex={0}
-                onClick={() => router.push(`/tickets/${ticket.id}`)}
-                onKeyDown={(e) => e.key === 'Enter' && router.push(`/tickets/${ticket.id}`)}
+                onClick={(e) => {
+                  if (e.button !== 0) return
+                  if (e.ctrlKey || e.metaKey) return
+                  e.preventDefault()
+                  router.push(`/tickets/${ticket.id}`)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (e.ctrlKey || e.metaKey) return
+                    e.preventDefault()
+                    router.push(`/tickets/${ticket.id}`)
+                  }
+                }}
                 style={{
                   display: 'inline-block',
+                  textDecoration: 'none',
                   backgroundColor: bgColor,
                   color: textColor,
                   border: priorityColor,
@@ -109,7 +122,7 @@ export default function TicketsRoundRobinView({
                 }}
               >
                 #{ticket.id}
-              </div>
+              </a>
               <p style={{ fontSize: 9, margin: 0, padding: 0 }}>
               {ticket.short_note}
             </p>

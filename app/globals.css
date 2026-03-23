@@ -56,6 +56,12 @@ body {
 .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected .anticon {
   color: #35165c !important;
 }
+
+ul#rc-menu-uuid-ticket-attributes-popup, .ant-menu.ant-menu-sub.ant-menu-inline {
+  background: #2B1251 !important;
+  margin-left: -5px !important;
+  padding-left: 10px;
+}
 /* cekungan atas */
 .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected::before {
   content: "";
@@ -160,3 +166,23 @@ body {
 .kb-article-content a:hover { text-decoration: underline; }
 .kb-article-content strong { font-weight: 600; }
 .kb-article-content img { max-width: 100%; height: auto; }
+
+/* ConditionBuilder - match ActionBuilder style (white cards, light borders) */
+.condition-builder-action-style {
+  --rqb-background-color: #fff;
+  --rqb-border-color: #eee;
+  --rqb-base-color: #666;
+  --rqb-border-radius: 6px;
+  --rqb-spacing: 12px;
+}
+.condition-builder-action-style .ruleGroup,
+.condition-builder-action-style .rule.rule-hasSubQuery {
+  background: #fff !important;
+  border: 1px solid #eee !important;
+  border-radius: 6px !important;
+  padding: 12px !important;
+}
+.condition-builder-action-style .ruleGroup .ruleGroup {
+  margin-top: 8px;
+}
+

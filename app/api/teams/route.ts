@@ -94,6 +94,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create team' }, { status: 500 })
   }
 
+  // Add creator as team member (manager role)
+  await db.insert(teamMembers).values({
+    teamId: inserted.id,
+    userId: session.user.id,
+    role: 'manager',
+  })
+
   return NextResponse.json({
     id: inserted.id,
     name: inserted.name,
@@ -101,7 +108,14 @@ export async function POST(request: Request) {
     created_by: inserted.createdBy,
     created_at: inserted.createdAt ? new Date(inserted.createdAt).toISOString() : '',
     creator_name: session.user.name || session.user.email || 'Unknown',
-    member_count: 0,
-    members: [],
+    member_count: 1,
+    members: [{
+      user_id: session.user.id,
+      role: 'manager',
+      joined_at: new Date().toISOString(),
+      user_name: session.user.name || session.user.email || 'Unknown',
+      user_email: session.user.email ?? undefined,
+      user_avatar_url: session.user.image ?? null,
+    }],
   })
 }

@@ -1,19 +1,41 @@
 'use client'
 
 import { useState } from 'react'
-import { Button, Flex, message } from 'antd'
-import { CommentOutlined, SendOutlined, PaperClipOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Flex, Select, message } from 'antd'
+import { CommentOutlined, SendOutlined, PaperClipOutlined, DeleteOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons'
 import CommentWysiwyg from './CommentWysiwyg'
 import { uploadTicketFile } from '@/utils/storage'
+
+export type CommentExtra = {
+  taggedUserIds?: string[]
+  ccEmails?: string[]
+  bccEmails?: string[]
+}
+
+interface NonCustomerUser {
+  id: string
+  full_name?: string | null
+  email: string
+}
 
 interface CommentComposerProps {
   ticketId: number
   companyName: string
-  onAddComment: (commentText: string, attachments: { url: string; file_name: string; file_path: string }[]) => Promise<void>
+  onAddComment: (
+    commentText: string,
+    attachments: { url: string; file_name: string; file_path: string }[],
+    extra?: CommentExtra
+  ) => Promise<void>
   loading?: boolean
   commentVisibility?: 'note' | 'reply'
   onCommentVisibilityChange?: (v: 'note' | 'reply') => void
   showNoteOption?: boolean
+  /** Non-customer users for tagging in notes (role !== 'customer') */
+  nonCustomerUsers?: NonCustomerUser[]
+  /** Company customers for CC/BCC preselect (users in ticket's company) */
+  companyCustomers?: Array<{ id: string; full_name: string | null; email: string }>
+  /** Emails ever CC'd on this ticket - pre-fill CC for auto-CC on replies */
+  ticketCcEmails?: string[]
 }
 
 export default function CommentComposer({
@@ -24,17 +46,52 @@ export default function CommentComposer({
   commentVisibility = 'reply',
   onCommentVisibilityChange,
   showNoteOption = false,
+  nonCustomerUsers = [],
+  companyCustomers = [],
+  ticketCcEmails = [],
 }: CommentComposerProps) {
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
   const [uploading, setUploading] = useState(false)
+  const [taggedUserIds, setTaggedUserIds] = useState<string[]>([])
+  const [ccEmails, setCcEmails] = useState<string[]>(() => {
+    const emails = (ticketCcEmails ?? []).map((e) => String(e).trim().toLowerCase()).filter((e) => e && e.includes('@'))
+    return emails
+  })
+  const [bccEmails, setBccEmails] = useState<string[]>([])
+
+  const baseCcOptions = companyCustomers
+    .filter((u) => u.email?.trim())
+    .map((u) => ({
+      value: u.email.trim().toLowerCase(),
+      label: u.full_name ? `${u.full_name} (${u.email})` : u.email,
+    }))
+  const ticketCcSet = new Set((ticketCcEmails ?? []).map((e) => String(e).trim().toLowerCase()).filter((e) => e && e.includes('@')))
+  const ticketCcOnlyOptions = [...ticketCcSet]
+    .filter((e) => !baseCcOptions.some((o) => o.value === e))
+    .map((e) => ({ value: e, label: e }))
+  const ccOptions = [...baseCcOptions, ...ticketCcOnlyOptions]
 
   const handleSubmit = async () => {
     if (!draft.trim() && attachments.length === 0) return
     try {
-      await onAddComment(draft.trim(), attachments)
+      const extra: CommentExtra = {}
+      if (showNoteOption && commentVisibility === 'note' && taggedUserIds.length > 0) {
+        extra.taggedUserIds = taggedUserIds
+      }
+      const isReplyMode = (showNoteOption && commentVisibility === 'reply') || !showNoteOption
+      if (isReplyMode) {
+        const cc = ccEmails.filter((e) => e?.trim() && e.includes('@'))
+        const bcc = bccEmails.filter((e) => e?.trim() && e.includes('@'))
+        if (cc.length > 0) extra.ccEmails = cc
+        if (bcc.length > 0) extra.bccEmails = bcc
+      }
+      await onAddComment(draft.trim(), attachments, Object.keys(extra).length > 0 ? extra : undefined)
       setDraft('')
       setAttachments([])
+      setTaggedUserIds([])
+      setCcEmails([])
+      setBccEmails([])
     } catch {
       // Error already shown by parent
     }
@@ -65,8 +122,12 @@ export default function CommentComposer({
       : 'Reply (visible to client)...'
     : 'Add a comment...'
 
+  const isNote = showNoteOption && commentVisibility === 'note'
+  const bgColor = isNote ? '#fffbe6' : '#e6f7ff'
+  const borderColor = isNote ? '#ffe5b4' : '#91caff'
+
   return (
-    <Flex vertical gap={8} style={{ marginTop: 8 }}>
+    <Flex vertical gap={8} style={{ marginTop: 8, backgroundColor: bgColor, padding: 16, borderRadius: 8, border: `1px solid ${borderColor}` }}>
       {showNoteOption && onCommentVisibilityChange && (
         <Flex gap={8}>
           <Button type="default" icon={<CommentOutlined />} onClick={() => onCommentVisibilityChange('note')}>
@@ -77,6 +138,58 @@ export default function CommentComposer({
           </Button>
         </Flex>
       )}
+      {showNoteOption && commentVisibility === 'note' && nonCustomerUsers.length > 0 && (
+        <Flex align="center" gap={8}>
+          <UserAddOutlined style={{ color: '#666' }} />
+          <Select
+            mode="multiple"
+            placeholder="Tag agents (optional)"
+            value={taggedUserIds}
+            onChange={setTaggedUserIds}
+            options={nonCustomerUsers.map((u) => ({
+              value: u.id,
+              label: u.full_name || u.email || u.id,
+            }))}
+            allowClear
+            style={{ minWidth: 200, flex: 1 }}
+            maxTagCount="responsive"
+          />
+        </Flex>
+      )}
+      {((showNoteOption && commentVisibility === 'reply') || !showNoteOption) && (
+        <Flex vertical gap={6}>
+          <Flex align="center" gap={8}>
+            <span style={{ fontSize: 12, color: '#666', minWidth: 36 }}>CC</span>
+            <Select
+              mode="tags"
+              placeholder="Optional: select from company or type email"
+              value={ccEmails}
+              onChange={(v) => setCcEmails(Array.isArray(v) ? v : [])}
+              options={ccOptions}
+              allowClear
+              style={{ flex: 1, minWidth: 200 }}
+              maxTagCount="responsive"
+              tokenSeparators={[',', ';', ' ']}
+            />
+          </Flex>
+          {showNoteOption && (
+            <Flex align="center" gap={8}>
+              <span style={{ fontSize: 12, color: '#666', minWidth: 36 }}>BCC</span>
+              <Select
+                mode="tags"
+                placeholder="Optional: type email (BCC, no company preselect)"
+                value={bccEmails}
+                onChange={(v) => setBccEmails(Array.isArray(v) ? v : [])}
+                options={[]}
+                allowClear
+                style={{ flex: 1, minWidth: 200 }}
+                maxTagCount="responsive"
+                tokenSeparators={[',', ';', ' ']}
+              />
+            </Flex>
+          )}
+        </Flex>
+      )}
       <CommentWysiwyg
         ticketId={ticketId}
         value={draft}
@@ -84,7 +197,6 @@ export default function CommentComposer({
         placeholder={placeholder}
         height="200px"
       />
-      <br />
       {attachments.length > 0 && (
         <Flex gap={8} wrap="wrap" align="center">
           {attachments.map((a, i) => (
@@ -113,7 +225,7 @@ export default function CommentComposer({
         />
         </div>
         
-        <Flex gap={8}>
+        <Flex gap={8} style={{ marginTop: 16 }}>
         <Button
           icon={<PaperClipOutlined />}
           onClick={() => document.getElementById('comment-files-input')?.click()}

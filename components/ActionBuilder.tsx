@@ -236,11 +236,11 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                 )}
               </div>
               <Button
-                type="text"
-                size="small"
+                type="primary"
+                color='danger'
+
                 icon={<CloseOutlined />}
                 onClick={() => removeAction(type)}
-                style={{ color: '#999', flexShrink: 0 }}
               />
             </div>
           ))

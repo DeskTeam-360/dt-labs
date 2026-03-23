@@ -12,6 +12,7 @@ import {
   Flex,
 } from 'antd'
 import { EditOutlined, DeleteOutlined, UserOutlined, MoreOutlined } from '@ant-design/icons'
+import { useRouter } from 'next/navigation'
 import DateDisplay from '../DateDisplay'
 import type { TicketRecord, StatusColumn } from './types'
 import { darkenColor } from './types'
@@ -33,6 +34,7 @@ export default function TicketsListView({
   onEdit,
   onDelete,
 }: TicketsListViewProps) {
+  const router = useRouter()
   const getPriorityOrder = (record: TicketRecord) => {
     if (!record.priority) return 999
     const idx = allPriorities.findIndex((p) => p.id === record.priority!.id)
@@ -64,8 +66,14 @@ export default function TicketsListView({
           sorter: (a: TicketRecord, b: TicketRecord) => (a.title || '').localeCompare(b.title || ''),
           render: (title: string, record: TicketRecord) => (
             <a
+              href={`/tickets/${record.id}`}
               style={{ cursor: 'pointer', color: '#1677ff', padding: 0, height: 'auto', textDecoration: 'underline' }}
-              onClick={() => window.location.href = `/tickets/${record.id}`}
+              onClick={(e) => {
+                if (e.button !== 0) return
+                if (e.ctrlKey || e.metaKey) return
+                e.preventDefault()
+                router.push(`/tickets/${record.id}`)
+              }}
             >
               {record.has_unread_replies && (
                 <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />

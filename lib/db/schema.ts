@@ -215,6 +215,11 @@ export const ticketComments = pgTable('ticket_comments', {
   comment: text('comment').notNull(),
   visibility: text('visibility').default('note'),
   authorType: text('author_type').default('agent'),
+  /** For notes: user IDs tagged (non-customer users to notify) */
+  taggedUserIds: uuid('tagged_user_ids').array(),
+  /** For replies: CC and BCC emails when sending via email integration */
+  ccEmails: text('cc_emails').array(),
+  bccEmails: text('bcc_emails').array(),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
 
@@ -260,6 +265,17 @@ export const ticketAttachments = pgTable('ticket_attachments', {
   uploadedBy: uuid('uploaded_by'),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
+
+/** All emails ever CC'd on this ticket - used to auto-CC on future replies */
+export const ticketCcRecipients = pgTable(
+  'ticket_cc_recipients',
+  {
+    ticketId: integer('ticket_id').notNull(),
+    email: varchar('email', { length: 255 }).notNull(),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [unique('ticket_cc_recipients_ticket_email').on(t.ticketId, t.email)]
+)
 
 export const commentAttachments = pgTable('comment_attachments', {
   id: uuid('id').primaryKey().defaultRandom(),

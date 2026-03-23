@@ -78,6 +78,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     activeId,
     columnsToShow,
     tickets,
+    userTeamIds,
   } = useTicketsData(currentUser.id, isCustomer)
 
   return (
@@ -193,6 +194,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         form={form}
         teams={teams}
         users={users}
+        currentUserId={currentUser.id}
+        userTeamIds={userTeamIds}
         ticketTypes={ticketTypes}
         ticketPriorities={ticketPriorities}
         companies={companies}

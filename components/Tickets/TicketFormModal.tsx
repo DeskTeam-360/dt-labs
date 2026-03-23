@@ -26,6 +26,8 @@ interface TicketFormModalProps {
   form: FormInstance
   teams: Team[]
   users: UserRecord[]
+  currentUserId?: string
+  userTeamIds?: string[]
   ticketTypes: Array<{ id: number; title: string; color: string }>
   ticketPriorities: Array<{ id: number; title: string; slug: string; color: string }>
   companies: Array<{ id: string; name: string }>
@@ -55,6 +57,8 @@ export default function TicketFormModal({
   form,
   teams,
   users,
+  currentUserId,
+  userTeamIds = [],
   ticketTypes,
   ticketPriorities,
   companies,
@@ -77,6 +81,7 @@ export default function TicketFormModal({
   isCustomer = false,
 }: TicketFormModalProps) {
   const showSimplifiedForm = isCustomer && !editingTicket
+  const selectableTeams = userTeamIds.length > 0 ? teams.filter((t) => userTeamIds.includes(t.id)) : []
 
   return (
     <Modal
@@ -265,6 +270,8 @@ export default function TicketFormModal({
                 onChange={(value) => {
                   if (value !== 'specific_users') {
                     onSelectedAssigneesChange([])
+                  } else if (currentUserId && !selectedAssignees.includes(currentUserId)) {
+                    onSelectedAssigneesChange([currentUserId, ...selectedAssignees])
                   }
                 }}
               >
@@ -289,7 +296,7 @@ export default function TicketFormModal({
                     rules={[{ required: getFieldValue('visibility') === 'team', message: 'Please select team!' }]}
                   >
                     <Select placeholder="Select Team">
-                      {teams.map((team) => (
+                      {selectableTeams.map((team) => (
                         <Option key={team.id} value={team.id}>
                           {team.name}
                         </Option>
@@ -329,11 +336,13 @@ export default function TicketFormModal({
                       onChange={onSelectedAssigneesChange}
                       optionLabelProp="label"
                     >
-                      {users.map((user) => (
-                        <Option key={user.id} value={user.id} label={user.full_name || user.email}>
-                          {user.full_name || user.email}
-                        </Option>
-                      ))}
+                      {users
+                        .filter((u) => (u.role ?? '').toLowerCase() !== 'customer')
+                        .map((user) => (
+                          <Option key={user.id} value={user.id} label={user.full_name || user.email}>
+                            {user.full_name || user.email}
+                          </Option>
+                        ))}
                     </Select>
                   </Form.Item>
                 ) : null

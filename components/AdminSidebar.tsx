@@ -20,8 +20,16 @@ import {
     ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
-import { signOut } from 'next-auth/react'
 import { useState, useEffect } from 'react'
+import { signOutAction } from '@/app/actions/auth'
+import {
+  canAccessCompanies,
+  canAccessTickets,
+  canAccessTeams,
+  canAccessEmailIntegration,
+  canAccessKnowledgeBase,
+  canAccessUsers,
+} from '@/lib/auth-utils'
 
 const { Sider } = Layout
 const { Text } = Typography
@@ -44,7 +52,8 @@ interface AdminSidebarProps {
 }
 
 export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSidebarProps) {
-  const isCustomer = (user.role ?? '').toLowerCase() === 'customer'
+  const role = (user.role ?? '').toLowerCase()
+  const isCustomer = role === 'customer'
   const router = useRouter()
   const pathname = usePathname()
   const [openKeys, setOpenKeys] = useState<string[]>([])
@@ -62,70 +71,85 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     }
   }, [pathname])
 
+  const linkLabel = (path: string, text: string) => (
+    <a
+      href={path}
+      title={text}
+      className="admin-sidebar-menu-link"
+      onClick={(e) => {
+        e.stopPropagation()
+        if (e.button !== 0) return
+        if (e.ctrlKey || e.metaKey) return
+        e.preventDefault()
+        router.push(path)
+      }}
+    >
+      {text}
+    </a>
+  )
+
   const menuItems = [
     {
       key: '/dashboard',
       icon: <DashboardOutlined />,
-      label: 'Dashboard',
+      label: linkLabel('/dashboard', 'Dashboard'),
     },
     {
       key: '/users',
       icon: <TeamOutlined />,
-      label: 'Users',
+      label: linkLabel('/users', 'Users'),
     },
     {
       key: '/companies',
       icon: <TeamOutlined />,
-      label: 'Companies',
+      label: linkLabel('/companies', 'Companies'),
     },
     {
       key: '/tickets',
       icon: <CheckSquareOutlined />,
-      label: 'Tickets',
+      label: linkLabel('/tickets', 'Tickets'),
     },
     {
       key: 'ticket-attributes',
       icon: <SettingOutlined />,
       label: 'Ticket Attributes',
+      popupClassName: 'admin-sidebar-ticket-attributes-popup',
       children: [
-        {
-          key: '/ticket-statuses',
-          icon: <SettingOutlined />,
-          label: 'Ticket Statuses',
-        },
-        {
-          key: '/ticket-types',
-          icon: <AppstoreOutlined />,
-          label: 'Ticket Types',
-        },
-        {
-          key: '/tags',
-          icon: <TagOutlined />,
-          label: 'Tags',
-        },
-        {
-          key: '/automation-rules',
-          icon: <ThunderboltOutlined />,
-          label: 'Automation Rules',
-        },
+        { key: '/ticket-statuses', icon: <SettingOutlined />, label: linkLabel('/ticket-statuses', 'Ticket Statuses') },
+        { key: '/ticket-types', icon: <AppstoreOutlined />, label: linkLabel('/ticket-types', 'Ticket Types') },
+        { key: '/tags', icon: <TagOutlined />, label: linkLabel('/tags', 'Tags') },
+        { key: '/automation-rules', icon: <ThunderboltOutlined />, label: linkLabel('/automation-rules', 'Automation Rules') },
       ],
     },
     {
       key: '/teams',
       icon: <TeamOutlined />,
-      label: 'Teams',
+      label: linkLabel('/teams', 'Teams'),
     },
     {
       key: '/email-integration',
       icon: <MailOutlined />,
-      label: 'Email Integration',
+      label: linkLabel('/email-integration', 'Email Integration'),
     },
     {
       key: '/knowledge-base',
       icon: <InfoCircleOutlined />,
-      label: 'Knowledge Base',
+      label: linkLabel('/knowledge-base', 'Knowledge Base'),
     },
-  ].filter((item) => (isCustomer ? !['ticket-attributes', '/teams', '/email-integration', '/companies', '/knowledge-base'].includes(item.key) : true))
+  ].filter((item) => {
+    if (isCustomer) {
+      return !['ticket-attributes', '/teams', '/email-integration', '/companies', '/knowledge-base', '/users'].includes(item.key)
+    }
+    // Role-based: Users, Company, Teams, Email Integration, Knowledge Base = Admin only; Tickets = Admin & Manager
+    if (item.key === '/users' && !canAccessUsers(role)) return false
+    if (item.key === '/companies' && !canAccessCompanies(role)) return false
+    if (item.key === '/tickets' && !canAccessTickets(role)) return false
+    if (item.key === '/teams' && !canAccessTeams(role)) return false
+    if (item.key === '/email-integration' && !canAccessEmailIntegration(role)) return false
+    if (item.key === '/knowledge-base' && !canAccessKnowledgeBase(role)) return false
+    if (item.key === 'ticket-attributes' && !canAccessTickets(role)) return false
+    return true
+  })
 
   // Determine which menu items should be selected (match parent routes: /tickets/2 -> /tickets)
   const selectedKeys = pathname
@@ -137,7 +161,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     : []
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: '/login' })
+    await signOutAction()
     router.push('/login')
     router.refresh()
   }
@@ -233,7 +257,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           background: 'transparent',
         }}
         onClick={({ key, domEvent }) => {
-          if (key && typeof key === 'string' && key.startsWith('/')) {
+          if (key && typeof key === 'string' && key.startsWith('/') && !(domEvent.target as HTMLElement)?.closest('a')) {
             const isMiddleClick = 'button' in domEvent && domEvent.button === 1
             if (domEvent.ctrlKey || domEvent.metaKey || isMiddleClick) {
               window.open(key, '_blank', 'noopener,noreferrer')
@@ -317,4 +341,3 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     </Sider>
   )
 }
-

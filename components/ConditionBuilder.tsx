@@ -1,10 +1,21 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { Button } from 'antd'
+import { PlusOutlined } from '@ant-design/icons'
 import { QueryBuilder, type Field, type RuleGroupType } from 'react-querybuilder'
 import { QueryBuilderAntD } from '@react-querybuilder/antd'
 import 'react-querybuilder/dist/query-builder.css'
 import { rqbToOurFormat, ourFormatToRQB, defaultRQBQuery, type OurConditionGroup } from '@/lib/condition-builder-utils'
+import type { ActionProps } from 'react-querybuilder'
+
+function AddRuleButton({ handleOnClick, label }: ActionProps) {
+  return (
+    <Button type="dashed" icon={<PlusOutlined />} block onClick={(e) => handleOnClick(e)}>
+      {label ?? 'Add Rule'}
+    </Button>
+  )
+}
 
 /** Fields available for ticket automation conditions */
 export const CONDITION_FIELDS: Field[] = [
@@ -74,6 +85,7 @@ export default function ConditionBuilder({ value, onChange }: ConditionBuilderPr
 
   return (
     <div
+      className="condition-builder-action-style"
       style={{
         padding: 16,
         background: '#fafafa',
@@ -88,7 +100,11 @@ export default function ConditionBuilder({ value, onChange }: ConditionBuilderPr
           onQueryChange={handleChange}
           addRuleToNewGroups
           showCombinatorsBetweenRules
-          controlElements={{ addGroupAction: () => null }}
+          translations={{ addRule: { label: 'Add Rule' } }}
+          controlElements={{
+            addGroupAction: () => null,
+            addRuleAction: AddRuleButton,
+          }}
         />
       </QueryBuilderAntD>
     </div>

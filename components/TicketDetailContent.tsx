@@ -70,6 +70,8 @@ interface TicketDetailContentProps {
     attributes: any[]
     screenshots?: Screenshot[]
     tags?: Array<{ id: string; name: string; slug: string; color?: string }>
+    /** Emails ever CC'd on this ticket - used to pre-fill CC on replies */
+    ticketCcEmails?: string[]
     /** 'customer' = navbar layout, back to /customer; 'admin' = sidebar layout (default) */
     variant?: 'admin' | 'customer'
 }
@@ -121,6 +123,7 @@ export default function TicketDetailContent({
     attributes: initialAttributes,
     screenshots: initialScreenshots = [],
     tags: initialTags = [],
+    ticketCcEmails: initialTicketCcEmails = [],
     variant = 'admin',
 }: TicketDetailContentProps) {
     const router = useRouter()
@@ -143,6 +146,7 @@ export default function TicketDetailContent({
     const [editModalVisible, setEditModalVisible] = useState(false)
     const [teams, setTeams] = useState<any[]>([])
     const [users, setUsers] = useState<any[]>([])
+    const [companyCustomers, setCompanyCustomers] = useState<Array<{ id: string; full_name: string | null; email: string }>>([])
     const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
     const [ticketTypes, setTicketTypes] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
     const [ticketPriorities, setTicketPriorities] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
@@ -301,10 +305,26 @@ export default function TicketDetailContent({
                 setActiveTimeTracker(data || null)
             } catch { setActiveTimeTracker(null) }
         }
+        const fetchCompanyUsers = async () => {
+            const cid = ticketData?.company_id
+            if (!cid) {
+                setCompanyCustomers([])
+                return
+            }
+            try {
+                const data = await apiFetch<{ users: Array<{ id: string; full_name: string | null; email: string }> }>(
+                    `/api/companies/${cid}/users`
+                )
+                setCompanyCustomers(data?.users || [])
+            } catch {
+                setCompanyCustomers([])
+            }
+        }
         fetchLookup()
         fetchTimeTrackerSessions()
         checkActiveTimeTracker()
-    }, [ticketData?.id])
+        fetchCompanyUsers()
+    }, [ticketData?.id, ticketData?.company_id])
 
     // Check for active time tracker and update current time
     useEffect(() => {
@@ -448,7 +468,11 @@ export default function TicketDetailContent({
         }
     }
 
-    const handleAddComment = async (commentText: string, attachments: { url: string; file_name: string; file_path: string }[]) => {
+    const handleAddComment = async (
+        commentText: string,
+        attachments: { url: string; file_name: string; file_path: string }[],
+        extra?: { taggedUserIds?: string[]; ccEmails?: string[]; bccEmails?: string[] }
+    ) => {
         if (!commentText.trim() && attachments.length === 0) {
             message.warning('Please enter a comment or attach files')
             return
@@ -457,15 +481,19 @@ export default function TicketDetailContent({
         try {
             const visibility = variant === 'customer' ? 'reply' : commentVisibility
             const author_type = variant === 'customer' ? 'customer' : 'agent'
+            const payload: Record<string, unknown> = {
+                comment: (commentText || '').trim(),
+                visibility,
+                author_type,
+                attachments: attachments.map((a) => ({ file_url: a.url, file_name: a.file_name, file_path: a.file_path })),
+            }
+            if (extra?.taggedUserIds?.length) payload.tagged_user_ids = extra.taggedUserIds
+            if (extra?.ccEmails?.length) payload.cc_emails = extra.ccEmails
+            if (extra?.bccEmails?.length) payload.bcc_emails = extra.bccEmails
             const data = await apiFetch<any>(`/api/tickets/${ticketData.id}/comments`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    comment: (commentText || '').trim(),
-                    visibility,
-                    author_type,
-                    attachments: attachments.map((a) => ({ file_url: a.url, file_name: a.file_name, file_path: a.file_path })),
-                }),
+                body: JSON.stringify(payload),
             })
             setComments((prev) => [...prev, { ...data, comment_attachments: data.comment_attachments || [] }])
             message.success('Comment added')
@@ -480,6 +508,8 @@ export default function TicketDetailContent({
                             commentBody: commentText.trim(),
                             ticketTitle: ticketData.title,
                             companyEmail: ticketData.company.email.trim(),
+                            ccEmails: extra?.ccEmails ?? [],
+                            bccEmails: extra?.bccEmails ?? [],
                         }),
                     })
                     if (!res.ok) {
@@ -792,6 +822,7 @@ export default function TicketDetailContent({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tag_ids: tagIds }),
             })
+            setSelectedTagIds(tagIds)
             message.success('Tags updated')
             router.refresh()
         } catch (err: unknown) {
@@ -973,6 +1004,8 @@ export default function TicketDetailContent({
                                 canDeleteComment={canDeleteComment}
                                 onAddComment={handleAddComment}
                                 addCommentLoading={loading}
+                                companyCustomers={companyCustomers}
+                                ticketCcEmails={initialTicketCcEmails}
                             />
                         ) : (
                         <Tabs
@@ -1052,9 +1085,12 @@ export default function TicketDetailContent({
                                             canDeleteComment={canDeleteComment}
                                             onAddComment={handleAddComment}
                                             addCommentLoading={loading}
+                                            ticketCcEmails={initialTicketCcEmails}
                                             commentVisibility={commentVisibility}
                                             onCommentVisibilityChange={setCommentVisibility}
                                             showNoteOption
+                                            nonCustomerUsers={users.filter((u: any) => (u?.role ?? '')?.toLowerCase() !== 'customer')}
+                                            companyCustomers={companyCustomers}
                                             attributes={attributes}
                                             newAttributeKey={newAttributeKey}
                                             newAttributeValue={newAttributeValue}

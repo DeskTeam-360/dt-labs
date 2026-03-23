@@ -29,16 +29,20 @@ export default async function TicketDetailPage({
 
   const role = (session.user as { role?: string }).role
   const isCustomer = role === 'customer'
+  const commentsForView = isCustomer
+    ? data.comments.filter((c: { visibility?: string }) => c.visibility !== 'note')
+    : data.comments
 
   return (
     <TicketDetailContent
       user={session.user}
       ticketData={data.ticketData}
       checklistItems={data.checklistItems}
-      comments={data.comments}
+      comments={commentsForView}
       attributes={data.attributes}
       screenshots={data.screenshots}
       tags={data.tags}
+      ticketCcEmails={data.ticketCcEmails ?? []}
       variant={isCustomer ? 'customer' : 'admin'}
     />
   )

@@ -6,8 +6,10 @@ import {
   emailSkipList,
   tickets,
   ticketComments,
+  ticketCcRecipients,
   companies,
   users,
+  companyUsers,
 } from '@/lib/db'
 import { runAutomationRules } from '@/lib/automation-engine'
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
@@ -35,6 +37,19 @@ function parseEmailFromHeader(from: string): string {
   const match = from.match(/<([^>]+)>/)
   if (match) return match[1].trim().toLowerCase()
   return from.trim().toLowerCase()
+}
+
+/** Parse CC header to array of emails, e.g. "a@x.com, Name <b@y.com>" -> ["a@x.com", "b@y.com"] */
+function parseCcHeader(cc: string): string[] {
+  if (!cc?.trim()) return []
+  return cc
+    .split(',')
+    .map((part) => {
+      const m = part.trim().match(/<([^>]+)>/)
+      if (m) return m[1].trim().toLowerCase()
+      return part.trim().toLowerCase()
+    })
+    .filter((e) => e && e.includes('@'))
 }
 
 /** Extract display name from From header, e.g. "John Doe <a@b.com>" -> "John Doe" */
@@ -274,6 +289,21 @@ export async function POST(request: NextRequest) {
       const from = getHeader('From')
       const to = getHeader('To')
       const subject = getHeader('Subject')
+      let ccHeader = getHeader('Cc') || getHeader('CC')
+      if (!ccHeader?.trim() && msg.payload?.parts?.length) {
+        for (const part of msg.payload.parts) {
+          const partHeaders = (part?.headers || []) as { name: string; value: string }[]
+          const ph = partHeaders.find((h) => h.name.toLowerCase() === 'cc')?.value
+          if (ph?.trim()) {
+            ccHeader = ph
+            break
+          }
+        }
+      }
+      const incomingCcEmails = parseCcHeader(ccHeader || '')
+      if (isDebug && incomingCcEmails.length > 0) {
+        console.log('[Sync] CC parsed:', incomingCcEmails.length, 'emails:', incomingCcEmails.join(', '))
+      }
 
       const senderEmail = parseEmailFromHeader(from)
       if (!senderEmail) {
@@ -384,7 +414,20 @@ export async function POST(request: NextRequest) {
           companyEmail = companyRow?.email?.trim().toLowerCase() ?? null
         }
 
-        if (!companyEmail || (senderEmail !== companyEmail && normalizeForMatch(senderEmail) !== normalizeForMatch(companyEmail))) {
+        const senderMatchesCompany = companyEmail && (senderEmail === companyEmail || normalizeForMatch(senderEmail) === normalizeForMatch(companyEmail))
+
+        let isFromCc = false
+        if (!senderMatchesCompany) {
+          const ccRows = await db
+            .select({ ccEmails: ticketComments.ccEmails })
+            .from(ticketComments)
+            .where(eq(ticketComments.ticketId, ticketId))
+          const allCc = ccRows.flatMap((r) => (Array.isArray(r.ccEmails) ? r.ccEmails : []))
+          const senderNorm = normalizeForMatch(senderEmail)
+          isFromCc = allCc.some((e) => e?.trim() && normalizeForMatch(e.trim()) === senderNorm)
+        }
+
+        if (!senderMatchesCompany && !isFromCc) {
           skippedCompanyMismatch++
           if (isDebug) {
             debugLog.push({ email: senderEmail, subject: subject || '', reason: `SKIP: company_mismatch (ticket company email: ${companyEmail || 'null'})` })
@@ -393,18 +436,113 @@ export async function POST(request: NextRequest) {
           continue
         }
 
+        let commentUserId = userId
+        if (senderMatchesCompany) {
+          const [companyUser] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(ilike(users.email, escapeIlike(senderEmail)))
+            .limit(1)
+          if (companyUser) commentUserId = companyUser.id
+        } else if (isFromCc && ticketRow.companyId) {
+          const [existingCcUser] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(ilike(users.email, escapeIlike(senderEmail)))
+            .limit(1)
+          if (existingCcUser) {
+            commentUserId = existingCcUser.id
+            await db.update(users).set({ companyId: ticketRow.companyId, updatedAt: new Date() }).where(eq(users.id, existingCcUser.id))
+            try {
+              await db
+                .insert(companyUsers)
+                .values({ companyId: ticketRow.companyId, userId: existingCcUser.id })
+                .onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+            } catch {}
+          } else {
+            const displayName = parseNameFromHeader(from) || senderEmail.split('@')[0] || 'User'
+            const [newUser] = await db
+              .insert(users)
+              .values({
+                email: truncateVarchar(senderEmail, 255),
+                fullName: truncateVarchar(displayName, 255),
+                companyId: ticketRow.companyId,
+                role: 'customer',
+                passwordHash: await bcrypt.hash(randomPassword(), 10),
+              })
+              .returning({ id: users.id })
+            if (newUser) {
+              commentUserId = newUser.id
+              try {
+                await db
+                  .insert(companyUsers)
+                  .values({ companyId: ticketRow.companyId, userId: newUser.id })
+                  .onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+              } catch {}
+            }
+          }
+        }
+
         const commentBody = body || (msg.snippet || '').trim() || '(No content)'
         const emailDateIso = getEmailDateIso(msg)
+
+        for (const ccEmail of incomingCcEmails) {
+          if (!ccEmail?.trim() || !ticketRow.companyId) continue
+          try {
+            await db
+              .insert(ticketCcRecipients)
+              .values({ ticketId, email: truncateVarchar(ccEmail.trim(), 255) })
+              .onConflictDoNothing({ target: [ticketCcRecipients.ticketId, ticketCcRecipients.email] })
+          } catch (e) {
+            if (isDebug) console.log('[Sync] ticketCcRecipients insert:', (e as Error)?.message)
+          }
+          const [ccUser] = await db.select({ id: users.id }).from(users).where(ilike(users.email, escapeIlike(ccEmail))).limit(1)
+          if (ccUser) {
+            await db.update(users).set({ companyId: ticketRow.companyId, updatedAt: new Date() }).where(eq(users.id, ccUser.id))
+            try {
+              await db.insert(companyUsers).values({ companyId: ticketRow.companyId, userId: ccUser.id }).onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+            } catch {}
+          } else {
+            try {
+              const [newCcUser] = await db
+                .insert(users)
+                .values({
+                  email: truncateVarchar(ccEmail, 255),
+                  fullName: truncateVarchar(ccEmail.split('@')[0] || 'User', 255),
+                  companyId: ticketRow.companyId,
+                  role: 'customer',
+                  passwordHash: await bcrypt.hash(randomPassword(), 10),
+                })
+                .returning({ id: users.id })
+              if (newCcUser) {
+                await db.insert(companyUsers).values({ companyId: ticketRow.companyId, userId: newCcUser.id }).onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+              }
+            } catch (e) {
+              console.error('[Sync] CC user create failed:', ccEmail, (e as Error)?.message)
+            }
+          }
+        }
 
         try {
           await db.insert(ticketComments).values({
             ticketId,
-            userId,
+            userId: commentUserId,
             comment: commentBody,
             visibility: 'reply',
             authorType: 'customer',
+            ccEmails: incomingCcEmails.length > 0 ? incomingCcEmails.map((e) => truncateVarchar(e.trim(), 255)) : null,
             ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
           })
+          if (isFromCc) {
+            sendAutomationLog({
+              event: 'email_reply_added',
+              ticket_id: ticketId,
+              email: senderEmail,
+              subject: subject || '',
+              message: commentBody?.slice(0, 200) || '',
+              detail: 'cc_recipient',
+            }).catch(() => {})
+          }
         } catch (insertErr) {
           console.error('Failed to insert comment from email:', insertErr)
           continue
@@ -590,16 +728,102 @@ export async function POST(request: NextRequest) {
           const senderMatches = extCompanyEmail && (senderEmail === extCompanyEmail || normalizeForMatch(senderEmail) === normalizeForMatch(extCompanyEmail))
           const isFromCompanyUser = ticketCompanyId && extTicket?.companyId === ticketCompanyId
 
-          if (senderMatches || isFromCompanyUser) {
+          let isFromCcRecipient = false
+          if (extTicket?.companyId && !senderMatches && !isFromCompanyUser) {
+            const ccRows = await db
+              .select({ ccEmails: ticketComments.ccEmails })
+              .from(ticketComments)
+              .where(eq(ticketComments.ticketId, ticketId))
+            const allCc = ccRows.flatMap((r) => (Array.isArray(r.ccEmails) ? r.ccEmails : []))
+            const senderNorm = normalizeForMatch(senderEmail)
+            isFromCcRecipient = allCc.some((e) => e?.trim() && normalizeForMatch(e.trim()) === senderNorm)
+          }
+
+          if (senderMatches || isFromCompanyUser || isFromCcRecipient) {
             const commentBody = body || (msg.snippet || '').trim() || '(No content)'
             const emailDateIso = getEmailDateIso(msg)
-            const commentUserId = creatorUserId ?? userId
+            let commentUserId = creatorUserId ?? userId
+            if (isFromCcRecipient && extTicket?.companyId) {
+              const [ccUser] = await db
+                .select({ id: users.id })
+                .from(users)
+                .where(ilike(users.email, escapeIlike(senderEmail)))
+                .limit(1)
+              if (ccUser) {
+                commentUserId = ccUser.id
+                await db.update(users).set({ companyId: extTicket.companyId, updatedAt: new Date() }).where(eq(users.id, ccUser.id))
+                try {
+                  await db
+                    .insert(companyUsers)
+                    .values({ companyId: extTicket.companyId, userId: ccUser.id })
+                    .onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+                } catch {}
+              } else {
+                const displayName = parseNameFromHeader(from) || senderEmail.split('@')[0] || 'User'
+                const [newCcUser] = await db
+                  .insert(users)
+                  .values({
+                    email: truncateVarchar(senderEmail, 255),
+                    fullName: truncateVarchar(displayName, 255),
+                    companyId: extTicket.companyId,
+                    role: 'customer',
+                    passwordHash: await bcrypt.hash(randomPassword(), 10),
+                  })
+                  .returning({ id: users.id })
+                if (newCcUser) {
+                  commentUserId = newCcUser.id
+                  try {
+                    await db
+                      .insert(companyUsers)
+                      .values({ companyId: extTicket.companyId, userId: newCcUser.id })
+                      .onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+                  } catch {}
+                }
+              }
+            }
+            for (const ccEmail of incomingCcEmails) {
+              if (!ccEmail?.trim() || !extTicket?.companyId) continue
+              try {
+                await db
+                  .insert(ticketCcRecipients)
+                  .values({ ticketId, email: truncateVarchar(ccEmail.trim(), 255) })
+                  .onConflictDoNothing({ target: [ticketCcRecipients.ticketId, ticketCcRecipients.email] })
+              } catch (e) {
+                if (isDebug) console.log('[Sync] ticketCcRecipients insert:', (e as Error)?.message)
+              }
+              const [ccUser] = await db.select({ id: users.id }).from(users).where(ilike(users.email, escapeIlike(ccEmail))).limit(1)
+              if (ccUser) {
+                await db.update(users).set({ companyId: extTicket.companyId, updatedAt: new Date() }).where(eq(users.id, ccUser.id))
+                try {
+                  await db.insert(companyUsers).values({ companyId: extTicket.companyId, userId: ccUser.id }).onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+                } catch {}
+              } else {
+                try {
+                  const [newCcUser] = await db
+                    .insert(users)
+                    .values({
+                      email: truncateVarchar(ccEmail, 255),
+                      fullName: truncateVarchar(ccEmail.split('@')[0] || 'User', 255),
+                      companyId: extTicket.companyId,
+                      role: 'customer',
+                      passwordHash: await bcrypt.hash(randomPassword(), 10),
+                    })
+                    .returning({ id: users.id })
+                  if (newCcUser) {
+                    await db.insert(companyUsers).values({ companyId: extTicket.companyId, userId: newCcUser.id }).onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+                  }
+                } catch (e) {
+                  console.error('[Sync] CC user create failed:', ccEmail, (e as Error)?.message)
+                }
+              }
+            }
             await db.insert(ticketComments).values({
               ticketId,
               userId: commentUserId,
               comment: commentBody,
               visibility: 'reply',
               authorType: 'customer',
+              ccEmails: incomingCcEmails.length > 0 ? incomingCcEmails.map((e) => truncateVarchar(e.trim(), 255)) : null,
               ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
             })
             sendAutomationLog({
@@ -657,6 +881,47 @@ export async function POST(request: NextRequest) {
             threadToTicketThisRun.set(msgThreadId, ticketId)
             await db.update(tickets).set({ gmailThreadId: truncateVarchar(msgThreadId, 255), updatedAt: new Date() }).where(eq(tickets.id, ticketId))
           }
+
+          // Add CC recipients to ticket and create users as customers in company
+          if (ticketCompanyId && incomingCcEmails.length > 0) {
+            for (const ccEmail of incomingCcEmails) {
+              if (!ccEmail?.trim()) continue
+              try {
+                await db
+                  .insert(ticketCcRecipients)
+                  .values({ ticketId, email: truncateVarchar(ccEmail.trim(), 255) })
+                  .onConflictDoNothing({ target: [ticketCcRecipients.ticketId, ticketCcRecipients.email] })
+              } catch (e) {
+                if (isDebug) console.log('[Sync] ticketCcRecipients insert (new ticket):', (e as Error)?.message)
+              }
+              const [ccUser] = await db.select({ id: users.id }).from(users).where(ilike(users.email, escapeIlike(ccEmail))).limit(1)
+              if (ccUser) {
+                await db.update(users).set({ companyId: ticketCompanyId, updatedAt: new Date() }).where(eq(users.id, ccUser.id))
+                try {
+                  await db.insert(companyUsers).values({ companyId: ticketCompanyId, userId: ccUser.id }).onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+                } catch {}
+              } else {
+                try {
+                  const [newCcUser] = await db
+                    .insert(users)
+                    .values({
+                      email: truncateVarchar(ccEmail, 255),
+                      fullName: truncateVarchar(ccEmail.split('@')[0] || 'User', 255),
+                      companyId: ticketCompanyId,
+                      role: 'customer',
+                      passwordHash: await bcrypt.hash(randomPassword(), 10),
+                    })
+                    .returning({ id: users.id })
+                  if (newCcUser) {
+                    await db.insert(companyUsers).values({ companyId: ticketCompanyId, userId: newCcUser.id }).onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+                  }
+                } catch (e) {
+                  console.error('[Sync] CC user create failed (new ticket):', ccEmail, (e as Error)?.message)
+                }
+              }
+            }
+          }
+
           createdCount++
           if (isDebug) {
             debugLog.push({ email: senderEmail, subject: title, reason: `OK: new_ticket #${newTicket.id} company=${ticketCompanyId}` })

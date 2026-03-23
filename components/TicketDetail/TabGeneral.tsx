@@ -61,6 +61,8 @@ interface Comment {
   author_type?: 'customer' | 'agent'
   user?: { id: string; full_name: string | null; email: string; avatar_url?: string | null }
   comment_attachments?: CommentAttachment[] | null
+  cc_emails?: string[]
+  bcc_emails?: string[]
 }
 
 interface Attribute {
@@ -142,11 +144,19 @@ interface TabGeneralProps {
   onCancelEditComment: () => void
   onDeleteComment: (commentId: string) => void
   canDeleteComment: (createdAt: string) => boolean
-  onAddComment: (commentText: string, attachments: { url: string; file_name: string; file_path: string }[]) => Promise<void>
+  onAddComment: (
+    commentText: string,
+    attachments: { url: string; file_name: string; file_path: string }[],
+    extra?: { taggedUserIds?: string[]; ccEmails?: string[]; bccEmails?: string[] }
+  ) => Promise<void>
   addCommentLoading?: boolean
   commentVisibility?: 'note' | 'reply'
   onCommentVisibilityChange?: (v: 'note' | 'reply') => void
   showNoteOption?: boolean
+  nonCustomerUsers?: Array<{ id: string; full_name?: string | null; email: string }>
+  companyCustomers?: Array<{ id: string; full_name: string | null; email: string }>
+  /** Emails ever CC'd on this ticket - pre-fill CC on replies */
+  ticketCcEmails?: string[]
   attributes: Attribute[]
   newAttributeKey: string
   newAttributeValue: string
@@ -227,6 +237,9 @@ export default function TabGeneral({
   commentVisibility = 'reply',
   onCommentVisibilityChange = () => {},
   showNoteOption = false,
+  nonCustomerUsers = [],
+  companyCustomers = [],
+  ticketCcEmails = [],
   attributes,
   newAttributeKey,
   newAttributeValue,
@@ -383,9 +396,19 @@ export default function TabGeneral({
                           ) : (
                             <Paragraph style={{ margin: 0 }}>{comment.comment}</Paragraph>
                           )}
-                          {comment.comment_attachments?.length ? (
-                            <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
-                              {comment.comment_attachments.map((att) => (
+                        {(comment.cc_emails?.length || comment.bcc_emails?.length) ? (
+                          <Flex gap={12} wrap="wrap" style={{ marginTop: 6, fontSize: 12, color: '#666' }}>
+                            {comment.cc_emails?.length ? (
+                              <span>CC: {comment.cc_emails.join(', ')}</span>
+                            ) : null}
+                            {comment.bcc_emails?.length ? (
+                              <span>BCC: {comment.bcc_emails.join(', ')}</span>
+                            ) : null}
+                          </Flex>
+                        ) : null}
+                        {comment.comment_attachments?.length ? (
+                          <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
+                            {comment.comment_attachments.map((att) => (
                                 <a key={att.id || att.file_url} href={att.file_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                   <PaperClipOutlined /> {att.file_name}
                                 </a>
@@ -410,6 +433,9 @@ export default function TabGeneral({
                 commentVisibility={commentVisibility}
                 onCommentVisibilityChange={onCommentVisibilityChange}
                 showNoteOption={showNoteOption ?? false}
+                nonCustomerUsers={nonCustomerUsers}
+                companyCustomers={companyCustomers}
+                ticketCcEmails={ticketCcEmails}
               />
             </Flex>
           {/* </Card> */}
@@ -523,6 +549,13 @@ export default function TabGeneral({
                   {ticketData.company?.name || ticketData.creator?.full_name || ticketData.creator?.email || 'Unknown'}
                 </Text>
               </Space>
+            </Descriptions.Item>
+            <Descriptions.Item label="CC Recipients">
+              {ticketCcEmails?.length ? (
+                <Text style={{ fontSize: 12 }}>{ticketCcEmails.join(', ')}</Text>
+              ) : (
+                <Text type="secondary">—</Text>
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="Due Date">
               {onDueDateChange ? (

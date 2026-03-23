@@ -59,8 +59,15 @@ interface TabGeneralCustomerProps {
   onCancelEditComment: () => void
   onDeleteComment: (commentId: string) => void
   canDeleteComment: (createdAt: string) => boolean
-  onAddComment: (commentText: string, attachments: { url: string; file_name: string; file_path: string }[]) => Promise<void>
+  onAddComment: (
+    commentText: string,
+    attachments: { url: string; file_name: string; file_path: string }[],
+    extra?: { taggedUserIds?: string[]; ccEmails?: string[]; bccEmails?: string[] }
+  ) => Promise<void>
   addCommentLoading?: boolean
+  companyCustomers?: Array<{ id: string; full_name: string | null; email: string }>
+  /** Emails ever CC'd on this ticket - pre-fill CC on replies */
+  ticketCcEmails?: string[]
   totalTimeSeconds: number
   activeTimeTracker: any
   currentTime: number
@@ -89,6 +96,8 @@ export default function TabGeneralCustomer({
   canDeleteComment,
   onAddComment,
   addCommentLoading = false,
+  companyCustomers = [],
+  ticketCcEmails = [],
   totalTimeSeconds,
   activeTimeTracker,
   currentTime,
@@ -219,6 +228,11 @@ export default function TabGeneralCustomer({
                         ) : (
                           <Paragraph style={{ margin: 0 }}>{comment.comment}</Paragraph>
                         )}
+                        {comment.cc_emails?.length ? (
+                          <Flex gap={12} wrap="wrap" style={{ marginTop: 6, fontSize: 12, color: '#666' }}>
+                            <span>CC: {comment.cc_emails.join(', ')}</span>
+                          </Flex>
+                        ) : null}
                         {comment.comment_attachments?.length ? (
                           <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
                             {comment.comment_attachments.map((att) => (
@@ -251,6 +265,8 @@ export default function TabGeneralCustomer({
             loading={addCommentLoading}
             commentVisibility="reply"
             showNoteOption={false}
+            companyCustomers={companyCustomers}
+            ticketCcEmails={ticketCcEmails}
           />
         </Flex>
       </Col>
@@ -313,6 +329,13 @@ export default function TabGeneralCustomer({
                 {ticketData.company?.name || ticketData.creator?.full_name || ticketData.creator?.email || 'Unknown'}
               </Text>
             </Space>
+          </Descriptions.Item>
+          <Descriptions.Item label="CC Recipients">
+            {ticketCcEmails?.length ? (
+              <Text style={{ fontSize: 12 }}>{ticketCcEmails.join(', ')}</Text>
+            ) : (
+              <Text type="secondary">—</Text>
+            )}
           </Descriptions.Item>
           <Descriptions.Item label="Due Date">
             {ticketData.due_date ? (

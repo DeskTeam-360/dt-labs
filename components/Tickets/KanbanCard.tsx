@@ -133,11 +133,15 @@ export default function KanbanCard({ ticket, onEdit, onDelete }: KanbanCardProps
           </Dropdown>
         </Flex>
 
-        {/* Title + subtitle */}
-        <div
-          style={{ cursor: 'pointer' }}
+        {/* Title + subtitle - use <a> for native right-click "Open in new tab" */}
+        <a
+          href={`/tickets/${ticket.id}`}
+          style={{ cursor: 'pointer', display: 'block', color: 'inherit', textDecoration: 'none' }}
           onClick={(e) => {
             e.stopPropagation()
+            if (e.button !== 0) return
+            if (e.ctrlKey || e.metaKey) return
+            e.preventDefault()
             router.push(`/tickets/${ticket.id}`)
           }}
         >
@@ -152,7 +156,7 @@ export default function KanbanCard({ ticket, onEdit, onDelete }: KanbanCardProps
               by {ticket.by_label}
             </Text>
           )}
-        </div>
+        </a>
 
         {/* Bottom: due, updated, comment, avatars */}
         <Flex justify="space-between" align="center" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.06)' }} wrap="wrap" gap={8}>

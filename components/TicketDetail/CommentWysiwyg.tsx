@@ -29,6 +29,7 @@ interface CommentWysiwygProps {
   onChange?: (value: string) => void
   placeholder?: string
   height?: string
+  bgColor?: string
   /** Ticket/todo id for image upload path: ticket/{ticketId}/{unixtime}. Omit for draft path (ticket/draft/...). */
   ticketId?: string | number
 }
@@ -38,6 +39,7 @@ export default function CommentWysiwyg({
   onChange,
   placeholder = 'Add a comment...',
   height = '100px',
+  bgColor = '#fff',
   ticketId,
 }: CommentWysiwygProps) {
   const [mounted, setMounted] = useState(false)
@@ -108,13 +110,23 @@ export default function CommentWysiwyg({
     placeholder,
     modules,
     formats: QUILL_FORMATS,
-    style: { height: height ? parseInt(height.replace('px', '')) : 200 },
+    style: { backgroundColor: bgColor,height: height },
     ref: quillRef,
+    tabIndex: 10
+
   }
   return (
+    <>
+    <style>{`
+      .ql-editor {
+        min-height: ${height ? (parseInt(height.replace('px', '')) - 1) : '99'}px;
+      }
+    `}</style>
+    
     <div className="comment-wysiwyg-wrapper" style={{ marginBottom: 20 }}>
       {/* ref passed for image handler; react-quill-new types omit ref */}
       <ReactQuill {...(quillProps as React.ComponentProps<typeof ReactQuill>)} />
     </div>
+    </>
   )
 }

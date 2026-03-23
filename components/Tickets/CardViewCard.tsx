@@ -31,7 +31,18 @@ export default function CardViewCard({ ticket, allStatusColumns, onEdit, onDelet
   const statusTitle = statusCol?.title ?? ticket.status
   const statusColor = statusCol?.color ?? '#8c8c8c'
 
+  const ticketUrl = `/tickets/${ticket.id}`
   return (
+    <a
+      href={ticketUrl}
+      style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}
+      onClick={(e) => {
+        if (e.button !== 0) return
+        if (e.ctrlKey || e.metaKey) return
+        e.preventDefault()
+        router.push(ticketUrl)
+      }}
+    >
     <Flex
       justify="space-between"
       gap={12}
@@ -45,7 +56,6 @@ export default function CardViewCard({ ticket, allStatusColumns, onEdit, onDelet
         boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
         cursor: 'pointer',
       }}
-      onClick={() => router.push(`/tickets/${ticket.id}`)}
     >
       <Flex vertical justify="flex-start" align="flex-start" gap={0} style={{ flex: 1, minWidth: 0 }}>
         <Text strong style={{ fontSize: 16, fontWeight: 700, color: '#1f2937', lineHeight: 1.4 }}>
@@ -122,5 +132,6 @@ export default function CardViewCard({ ticket, allStatusColumns, onEdit, onDelet
         </Dropdown>
       </Flex>
     </Flex>
+    </a>
   )
 }

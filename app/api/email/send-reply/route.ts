@@ -13,11 +13,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { ticketId, commentBody, ticketTitle, companyEmail } = body as {
+    const { ticketId, commentBody, ticketTitle, companyEmail, ccEmails = [], bccEmails = [] } = body as {
       ticketId: number
       commentBody: string
       ticketTitle?: string
       companyEmail: string
+      ccEmails?: string[]
+      bccEmails?: string[]
     }
 
     if (!ticketId || !commentBody?.trim() || !companyEmail?.trim()) {
@@ -26,6 +28,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const ccList = Array.isArray(ccEmails) ? ccEmails.filter((e) => e?.trim()) : []
+    const bccList = Array.isArray(bccEmails) ? bccEmails.filter((e) => e?.trim()) : []
 
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
     const clientId = process.env.GOOGLE_CLIENT_ID
@@ -141,6 +146,8 @@ export async function POST(request: NextRequest) {
       'MIME-Version: 1.0',
       'Content-Type: text/html; charset=UTF-8',
     ]
+    if (ccList.length > 0) headers.push('Cc: ' + ccList.join(', '))
+    if (bccList.length > 0) headers.push('Bcc: ' + bccList.join(', '))
     if (inReplyTo) {
       headers.push('In-Reply-To: ' + inReplyTo)
       headers.push('References: ' + inReplyTo)

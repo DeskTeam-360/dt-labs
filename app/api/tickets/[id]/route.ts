@@ -108,21 +108,24 @@ export async function PATCH(
     attachments_delete = [],
   } = body
 
-  await db
-    .update(tickets)
-    .set({
-      ...(title !== undefined && { title }),
-      ...(description !== undefined && { description }),
-      ...(short_note !== undefined && { shortNote: short_note ?? null }),
-      ...(status !== undefined && { status }),
-      ...(visibility !== undefined && { visibility }),
-      ...(team_id !== undefined && { teamId: team_id || null }),
-      ...(type_id !== undefined && { typeId: type_id ?? null }),
-      ...(priority_id !== undefined && { priorityId: priority_id ?? null }),
-      ...(company_id !== undefined && { companyId: company_id || null }),
-      ...(due_date !== undefined && { dueDate: due_date ? new Date(due_date) : null }),
-    })
-    .where(eq(tickets.id, ticketId))
+  const ticketUpdates: Record<string, unknown> = {
+    ...(title !== undefined && { title }),
+    ...(description !== undefined && { description }),
+    ...(short_note !== undefined && { shortNote: short_note ?? null }),
+    ...(status !== undefined && { status }),
+    ...(visibility !== undefined && { visibility }),
+    ...(team_id !== undefined && { teamId: team_id || null }),
+    ...(type_id !== undefined && { typeId: type_id ?? null }),
+    ...(priority_id !== undefined && { priorityId: priority_id ?? null }),
+    ...(company_id !== undefined && { companyId: company_id || null }),
+    ...(due_date !== undefined && { dueDate: due_date ? new Date(due_date) : null }),
+  }
+  if (Object.keys(ticketUpdates).length > 0) {
+    await db
+      .update(tickets)
+      .set({ ...ticketUpdates, updatedAt: new Date() })
+      .where(eq(tickets.id, ticketId))
+  }
 
   if (assignees !== undefined) {
     await db.delete(ticketAssignees).where(eq(ticketAssignees.ticketId, ticketId))

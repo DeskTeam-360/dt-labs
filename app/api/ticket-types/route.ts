@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { title, slug, color } = body
+  const { title, slug, color, sort_order } = body
 
   if (!title || !slug) {
     return NextResponse.json({ error: 'title and slug required' }, { status: 400 })
@@ -46,6 +46,7 @@ export async function POST(request: Request) {
       title: String(title).trim(),
       slug: String(slug).trim().toLowerCase().replace(/\s+/g, '_'),
       color: color || '#000000',
+      ...(sort_order !== undefined && { sortOrder: Number(sort_order) ?? 0 }),
     })
     .returning()
 

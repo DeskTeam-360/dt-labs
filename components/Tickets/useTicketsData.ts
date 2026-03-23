@@ -360,6 +360,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   ])
 
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null)
+  const [userTeamIds, setUserTeamIds] = useState<string[]>([])
 
   const fetchLookup = async () => {
     try {
@@ -382,6 +383,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       setCompanies(data.companies || [])
       setAllTags(data.tags || [])
       setUserCompanyId(data.userCompanyId ?? null)
+      setUserTeamIds(data.userTeamIds || [])
 
       const stored = loadFiltersFromStorage()
       const fromUrl = initialRef.current?.fromUrl
@@ -559,7 +561,11 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
   const handleEdit = (record: TicketRecord) => {
     setEditingTicket(record)
-    setSelectedAssignees(record.assignees?.map((a) => a.user_id) || [])
+    let assigneeIds = record.assignees?.map((a) => a.user_id) || []
+    if (record.visibility === 'specific_users' && record.created_by && !assigneeIds.includes(record.created_by)) {
+      assigneeIds = [record.created_by, ...assigneeIds]
+    }
+    setSelectedAssignees(assigneeIds)
     setSelectedTagIds(record.tags?.map((t) => t.id) || [])
     form.setFieldsValue({
       title: record.title,
@@ -837,5 +843,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     handleTicketFilesSelected,
     handleRemoveNewAttachment,
     attachmentUploading,
+    userTeamIds,
   }
 }

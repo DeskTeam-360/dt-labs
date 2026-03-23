@@ -13,6 +13,7 @@ import {
   ticketAssignees,
   ticketChecklist,
   ticketComments,
+  ticketCcRecipients,
   commentAttachments,
   ticketAttributs,
   screenshots,
@@ -54,7 +55,7 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     return null
   }
 
-  const [assigneesRows, checklistRows, commentsRows, attributsRows, screenshotsRows, ticketTagsRows] =
+  const [assigneesRows, checklistRows, commentsRows, attributsRows, screenshotsRows, ticketTagsRows, ccRecipientsRows] =
     await Promise.all([
       db
         .select({
@@ -69,7 +70,8 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
         .select()
         .from(ticketChecklist)
         .where(eq(ticketChecklist.ticketId, ticketId))
-        .orderBy(asc(ticketChecklist.orderIndex)),
+        .orderBy(asc(ticketChecklist.orderIndex))
+        .catch(() => [] as Awaited<ReturnType<typeof db.select>>),
       db
         .select({
           comment: ticketComments,
@@ -83,7 +85,8 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
         .select()
         .from(ticketAttributs)
         .where(eq(ticketAttributs.ticketId, ticketId))
-        .orderBy(asc(ticketAttributs.metaKey)),
+        .orderBy(asc(ticketAttributs.metaKey))
+        .catch(() => [] as Awaited<ReturnType<typeof db.select>>),
       db
         .select()
         .from(screenshots)
@@ -98,6 +101,7 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
         .from(ticketTags)
         .leftJoin(tags, eq(ticketTags.tagId, tags.id))
         .where(eq(ticketTags.ticketId, ticketId)),
+      db.select({ email: ticketCcRecipients.email }).from(ticketCcRecipients).where(eq(ticketCcRecipients.ticketId, ticketId)).catch(() => [] as { email: string }[]),
     ])
 
   // Get comment attachments for each comment
@@ -198,6 +202,9 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     created_at: r.comment.createdAt ? new Date(r.comment.createdAt).toISOString() : '',
     visibility: r.comment.visibility ?? 'reply',
     author_type: r.comment.authorType ?? 'agent',
+    tagged_user_ids: r.comment.taggedUserIds ?? [],
+    cc_emails: r.comment.ccEmails ?? [],
+    bcc_emails: r.comment.bccEmails ?? [],
     user: r.user
       ? { id: r.user.id, full_name: r.user.fullName, email: r.user.email, avatar_url: r.user.avatarUrl }
       : null,
@@ -237,6 +244,8 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
   }))
 
+  const ticketCcEmails = Array.isArray(ccRecipientsRows) ? ccRecipientsRows.map((r) => r.email).filter(Boolean) : []
+
   return {
     ticketData,
     checklistItems,
@@ -244,5 +253,6 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     attributes,
     screenshots: screenshotsList,
     tags: tagsList,
+    ticketCcEmails,
   }
 }

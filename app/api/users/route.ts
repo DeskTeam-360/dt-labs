@@ -5,44 +5,45 @@ import { NextResponse } from 'next/server'
 
 /** GET /api/users - List users with company. When customer: only users in same company */
 export async function GET() {
-  const session = await auth()
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const userId = session.user.id!
-  const role = (session.user as { role?: string }).role?.toLowerCase()
-
-  let companyId: string | null = null
-  if (role === 'customer') {
-    const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
-    companyId = userRow?.companyId ?? null
-    if (!companyId) {
-      const [cu] = await db.select({ companyId: companyUsers.companyId }).from(companyUsers).where(eq(companyUsers.userId, userId)).limit(1)
-      companyId = cu?.companyId ?? null
+  try {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-  }
 
-  if (role === 'customer' && !companyId) {
-    return NextResponse.json([])
-  }
+    const userId = session.user.id!
+    const role = (session.user as { role?: string }).role?.toLowerCase()
 
-  let query = db
-    .select({
-      user: users,
-      company: companies,
-    })
-    .from(users)
-    .leftJoin(companies, eq(users.companyId, companies.id))
-    .orderBy(desc(users.createdAt))
+    let companyId: string | null = null
+    if (role === 'customer') {
+      const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
+      companyId = userRow?.companyId ?? null
+      if (!companyId) {
+        const [cu] = await db.select({ companyId: companyUsers.companyId }).from(companyUsers).where(eq(companyUsers.userId, userId)).limit(1)
+        companyId = cu?.companyId ?? null
+      }
+    }
 
-  if (role === 'customer' && companyId) {
-    query = query.where(eq(users.companyId, companyId)) as typeof query
-  }
+    if (role === 'customer' && !companyId) {
+      return NextResponse.json([])
+    }
 
-  const rows = await query
+    let query = db
+      .select({
+        user: users,
+        company: companies,
+      })
+      .from(users)
+      .leftJoin(companies, eq(users.companyId, companies.id))
+      .orderBy(desc(users.createdAt))
 
-  const result = rows.map((r) => {
+    if (role === 'customer' && companyId) {
+      query = query.where(eq(users.companyId, companyId)) as typeof query
+    }
+
+    const rows = await query
+
+    const result = rows.map((r) => {
     const u = r.user
     return {
       id: u.id,
@@ -66,5 +67,10 @@ export async function GET() {
     }
   })
 
-  return NextResponse.json(result)
+    return NextResponse.json(result)
+  } catch (err: any) {
+    console.error('[API /api/users]', err)
+    const msg = err?.message || String(err)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }

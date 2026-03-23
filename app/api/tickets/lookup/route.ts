@@ -16,17 +16,18 @@ import { NextResponse } from 'next/server'
 
 /** GET /api/tickets/lookup - Lookup data for ticket form */
 export async function GET() {
-  const session = await auth()
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  try {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-  const userId = session.user.id!
-  const role = (session.user as { role?: string }).role?.toLowerCase()
-  const [teamsData, usersData, ticketTypesData, ticketPrioritiesData, companiesData, tagsData, statusesData, userTeamRows, userCompanyRow] =
+    const userId = session.user.id!
+    const role = (session.user as { role?: string }).role?.toLowerCase()
+    const [teamsData, usersData, ticketTypesData, ticketPrioritiesData, companiesData, tagsData, statusesData, userTeamRows, userCompanyRow] =
     await Promise.all([
       db.select({ id: teams.id, name: teams.name }).from(teams).orderBy(asc(teams.name)),
-      db.select({ id: users.id, fullName: users.fullName, email: users.email }).from(users).orderBy(asc(users.fullName)),
+      db.select({ id: users.id, fullName: users.fullName, email: users.email, role: users.role }).from(users).orderBy(asc(users.fullName)),
       db.select({ id: ticketTypes.id, title: ticketTypes.title, slug: ticketTypes.slug, color: ticketTypes.color }).from(ticketTypes).orderBy(asc(ticketTypes.sortOrder)),
       db.select({ id: ticketPriorities.id, title: ticketPriorities.title, slug: ticketPriorities.slug, color: ticketPriorities.color, sortOrder: ticketPriorities.sortOrder }).from(ticketPriorities).orderBy(asc(ticketPriorities.sortOrder)),
       db.select({ id: companies.id, name: companies.name, color: companies.color, email: companies.email }).from(companies).orderBy(asc(companies.name)),
@@ -47,7 +48,7 @@ export async function GET() {
     userCompanyId,
     userTeamIds,
     teams: teamsData,
-    users: usersData.map((u) => ({ id: u.id, full_name: u.fullName, email: u.email })),
+    users: usersData.map((u) => ({ id: u.id, full_name: u.fullName, email: u.email, role: u.role })),
     ticketTypes: ticketTypesData,
     ticketPriorities: ticketPrioritiesData,
     companies: companiesData,
@@ -62,4 +63,9 @@ export async function GET() {
       sort_order: s.sortOrder,
     })),
   })
+  } catch (err: any) {
+    console.error('[API /api/tickets/lookup]', err)
+    const msg = err?.message || String(err)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }

@@ -47,6 +47,7 @@ export interface UserRecord {
   id: string
   full_name: string | null
   email: string
+  role?: string
 }
 
 export interface TicketStatusRecord {

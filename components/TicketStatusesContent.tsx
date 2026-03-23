@@ -220,16 +220,6 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
       render: (v: string) => v || '—',
     },
     {
-      title: 'Slug',
-      dataIndex: 'slug',
-      key: 'slug',
-      render: (slug: string) => (
-        <Typography.Text code copyable>
-          {slug}
-        </Typography.Text>
-      ),
-    },
-    {
       title: 'Color',
       dataIndex: 'color',
       key: 'color',
