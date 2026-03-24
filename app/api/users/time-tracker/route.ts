@@ -38,6 +38,7 @@ export async function GET(request: Request) {
   }
   if (activeOnly) {
     conditions.push(isNull(ticketTimeTracker.stopTime))
+    conditions.push(eq(ticketTimeTracker.trackerType, 'timer'))
   }
 
   const rows = await db
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
     id: r.tracker.id,
     ticket_id: r.tracker.ticketId,
     user_id: r.tracker.userId,
+    tracker_type: r.tracker.trackerType,
     start_time: r.tracker.startTime ? new Date(r.tracker.startTime).toISOString() : null,
     stop_time: r.tracker.stopTime ? new Date(r.tracker.stopTime).toISOString() : null,
     duration_seconds: r.tracker.durationSeconds,
@@ -68,5 +70,5 @@ export async function GET(request: Request) {
       : null,
   }))
 
-  return NextResponse.json(activeOnly ? (result[0] ?? null) : result)
+  return NextResponse.json(result)
 }

@@ -3,6 +3,18 @@ import { redirect } from 'next/navigation'
 import { db, users, companies } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import UserDetailContent from '@/components/UserDetailContent'
+import type { Metadata } from 'next'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const session = await auth()
+  const { id } = await params
+  const own = session?.user?.id != null && String(session.user.id) === String(id)
+  return { title: own ? 'My Profile' : 'User details' }
+}
 
 export default async function UserDetailPage({
   params,

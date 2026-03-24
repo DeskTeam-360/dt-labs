@@ -348,6 +348,16 @@ export default function TicketDetailContent({
         } catch { /* ignore */ }
     }
 
+    const refreshTimeTracking = async () => {
+        await fetchTimeTrackerSessions()
+        try {
+            const data = await apiFetch<any>(`/api/tickets/${ticketData.id}/time-tracker?active=1`)
+            setActiveTimeTracker(data || null)
+        } catch {
+            setActiveTimeTracker(null)
+        }
+    }
+
     const handleStartTimeTracker = async () => {
         setLoading(true)
         try {
@@ -1121,6 +1131,8 @@ export default function TicketDetailContent({
                                             timeTrackerLoading={loading}
                                             onStartTimeTracker={handleStartTimeTracker}
                                             onStopTimeTracker={handleStopTimeTracker}
+                                            currentUserId={currentUser.id}
+                                            onTimeTrackingChanged={refreshTimeTracking}
                                         />
                                     ),
                                 },

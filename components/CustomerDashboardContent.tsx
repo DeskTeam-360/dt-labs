@@ -10,10 +10,12 @@ import {
   EditOutlined,
   DeleteOutlined,
 } from '@ant-design/icons'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import AdminSidebar from './AdminSidebar'
+import DashboardHourlyActivityCard from './DashboardHourlyActivityCard'
+import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 import {
   BarChart,
   Bar,
@@ -101,6 +103,40 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
   const [kbArticles, setKbArticles] = useState<KnowledgeBaseArticle[]>([])
   const [kbCategory, setKbCategory] = useState<string>('')
   const [kbDetailModal, setKbDetailModal] = useState<KnowledgeBaseArticle | null>(null)
+  const [hourlyStopped, setHourlyStopped] = useState<StoppedTimeSession[]>([])
+  const [hourlyActive, setHourlyActive] = useState<Array<{ ticket_id: number; start_time: string }>>([])
+
+  const fetchHourlyTimeData = useCallback(async () => {
+    if (!user?.id) return
+    try {
+      const startOfMonth = dayjs().subtract(30, 'day').startOf('day').toISOString()
+      const end = dayjs().toISOString()
+      const [stoppedRes, activeRes] = await Promise.all([
+        fetch(
+          `/api/users/time-tracker?user_id=${user.id}&filter=custom&start=${encodeURIComponent(startOfMonth)}&end=${encodeURIComponent(end)}&stopped_only=1&limit=500`,
+          { credentials: 'include' }
+        ),
+        fetch(`/api/users/time-tracker?user_id=${user.id}&active_only=1`, { credentials: 'include' }),
+      ])
+      const stopped = stoppedRes.ok ? await stoppedRes.json() : []
+      const act = activeRes.ok ? await activeRes.json() : []
+      setHourlyStopped(Array.isArray(stopped) ? stopped : [])
+      const list = Array.isArray(act) ? act : []
+      setHourlyActive(
+        list.map((t: { ticket_id: number; start_time: string }) => ({
+          ticket_id: t.ticket_id,
+          start_time: t.start_time,
+        }))
+      )
+    } catch {
+      setHourlyStopped([])
+      setHourlyActive([])
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    fetchHourlyTimeData()
+  }, [fetchHourlyTimeData])
 
   const fetchStats = async () => {
     setLoading(true)
@@ -296,6 +332,14 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
 
 
             </Card>
+          </Col>
+
+          <Col xs={24}>
+            <DashboardHourlyActivityCard
+              stoppedSessions={hourlyStopped}
+              activeSessions={hourlyActive}
+              style={{ marginTop: 0 }}
+            />
           </Col>
 
           {/* Time Spent - Donut */}
@@ -603,6 +647,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                                         }
                                         message.success('Ticket deleted')
                                         fetchStats()
+                                        fetchHourlyTimeData()
                                       } catch (err) {
                                         message.error((err as Error).message || 'Failed to delete ticket')
                                       }

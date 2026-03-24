@@ -17,6 +17,8 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 import AdminSidebar from './AdminSidebar'
+import DashboardHourlyActivityCard from './DashboardHourlyActivityCard'
+import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -36,6 +38,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const [collapsed, setCollapsed] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [userData, setUserData] = useState(initialUserData)
+  const isOwnProfile = String(currentUser.id) === String(userData?.id)
   const isCustomer = ((userData?.role ?? '').toLowerCase() === 'customer')
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -57,6 +60,38 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const [resetPwdLoading, setResetPwdLoading] = useState(false)
   const [resetPwdForm] = Form.useForm()
   const [activeTabKey, setActiveTabKey] = useState('general')
+  const [hourlyStopped, setHourlyStopped] = useState<StoppedTimeSession[]>([])
+  const [hourlyActive, setHourlyActive] = useState<Array<{ ticket_id: number; start_time: string }>>([])
+
+  const fetchHourlyActivityData = useCallback(async () => {
+    if (!userData?.id || isCustomer) return
+    try {
+      const startOfMonth = dayjs().subtract(30, 'day').startOf('day').toISOString()
+      const [stopped, act] = await Promise.all([
+        apiFetch<StoppedTimeSession[]>(
+          `/api/users/time-tracker?user_id=${userData.id}&filter=custom&start=${encodeURIComponent(startOfMonth)}&end=${encodeURIComponent(dayjs().toISOString())}&stopped_only=1&limit=500`
+        ),
+        apiFetch<Array<{ ticket_id: number; start_time: string }>>(
+          `/api/users/time-tracker?user_id=${userData.id}&active_only=1`
+        ),
+      ])
+      setHourlyStopped(Array.isArray(stopped) ? stopped : [])
+      const list = Array.isArray(act) ? act : []
+      setHourlyActive(
+        list.map((t) => ({
+          ticket_id: t.ticket_id,
+          start_time: t.start_time,
+        }))
+      )
+    } catch {
+      setHourlyStopped([])
+      setHourlyActive([])
+    }
+  }, [userData?.id, isCustomer])
+
+  useEffect(() => {
+    fetchHourlyActivityData()
+  }, [fetchHourlyActivityData])
 
   useEffect(() => {
     setUserData(initialUserData)
@@ -272,7 +307,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
 
       setIsEditing(false)
       setActiveTabKey('general')
-      message.success('User updated successfully')
+      message.success(isOwnProfile ? 'Profile updated successfully' : 'User updated successfully')
       router.refresh()
     } catch (error: any) {
       message.error(error.message || 'Failed to update user')
@@ -310,21 +345,31 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
         <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
           <Card>
-            <Space style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 20 }}>
+              <Title level={3} style={{ margin: 0 }}>
+                {isOwnProfile ? 'My Profile' : 'User details'}
+              </Title>
+              {isOwnProfile ? (
+                <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
+                  View and update your personal information
+                </Text>
+              ) : null}
+            </div>
+            <Space style={{ marginBottom: 24 }} wrap>
               <Button
                 icon={<ArrowLeftOutlined />}
-                onClick={() => router.push('/users')}
+                onClick={() => router.push(isOwnProfile ? '/dashboard' : '/users')}
               >
-                Back to Users
+                {isOwnProfile ? 'Back to dashboard' : 'Back to Users'}
               </Button>
               {!isEditing ? (
-                <Space>
+                <Space wrap>
                   <Button
                     type="primary"
                     icon={<EditOutlined />}
                     onClick={handleEdit}
                   >
-                    Edit User
+                    {isOwnProfile ? 'Edit profile' : 'Edit User'}
                   </Button>
                   {isAdmin && (
                     <Button
@@ -824,6 +869,14 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         </Col>
                       </Row>
 
+                      {!isCustomer && (
+                        <DashboardHourlyActivityCard
+                          stoppedSessions={hourlyStopped}
+                          activeSessions={hourlyActive}
+                          style={{ marginTop: 0, marginBottom: 24 }}
+                        />
+                      )}
+
                       {/* Filter Section */}
                       <Card style={{ marginBottom: 24 }}>
                         <Space orientation="vertical" style={{ width: '100%' }} size="middle">
@@ -874,6 +927,17 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                                   </div>
                                 )}
                               </div>
+                            ),
+                          },
+                          {
+                            title: 'Type',
+                            dataIndex: 'tracker_type',
+                            key: 'tracker_type',
+                            width: 100,
+                            render: (t: string | undefined) => (
+                              <Tag color={t === 'manual' ? 'default' : 'blue'}>
+                                {t === 'manual' ? 'Manual' : 'Timer'}
+                              </Tag>
                             ),
                           },
                           {

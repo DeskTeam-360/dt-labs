@@ -236,10 +236,16 @@ export const ticketAttributs = pgTable(
   (t) => [unique('ticket_attributs_ticket_id_meta_key_key').on(t.ticketId, t.metaKey)]
 )
 
+/** timer = start/stop clock; manual = user-entered duration (always completed rows) */
+export const ticketTimeTrackerTypes = ['timer', 'manual'] as const
+export type TicketTimeTrackerType = (typeof ticketTimeTrackerTypes)[number]
+
 export const ticketTimeTracker = pgTable('ticket_time_tracker', {
   id: uuid('id').primaryKey().defaultRandom(),
   ticketId: integer('ticket_id').notNull(),
   userId: uuid('user_id').notNull(),
+  /** timer | manual — enables parallel timer sessions across tickets; manual rows are closed entries */
+  trackerType: varchar('tracker_type', { length: 32 }).notNull().default('timer'),
   startTime: ts('start_time').notNull(),
   stopTime: ts('stop_time'),
   durationSeconds: integer('duration_seconds'),

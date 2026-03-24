@@ -15,6 +15,8 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminSidebar from './AdminSidebar'
+import DashboardHourlyActivityCard from './DashboardHourlyActivityCard'
+import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...options, credentials: 'include' })
@@ -34,10 +36,19 @@ import {
   ResponsiveContainer,
   Tooltip,
   Legend,
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
 } from 'recharts'
 
 const { Content } = Layout
 const { Title, Text } = Typography
+
+/** How many rows Recent Activities fetches (API max 100). */
+const RECENT_TRACKERS_LIMIT = 15
 
 interface DashboardContentProps {
   user: { id: string; email?: string | null; name?: string | null }
@@ -60,15 +71,17 @@ function formatTime(seconds: number) {
 
 export default function DashboardContent({ user, stats }: DashboardContentProps) {
   const [collapsed, setCollapsed] = useState(false)
-  const [activeTracker, setActiveTracker] = useState<{
-    id: number
+  type ActiveTrackerRow = {
+    id: string
     ticket_id: number
     user_id: string
     start_time: string
+    tracker_type?: string
     ticket?: { id: number; title: string }
-  } | null>(null)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
-  const [stopping, setStopping] = useState(false)
+  }
+  const [activeTrackers, setActiveTrackers] = useState<ActiveTrackerRow[]>([])
+  const [elapsedBySessionId, setElapsedBySessionId] = useState<Record<string, number>>({})
+  const [stoppingId, setStoppingId] = useState<string | null>(null)
   const [lastTrackers, setLastTrackers] = useState<
     Array<{
       id: number | string
@@ -117,16 +130,15 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
       setIdriveTestLoading(false)
     }
   }
-  const [allSessionsForStats, setAllSessionsForStats] = useState<
-    Array<{ ticket_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null }>
-  >([])
+  const [allSessionsForStats, setAllSessionsForStats] = useState<StoppedTimeSession[]>([])
   const router = useRouter()
 
   const fetchAllSessionsForStats = async () => {
     try {
-      const startOfMonth = dayjs().subtract(30, 'day').startOf('day').toISOString()
-      const data = await apiFetch<Array<{ ticket_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null }>>(
-        `/api/users/time-tracker?user_id=${user.id}&filter=custom&start=${encodeURIComponent(startOfMonth)}&end=${encodeURIComponent(dayjs().toISOString())}&stopped_only=1&limit=500`
+      // From 2 calendar months ago so rolling "30d" stats + previous calendar month stay covered
+      const fetchFrom = dayjs().subtract(2, 'month').startOf('month').toISOString()
+      const data = await apiFetch<StoppedTimeSession[]>(
+        `/api/users/time-tracker?user_id=${user.id}&filter=custom&start=${encodeURIComponent(fetchFrom)}&end=${encodeURIComponent(dayjs().toISOString())}&stopped_only=1&limit=500`
       )
       setAllSessionsForStats(Array.isArray(data) ? data : [])
     } catch {
@@ -146,6 +158,8 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
     const todayTickets = new Set<number>()
     const weekTickets = new Set<number>()
     const monthTickets = new Set<number>()
+    const lastMonthTickets = new Set<number>()
+    const lastMonthRef = now.subtract(1, 'month')
 
     allSessionsForStats.forEach((s) => {
       const start = dayjs(s.start_time)
@@ -162,6 +176,9 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
         monthSeconds += dur
         monthTickets.add(s.ticket_id)
       }
+      if (start.isSame(lastMonthRef, 'month')) {
+        lastMonthTickets.add(s.ticket_id)
+      }
     })
 
     return {
@@ -171,6 +188,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
       todayTickets: todayTickets.size,
       weekTickets: weekTickets.size,
       monthTickets: monthTickets.size,
+      lastMonthTickets: lastMonthTickets.size,
     }
   }, [allSessionsForStats])
 
@@ -200,7 +218,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
     setLoadingTrackers(true)
     try {
       const data = await apiFetch<Array<{ id: string; ticket_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null; ticket?: { id: number; title: string } }>>(
-        `/api/users/time-tracker?user_id=${user.id}&filter=all&limit=15`
+        `/api/users/time-tracker?user_id=${user.id}&filter=all&limit=${RECENT_TRACKERS_LIMIT}`
       )
       setLastTrackers(Array.isArray(data) ? data : [])
     } catch {
@@ -217,12 +235,13 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
 
   const fetchActiveTracker = async () => {
     try {
-      const data = await apiFetch<{ id: string; ticket_id: number; user_id: string; start_time: string; ticket?: { id: number; title: string } } | null>(
+      const data = await apiFetch<ActiveTrackerRow[]>(
         `/api/users/time-tracker?user_id=${user.id}&active_only=1`
       )
-      setActiveTracker(data as { id: number; ticket_id: number; user_id: string; start_time: string; ticket?: { id: number; title: string } } | null)
+      const list = Array.isArray(data) ? data : []
+      setActiveTrackers(list)
     } catch {
-      setActiveTracker(null)
+      setActiveTrackers([])
     }
   }
 
@@ -231,49 +250,41 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
   }, [user.id])
 
   useEffect(() => {
-    if (!activeTracker) {
-      setElapsedSeconds(0)
+    if (activeTrackers.length === 0) {
+      setElapsedBySessionId({})
       return
     }
-    const interval = setInterval(() => {
-      const elapsed = Math.floor(
-        (Date.now() - new Date(activeTracker.start_time).getTime()) / 1000
-      )
-      setElapsedSeconds(elapsed)
-    }, 1000)
+    const tick = () => {
+      const next: Record<string, number> = {}
+      for (const t of activeTrackers) {
+        next[t.id] = Math.floor((Date.now() - new Date(t.start_time).getTime()) / 1000)
+      }
+      setElapsedBySessionId(next)
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [activeTracker])
+  }, [activeTrackers])
 
-  const handleStopTracker = async () => {
-    if (!activeTracker) return
-    setStopping(true)
+  const handleStopTracker = async (row: ActiveTrackerRow) => {
+    setStoppingId(row.id)
     try {
-      const stopTime = new Date().toISOString()
-      const startTime = new Date(activeTracker.start_time)
-      let durationSeconds = Math.floor(
-        (new Date(stopTime).getTime() - startTime.getTime()) / 1000
-      )
-      // Cap at PostgreSQL INTEGER max so very long sessions (>68 years) don't overflow
-      const MAX_DURATION = 2147483647
-      if (durationSeconds > MAX_DURATION) durationSeconds = MAX_DURATION
-      if (durationSeconds < 0) durationSeconds = 0
-
-      await apiFetch(`/api/tickets/${activeTracker.ticket_id}/time-tracker`, {
+      await apiFetch(`/api/tickets/${row.ticket_id}/time-tracker`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'stop', session_id: activeTracker.id }),
+        body: JSON.stringify({ action: 'stop', session_id: row.id }),
       })
-      setActiveTracker(null)
-      setElapsedSeconds(0)
+      setActiveTrackers((prev) => prev.filter((t) => t.id !== row.id))
       message.success('Time tracker stopped')
       fetchLastTrackers()
       fetchAllSessionsForStats()
-    } catch (error: any) {
-      const errMsg = error?.message || error?.error_description || 'Failed to stop tracker'
+    } catch (error: unknown) {
+      const errMsg =
+        error instanceof Error ? error.message : 'Failed to stop tracker'
       message.error(errMsg)
       console.error('Stop tracker error:', error)
     } finally {
-      setStopping(false)
+      setStoppingId(null)
     }
   }
 
@@ -385,10 +396,18 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                 prefix={<FileTextOutlined />}
                 valueStyle={{ color: '#fa8c16' }}
               />
+               <Text type="secondary" style={{ fontSize: 12 }}>Last Month Tickets: {trackerStats.lastMonthTickets}</Text>
             </Card>
           </Col>
         </Row>
 
+        <DashboardHourlyActivityCard
+          stoppedSessions={allSessionsForStats}
+          activeSessions={activeTrackers.map((t) => ({
+            ticket_id: t.ticket_id,
+            start_time: t.start_time,
+          }))}
+        />
 
         <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
           <Col xs={24}>
@@ -396,46 +415,69 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
               title={
                 <Space>
                   <ClockCircleOutlined />
-                  <span>Active Tracker</span>
+                  <span>Active timers</span>
+                  {activeTrackers.length > 0 ? (
+                    <Text type="secondary" style={{ fontSize: 12, fontWeight: 'normal' }}>
+                      ({activeTrackers.length} running)
+                    </Text>
+                  ) : null}
                 </Space>
               }
               style={{ marginBottom: 16 }}
             >
-              {activeTracker ? (
+              {activeTrackers.length > 0 ? (
                 <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
-                    <div>
-                      <Text type="secondary">Ticket:</Text>
-                      <br />
-                      <Text
-                        strong
-                        style={{ cursor: 'pointer', color: '#1890ff' }}
-                        onClick={() => router.push(`/tickets/${activeTracker.ticket_id}`)}
+                  {activeTrackers.map((row, idx) => (
+                    <div
+                      key={row.id}
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 16,
+                        paddingBottom: idx < activeTrackers.length - 1 ? 12 : 0,
+                        borderBottom:
+                          idx < activeTrackers.length - 1 ? '1px solid #f0f0f0' : undefined,
+                      }}
+                    >
+                      <div>
+                        <Text type="secondary">Ticket:</Text>
+                        <br />
+                        <Text
+                          strong
+                          style={{ cursor: 'pointer', color: '#1890ff' }}
+                          onClick={() => router.push(`/tickets/${row.ticket_id}`)}
+                        >
+                          {row.ticket?.title || `#${row.ticket_id}`}
+                        </Text>
+                      </div>
+                      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                      <div style={{marginRight: '50px'}}>
+                        <Text type="secondary">Elapsed:</Text>
+                        <br />
+                        <Text strong style={{ fontSize: 18 }}>
+                          {formatTime(elapsedBySessionId[row.id] ?? 0)}
+                        </Text>
+                      </div>
+                      <Button
+                        type="primary"
+                        danger
+                        icon={<StopOutlined />}
+                        onClick={() => handleStopTracker(row)}
+                        loading={stoppingId === row.id}
                       >
-                        {activeTracker.ticket?.title || `#${activeTracker.ticket_id}`}
-                      </Text>
+                        Stop
+                      </Button>
+                      <Button
+                        type="default"
+                        onClick={() => router.push(`/tickets/${row.ticket_id}`)}
+                      >
+                        Open Ticket
+                      </Button>
+                      </div>
                     </div>
-                    <div>
-                      <Text type="secondary">Elapsed:</Text>
-                      <br />
-                      <Text strong style={{ fontSize: 18 }}>{formatTime(elapsedSeconds)}</Text>
-                    </div>
-                    <Button
-                      type="primary"
-                      danger
-                      icon={<StopOutlined />}
-                      onClick={handleStopTracker}
-                      loading={stopping}
-                    >
-                      Stop
-                    </Button>
-                    <Button
-                      type="default"
-                      onClick={() => router.push(`/tickets/${activeTracker.ticket_id}`)}
-                    >
-                      Open Ticket
-                    </Button>
-                  </div>
+                  ))}
                 </Space>
               ) : (
                 <Text type="secondary">No active time tracker. Start one from a ticket detail page.</Text>
@@ -452,7 +494,8 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                   <ClockCircleOutlined />
                   <span>Recent Activities</span>
                   <Text type="secondary" style={{ fontSize: 12, fontWeight: 'normal' }}>
-                    (Last trackers)
+                    (Last {RECENT_TRACKERS_LIMIT} trackers
+                    {lastTrackers.length > 0 ? ` · ${lastTrackers.length} shown` : ''})
                   </Text>
                 </Space>
               }

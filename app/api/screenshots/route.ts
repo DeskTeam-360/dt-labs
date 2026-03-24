@@ -54,7 +54,13 @@ export async function POST(request: Request) {
     const [activeTracker] = await db
       .select({ ticketId: ticketTimeTracker.ticketId })
       .from(ticketTimeTracker)
-      .where(and(eq(ticketTimeTracker.userId, userId), isNull(ticketTimeTracker.stopTime)))
+      .where(
+        and(
+          eq(ticketTimeTracker.userId, userId),
+          isNull(ticketTimeTracker.stopTime),
+          eq(ticketTimeTracker.trackerType, 'timer')
+        )
+      )
       .orderBy(desc(ticketTimeTracker.startTime))
       .limit(1)
 
