@@ -1,9 +1,10 @@
 'use client'
 
 import { Layout, Card, Form, Input, Button, Typography, message, Avatar, Space, Upload, Select, Row, Col, Divider, Tag, Popconfirm } from 'antd'
-import { UserOutlined, MailOutlined, UploadOutlined, PhoneOutlined, BankOutlined, IdcardOutlined, KeyOutlined, CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { UserOutlined, MailOutlined, UploadOutlined, PhoneOutlined, KeyOutlined, CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { uploadAvatar } from '@/utils/storage'
+import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
 import AdminSidebar from './AdminSidebar'
 
 const { Content } = Layout
@@ -296,10 +297,13 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
                     name="department"
                     label="Department"
                   >
-                    <Input
-                      prefix={<BankOutlined />}
-                      placeholder="Department"
-                    />
+                    <Select placeholder="Select Department" allowClear>
+                      {USER_DEPARTMENTS.map((d) => (
+                        <Option key={d} value={d}>
+                          {d}
+                        </Option>
+                      ))}
+                    </Select>
                   </Form.Item>
                 </Col>
               </Row>
@@ -310,10 +314,13 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
                     name="position"
                     label="Position"
                   >
-                    <Input
-                      prefix={<IdcardOutlined />}
-                      placeholder="Position/Job Title"
-                    />
+                    <Select placeholder="Select Position" allowClear>
+                      {USER_POSITIONS.map((p) => (
+                        <Option key={p} value={p}>
+                          {p}
+                        </Option>
+                      ))}
+                    </Select>
                   </Form.Item>
                 </Col>
 

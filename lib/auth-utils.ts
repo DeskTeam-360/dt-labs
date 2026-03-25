@@ -26,7 +26,7 @@ export function canAccessCompanies(role: string | undefined): boolean {
 
 /** Tickets: Admin & Manager */
 export function canAccessTickets(role: string | undefined): boolean {
-  return isAdminOrManager(role)
+  return true
 }
 
 /** Teams: Admin only */

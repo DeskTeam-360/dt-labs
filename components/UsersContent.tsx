@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createUser } from '@/app/actions/users'
 import { uploadAvatar } from '@/utils/storage'
+import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...options, credentials: 'include' })
@@ -477,20 +478,32 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               </Space>
             </div>
 
-            <Table
-              columns={columns}
-              dataSource={filteredUsers}
-              rowKey="id"
-              loading={loading}
-              pagination={{
-                current: pagination.current,
-                pageSize: pagination.pageSize,
-                showSizeChanger: true,
-                pageSizeOptions: ['10', '20', '50', '100'],
-                showTotal: (total) => `Total ${total} users`,
-                onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
+            <div
+              style={{
+                width: '100%',
+                maxWidth: '100%',
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
               }}
-            />
+            >
+              <Table<UserRecord>
+                columns={columns}
+                dataSource={filteredUsers}
+                rowKey="id"
+                loading={loading}
+                scroll={{ x: 'max-content' }}
+                tableLayout="auto"
+                pagination={{
+                  current: pagination.current,
+                  pageSize: pagination.pageSize,
+                  showSizeChanger: true,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                  showTotal: (total) => `Total ${total} users`,
+                  onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
+                  responsive: true,
+                }}
+              />
+            </div>
           </Card>
 
           <Modal
@@ -672,9 +685,11 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                           label="Department"
                         >
                           <Select placeholder="Select Department" allowClear>
-                            <Option value="Management">Management</Option>
-                            <Option value="Account Manager">Account Manager</Option>
-                            <Option value="Production">Production</Option>
+                            {USER_DEPARTMENTS.map((d) => (
+                              <Option key={d} value={d}>
+                                {d}
+                              </Option>
+                            ))}
                           </Select>
                         </Form.Item>
                       </Col>
@@ -684,17 +699,11 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                           label="Position"
                         >
                           <Select placeholder="Select Position" allowClear>
-                            <Option value="Frontend">Frontend</Option>
-                            <Option value="Desinger">Desinger</Option>
-                            <Option value="Backend (Mjolnir)">Backend (Mjolnir)</Option>
-                            <Option value="Account Specialist">Account Specialist</Option>
-                            <Option value="HR">HR</Option>
-                            <Option value="CEO">CEO</Option>
-                            <Option value="Production Director">Production Director</Option>
-                            <Option value="Project Director">Project Director</Option>
-                            <Option value="Project Manager">Project Manager</Option>
-                            <Option value="Video Specialist">Video Specialist</Option>
-                            <Option value="Intake Person">Intake Person</Option>
+                            {USER_POSITIONS.map((p) => (
+                              <Option key={p} value={p}>
+                                {p}
+                              </Option>
+                            ))}
                           </Select>
                         </Form.Item>
                       </Col>

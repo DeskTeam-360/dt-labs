@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadAvatar } from '@/utils/storage'
+import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...options, credentials: 'include' })
@@ -577,24 +578,20 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           <>
                             <Form.Item name="department" label="Department">
                               <Select placeholder="Select Department" allowClear>
-                                <Option value="Management">Management</Option>
-                                <Option value="Account Manager">Account Manager</Option>
-                                <Option value="Production">Production</Option>
+                                {USER_DEPARTMENTS.map((d) => (
+                                  <Option key={d} value={d}>
+                                    {d}
+                                  </Option>
+                                ))}
                               </Select>
                             </Form.Item>
                             <Form.Item name="position" label="Position">
                               <Select placeholder="Select Position" allowClear>
-                                <Option value="Frontend">Frontend</Option>
-                                <Option value="Desinger">Desinger</Option>
-                                <Option value="Backend (Mjolnir)">Backend (Mjolnir)</Option>
-                                <Option value="Account Specialist">Account Specialist</Option>
-                                <Option value="HR">HR</Option>
-                                <Option value="CEO">CEO</Option>
-                                <Option value="Production Director">Production Director</Option>
-                                <Option value="Project Director">Project Director</Option>
-                                <Option value="Project Manager">Project Manager</Option>
-                                <Option value="Video Specialist">Video Specialist</Option>
-                                <Option value="Intake Person">Intake Person</Option>
+                                {USER_POSITIONS.map((p) => (
+                                  <Option key={p} value={p}>
+                                    {p}
+                                  </Option>
+                                ))}
                               </Select>
                             </Form.Item>
                           </>
