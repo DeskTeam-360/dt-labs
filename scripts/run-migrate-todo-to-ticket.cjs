@@ -20,7 +20,7 @@ const connUrl = url.includes('?') ? url.replace(/\?schema=public&?|&?schema=publ
 const sql = postgres(connUrl, { max: 1 })
 
 async function run() {
-  const sqlPath = join(__dirname, '..', 'drizzle', 'migrations', '0001_rename_todo_tables_to_ticket.sql')
+  const sqlPath = join(__dirname, '..', 'drizzle', 'migrations', '001_rename_todo_tables_to_ticket.sql')
   const sqlContent = readFileSync(sqlPath, 'utf-8')
 
   // Remove BEGIN/COMMIT - we'll use sql.begin()

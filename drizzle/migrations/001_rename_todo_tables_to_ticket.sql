@@ -1,5 +1,8 @@
--- Migration: Rename todo_* tables and todo_id columns to ticket_*
--- Run with: psql $DATABASE_URL -f drizzle/migrations/0001_rename_todo_tables_to_ticket.sql
+-- =============================================================================
+-- Migration 001 — Rename todo_* → ticket_* (schema + FK + helper function)
+-- Jalankan urut: 001 → 002 → 003 (lihat README.md di folder ini)
+-- Run: psql $DATABASE_URL -f drizzle/migrations/001_rename_todo_tables_to_ticket.sql
+-- =============================================================================
 
 BEGIN;
 

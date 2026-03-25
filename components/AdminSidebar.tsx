@@ -20,7 +20,8 @@ import {
     ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useSession } from 'next-auth/react'
 import { signOutAction } from '@/app/actions/auth'
 import {
   canAccessCompanies,
@@ -51,8 +52,29 @@ interface AdminSidebarProps {
   onCollapse: (collapsed: boolean) => void
 }
 
+/** Paths that map to a Menu item key (avoid selectedKeys pointing at missing items, e.g. /profile). */
+function selectedKeysForPathname(pathname: string | null): string[] {
+  if (!pathname) return []
+  const topLevel = [
+    '/dashboard',
+    '/users',
+    '/companies',
+    '/tickets',
+    '/teams',
+    '/email-integration',
+    '/knowledge-base',
+  ]
+  const top = topLevel.find((k) => pathname === k || (k !== '/dashboard' && pathname.startsWith(`${k}/`)))
+  if (top) return [top]
+  const ticketAttr = ['/ticket-statuses', '/ticket-types', '/tags', '/automation-rules']
+  const sub = ticketAttr.find((k) => pathname === k || pathname.startsWith(`${k}/`))
+  return sub ? [sub] : []
+}
+
 export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSidebarProps) {
-  const role = (user.role ?? '').toLowerCase()
+  const { data: session } = useSession()
+  const sessionRole = (session?.user as { role?: string } | undefined)?.role
+  const role = ((user.role ?? sessionRole) ?? '').toLowerCase()
   const isCustomer = role === 'customer'
   const router = useRouter()
   const pathname = usePathname()
@@ -151,14 +173,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     return true
   })
 
-  // Determine which menu items should be selected (match parent routes: /tickets/2 -> /tickets)
-  const selectedKeys = pathname
-    ? [
-        ['/dashboard', '/users', '/companies', '/tickets', '/teams', '/email-integration', '/knowledge-base'].find((k) =>
-          pathname === k || (k !== '/dashboard' && pathname.startsWith(k + '/'))
-        ) || pathname,
-      ].filter(Boolean)
-    : []
+  const selectedKeys = useMemo(() => selectedKeysForPathname(pathname), [pathname])
 
   const handleLogout = async () => {
     await signOutAction()
