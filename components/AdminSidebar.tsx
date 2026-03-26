@@ -23,6 +23,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { signOutAction } from '@/app/actions/auth'
+import { SpaNavLink, shouldOpenHrefInNewTab } from '@/components/SpaNavLink'
 import {
   canAccessCompanies,
   canAccessTickets,
@@ -94,20 +95,9 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
   }, [pathname])
 
   const linkLabel = (path: string, text: string) => (
-    <a
-      href={path}
-      title={text}
-      className="admin-sidebar-menu-link"
-      onClick={(e) => {
-        e.stopPropagation()
-        if (e.button !== 0) return
-        if (e.ctrlKey || e.metaKey) return
-        e.preventDefault()
-        router.push(path)
-      }}
-    >
+    <SpaNavLink href={path} title={text} className="admin-sidebar-menu-link" onClick={(e) => e.stopPropagation()}>
       {text}
-    </a>
+    </SpaNavLink>
   )
 
   const menuItems = [
@@ -184,15 +174,27 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
   const accountMenuItems = [
     {
       key: 'profile',
-      icon: <UserOutlined />,
-      label: 'Edit Profile',
-      onClick: () => router.push('/profile'),
+      label: (
+        <SpaNavLink
+          href="/profile"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'inherit' }}
+        >
+          <UserOutlined />
+          Edit Profile
+        </SpaNavLink>
+      ),
     },
     {
       key: 'password',
-      icon: <LockOutlined />,
-      label: 'Change Password',
-      onClick: () => router.push('/change-password'),
+      label: (
+        <SpaNavLink
+          href="/change-password"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'inherit' }}
+        >
+          <LockOutlined />
+          Change Password
+        </SpaNavLink>
+      ),
     },
     {
       type: 'divider' as const,
@@ -273,10 +275,9 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         }}
         onClick={({ key, domEvent }) => {
           if (key && typeof key === 'string' && key.startsWith('/') && !(domEvent.target as HTMLElement)?.closest('a')) {
-            const isMiddleClick = 'button' in domEvent && domEvent.button === 1
-            if (domEvent.ctrlKey || domEvent.metaKey || isMiddleClick) {
+            if (shouldOpenHrefInNewTab(domEvent)) {
               window.open(key, '_blank', 'noopener,noreferrer')
-            } else {
+            } else if (!('button' in domEvent) || domEvent.button === 0) {
               router.push(key)
             }
           }

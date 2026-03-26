@@ -121,7 +121,7 @@ export default function FilterSidebar({
       </div>
       {!collapsed && (
         <div style={{ padding: 16 }}>
-          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Space orientation="vertical" style={{ width: '100%' }} size="middle">
             <div>
               <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Status</Text>
               <Select

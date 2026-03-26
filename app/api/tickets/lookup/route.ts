@@ -59,6 +59,7 @@ export async function GET() {
       title: s.title,
       customer_title: s.customerTitle ?? undefined,
       color: s.color,
+      /** Nilai mentah dari DB; klien memakai isTicketStatusInKanban */
       show_in_kanban: s.showInKanban,
       sort_order: s.sortOrder,
     })),

@@ -297,7 +297,7 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
               form.resetFields()
             }}
             footer={null}
-            width={700}
+            width={820}
           >
             <Form form={form} layout="vertical" onFinish={handleSubmit}>
               <Form.Item name="name" label="Name (optional)">

@@ -165,7 +165,9 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
         customer_title: (values.customer_title as string)?.trim() || null,
         description: (values.description as string)?.trim() ?? '',
         color: (values.color as string) || '#8c8c8c',
-        show_in_kanban: !!(values.show_in_kanban ?? true),
+        show_in_kanban: editingStatus
+          ? Boolean(values.show_in_kanban)
+          : !!(values.show_in_kanban ?? true),
         sort_order: Number(values.sort_order) ?? 0,
       }
 

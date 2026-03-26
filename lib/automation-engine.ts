@@ -17,6 +17,16 @@ import { eq, and, desc } from 'drizzle-orm'
 import type { OurCondition, OurConditionGroup, OurConditionLeaf } from './condition-builder-utils'
 import type { AutomationActions } from './automation-actions-types'
 
+function automationNoteHtmlHasText(html: string | undefined | null): boolean {
+  if (!html?.trim()) return false
+  const text = html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return text.length > 0
+}
+
 export interface TicketContext {
   id: number
   title?: string | null
@@ -189,11 +199,11 @@ export async function runAutomationRules(
       }
     }
 
-    if (actions.add_note?.trim() && actions.add_note_user_id?.trim()) {
+    if (automationNoteHtmlHasText(actions.add_note) && actions.add_note_user_id?.trim()) {
       await db.insert(ticketComments).values({
         ticketId: ctx.id,
         userId: actions.add_note_user_id,
-        comment: actions.add_note.trim(),
+        comment: actions.add_note!.trim(),
         visibility: 'note',
         authorType: 'automation',
       })

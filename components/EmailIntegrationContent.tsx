@@ -123,7 +123,7 @@ export default function EmailIntegrationContent({
       <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
         <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
           <Card style={{ maxWidth: 600 }}>
-            <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            <Space orientation="vertical" size="large" style={{ width: '100%' }}>
               <div>
                 <Title level={2}>
                   <MailOutlined style={{ marginRight: 8 }} />
@@ -137,7 +137,7 @@ export default function EmailIntegrationContent({
               <div>
                 <Title level={5}>Google Connection</Title>
                 {isConnected ? (
-                  <Space direction="vertical" size="middle">
+                  <Space orientation="vertical" size="middle">
                     <Space>
                       <Tag icon={<CheckCircleOutlined />} color="success">Connected</Tag>
                       <Text strong>{integration.email_address}</Text>
@@ -166,7 +166,7 @@ export default function EmailIntegrationContent({
                     </Space>
                   </Space>
                 ) : (
-                  <Space direction="vertical">
+                  <Space orientation="vertical">
                     <Text type="secondary">No Google account connected.</Text>
                     <Button type="primary" icon={<MailOutlined />} onClick={handleConnect}>
                       Connect Google

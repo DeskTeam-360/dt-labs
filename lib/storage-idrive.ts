@@ -85,6 +85,35 @@ export async function uploadBuffer(
   }
 }
 
+/** Download object bytes (server-only). path = object key. */
+export async function getObjectBuffer(
+  path: string
+): Promise<{ buffer: Buffer; contentType?: string } | { error: string }> {
+  const client = getClient()
+  if (!client) {
+    return { error: 'Storage not configured' }
+  }
+  const key = path.replace(/^\/+/, '')
+  if (!key) return { error: 'Empty key' }
+
+  try {
+    const res = await client.send(
+      new GetObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+      })
+    )
+    const body = res.Body
+    if (!body) return { error: 'Empty object body' }
+    const buffer = Buffer.from(await body.transformToByteArray())
+    return { buffer, contentType: res.ContentType }
+  } catch (e) {
+    console.error('[Storage] GetObject error:', e)
+    const msg = e instanceof Error ? e.message : 'Get failed'
+    return { error: msg }
+  }
+}
+
 /** Delete file from iDrive e2. path = object key (no leading slash, no bucket prefix). Returns { ok, error }. */
 export async function deleteObject(
   path: string

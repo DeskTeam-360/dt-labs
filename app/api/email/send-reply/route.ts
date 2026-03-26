@@ -1,9 +1,79 @@
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { emailIntegrations, emailMessages, tickets } from '@/lib/db/schema'
+import { getObjectBuffer } from '@/lib/storage-idrive'
 import { eq, and, desc, isNotNull, isNull } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
+
+const MIME_BY_EXT: Record<string, string> = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  zip: 'application/zip',
+}
+
+function guessMimeType(fileName: string, headerType?: string): string {
+  const t = headerType?.split(';')[0]?.trim()
+  if (t && t !== 'binary/octet-stream' && t !== 'application/octet-stream') return t
+  const ext = fileName.split('.').pop()?.toLowerCase() || ''
+  return MIME_BY_EXT[ext] || 'application/octet-stream'
+}
+
+function foldBase64(b64: string): string {
+  const lines: string[] = []
+  for (let i = 0; i < b64.length; i += 76) {
+    lines.push(b64.slice(i, i + 76))
+  }
+  return lines.join('\r\n')
+}
+
+function contentDispositionAttachment(fileName: string): string {
+  const asciiSafe = fileName.replace(/[^\x20-\x7E]/g, '_')
+  const star = encodeURIComponent(fileName)
+  return `attachment; filename="${asciiSafe.replace(/["\\]/g, '_')}"; filename*=UTF-8''${star}`
+}
+
+type IncomingAttachment = { file_url?: string; file_name: string; file_path?: string }
+
+async function loadAttachmentBytes(a: IncomingAttachment): Promise<{
+  buffer: Buffer
+  mime: string
+  fileName: string
+}> {
+  const fileName = a.file_name?.trim() || 'attachment'
+  if (a.file_path?.trim()) {
+    const got = await getObjectBuffer(a.file_path.trim())
+    if (!('error' in got)) {
+      return {
+        buffer: got.buffer,
+        mime: guessMimeType(fileName, got.contentType),
+        fileName,
+      }
+    }
+    console.warn('[send-reply] Storage get failed for', a.file_path, got.error)
+  }
+  const url = a.file_url?.trim()
+  if (url) {
+    const res = await fetch(url)
+    if (res.ok) {
+      const buf = Buffer.from(await res.arrayBuffer())
+      const ct = res.headers.get('content-type') || undefined
+      return { buffer: buf, mime: guessMimeType(fileName, ct), fileName }
+    }
+    console.warn('[send-reply] Fetch failed for', url, res.status)
+  }
+  throw new Error(`Could not load attachment: ${fileName}`)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,18 +83,38 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { ticketId, commentBody, ticketTitle, companyEmail, ccEmails = [], bccEmails = [] } = body as {
+    const {
+      ticketId,
+      commentBody = '',
+      ticketTitle,
+      toEmail: toEmailRaw,
+      companyEmail: companyEmailLegacy,
+      ccEmails = [],
+      bccEmails = [],
+      attachments: rawAttachments = [],
+    } = body as {
       ticketId: number
-      commentBody: string
+      commentBody?: string
       ticketTitle?: string
-      companyEmail: string
+      /** Primary recipient (e.g. ticket creator / customer) */
+      toEmail?: string
+      /** @deprecated use toEmail — still accepted for older clients */
+      companyEmail?: string
       ccEmails?: string[]
       bccEmails?: string[]
+      attachments?: IncomingAttachment[]
     }
 
-    if (!ticketId || !commentBody?.trim() || !companyEmail?.trim()) {
+    const recipientEmail = (typeof toEmailRaw === 'string' ? toEmailRaw.trim() : '') || (typeof companyEmailLegacy === 'string' ? companyEmailLegacy.trim() : '')
+
+    const attachmentList = Array.isArray(rawAttachments) ? rawAttachments : []
+    const bodyText = typeof commentBody === 'string' ? commentBody : ''
+    const hasText = bodyText.trim().length > 0
+    const hasFiles = attachmentList.length > 0
+
+    if (!ticketId || !recipientEmail || (!hasText && !hasFiles)) {
       return NextResponse.json(
-        { error: 'Missing ticketId, commentBody, or companyEmail' },
+        { error: 'Missing ticketId, recipient email (toEmail), or message body / attachments' },
         { status: 400 }
       )
     }
@@ -136,15 +226,19 @@ export async function POST(request: NextRequest) {
 
     const ticketUrl = `${baseUrl}/tickets/${ticketId}`
     const portalFooter = `<p style="margin-top:24px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#666;">To view ticket details, please visit our portal: <a href="${ticketUrl}">${ticketUrl}</a></p>`
-    const bodyHtml = (commentBody.trim().includes('<')
-      ? commentBody.trim()
-      : commentBody.trim().replace(/\n/g, '<br>')) + portalFooter
-    const headers = [
+    const innerHtml =
+      hasText
+        ? (bodyText.trim().includes('<')
+            ? bodyText.trim()
+            : bodyText.trim().replace(/\n/g, '<br>'))
+        : '<p>&nbsp;</p>'
+    const bodyHtml = innerHtml + portalFooter
+
+    const headers: string[] = [
       'From: ' + fromEmail,
-      'To: ' + companyEmail.trim(),
+      'To: ' + recipientEmail,
       'Subject: ' + subject,
       'MIME-Version: 1.0',
-      'Content-Type: text/html; charset=UTF-8',
     ]
     if (ccList.length > 0) headers.push('Cc: ' + ccList.join(', '))
     if (bccList.length > 0) headers.push('Bcc: ' + bccList.join(', '))
@@ -152,9 +246,39 @@ export async function POST(request: NextRequest) {
       headers.push('In-Reply-To: ' + inReplyTo)
       headers.push('References: ' + inReplyTo)
     }
-    headers.push('')
-    headers.push(bodyHtml)
-    const emailBody = headers.join('\r\n')
+
+    let emailBody: string
+    if (!hasFiles) {
+      headers.push('Content-Type: text/html; charset=UTF-8')
+      headers.push('')
+      headers.push(bodyHtml)
+      emailBody = headers.join('\r\n')
+    } else {
+      const loaded = await Promise.all(attachmentList.map((a) => loadAttachmentBytes(a)))
+      const mixedBoundary = 'mix_' + Math.random().toString(36).slice(2) + Date.now().toString(36)
+      headers.push(`Content-Type: multipart/mixed; boundary="${mixedBoundary}"`)
+      headers.push('')
+
+      const parts: string[] = [
+        `--${mixedBoundary}`,
+        'Content-Type: text/html; charset=UTF-8',
+        'Content-Transfer-Encoding: 8bit',
+        '',
+        bodyHtml,
+      ]
+      for (const { buffer, mime, fileName } of loaded) {
+        parts.push(
+          `--${mixedBoundary}`,
+          `Content-Type: ${mime}; name="${fileName.replace(/"/g, '')}"`,
+          'Content-Transfer-Encoding: base64',
+          `Content-Disposition: ${contentDispositionAttachment(fileName)}`,
+          '',
+          foldBase64(buffer.toString('base64'))
+        )
+      }
+      parts.push(`--${mixedBoundary}--`)
+      emailBody = headers.join('\r\n') + '\r\n' + parts.join('\r\n')
+    }
 
     const raw = Buffer.from(emailBody)
       .toString('base64')
@@ -178,9 +302,9 @@ export async function POST(request: NextRequest) {
         gmailMessageId: sentMessageId,
         threadId: sentThreadId || null,
         fromEmail,
-        toEmail: companyEmail.trim(),
+        toEmail: recipientEmail,
         subject,
-        snippet: commentBody.trim().slice(0, 500),
+        snippet: bodyText.trim().slice(0, 500) || (hasFiles ? `(${attachmentList.length} attachment(s))` : ''),
         ticketId,
         direction: 'outgoing',
       })
