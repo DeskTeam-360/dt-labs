@@ -10,6 +10,7 @@ import TicketsRoundRobinView from './Tickets/TicketsRoundRobinView'
 import FilterSidebar from './Tickets/FilterSidebar'
 import TicketFormModal from './Tickets/TicketFormModal'
 import { useTicketsData } from './Tickets/useTicketsData'
+import TicketSearchNavbar from './TicketSearchNavbar'
 
 interface TicketsContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string }
@@ -79,6 +80,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     columnsToShow,
     tickets,
     userTeamIds,
+    lookupReady,
   } = useTicketsData(currentUser.id, isCustomer)
 
   return (
@@ -96,6 +98,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
           minHeight: '100vh',
         }}
       >
+        <TicketSearchNavbar />
         <div style={{ padding: 0, minWidth: 0 }}>
           <TicketsHeader
             viewMode={viewMode}
@@ -111,7 +114,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             onFilterSearchChange={setFilterSearch}
           />
 
-          {loading ? (
+          {loading || !lookupReady ? (
             <div style={{ padding: 48, textAlign: 'center' }}>
               <Spin size="large" tip="Loading tasks..." />
             </div>

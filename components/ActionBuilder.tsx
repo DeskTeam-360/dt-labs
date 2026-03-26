@@ -4,6 +4,7 @@ import { Button, Dropdown, Form, Input, Select, Space } from 'antd'
 import { PlusOutlined, CloseOutlined } from '@ant-design/icons'
 import { useEffect, useState } from 'react'
 import type { AutomationActions } from '@/lib/automation-actions-types'
+import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
 
 type ActionType = 'team_id' | 'priority_slug' | 'type_slug' | 'tag_ids' | 'visibility' | 'add_note' | 'add_checklist_items'
 
@@ -58,9 +59,19 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
 
   const update = (key: keyof AutomationActions, val: unknown) => {
     const next = { ...actions }
+    /** Quill memanggil onChange saat mount dengan HTML “kosong”; jangan hapus baris Add Note. */
+    if (key === 'add_note') {
+      if (val === undefined || val === null) {
+        delete next.add_note
+        delete next.add_note_user_id
+      } else {
+        ;(next as Record<string, unknown>).add_note = val
+      }
+      onChange(next as AutomationActions)
+      return
+    }
     if (val === undefined || val === null || val === '') {
       delete next[key]
-      if (key === 'add_note') delete next.add_note_user_id
       if (key === 'add_checklist_items') delete next.add_checklist_items
     } else {
       ;(next as Record<string, unknown>)[key] = val
@@ -108,7 +119,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
         border: '1px solid #f0f0f0',
       }}
     >
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         {shownKeys.length === 0 ? (
           <div style={{ color: '#999', padding: '8px 0' }}>No actions configured</div>
         ) : (
@@ -199,11 +210,11 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                 {type === 'add_note' && (
                   <>
                     <Form.Item label={ACTION_LABELS.add_note} style={{ marginBottom: 8 }}>
-                      <Input.TextArea
-                        placeholder="Enter note text (e.g. Auto-assigned by rule)"
-                        rows={3}
-                        value={(actions as Record<string, unknown>).add_note as string | undefined}
-                        onChange={(e) => update('add_note', e.target.value || undefined)}
+                      <CommentWysiwyg
+                        placeholder="Enter note (rich text). Images upload to draft storage."
+                        height="200px"
+                        value={((actions as Record<string, unknown>).add_note as string | undefined) ?? ''}
+                        onChange={(html) => update('add_note', html)}
                       />
                     </Form.Item>
                     <Form.Item label="Note author" style={{ marginBottom: 0 }}>

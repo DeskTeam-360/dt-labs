@@ -7,10 +7,13 @@ import {
   tickets,
   ticketComments,
   ticketCcRecipients,
+  ticketAttachments,
+  commentAttachments,
   companies,
   users,
   companyUsers,
 } from '@/lib/db'
+import { uploadBuffer } from '@/lib/storage-idrive'
 import { runAutomationRules } from '@/lib/automation-engine'
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import { eq, and, ilike, not, isNull, desc, gte, or, sql } from 'drizzle-orm'
@@ -112,29 +115,199 @@ function normalizeForMatch(email: string): string {
   return lower
 }
 
-/** Decode Gmail API base64url body, handles nested multipart */
-function getMessageBody(payload: any): string {
-  function extract(p: any): string | undefined {
-    if (!p) return undefined
-    if (p.body?.data) return p.body.data
-    if (p.parts?.length) {
-      let plain: string | undefined
-      let html: string | undefined
-      for (const part of p.parts) {
-        const nested = extract(part)
-        if (nested) {
-          if (part.mimeType === 'text/html') html = nested
-          else if (part.mimeType === 'text/plain') plain = nested
-        }
-      }
-      return html ?? plain ?? (p.parts[0] ? extract(p.parts[0]) : undefined)
-    }
-    return undefined
+function decodeBodyDataBase64(b64: string | undefined): Buffer | null {
+  if (!b64) return null
+  try {
+    return Buffer.from(b64.replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+  } catch {
+    return null
   }
-  const data = extract(payload)
-  if (!data) return ''
-  const decoded = Buffer.from(data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
-  return decoded
+}
+
+function flattenGmailParts(part: any): any[] {
+  if (!part) return []
+  if (Array.isArray(part.parts) && part.parts.length > 0) {
+    return part.parts.flatMap(flattenGmailParts)
+  }
+  return [part]
+}
+
+/** Plain + HTML from any nesting (multipart/alternative, related, etc.) */
+function extractEmailTextBodies(payload: any): { html: string; plain: string } {
+  const flat = flattenGmailParts(payload || {})
+  let html = ''
+  let plain = ''
+  for (const p of flat) {
+    const mt = (p.mimeType || '').toLowerCase()
+    if (mt === 'text/html' && p.body?.data) {
+      const buf = decodeBodyDataBase64(p.body.data)
+      if (buf) {
+        const s = buf.toString('utf-8')
+        if (s.length > html.length) html = s
+      }
+    }
+    if (mt === 'text/plain' && p.body?.data) {
+      const buf = decodeBodyDataBase64(p.body.data)
+      if (buf) {
+        const s = buf.toString('utf-8')
+        if (s.length > plain.length) plain = s
+      }
+    }
+  }
+  return { html, plain }
+}
+
+function normalizeContentId(raw: string | undefined): string | null {
+  if (!raw) return null
+  const s = raw.replace(/^<|>$/g, '').trim()
+  return s || null
+}
+
+function partDispositionAndCid(part: any): { disposition: 'inline' | 'attachment' | null; contentId: string | null } {
+  const headers = part.headers as { name: string; value: string }[] | undefined
+  const m: Record<string, string> = {}
+  for (const h of headers || []) {
+    const k = h.name?.toLowerCase()
+    if (k) m[k] = h.value
+  }
+  const cd = (m['content-disposition'] || '').toLowerCase()
+  const cid = normalizeContentId(m['content-id'])
+  let disposition: 'inline' | 'attachment' | null = null
+  if (cd.includes('inline')) disposition = 'inline'
+  else if (cd.includes('attachment')) disposition = 'attachment'
+  else if (cid) disposition = 'inline'
+  return { disposition, contentId: cid }
+}
+
+function sanitizeCompanyFolder(name: string | undefined): string {
+  const s = (name || '').trim()
+  if (!s || s.toLowerCase() === 'unknown') return 'non-company'
+  const safe = s.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
+  return safe || 'non-company'
+}
+
+function sanitizeAttachmentFileName(name: string, mimeType: string): string {
+  const raw = name?.trim() || 'file'
+  const base = raw.replace(/\.[^.]+$/, '') || 'file'
+  const extFromName = raw.includes('.') ? raw.split('.').pop()!.toLowerCase() : ''
+  const ext =
+    extFromName ||
+    (mimeType.includes('png')
+      ? 'png'
+      : mimeType.includes('jpeg') || mimeType.includes('jpg')
+        ? 'jpg'
+        : mimeType.includes('gif')
+          ? 'gif'
+          : mimeType.includes('webp')
+            ? 'webp'
+            : mimeType.includes('pdf')
+              ? 'pdf'
+              : '')
+  const safe = base.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100)
+  return ext ? `${safe}.${ext}` : safe
+}
+
+async function fetchGmailAttachmentBuffer(
+  gmail: any,
+  messageId: string,
+  attachmentId: string
+): Promise<Buffer | null> {
+  try {
+    const res = await gmail.users.messages.attachments.get({
+      userId: 'me',
+      messageId,
+      id: attachmentId,
+    })
+    const data = res.data?.data
+    if (!data) return null
+    return Buffer.from(data.replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+  } catch (e) {
+    console.error('[Sync] Gmail attachment fetch failed:', attachmentId, (e as Error)?.message)
+    return null
+  }
+}
+
+function replaceContentIdsInHtml(html: string, cidToUrl: Map<string, string>): string {
+  let out = html
+  for (const [cid, url] of cidToUrl) {
+    const enc = cid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    out = out.replace(new RegExp(`cid:${enc}`, 'gi'), url)
+  }
+  return out
+}
+
+/**
+ * Unduh part Gmail (attachmentId / gambar inline), unggah ke storage,
+ * ganti cid: di HTML dengan URL publik, dan kumpulkan file untuk ticket_attachments / comment_attachments.
+ */
+async function processIncomingEmailMedia(
+  gmail: any,
+  gmailMessageId: string,
+  payload: any,
+  ticketId: number,
+  companyFolder: string,
+  html: string | null,
+  plain: string | null,
+  fallbackSnippet: string,
+  storageSubfolder: 'attachments' | 'comments' = 'attachments'
+): Promise<{ body: string; files: Array<{ fileUrl: string; fileName: string; filePath: string }> }> {
+  const safeCompany = sanitizeCompanyFolder(companyFolder)
+  const pathSeg = storageSubfolder === 'comments' ? 'comments' : 'attachments'
+  const flat = flattenGmailParts(payload || {})
+  const seenAttachmentIds = new Set<string>()
+  const cidToUrl = new Map<string, string>()
+  const files: Array<{ fileUrl: string; fileName: string; filePath: string }> = []
+  let seq = 0
+
+  for (const p of flat) {
+    const aid = p.body?.attachmentId as string | undefined
+    const directB64 = p.body?.data as string | undefined
+    const mimeRaw = p.mimeType || 'application/octet-stream'
+    const mime = mimeRaw.toLowerCase()
+    let filename = typeof p.filename === 'string' && p.filename.trim() ? p.filename.trim() : 'attachment'
+    const { disposition, contentId } = partDispositionAndCid(p)
+
+    let buf: Buffer | null = null
+    if (aid) {
+      if (seenAttachmentIds.has(aid)) continue
+      seenAttachmentIds.add(aid)
+      buf = await fetchGmailAttachmentBuffer(gmail, gmailMessageId, aid)
+    } else if (directB64 && mime.startsWith('image/')) {
+      buf = decodeBodyDataBase64(directB64)
+    }
+
+    if (!buf || buf.length === 0) continue
+
+    const isImage = mime.startsWith('image/')
+    const safeName = sanitizeAttachmentFileName(filename, mime)
+    const filePath = `tickets/${safeCompany}/#${ticketId}/${pathSeg}/${Date.now()}_${seq++}_${safeName}`
+    const { url, error } = await uploadBuffer(filePath, buf, mimeRaw || 'application/octet-stream')
+    if (error || !url) {
+      console.error('[Sync] email media upload failed:', error, filename)
+      continue
+    }
+
+    if (isImage && contentId) {
+      cidToUrl.set(contentId, url)
+      const shortId = contentId.split('@')[0]
+      if (shortId && shortId !== contentId) cidToUrl.set(shortId, url)
+    }
+
+    const hideFromAttachmentList = isImage && !!contentId && disposition !== 'attachment'
+    if (!hideFromAttachmentList) {
+      files.push({ fileUrl: url, fileName: filename, filePath })
+    }
+  }
+
+  let body = ''
+  if (html && html.trim()) {
+    body = replaceContentIdsInHtml(html, cidToUrl).trim()
+  } else if (plain && plain.trim()) {
+    body = plain.trim()
+  } else {
+    body = (fallbackSnippet || '').trim() || '(No content)'
+  }
+  return { body, files }
 }
 
 export async function POST(request: NextRequest) {
@@ -311,7 +484,8 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      const body = getMessageBody(msg.payload || {}).trim()
+      const textBodies = extractEmailTextBodies(msg.payload || {})
+      const body = (textBodies.html || textBodies.plain || '').trim()
       const rfcMessageId = getHeader('Message-ID')?.trim() || null
 
       try {
@@ -483,8 +657,29 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const commentBody = body || (msg.snippet || '').trim() || '(No content)'
         const emailDateIso = getEmailDateIso(msg)
+        let companyFolderReply = 'non-company'
+        if (ticketRow.companyId) {
+          const [cnReply] = await db
+            .select({ name: companies.name })
+            .from(companies)
+            .where(eq(companies.id, ticketRow.companyId))
+            .limit(1)
+          companyFolderReply = cnReply?.name || 'non-company'
+        }
+        const snippetFallbackReply = (msg.snippet || '').trim() || '(No content)'
+        const processedReply = await processIncomingEmailMedia(
+          gmail,
+          gmailMessageId,
+          msg.payload,
+          ticketId,
+          companyFolderReply,
+          textBodies.html || null,
+          textBodies.plain || null,
+          snippetFallbackReply,
+          'comments'
+        )
+        const commentBody = processedReply.body || snippetFallbackReply
 
         for (const ccEmail of incomingCcEmails) {
           if (!ccEmail?.trim() || !ticketRow.companyId) continue
@@ -524,15 +719,30 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-          await db.insert(ticketComments).values({
-            ticketId,
-            userId: commentUserId,
-            comment: commentBody,
-            visibility: 'reply',
-            authorType: 'customer',
-            ccEmails: incomingCcEmails.length > 0 ? incomingCcEmails.map((e) => truncateVarchar(e.trim(), 255)) : null,
-            ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
-          })
+          const [insertedReplyComment] = await db
+            .insert(ticketComments)
+            .values({
+              ticketId,
+              userId: commentUserId,
+              comment: commentBody,
+              visibility: 'reply',
+              authorType: 'customer',
+              ccEmails: incomingCcEmails.length > 0 ? incomingCcEmails.map((e) => truncateVarchar(e.trim(), 255)) : null,
+              ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
+            })
+            .returning({ id: ticketComments.id })
+
+          if (insertedReplyComment && processedReply.files.length > 0) {
+            await db.insert(commentAttachments).values(
+              processedReply.files.map((f) => ({
+                commentId: insertedReplyComment.id,
+                fileUrl: f.fileUrl,
+                fileName: truncateVarchar(f.fileName, 2048),
+                filePath: f.filePath,
+                uploadedBy: commentUserId,
+              }))
+            )
+          }
           if (isFromCc) {
             sendAutomationLog({
               event: 'email_reply_added',
@@ -740,8 +950,29 @@ export async function POST(request: NextRequest) {
           }
 
           if (senderMatches || isFromCompanyUser || isFromCcRecipient) {
-            const commentBody = body || (msg.snippet || '').trim() || '(No content)'
             const emailDateIso = getEmailDateIso(msg)
+            let companyFolderExt = 'non-company'
+            if (extTicket?.companyId) {
+              const [cnExt] = await db
+                .select({ name: companies.name })
+                .from(companies)
+                .where(eq(companies.id, extTicket.companyId))
+                .limit(1)
+              companyFolderExt = cnExt?.name || 'non-company'
+            }
+            const snippetFallbackExt = (msg.snippet || '').trim() || '(No content)'
+            const processedExtReply = await processIncomingEmailMedia(
+              gmail,
+              gmailMessageId,
+              msg.payload,
+              ticketId,
+              companyFolderExt,
+              textBodies.html || null,
+              textBodies.plain || null,
+              snippetFallbackExt,
+              'comments'
+            )
+            const commentBody = processedExtReply.body || snippetFallbackExt
             let commentUserId = creatorUserId ?? userId
             if (isFromCcRecipient && extTicket?.companyId) {
               const [ccUser] = await db
@@ -817,15 +1048,30 @@ export async function POST(request: NextRequest) {
                 }
               }
             }
-            await db.insert(ticketComments).values({
-              ticketId,
-              userId: commentUserId,
-              comment: commentBody,
-              visibility: 'reply',
-              authorType: 'customer',
-              ccEmails: incomingCcEmails.length > 0 ? incomingCcEmails.map((e) => truncateVarchar(e.trim(), 255)) : null,
-              ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
-            })
+            const [insertedExtComment] = await db
+              .insert(ticketComments)
+              .values({
+                ticketId,
+                userId: commentUserId,
+                comment: commentBody,
+                visibility: 'reply',
+                authorType: 'customer',
+                ccEmails: incomingCcEmails.length > 0 ? incomingCcEmails.map((e) => truncateVarchar(e.trim(), 255)) : null,
+                ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
+              })
+              .returning({ id: ticketComments.id })
+
+            if (insertedExtComment && processedExtReply.files.length > 0) {
+              await db.insert(commentAttachments).values(
+                processedExtReply.files.map((f) => ({
+                  commentId: insertedExtComment.id,
+                  fileUrl: f.fileUrl,
+                  fileName: truncateVarchar(f.fileName, 2048),
+                  filePath: f.filePath,
+                  uploadedBy: commentUserId,
+                }))
+              )
+            }
             sendAutomationLog({
               event: 'email_reply_added',
               ticket_id: ticketId,
@@ -922,6 +1168,42 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          let companyFolderNew = company?.name || 'non-company'
+          if (ticketCompanyId && (!companyFolderNew || companyFolderNew === 'non-company')) {
+            const [rCo] = await db
+              .select({ name: companies.name })
+              .from(companies)
+              .where(eq(companies.id, ticketCompanyId))
+              .limit(1)
+            if (rCo?.name) companyFolderNew = rCo.name
+          }
+          const snippetNew = (msg.snippet || '').trim() || ''
+          const processedNew = await processIncomingEmailMedia(
+            gmail,
+            gmailMessageId,
+            msg.payload,
+            newTicket.id,
+            companyFolderNew,
+            textBodies.html || null,
+            textBodies.plain || null,
+            snippetNew
+          )
+          const finalDescription = processedNew.body || null
+          if (processedNew.body !== body) {
+            await db.update(tickets).set({ description: finalDescription, updatedAt: new Date() }).where(eq(tickets.id, newTicket.id))
+          }
+          if (processedNew.files.length > 0) {
+            await db.insert(ticketAttachments).values(
+              processedNew.files.map((f) => ({
+                ticketId: newTicket.id,
+                fileUrl: f.fileUrl,
+                fileName: truncateVarchar(f.fileName, 2048),
+                filePath: f.filePath,
+                uploadedBy: creatorUserId ?? null,
+              }))
+            )
+          }
+
           createdCount++
           if (isDebug) {
             debugLog.push({ email: senderEmail, subject: title, reason: `OK: new_ticket #${newTicket.id} company=${ticketCompanyId}` })
@@ -932,7 +1214,7 @@ export async function POST(request: NextRequest) {
             ticket_id: ticketId,
             email: senderEmail,
             subject: title,
-            message: body?.slice(0, 200) || '',
+            message: (processedNew.body || '').slice(0, 200) || '',
             detail: `company=${ticketCompanyId}`,
           }).catch(() => {})
 
@@ -940,7 +1222,7 @@ export async function POST(request: NextRequest) {
             await runAutomationRules('ticket_created', {
               id: ticketId,
               title,
-              description: body || null,
+              description: finalDescription,
               status: 'to_do',
               priority_slug: null,
               company_id: ticketCompanyId,

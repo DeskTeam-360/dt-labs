@@ -6,6 +6,10 @@
  * - Customer: limited (handled separately in sidebar)
  */
 
+export function everyOneCanAccess(role: string | undefined): boolean {
+  return true
+}
+
 export function isAdmin(role: string | undefined): boolean {
   return (role ?? '').toLowerCase() === 'admin'
 }
@@ -26,7 +30,7 @@ export function canAccessCompanies(role: string | undefined): boolean {
 
 /** Tickets: Admin & Manager */
 export function canAccessTickets(role: string | undefined): boolean {
-  return true
+  return everyOneCanAccess(role)
 }
 
 /** Teams: Admin only */

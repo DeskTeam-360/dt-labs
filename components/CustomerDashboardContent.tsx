@@ -14,7 +14,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import AdminSidebar from './AdminSidebar'
-import DashboardHourlyActivityCard from './DashboardHourlyActivityCard'
+import TicketSearchNavbar from './TicketSearchNavbar'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 import {
   BarChart,
@@ -334,14 +334,6 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
             </Card>
           </Col>
 
-          <Col xs={24}>
-            <DashboardHourlyActivityCard
-              stoppedSessions={hourlyStopped}
-              activeSessions={hourlyActive}
-              style={{ marginTop: 0 }}
-            />
-          </Col>
-
           {/* Time Spent - Donut */}
           <Col xs={24} lg={10}>
             <Card>
@@ -459,7 +451,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
               <span style={{ fontWeight: 600, fontSize: 16 }}>Knowledge base</span>
               <br />
               <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>How can we help you today?</Text>
-              <Space direction="vertical" style={{ width: '100%' }}>
+              <Space orientation="vertical" style={{ width: '100%' }}>
                 <Select
                   placeholder="Filter by category"
                   style={{ width: '100%' }}
@@ -694,6 +686,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
             background: '#f0f2f5',
           }}
         >
+          <TicketSearchNavbar />
           <Content
             style={{
               padding: 0,

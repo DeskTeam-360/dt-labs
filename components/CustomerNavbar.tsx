@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
+import { SpaNavLink, shouldOpenHrefInNewTab } from '@/components/SpaNavLink'
 
 const { Header } = Layout
 const { Text } = Typography
@@ -60,15 +61,27 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
   const accountMenuItems = [
     {
       key: 'profile',
-      icon: <UserOutlined />,
-      label: 'Edit Profile',
-      onClick: () => router.push('/profile'),
+      label: (
+        <SpaNavLink
+          href="/profile"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'inherit' }}
+        >
+          <UserOutlined />
+          Edit Profile
+        </SpaNavLink>
+      ),
     },
     {
       key: 'password',
-      icon: <LockOutlined />,
-      label: 'Change Password',
-      onClick: () => router.push('/change-password'),
+      label: (
+        <SpaNavLink
+          href="/change-password"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'inherit' }}
+        >
+          <LockOutlined />
+          Change Password
+        </SpaNavLink>
+      ),
     },
     {
       type: 'divider' as const,
@@ -162,10 +175,9 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
             }
             const path = pathMap[key as string]
             if (path) {
-              const isMiddleClick = 'button' in domEvent && domEvent.button === 1
-              if (domEvent.ctrlKey || domEvent.metaKey || isMiddleClick) {
+              if (shouldOpenHrefInNewTab(domEvent)) {
                 window.open(path, '_blank', 'noopener,noreferrer')
-              } else {
+              } else if (!('button' in domEvent) || domEvent.button === 0) {
                 router.push(path)
               }
             }

@@ -18,6 +18,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 }
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
+import { SpaNavLink, shouldOpenHrefInNewTab } from './SpaNavLink'
 import type { ColumnsType } from 'antd/es/table'
 
 const { Content } = Layout
@@ -51,9 +52,9 @@ interface UserRecord {
 }
 
 export default function UsersContent({ user: currentUser }: UsersContentProps) {
+  const router = useRouter()
   const isCustomer = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'customer'
   const isAdmin = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'admin'
-  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [users, setUsers] = useState<UserRecord[]>([])
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
@@ -274,12 +275,17 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       sorter: (a, b) => (a.full_name || '').localeCompare(b.full_name || ''),
       sortDirections: ['ascend', 'descend'],
       render: (_, record) => (
-        <Space>
+        <Space align="start">
           <Avatar icon={<UserOutlined />} src={record.avatar_url} />
-          <div>
-            <div style={{ fontWeight: 500 }}>{record.full_name || 'N/A'}</div>
-            <div style={{ fontSize: 12, color: '#999' }}>{record.email}</div>
-          </div>
+          <SpaNavLink
+            href={`/users/${record.id}`}
+            style={{ textDecoration: 'none', color: 'inherit' }}
+          >
+            <div>
+              <div style={{ fontWeight: 500 }}>{record.full_name || 'N/A'}</div>
+              <div style={{ fontSize: 12, color: '#999' }}>{record.email}</div>
+            </div>
+          </SpaNavLink>
         </Space>
       ),
     },
@@ -371,8 +377,14 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
             <Button
               type="default"
               icon={<EyeOutlined />}
-
-              onClick={() => router.push(`/users/${record.id}`)}
+              href={`/users/${record.id}`}
+              aria-label="View user details"
+              onClick={(e) => {
+                if (shouldOpenHrefInNewTab(e)) return
+                if (e.button !== 0) return
+                e.preventDefault()
+                router.push(`/users/${record.id}`)
+              }}
             />
           </Tooltip>
           <Tooltip title="Edit">

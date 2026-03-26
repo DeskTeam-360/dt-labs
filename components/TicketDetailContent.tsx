@@ -508,7 +508,11 @@ export default function TicketDetailContent({
             setComments((prev) => [...prev, { ...data, comment_attachments: data.comment_attachments || [] }])
             message.success('Comment added')
 
-            if (variant === 'admin' && visibility === 'reply' && author_type === 'agent' && ticketData.company?.email?.trim()) {
+            const replyRecipientEmail =
+                (typeof ticketData.creator?.email === 'string' && ticketData.creator.email.trim()) ||
+                (typeof ticketData.company?.email === 'string' && ticketData.company.email.trim()) ||
+                ''
+            if (variant === 'admin' && visibility === 'reply' && author_type === 'agent' && replyRecipientEmail) {
                 try {
                     const res = await fetch('/api/email/send-reply', {
                         method: 'POST',
@@ -517,17 +521,22 @@ export default function TicketDetailContent({
                             ticketId: ticketData.id,
                             commentBody: commentText.trim(),
                             ticketTitle: ticketData.title,
-                            companyEmail: ticketData.company.email.trim(),
+                            toEmail: replyRecipientEmail,
                             ccEmails: extra?.ccEmails ?? [],
                             bccEmails: extra?.bccEmails ?? [],
+                            attachments: attachments.map((a) => ({
+                                file_url: a.url,
+                                file_name: a.file_name,
+                                file_path: a.file_path,
+                            })),
                         }),
                     })
                     if (!res.ok) {
                         const err = await res.json().catch(() => ({}))
-                        message.warning('Balasan dikirim, tapi email ke company gagal: ' + (err?.error || res.statusText))
+                        message.warning('Balasan dikirim, tapi email ke pelanggan gagal: ' + (err?.error || res.statusText))
                     }
                 } catch {
-                    message.warning('Balasan dikirim, tapi email ke company gagal.')
+                    message.warning('Balasan dikirim, tapi email ke pelanggan gagal.')
                 }
             }
         } catch (error: any) {

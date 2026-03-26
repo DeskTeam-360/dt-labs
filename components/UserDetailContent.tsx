@@ -840,7 +840,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                               title="Today"
                               value={formatDuration(overviewData.today)}
                               prefix={<ClockCircleOutlined />}
-                              valueStyle={{ color: '#3f8600' }}
+                              styles={{ content : { color: '#3f8600'} }}
                             />
                           </Card>
                         </Col>
@@ -850,7 +850,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                               title="This Week"
                               value={formatDuration(overviewData.thisWeek)}
                               prefix={<ClockCircleOutlined />}
-                              valueStyle={{ color: '#1890ff' }}
+                              styles={{ content : { color: '#1890ff'} }}
                             />
                           </Card>
                         </Col>
@@ -860,7 +860,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                               title="This Month"
                               value={formatDuration(overviewData.thisMonth)}
                               prefix={<ClockCircleOutlined />}
-                              valueStyle={{ color: '#722ed1' }}
+                              styles={{ content : { color: '#722ed1'} }}
                             />
                           </Card>
                         </Col>

@@ -179,8 +179,9 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       setTypes(data.ticketTypes || [])
       setPriorities(data.ticketPriorities || [])
       setAllTags(data.tags || [])
-      if (data.statuses?.length && filterStatus.length === 0) {
-        setFilterStatus(data.statuses.map((s) => s.slug))
+      const slugs = (data.statuses || []).map((s) => s.slug)
+      if (slugs.length) {
+        setFilterStatus((prev) => (prev.length === 0 ? slugs : prev))
       }
     } catch {
       setStatuses([])
@@ -198,8 +199,16 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     fetchLookup()
   }, [])
 
+  const statusFilterNarrowed = useMemo(() => {
+    if (statuses.length === 0) return false
+    if (filterStatus.length === 0) return false
+    if (filterStatus.length < statuses.length) return true
+    const set = new Set(filterStatus)
+    return !statuses.every((s) => set.has(s.slug))
+  }, [filterStatus, statuses])
+
   const hasActiveFilters =
-    filterStatus.length > 0 || filterTypeId != null || filterSearch.trim() !== ''
+    statusFilterNarrowed || filterTypeId != null || filterSearch.trim() !== ''
 
   const clearFilters = () => {
     setFilterStatus(statuses.map((s) => s.slug))
@@ -443,7 +452,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
 
   return (
     <Card>
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <Row gutter={[16, 8]} align="middle" justify="space-between">
           <Col>
             <Space wrap align="center">
@@ -498,11 +507,11 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
             )}
           </Col>
           <Col>
-            {currentUser && (
+            {/* {currentUser && (
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
                 Create Ticket
               </Button>
-            )}
+            )} */}
           </Col>
         </Row>
 

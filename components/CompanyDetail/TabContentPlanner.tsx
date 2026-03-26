@@ -939,7 +939,7 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
         footer={null}
         width={720}
       >
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        <Space orientation="vertical" style={{ width: '100%' }} size="middle">
           <Text type="secondary">
             Paste link dari Google Sheets (docs.google.com/spreadsheets/d/...) atau OpenSheet URL. ID spreadsheet akan dipakai untuk fetch via opensheet.elk.sh.
           </Text>
@@ -1095,7 +1095,7 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
         <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
           Set default AI System Template per channel. Saat Generate content, template ini akan dipakai otomatis jika channel planner memakai channel ini.
         </Text>
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        <Space orientation="vertical" style={{ width: '100%' }} size="middle">
           {channels.map((ch) => (
             <div key={ch.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Text strong style={{ minWidth: 180 }}>{ch.title}</Text>

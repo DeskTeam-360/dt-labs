@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { ticketStatuses } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
 
 /** PATCH /api/ticket-statuses/[id] - Update ticket status */
 export async function PATCH(
@@ -53,7 +54,7 @@ export async function PATCH(
     customer_title: updated.customerTitle ?? undefined,
     description: updated.description ?? undefined,
     color: updated.color,
-    show_in_kanban: updated.showInKanban ?? true,
+    show_in_kanban: isTicketStatusInKanban(updated.showInKanban),
     sort_order: updated.sortOrder ?? 0,
     created_at: updated.createdAt ? new Date(updated.createdAt).toISOString() : '',
     updated_at: updated.updatedAt ? new Date(updated.updatedAt).toISOString() : '',

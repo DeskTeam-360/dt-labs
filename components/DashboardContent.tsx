@@ -1,6 +1,6 @@
 'use client'
 
-import { Layout, Card, Row, Col, Typography, Statistic, Space, Button, message, List, Empty } from 'antd'
+import { App, Layout, Card, Row, Col, Typography, Statistic, Space, Button, List, Empty } from 'antd'
 import {
   CheckCircleOutlined,
   FileTextOutlined,
@@ -15,6 +15,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminSidebar from './AdminSidebar'
+import TicketSearchNavbar from './TicketSearchNavbar'
 import DashboardHourlyActivityCard from './DashboardHourlyActivityCard'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 
@@ -43,7 +44,6 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts'
-
 const { Content } = Layout
 const { Title, Text } = Typography
 
@@ -70,6 +70,7 @@ function formatTime(seconds: number) {
 }
 
 export default function DashboardContent({ user, stats }: DashboardContentProps) {
+  const { message } = App.useApp()
   const [collapsed, setCollapsed] = useState(false)
   type ActiveTrackerRow = {
     id: string
@@ -302,6 +303,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
           minHeight: '100vh',
         }}
       >
+        <TicketSearchNavbar />
         <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
         <div style={{ marginBottom: 24 }}>
           <Title level={2}>Welcome!</Title>
@@ -317,7 +319,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                 title="Total Users"
                 value={stats.totalUsers}
                 prefix={<TeamOutlined />}
-                valueStyle={{ color: '#3f8600' }}
+                styles={{ content: { color: '#3f8600' } }}
               />
             </Card>
           </Col>
@@ -327,7 +329,8 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                 title="Total Teams"
                 value={stats.totalTeams}
                 prefix={<FolderOutlined />}
-                valueStyle={{ color: '#1890ff' }}
+                
+                styles={{ content: { color: '#1890ff' } }}
               />
             </Card>
           </Col>
@@ -337,7 +340,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                 title="Completed Tickets"
                 value={stats.completedTickets}
                 prefix={<CheckCircleOutlined />}
-                valueStyle={{ color: '#52c41a' }}
+                styles={{ content: { color: '#52c41a' } }}
               />
             </Card>
           </Col>
@@ -347,7 +350,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                 title="Total Tickets"
                 value={stats.totalTickets}
                 prefix={<FileTextOutlined />}
-                valueStyle={{ color: '#722ed1' }}
+                styles={{ content: { color: '#722ed1' } }}
               />
             </Card>
           </Col>
@@ -360,7 +363,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                 title="Time today"
                 value={formatTime(trackerStats.todaySeconds)}
                 prefix={<ClockCircleOutlined />}
-                valueStyle={{ color: '#1890ff', fontSize: 18 }}
+                styles={{content:{ color: '#1890ff', fontSize: 18} }}
               />
               <Text type="secondary" style={{ fontSize: 12 }}>Tickets: {trackerStats.todayTickets}</Text>
             </Card>
@@ -371,7 +374,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                 title="Time this week"
                 value={formatTime(trackerStats.weekSeconds)}
                 prefix={<ClockCircleOutlined />}
-                valueStyle={{ color: '#52c41a', fontSize: 18 }}
+                styles={{ content:{color: '#52c41a', fontSize: 18} }}
               />
               <Text type="secondary" style={{ fontSize: 12 }}>Tickets: {trackerStats.weekTickets}</Text>
             </Card>
@@ -382,7 +385,8 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                 title="Time this month"
                 value={formatTime(trackerStats.monthSeconds)}
                 prefix={<ClockCircleOutlined />}
-                valueStyle={{ color: '#722ed1', fontSize: 18 }}
+                styles={{content:{ color: '#722ed1', fontSize: 18 }}}
+
               />
               <Text type="secondary" style={{ fontSize: 12 }}>Tickets: {trackerStats.monthTickets}</Text>
             </Card>
@@ -394,7 +398,8 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                 value={trackerStats.monthTickets}
                 suffix="this month"
                 prefix={<FileTextOutlined />}
-                valueStyle={{ color: '#fa8c16' }}
+                
+                styles={{ content:{color: '#fa8c16'} }}
               />
                <Text type="secondary" style={{ fontSize: 12 }}>Last Month Tickets: {trackerStats.lastMonthTickets}</Text>
             </Card>

@@ -166,6 +166,7 @@ function saveFiltersToStorage(stored: StoredFilter) {
 import { uploadTicketFileDraft, deleteFile } from '@/utils/storage'
 import type { TicketRecord, Team, UserRecord } from './types'
 import type { NewTicketAttachment } from './types'
+import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
 import {
   DEFAULT_KANBAN_COLUMNS,
   DEFAULT_ALL_STATUSES,
@@ -256,6 +257,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   }
   const initialState = initialRef.current?.state ?? getInitialFilterStateFromStored(null)
 
+  /** Snapshot kanban slugs terakhir dari lookup — untuk menambahkan status baru (Cancel/Archived dll) ke filter API tanpa timpa penyempitan manual. */
+  const lastKanbanSlugsRef = useRef<string[] | null>(null)
+
   const [collapsed, setCollapsed] = useState(true)
   const [tickets, setTickets] = useState<TicketRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -271,14 +275,16 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   const [companies, setCompanies] = useState<Array<{ id: string; name: string; color?: string }>>([])
   const [allTags, setAllTags] = useState<Array<{ id: string; name: string; slug: string; color?: string }>>([])
   const [activeId, setActiveId] = useState<number | null>(null)
-  const [statusColumns, setStatusColumns] = useState<StatusColumn[]>(DEFAULT_KANBAN_COLUMNS)
+  /** Kosong sampai lookup DB selesai — hindari kolom DEFAULT yang salah saat Show in Kanban = No */
+  const [statusColumns, setStatusColumns] = useState<StatusColumn[]>([])
+  const [lookupReady, setLookupReady] = useState(false)
   const [allStatusColumns, setAllStatusColumns] = useState<StatusColumn[]>(DEFAULT_ALL_STATUS_COLUMNS)
   const [allStatuses, setAllStatuses] = useState<{ slug: string; title: string }[]>(DEFAULT_ALL_STATUSES)
   const [filterStatus, setFilterStatus] = useState<string[]>(initialState.filterStatus)
   const [filterTypeIds, setFilterTypeIds] = useState<number[]>(initialState.filterTypeIds)
   const [filterCompanyIds, setFilterCompanyIds] = useState<string[]>(initialState.filterCompanyIds)
   const [filterTagIds, setFilterTagIds] = useState<string[]>(initialState.filterTagIds)
-  const [filterVisibility, setFilterVisibility] = useState<string[]>(initialState.filterVisibility)
+  const [filterVisibility, setFilterVisibilityState] = useState<string[]>(initialState.filterVisibility)
   const [filterTeamIds, setFilterTeamIds] = useState<string[]>(initialState.filterTeamIds)
   const [filterDateRange, setFilterDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(initialState.filterDateRange)
   const [filterSearch, setFilterSearch] = useState(initialState.filterSearch)
@@ -292,13 +298,39 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   /** Server returns filtered data - no client-side filtering */
   const filteredTickets = tickets
 
-  const columnsToShow = useMemo(
-    () => (filterStatus.length > 0 ? allStatusColumns.filter((c) => filterStatus.includes(c.id)) : statusColumns),
-    [filterStatus, allStatusColumns, statusColumns]
+  /**
+   * Kolom Kanban: persis slug yang dipilih di filter (urutan sort DB).
+   * Status show_in_kanban=false hanya dapat kolom jika slug-nya dipilih di filter.
+   */
+  const columnsToShow = useMemo(() => {
+    if (filterStatus.length === 0 || allStatusColumns.length === 0) return []
+    const allowed = new Set(filterStatus)
+    return allStatusColumns.filter((c) => allowed.has(c.id))
+  }, [filterStatus, allStatusColumns])
+
+  /** Slug default = semua yang show_in_kanban (sama isi statusColumns.id). */
+  const defaultKanbanStatusKey = useMemo(
+    () => [...statusColumns.map((c) => c.id)].sort().join(','),
+    [statusColumns]
   )
 
+  /**
+   * Filter status "aktif" jika bukan tepat kumpulan default kanban, atau ada tambahan non-kanban / kurang kolom kanban.
+   */
+  const statusFilterIsRestrictive = useMemo(() => {
+    if (statusColumns.length === 0) return false
+    if (filterStatus.length === 0) return false
+    return [...filterStatus].sort().join(',') !== defaultKanbanStatusKey
+  }, [filterStatus, defaultKanbanStatusKey, statusColumns.length])
+
+  /** Multi-select Status dikosongkan → kembali ke slug show_in_kanban saja (bukan [] / semua tiket). */
+  useEffect(() => {
+    if (!lookupReady || statusColumns.length === 0 || filterStatus.length > 0) return
+    setFilterStatus(statusColumns.map((c) => c.id))
+  }, [lookupReady, statusColumns, filterStatus.length])
+
   const hasActiveFilters =
-    filterStatus.length > 0 ||
+    statusFilterIsRestrictive ||
     filterTypeIds.length > 0 ||
     filterCompanyIds.length > 0 ||
     filterTagIds.length > 0 ||
@@ -307,16 +339,37 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     (filterDateRange != null && filterDateRange[0] != null && filterDateRange[1] != null) ||
     filterSearch.trim() !== ''
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilterStatus(statusColumns.map((c) => c.id))
     setFilterTypeIds([])
     setFilterCompanyIds([])
     setFilterTagIds([])
-    setFilterVisibility(['team'])
+    setFilterVisibilityState([])
     setFilterTeamIds([])
     setFilterDateRange(null)
     setFilterSearch('')
-  }
+  }, [statusColumns])
+
+  /**
+   * Visibility multiselect kosong = "All visibility" (tidak kirim param ke API).
+   * Saat user clear visibility (non-customer): reset filter lain dan status = slug show_in_kanban saja.
+   */
+  const setFilterVisibility = useCallback(
+    (v: string[]) => {
+      const next = v ?? []
+      setFilterVisibilityState(next)
+      if (!isCustomer && next.length === 0) {
+        setFilterTypeIds([])
+        setFilterCompanyIds([])
+        setFilterTagIds([])
+        setFilterTeamIds([])
+        setFilterDateRange(null)
+        setFilterSearch('')
+        setFilterStatus(statusColumns.map((c) => c.id))
+      }
+    },
+    [isCustomer, statusColumns]
+  )
 
   const fetchTickets = useCallback(async () => {
     const params = new URLSearchParams()
@@ -326,7 +379,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       if (filterVisibility.length > 0) params.set('visibility', filterVisibility.join(','))
       if (filterTeamIds.length > 0) params.set('team_ids', filterTeamIds.join(','))
     }
-    if (filterStatus.length > 0) params.set('status', filterStatus.join(','))
+    /** Customer: load all statuses from API (company-wide list); status filter only affects UI columns. */
+    if (!isCustomer && filterStatus.length > 0) params.set('status', filterStatus.join(','))
     if (filterTypeIds.length > 0) params.set('type_ids', filterTypeIds.join(','))
     if (filterDateRange?.[0] && filterDateRange?.[1]) {
       params.set('date_from', filterDateRange[0].startOf('day').toISOString())
@@ -364,6 +418,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
   const fetchLookup = async () => {
     try {
+      setLookupReady(false)
       const data = await apiFetch<{
         userTeamIds?: string[]
         userCompanyId?: string | null
@@ -373,7 +428,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         ticketPriorities: Array<{ id: number; title: string; slug: string; color: string }>
         companies: Array<{ id: string; name: string; color?: string }>
         tags: Array<{ id: string; name: string; slug: string; color?: string }>
-        statuses: TicketStatusRecord[]
+        statuses: Array<TicketStatusRecord & { show_in_kanban?: boolean | null }>
       }>('/api/tickets/lookup')
 
       setTeams(data.teams || [])
@@ -396,35 +451,75 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       if (list.length > 0) {
         const statusTitle = (s: { slug: string; title: string; customer_title?: string; color: string }) =>
           isCustomer && s.customer_title ? s.customer_title : s.title
-        const kanbanSlugs = list.filter((s) => s.show_in_kanban).map((s) => s.slug)
-        setStatusColumns(list.filter((s) => s.show_in_kanban).map((s) => ({ id: s.slug, title: statusTitle(s), color: s.color })))
+        const inKanban = (s: { show_in_kanban?: unknown }) => isTicketStatusInKanban(s.show_in_kanban)
+        const kanbanSlugs = list.filter(inKanban).map((s) => s.slug)
+        setStatusColumns(list.filter(inKanban).map((s) => ({ id: s.slug, title: statusTitle(s), color: s.color })))
         setAllStatusColumns(list.map((s) => ({ id: s.slug, title: statusTitle(s), color: s.color })))
         setAllStatuses(list.map((s) => ({ slug: s.slug, title: statusTitle(s) })))
         const validSlugs = new Set(list.map((s) => s.slug))
-        let resolvedStatus: string[]
         if (fromUrl) {
           const current = initialRef.current?.state.filterStatus ?? []
           const intersection = current.filter((slug: string) => validSlugs.has(slug))
-          resolvedStatus = intersection.length > 0 ? intersection : kanbanSlugs
+          const resolvedStatus = intersection.length > 0 ? intersection : kanbanSlugs
           setFilterStatus(resolvedStatus)
+          lastKanbanSlugsRef.current = kanbanSlugs
+          saveFiltersToStorage({ ...(stored || {}), filterStatus: resolvedStatus.length ? resolvedStatus : null } as StoredFilter)
         } else {
-          const hasStoredStatusPreference = stored && ('filterStatus' in stored && Array.isArray(stored.filterStatus) && stored.filterStatus.length > 0)
-          if (hasStoredStatusPreference && stored?.filterStatus?.length) {
-            const intersection = stored.filterStatus.filter((slug: string) => validSlugs.has(slug))
-            resolvedStatus = intersection.length > 0 ? intersection : kanbanSlugs
+          if (isCustomer) {
+            const allSlugs = list.map((s) => s.slug)
+            const hasStoredStatusPreference =
+              stored &&
+              'filterStatus' in stored &&
+              Array.isArray(stored.filterStatus) &&
+              stored.filterStatus.length > 0
+            const fromStore =
+              hasStoredStatusPreference && stored?.filterStatus?.length
+                ? stored.filterStatus.filter((slug: string) => validSlugs.has(slug))
+                : []
+            setFilterStatus(fromStore.length > 0 ? fromStore : allSlugs)
+            lastKanbanSlugsRef.current = kanbanSlugs
           } else {
-            resolvedStatus = kanbanSlugs
+            // Gabungkan slug kanban baru (mis. user centang Show in Kanban untuk Cancel/Archived) ke filter API.
+            setFilterStatus((prev) => {
+              let next: string[]
+              if (prev.length > 0) {
+                const pruned = prev.filter((slug) => validSlugs.has(slug))
+                next = pruned.length > 0 ? pruned : kanbanSlugs
+              } else {
+                const hasStoredStatusPreference =
+                  stored &&
+                  'filterStatus' in stored &&
+                  Array.isArray(stored.filterStatus) &&
+                  stored.filterStatus.length > 0
+                if (hasStoredStatusPreference && stored?.filterStatus?.length) {
+                  const intersection = stored.filterStatus.filter((slug: string) => validSlugs.has(slug))
+                  next = intersection.length > 0 ? intersection : kanbanSlugs
+                } else {
+                  next = kanbanSlugs
+                }
+              }
+              const prevKanban = lastKanbanSlugsRef.current
+              lastKanbanSlugsRef.current = kanbanSlugs
+              if (prevKanban === null) {
+                const extra = next.filter((s) => !kanbanSlugs.includes(s) && validSlugs.has(s))
+                return [...new Set([...kanbanSlugs, ...extra])]
+              }
+              const newlyAdded = kanbanSlugs.filter((s) => !prevKanban.includes(s))
+              if (newlyAdded.length === 0) return next
+              return [...new Set([...next, ...newlyAdded])]
+            })
           }
-          setFilterStatus(resolvedStatus)
         }
-        saveFiltersToStorage({ ...(stored || {}), filterStatus: resolvedStatus.length ? resolvedStatus : null } as StoredFilter)
       }
     } catch (error) {
       console.error('Failed to fetch lookup data:', error)
+    } finally {
+      setLookupReady(true)
     }
   }
 
   useEffect(() => {
+    lastKanbanSlugsRef.current = null
     fetchLookup()
   }, [isCustomer])
 
@@ -844,5 +939,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     handleRemoveNewAttachment,
     attachmentUploading,
     userTeamIds,
+    lookupReady,
   }
 }

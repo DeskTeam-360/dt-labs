@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { ticketStatuses } from '@/lib/db'
 import { asc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
 
 /** GET /api/ticket-statuses - List all ticket statuses */
 export async function GET() {
@@ -23,7 +24,7 @@ export async function GET() {
     customer_title: r.customerTitle ?? undefined,
     description: r.description ?? undefined,
     color: r.color,
-    show_in_kanban: r.showInKanban ?? true,
+    show_in_kanban: isTicketStatusInKanban(r.showInKanban),
     sort_order: r.sortOrder ?? 0,
     created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
     updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
     customer_title: inserted.customerTitle ?? undefined,
     description: inserted.description ?? undefined,
     color: inserted.color,
-    show_in_kanban: inserted.showInKanban ?? true,
+    show_in_kanban: isTicketStatusInKanban(inserted.showInKanban),
     sort_order: inserted.sortOrder ?? 0,
     created_at: inserted.createdAt ? new Date(inserted.createdAt).toISOString() : '',
     updated_at: inserted.updatedAt ? new Date(inserted.updatedAt).toISOString() : '',

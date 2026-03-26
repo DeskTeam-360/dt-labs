@@ -2,6 +2,9 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { getTicketDetail } from '@/lib/ticket-detail'
 import TicketDetailContent from '@/components/TicketDetailContent'
+import { db } from '@/lib/db'
+import { users, companyUsers } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 
 export default async function TicketDetailPage({
   params,
@@ -19,15 +22,35 @@ export default async function TicketDetailPage({
     redirect('/tickets')
   }
 
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+  let customerCompanyId: string | undefined
+  if (role === 'customer' && session.user.id) {
+    const userId = session.user.id
+    const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
+    let cid = userRow?.companyId ?? null
+    if (!cid) {
+      const [cu] = await db
+        .select({ companyId: companyUsers.companyId })
+        .from(companyUsers)
+        .where(eq(companyUsers.userId, userId))
+        .limit(1)
+      cid = cu?.companyId ?? null
+    }
+    if (!cid) {
+      redirect('/tickets')
+    }
+    customerCompanyId = cid
+  }
+
   const data = await getTicketDetail(ticketId, {
     screenshotUserId: session.user.id,
+    ...(customerCompanyId ? { companyId: customerCompanyId } : {}),
   })
 
   if (!data) {
     redirect('/tickets')
   }
 
-  const role = (session.user as { role?: string }).role
   const isCustomer = role === 'customer'
   const commentsForView = isCustomer
     ? data.comments.filter((c: { visibility?: string }) => c.visibility !== 'note')
