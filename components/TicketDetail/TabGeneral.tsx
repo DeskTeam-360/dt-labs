@@ -22,6 +22,7 @@ import {
 } from 'antd'
 import {
   UserOutlined,
+  ThunderboltOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
   CommentOutlined,
@@ -38,6 +39,7 @@ import DateDisplay from '../DateDisplay'
 import dayjs from 'dayjs'
 import CommentWysiwyg from './CommentWysiwyg'
 import CommentComposer from './CommentComposer'
+import TicketUserMention from './TicketUserMention'
 
 const { Text, Paragraph } = Typography
 
@@ -58,7 +60,7 @@ interface Comment {
   comment: string
   created_at: string
   visibility?: 'note' | 'reply'
-  author_type?: 'customer' | 'agent'
+  author_type?: 'customer' | 'agent' | 'automation'
   user?: { id: string; full_name: string | null; email: string; avatar_url?: string | null }
   comment_attachments?: CommentAttachment[] | null
   cc_emails?: string[]
@@ -257,6 +259,11 @@ export default function TabGeneral({
     setShortNoteInput(shortNote ?? '')
   }, [shortNote])
 
+  const creatorId = ticketData.creator?.id ?? ticketData.created_by ?? null
+  const creatorEmail = ticketData.creator?.email ?? null
+  const creatorLabel =
+    ticketData.company?.name || ticketData.creator?.full_name || ticketData.creator?.email || 'Unknown'
+
   return (
     <Space orientation="vertical" style={{ width: '100%' }} size="middle">
       <Row gutter={[24, 24]}>
@@ -264,13 +271,17 @@ export default function TabGeneral({
 
 
       <Flex gap="middle" align="flex-start" style={{ padding: 10, marginBottom: 10, borderBottom: '1px solid black',  }}>
-                      <Avatar icon={<UserOutlined />} src={ticketData.creator?.avatar_url} />
+                      <TicketUserMention userId={creatorId} email={creatorEmail}>
+                        <Avatar style={{ cursor: creatorId ? 'pointer' : undefined }} icon={<UserOutlined />} src={ticketData.creator?.avatar_url} />
+                      </TicketUserMention>
                       <Flex vertical style={{ flex: 1, minWidth: 0 }}>
                         <Flex justify="space-between" align="center" wrap="wrap" gap="small">
                           <Space>
-                            <Text strong>
-                              {ticketData.company?.name || ticketData.creator?.full_name || ticketData.creator?.email || 'Unknown'}
-                            </Text>
+                            <TicketUserMention userId={creatorId} email={creatorEmail}>
+                              <Text strong style={{ cursor: creatorId ? 'pointer' : undefined }}>
+                                {creatorLabel}
+                              </Text>
+                            </TicketUserMention>
                             <Text type="secondary" style={{ fontSize: 12 }}>
                               <DateDisplay date={ticketData.created_at} />
                             </Text>
@@ -299,28 +310,56 @@ export default function TabGeneral({
               {comments.length > 0 ? (
                 <Flex vertical gap={10}>
                   {comments.map((comment) => {
+                    const isAutomation = comment.author_type === 'automation'
                     const isCustomer = comment.author_type === 'customer'
                     const isCurrentUser = comment.user_id === currentUserId
-                    const cardBg = isCustomer ? 'rgba(230, 247, 255, 0.5)' : (comment.visibility === 'note' ? '#f5f5f5' : 'rgba(255, 251, 230, 0.4)')
-                    const borderColor = isCustomer ? '#91caff' : (comment.visibility === 'note' ? '#d9d9d9' : '#ffe58f')
+                    const cardBg = isAutomation
+                      ? 'rgba(246, 240, 255, 0.6)'
+                      : isCustomer
+                        ? 'rgba(230, 247, 255, 0.5)'
+                        : comment.visibility === 'note'
+                          ? '#f5f5f5'
+                          : 'rgba(255, 251, 230, 0.4)'
+                    const borderColor = isAutomation ? '#b37feb91' : isCustomer ? '#91caff' : comment.visibility === 'note' ? '#d9d9d9' : '#ffe58f'
                     const borderStyle = isCurrentUser
                       ? { borderRight: `3px solid green` as const }
                       : { borderLeft: `3px solid ${borderColor}` as const }
+                    const authorLabel = isAutomation
+                      ? 'Automation'
+                      : isCustomer
+                        ? (ticketData.company?.name || 'Customer') + ' - ' + (comment.user?.full_name || comment.user?.email || 'Unknown')
+                        : comment.user?.full_name || comment.user?.email || 'Unknown'
                     return (
                     <Flex key={comment.id} gap="middle" align="flex-start" 
                     style={{ padding: 20, backgroundColor: cardBg, borderRadius: 10, ...borderStyle }}>
-                      <Avatar icon={<UserOutlined />} src={comment.user?.avatar_url} />
+                      {isAutomation ? (
+                        <Avatar style={{ backgroundColor: '#722ed1' }} icon={<ThunderboltOutlined />} />
+                      ) : (
+                        <TicketUserMention userId={comment.user_id} email={comment.user?.email}>
+                          <Avatar
+                            style={{ cursor: comment.user_id ? 'pointer' : undefined }}
+                            icon={<UserOutlined />}
+                            src={comment.user?.avatar_url}
+                          />
+                        </TicketUserMention>
+                      )}
                       <Flex vertical style={{ flex: 1, minWidth: 0 }}>
                         <Flex justify="space-between" align="center" wrap="wrap" gap="small">
                           <Space>
-                          <Text strong>
-                            {isCustomer
-                              ? (ticketData.company?.name || 'Customer') + ' - ' + (comment.user?.full_name || comment.user?.email || 'Unknown')
-                              : (comment.user?.full_name || comment.user?.email || 'Unknown')}
-                          </Text>
-                            <Tag color={isCustomer ? 'cyan' : 'gold'}>
-                              {isCustomer ? 'Customer' : 'Agent'}
-                            </Tag>
+                          {isAutomation ? (
+                            <Text strong>{authorLabel}</Text>
+                          ) : (
+                            <TicketUserMention userId={comment.user_id} email={comment.user?.email}>
+                              <Text strong style={{ cursor: comment.user_id ? 'pointer' : undefined }}>
+                                {authorLabel}
+                              </Text>
+                            </TicketUserMention>
+                          )}
+                            {isAutomation ? (
+                              <Tag color="purple">Automation</Tag>
+                            ) : (
+                              <Tag color={isCustomer ? 'cyan' : 'gold'}>{isCustomer ? 'Customer' : 'Agent'}</Tag>
+                            )}
                             {showNoteOption && (
                               <Tag color={comment.visibility === 'note' ? 'default' : 'blue'}>
                                 {comment.visibility === 'note' ? 'Note' : 'Reply'}
@@ -330,7 +369,7 @@ export default function TabGeneral({
                               <DateDisplay date={comment.created_at} />
                             </Text>
                           </Space>
-                          {!isCustomer && comment.user_id === currentUserId && editingComment !== comment.id && (
+                          {!isAutomation && !isCustomer && comment.user_id === currentUserId && editingComment !== comment.id && (
                             <Space>
                               
                               {canDeleteComment(comment.created_at) && (
@@ -390,7 +429,7 @@ export default function TabGeneral({
                           ) : comment.comment && /<[a-z][\s\S]*>/i.test(comment.comment) ? (
                             <div
                               className="ql-editor comment-html"
-                              style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
+                              style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14, border: 'none' }}
                               dangerouslySetInnerHTML={{ __html: comment.comment }}
                             />
                           ) : (
@@ -543,12 +582,12 @@ export default function TabGeneral({
               )}
             </Descriptions.Item>
             <Descriptions.Item label="Created By">
-              <Space>
-                <UserOutlined />
-                <Text>
-                  {ticketData.company?.name || ticketData.creator?.full_name || ticketData.creator?.email || 'Unknown'}
-                </Text>
-              </Space>
+              <TicketUserMention userId={creatorId} email={creatorEmail}>
+                <Space style={{ cursor: creatorId ? 'pointer' : undefined }}>
+                  <UserOutlined />
+                  <Text>{creatorLabel}</Text>
+                </Space>
+              </TicketUserMention>
             </Descriptions.Item>
             <Descriptions.Item label="CC Recipients">
               {ticketCcEmails?.length ? (

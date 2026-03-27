@@ -303,7 +303,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
           minHeight: '100vh',
         }}
       >
-        <TicketSearchNavbar />
+        <TicketSearchNavbar savedFiltersUserId={user.id} />
         <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
         <div style={{ marginBottom: 24 }}>
           <Title level={2}>Welcome!</Title>

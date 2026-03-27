@@ -8,122 +8,10 @@ export type TicketsDragStartHandler = (event: DragStartEvent) => void
 export type TicketsDragEndHandler = (event: DragEndEvent) => Promise<void>
 import { Form, message } from 'antd'
 import dayjs from 'dayjs'
+import { parseFiltersFromUrl, buildSearchStringFromFilters, hasUrlFilterParams } from '@/lib/ticket-filter-url'
+import type { ParsedUrlFilters } from '@/lib/ticket-filter-url'
 
 const FILTER_STORAGE_KEY = 'deskteam-tickets-filter'
-
-/** URL param keys - used for shareable filter links */
-const URL_PARAMS = {
-  status: 'status',
-  type_ids: 'type_ids',
-  company_ids: 'company_ids',
-  tag_ids: 'tag_ids',
-  visibility: 'visibility',
-  team_ids: 'team_ids',
-  date_from: 'date_from',
-  date_to: 'date_to',
-  search: 'search',
-  view: 'view',
-  sort: 'sort',
-  order: 'order',
-  sidebar: 'sidebar',
-} as const
-
-function hasUrlFilterParams(searchParams: URLSearchParams): boolean {
-  return Array.from(Object.values(URL_PARAMS)).some((key) => searchParams.has(key))
-}
-
-interface ParsedUrlFilters {
-  filterStatus: string[]
-  filterTypeIds: number[]
-  filterCompanyIds: string[]
-  filterTagIds: string[]
-  filterVisibility: string[]
-  filterTeamIds: string[]
-  filterDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
-  filterSearch: string
-  viewMode: 'kanban' | 'list' | 'card' | 'roundrobin'
-  sortBy: import('./types').TicketSortField
-  sortOrder: import('./types').TicketSortOrder
-  filterSidebarCollapsed: boolean
-}
-
-function parseFiltersFromUrl(searchParams: URLSearchParams): ParsedUrlFilters | null {
-  if (!hasUrlFilterParams(searchParams)) return null
-  const split = (s: string | null) => (s ? s.split(',').map((x) => x.trim()).filter(Boolean) : [])
-  const status = split(searchParams.get(URL_PARAMS.status))
-  const typeIds = split(searchParams.get(URL_PARAMS.type_ids)).map((x) => parseInt(x, 10)).filter((n) => !isNaN(n))
-  const companyIds = split(searchParams.get(URL_PARAMS.company_ids))
-  const tagIds = split(searchParams.get(URL_PARAMS.tag_ids))
-  const visibilityRaw = split(searchParams.get(URL_PARAMS.visibility))
-  const visibility = visibilityRaw.map((v) => (v === 'specific_users' ? 'private' : v)).filter((v, i, arr) => arr.indexOf(v) === i)
-  const teamIds = split(searchParams.get(URL_PARAMS.team_ids))
-  const dateFrom = searchParams.get(URL_PARAMS.date_from)
-  const dateTo = searchParams.get(URL_PARAMS.date_to)
-  let filterDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null = null
-  if (dateFrom && dateTo) {
-    const d0 = dayjs(dateFrom)
-    const d1 = dayjs(dateTo)
-    if (d0.isValid() && d1.isValid()) filterDateRange = [d0, d1]
-  }
-  const viewRaw = searchParams.get(URL_PARAMS.view) as 'kanban' | 'list' | 'card' | 'roundrobin' | null
-  const viewMode = ['kanban', 'list', 'card', 'roundrobin'].includes(viewRaw || '') ? viewRaw! : 'kanban'
-  const sortRaw = searchParams.get(URL_PARAMS.sort)
-  const sortBy = (['id', 'title', 'priority', 'due_date', 'updated_at', 'created_at', 'company'] as const).includes(sortRaw as any)
-    ? (sortRaw as import('./types').TicketSortField)
-    : 'updated_at'
-  const orderRaw = searchParams.get(URL_PARAMS.order)
-  const sortOrder = orderRaw === 'asc' || orderRaw === 'desc' ? orderRaw : 'desc'
-  const sidebarRaw = searchParams.get(URL_PARAMS.sidebar)
-  const filterSidebarCollapsed = sidebarRaw === '0' ? false : true
-
-  return {
-    filterStatus: status.length > 0 ? status : DEFAULT_KANBAN_COLUMNS.map((c) => c.id),
-    filterTypeIds: typeIds,
-    filterCompanyIds: companyIds,
-    filterTagIds: tagIds,
-    filterVisibility: visibility.length > 0 ? visibility : ['public'],
-    filterTeamIds: teamIds,
-    filterDateRange,
-    filterSearch: searchParams.get(URL_PARAMS.search)?.trim() ?? '',
-    viewMode,
-    sortBy,
-    sortOrder,
-    filterSidebarCollapsed,
-  }
-}
-
-function buildSearchStringFromFilters(state: {
-  filterStatus: string[]
-  filterTypeIds: number[]
-  filterCompanyIds: string[]
-  filterTagIds: string[]
-  filterVisibility: string[]
-  filterTeamIds: string[]
-  filterDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
-  filterSearch: string
-  viewMode: string
-  sortBy: string
-  sortOrder: string
-  filterSidebarCollapsed: boolean
-}): string {
-  const p = new URLSearchParams()
-  if (state.filterStatus.length > 0) p.set(URL_PARAMS.status, state.filterStatus.join(','))
-  if (state.filterTypeIds.length > 0) p.set(URL_PARAMS.type_ids, state.filterTypeIds.join(','))
-  if (state.filterCompanyIds.length > 0) p.set(URL_PARAMS.company_ids, state.filterCompanyIds.join(','))
-  if (state.filterTagIds.length > 0) p.set(URL_PARAMS.tag_ids, state.filterTagIds.join(','))
-  if (state.filterVisibility.length > 0) p.set(URL_PARAMS.visibility, state.filterVisibility.join(','))
-  if (state.filterTeamIds.length > 0) p.set(URL_PARAMS.team_ids, state.filterTeamIds.join(','))
-  if (state.filterDateRange?.[0] && state.filterDateRange?.[1]) {
-    p.set(URL_PARAMS.date_from, state.filterDateRange[0].toISOString())
-    p.set(URL_PARAMS.date_to, state.filterDateRange[1].toISOString())
-  }
-  if (state.filterSearch.trim()) p.set(URL_PARAMS.search, state.filterSearch.trim())
-  if (state.viewMode && state.viewMode !== 'kanban') p.set(URL_PARAMS.view, state.viewMode)
-  if (state.sortBy && state.sortBy !== 'updated_at') p.set(URL_PARAMS.sort, state.sortBy)
-  if (state.sortOrder && state.sortOrder !== 'desc') p.set(URL_PARAMS.order, state.sortOrder)
-  if (!state.filterSidebarCollapsed) p.set(URL_PARAMS.sidebar, '0')
-  return p.toString()
-}
 
 interface StoredFilter {
   filterStatus?: string[] | null
@@ -259,6 +147,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
   /** Snapshot kanban slugs terakhir dari lookup — untuk menambahkan status baru (Cancel/Archived dll) ke filter API tanpa timpa penyempitan manual. */
   const lastKanbanSlugsRef = useRef<string[] | null>(null)
+  /** Hindari loop `router.replace` saat state diset dari perubahan URL (preset / browser back). */
+  const applyingFromUrlRef = useRef(false)
+  /** Hanya `search` halaman daftar tiket — deteksi navigasi query baru vs mount pertama. */
+  const prevTicketsListSearchRef = useRef<string | null>(null)
 
   const [collapsed, setCollapsed] = useState(true)
   const [tickets, setTickets] = useState<TicketRecord[]>([])
@@ -539,6 +431,77 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     fetchTickets()
   }, [fetchTickets])
 
+  const searchParamsKey = searchParams.toString()
+
+  /** Saat query `/tickets` berubah (preset navbar, link, back): samakan state Filter sidebar & hook. */
+  useEffect(() => {
+    const isTicketsList = pathname === '/tickets' || pathname === '/tickets/'
+    if (!isTicketsList) return
+
+    if (prevTicketsListSearchRef.current === null) {
+      prevTicketsListSearchRef.current = searchParamsKey
+      return
+    }
+    if (prevTicketsListSearchRef.current === searchParamsKey) return
+    prevTicketsListSearchRef.current = searchParamsKey
+
+    applyingFromUrlRef.current = true
+
+    if (hasUrlFilterParams(searchParams)) {
+      let parsed = parseFiltersFromUrl(searchParams)
+      if (!parsed) {
+        applyingFromUrlRef.current = false
+        return
+      }
+      if (isCustomer && parsed.viewMode === 'roundrobin') {
+        parsed = { ...parsed, viewMode: 'kanban' }
+      }
+      let statuses = parsed.filterStatus
+      if (lookupReady && allStatuses.length > 0 && statusColumns.length > 0) {
+        const valid = new Set(allStatuses.map((s) => s.slug))
+        const pruned = statuses.filter((s) => valid.has(s))
+        statuses = pruned.length > 0 ? pruned : statusColumns.map((c) => c.id)
+      }
+      setFilterStatus(statuses)
+      setFilterTypeIds(parsed.filterTypeIds)
+      setFilterCompanyIds(parsed.filterCompanyIds)
+      setFilterTagIds(parsed.filterTagIds)
+      setFilterVisibilityState(parsed.filterVisibility)
+      setFilterTeamIds(parsed.filterTeamIds)
+      setFilterDateRange(parsed.filterDateRange)
+      setFilterSearch(parsed.filterSearch)
+      setViewMode(parsed.viewMode)
+      setSortBy(parsed.sortBy)
+      setSortOrder(parsed.sortOrder)
+      setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
+    } else {
+      const fallbackStatus =
+        lookupReady && statusColumns.length > 0
+          ? statusColumns.map((c) => c.id)
+          : DEFAULT_KANBAN_COLUMNS.map((c) => c.id)
+      setFilterStatus(fallbackStatus)
+      setFilterTypeIds([])
+      setFilterCompanyIds([])
+      setFilterTagIds([])
+      setFilterVisibilityState([])
+      setFilterTeamIds([])
+      setFilterDateRange(null)
+      setFilterSearch('')
+      setViewMode('kanban')
+      setSortBy('updated_at')
+      setSortOrder('desc')
+      setFilterSidebarCollapsed(true)
+    }
+  }, [
+    pathname,
+    searchParamsKey,
+    searchParams,
+    isCustomer,
+    lookupReady,
+    allStatuses,
+    statusColumns,
+  ])
+
   /** On every filter change: save to localStorage + update URL (so link can be shared) */
   useEffect(() => {
     saveFiltersToStorage({
@@ -558,6 +521,11 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       sortBy: sortBy || null,
       sortOrder: sortOrder || null,
     })
+
+    if (applyingFromUrlRef.current) {
+      applyingFromUrlRef.current = false
+      return
+    }
 
     /** Always write filter state to URL so link can be shared */
     if (pathname) {
@@ -596,6 +564,36 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterSidebarCollapsed,
     sortBy,
     sortOrder,
+  ])
+
+  const getFilterQueryString = useCallback(() => {
+    return buildSearchStringFromFilters({
+      filterStatus,
+      filterTypeIds,
+      filterCompanyIds,
+      filterTagIds,
+      filterVisibility,
+      filterTeamIds,
+      filterDateRange,
+      filterSearch,
+      viewMode,
+      sortBy,
+      sortOrder,
+      filterSidebarCollapsed,
+    })
+  }, [
+    filterStatus,
+    filterTypeIds,
+    filterCompanyIds,
+    filterTagIds,
+    filterVisibility,
+    filterTeamIds,
+    filterDateRange,
+    filterSearch,
+    viewMode,
+    sortBy,
+    sortOrder,
+    filterSidebarCollapsed,
   ])
 
   const handleDragStart: TicketsDragStartHandler = (event) => {
@@ -940,5 +938,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     attachmentUploading,
     userTeamIds,
     lookupReady,
+    getFilterQueryString,
   }
 }

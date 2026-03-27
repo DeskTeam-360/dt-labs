@@ -97,7 +97,7 @@ interface Comment {
     comment: string
     created_at: string
     visibility?: 'note' | 'reply'
-    author_type?: 'customer' | 'agent'
+    author_type?: 'customer' | 'agent' | 'automation'
     user?: {
         id: string
         full_name: string | null

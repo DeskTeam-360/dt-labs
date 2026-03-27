@@ -119,11 +119,14 @@ export default function CommentWysiwyg({
     <>
     <style>{`
       .ql-editor {
-        min-height: ${height ? (parseInt(height.replace('px', '')) - 1) : '99'}px;
+        min-height: ${height ? (parseInt(height.replace('px', '')) - 1) : '990'}px;
+        
       }
+        .ql-container .ql-editor{
+        background-color: white;}
     `}</style>
     
-    <div className="comment-wysiwyg-wrapper" style={{ marginBottom: 20 }}>
+    <div className="comment-wysiwyg-wrapper" style={{ marginBottom: 20, height: height, }}>
       {/* ref passed for image handler; react-quill-new types omit ref */}
       <ReactQuill {...(quillProps as React.ComponentProps<typeof ReactQuill>)} />
     </div>

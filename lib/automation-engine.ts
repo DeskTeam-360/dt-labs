@@ -1,5 +1,6 @@
 /**
- * Automation rules engine: evaluate conditions and apply actions when tickets are created/updated.
+ * Automation rules engine: evaluate conditions and apply actions when tickets are
+ * created, updated, or when a new comment/reply/note is added.
  */
 import { db } from '@/lib/db'
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
@@ -8,6 +9,7 @@ import {
   tickets,
   ticketPriorities,
   ticketTypes,
+  ticketAssignees,
   teams,
   ticketTags,
   ticketComments,
@@ -16,6 +18,7 @@ import {
 import { eq, and, desc } from 'drizzle-orm'
 import type { OurCondition, OurConditionGroup, OurConditionLeaf } from './condition-builder-utils'
 import type { AutomationActions } from './automation-actions-types'
+import { AUTOMATION_NOTE_USER_ID } from './automation-constants'
 
 function automationNoteHtmlHasText(html: string | undefined | null): boolean {
   if (!html?.trim()) return false
@@ -40,7 +43,16 @@ export interface TicketContext {
   sender_email?: string | null
   sender_domain?: string | null
   assignee_ids?: string[]
+  /** Set for event ticket_comment_added: reply | note */
+  comment_visibility?: string | null
+  /** Set for event ticket_comment_added: agent | customer | automation */
+  comment_author_type?: string | null
 }
+
+export type AutomationEventType =
+  | 'ticket_created'
+  | 'ticket_updated'
+  | 'ticket_comment_added'
 
 function isLeaf(c: OurCondition): c is OurConditionLeaf {
   return !('conditions' in c) || !Array.isArray((c as OurConditionGroup).conditions)
@@ -69,6 +81,10 @@ function evalLeaf(leaf: OurConditionLeaf, ctx: TicketContext): boolean {
         return (ctx.assignee_ids ?? [])[0] ?? ''
       case 'created_via':
         return (ctx.created_via ?? '') || ''
+      case 'comment_visibility':
+        return (ctx.comment_visibility ?? '') || ''
+      case 'comment_author_type':
+        return (ctx.comment_author_type ?? '') || ''
       default:
         return ''
     }
@@ -116,8 +132,56 @@ function evalConditions(cond: OurConditionGroup, ctx: TicketContext): boolean {
   return operator === 'OR' ? results.some(Boolean) : results.every(Boolean)
 }
 
+/** Load ticket + assignees for automation context (shared across triggers). */
+export async function loadAutomationTicketContext(ticketId: number): Promise<TicketContext | null> {
+  const [row] = await db
+    .select({
+      t: tickets,
+      prioritySlug: ticketPriorities.slug,
+    })
+    .from(tickets)
+    .leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id))
+    .where(eq(tickets.id, ticketId))
+    .limit(1)
+  if (!row?.t) return null
+  const assigneeRows = await db
+    .select({ userId: ticketAssignees.userId })
+    .from(ticketAssignees)
+    .where(eq(ticketAssignees.ticketId, ticketId))
+  const t = row.t
+  return {
+    id: t.id,
+    title: t.title,
+    description: t.description,
+    status: t.status,
+    priority_slug: row.prioritySlug ?? null,
+    company_id: t.companyId,
+    created_via: t.createdVia,
+    team_id: t.teamId,
+    visibility: t.visibility,
+    assignee_ids: assigneeRows.map((r) => r.userId),
+  }
+}
+
+/**
+ * After a human or customer comment is saved. Skips author_type automation to avoid loops.
+ */
+export async function runTicketCommentAutomation(
+  ticketId: number,
+  comment: { visibility: string; authorType: string }
+): Promise<void> {
+  if (comment.authorType === 'automation') return
+  const base = await loadAutomationTicketContext(ticketId)
+  if (!base) return
+  await runAutomationRules('ticket_comment_added', {
+    ...base,
+    comment_visibility: comment.visibility ?? 'reply',
+    comment_author_type: comment.authorType ?? 'agent',
+  })
+}
+
 export async function runAutomationRules(
-  eventType: 'ticket_created' | 'ticket_updated',
+  eventType: AutomationEventType,
   ctx: TicketContext
 ): Promise<void> {
   const rows = await db
@@ -129,6 +193,7 @@ export async function runAutomationRules(
         eq(automationRules.status, true)
       )
     )
+    /** Higher `priority` value runs first; every matching rule runs (not only the first). */
     .orderBy(desc(automationRules.priority))
 
   for (const rule of rows) {
@@ -199,10 +264,11 @@ export async function runAutomationRules(
       }
     }
 
-    if (automationNoteHtmlHasText(actions.add_note) && actions.add_note_user_id?.trim()) {
+    if (automationNoteHtmlHasText(actions.add_note)) {
+      const noteUserId = actions.add_note_user_id?.trim() || AUTOMATION_NOTE_USER_ID
       await db.insert(ticketComments).values({
         ticketId: ctx.id,
-        userId: actions.add_note_user_id,
+        userId: noteUserId,
         comment: actions.add_note!.trim(),
         visibility: 'note',
         authorType: 'automation',
@@ -234,6 +300,17 @@ export async function runAutomationRules(
       }
     }
 
-    break
+    const fresh = await loadAutomationTicketContext(ctx.id)
+    if (fresh) {
+      ctx.title = fresh.title
+      ctx.description = fresh.description
+      ctx.status = fresh.status
+      ctx.priority_slug = fresh.priority_slug
+      ctx.company_id = fresh.company_id
+      ctx.created_via = fresh.created_via
+      ctx.team_id = fresh.team_id
+      ctx.visibility = fresh.visibility
+      ctx.assignee_ids = fresh.assignee_ids
+    }
   }
 }

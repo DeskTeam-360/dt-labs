@@ -24,13 +24,14 @@ import {
   DeleteOutlined,
   FilterOutlined,
   SyncOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import DateDisplay from '../DateDisplay'
 import CommentWysiwyg from '../TicketDetail/CommentWysiwyg'
 import { DatePicker } from 'antd'
-import dayjs from 'dayjs'
+import dayjs, { type Dayjs } from 'dayjs'
 import type { ColumnsType } from 'antd/es/table'
 
 const { Text } = Typography
@@ -100,6 +101,8 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
   const [filterStatus, setFilterStatus] = useState<string[]>([])
   const [filterTypeId, setFilterTypeId] = useState<number | undefined>(undefined)
   const [filterSearch, setFilterSearch] = useState('')
+  /** Filter tiket by tanggal **created** (server, pakai date_from / date_to API). */
+  const [filterDateRange, setFilterDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingTicket, setEditingTicket] = useState<TicketRecord | null>(null)
   const [saving, setSaving] = useState(false)
@@ -127,13 +130,18 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     }
   }
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     if (!companyData?.id) return
     setLoading(true)
     try {
-      const data = await apiFetch<TicketRecord[]>(
-        `/api/tickets?company_id=${encodeURIComponent(companyData.id)}`
-      )
+      const params = new URLSearchParams()
+      params.set('company_id', companyData.id)
+      if (filterDateRange) {
+        params.set('date_from', filterDateRange[0].startOf('day').toISOString())
+        params.set('date_to', filterDateRange[1].endOf('day').toISOString())
+      }
+      const qs = params.toString()
+      const data = await apiFetch<TicketRecord[]>(`/api/tickets?${qs}`)
       const list = Array.isArray(data) ? data : []
       setTickets(
         list.map((t: any) => ({
@@ -165,7 +173,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     } finally {
       setLoading(false)
     }
-  }
+  }, [companyData?.id, filterDateRange])
 
   const fetchLookup = async () => {
     try {
@@ -193,7 +201,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
 
   useEffect(() => {
     fetchTickets()
-  }, [companyData?.id])
+  }, [fetchTickets])
 
   useEffect(() => {
     fetchLookup()
@@ -207,13 +215,15 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     return !statuses.every((s) => set.has(s.slug))
   }, [filterStatus, statuses])
 
+  const hasDateFilter = filterDateRange != null
   const hasActiveFilters =
-    statusFilterNarrowed || filterTypeId != null || filterSearch.trim() !== ''
+    statusFilterNarrowed || filterTypeId != null || filterSearch.trim() !== '' || hasDateFilter
 
   const clearFilters = () => {
     setFilterStatus(statuses.map((s) => s.slug))
     setFilterTypeId(undefined)
     setFilterSearch('')
+    setFilterDateRange(null)
   }
 
   const filteredTickets = useMemo(() => {
@@ -488,7 +498,18 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
                   </Option>
                 ))}
               </Select>
-              <Button onClick={fetchTickets}>Refresh</Button>
+              <DatePicker.RangePicker
+                allowClear
+                value={filterDateRange}
+                onChange={(dates) =>
+                  setFilterDateRange(dates?.[0] && dates?.[1] ? [dates[0], dates[1]] : null)
+                }
+                format="YYYY-MM-DD"
+                placeholder={['Created from', 'Created to']}
+                style={{ width: 280 }}
+                suffixIcon={<CalendarOutlined />}
+              />
+              <Button onClick={() => fetchTickets()}>Refresh</Button>
               {basePath && (
                 <Button icon={<SyncOutlined />} onClick={handleSyncEmail} loading={syncingEmail}>
                   Sync Email
@@ -502,7 +523,8 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
             </Space>
             {hasActiveFilters && (
               <Text type="secondary" style={{ fontSize: 12 }}>
-                Showing {filteredTickets.length} of {tickets.length} tickets
+                Showing {filteredTickets.length} ticket{filteredTickets.length !== 1 ? 's' : ''}
+                {hasDateFilter ? ' (created in selected range)' : ''}
               </Text>
             )}
           </Col>

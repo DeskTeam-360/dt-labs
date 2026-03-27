@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { db, ticketComments, commentAttachments, ticketCcRecipients, tickets, users, companyUsers } from '@/lib/db'
+import { runTicketCommentAutomation } from '@/lib/automation-engine'
 import { eq, ilike } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { NextResponse } from 'next/server'
@@ -133,6 +134,15 @@ export async function POST(
         uploadedBy: session.user.id,
       }))
     )
+  }
+
+  try {
+    await runTicketCommentAutomation(ticketId, {
+      visibility: effectiveVisibility,
+      authorType: effectiveAuthorType,
+    })
+  } catch (err) {
+    console.error('Automation rules error (ticket_comment_added):', err)
   }
 
   return NextResponse.json({

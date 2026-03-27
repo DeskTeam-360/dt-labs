@@ -1,9 +1,10 @@
 'use client'
 
-import { Layout, Button, Select, DatePicker, Input, Space, Typography, Badge, Tooltip } from 'antd'
+import { useState } from 'react'
+import { Layout, Button, Select, DatePicker, Input, Space, Typography, Badge, Tooltip, Modal, Form, message } from 'antd'
 
 const { Sider } = Layout
-import { FilterOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons'
+import { FilterOutlined, LeftOutlined, RightOutlined, BookOutlined } from '@ant-design/icons'
 import type { StatusColumn } from './types'
 import type { Dayjs } from 'dayjs'
 
@@ -47,6 +48,8 @@ interface FilterSidebarProps {
   onClearFilters: () => void
   /** When true, show only Status, Type, Date Range, Search */
   isCustomer?: boolean
+  /** Staff/admin: save current filters as a named shortcut (navbar). */
+  onSaveViewPreset?: (name: string) => { ok: boolean; error?: string }
 }
 
 export default function FilterSidebar({
@@ -78,7 +81,11 @@ export default function FilterSidebar({
   totalCount,
   onClearFilters,
   isCustomer = false,
+  onSaveViewPreset,
 }: FilterSidebarProps) {
+  const [savePresetOpen, setSavePresetOpen] = useState(false)
+  const [savePresetForm] = Form.useForm<{ name: string }>()
+
   return (
     <Sider
       trigger={null}
@@ -242,6 +249,19 @@ export default function FilterSidebar({
                 </Text>
               </>
             )}
+            {!isCustomer && onSaveViewPreset && (
+              <Button
+                type="primary"
+                icon={<BookOutlined />}
+                onClick={() => {
+                  savePresetForm.resetFields()
+                  setSavePresetOpen(true)
+                }}
+                style={{ width: '100%' }}
+              >
+                Save filter to My Filters
+              </Button>
+            )}
           </Space>
         </div>
       )}
@@ -259,6 +279,40 @@ export default function FilterSidebar({
           </Tooltip>
         </div>
       )}
+      <Modal
+        title="Save view to navbar"
+        open={savePresetOpen}
+        onCancel={() => setSavePresetOpen(false)}
+        okText="Save"
+        onOk={() => savePresetForm.submit()}
+      >
+        <Form
+          form={savePresetForm}
+          layout="vertical"
+          onFinish={(v) => {
+            if (!onSaveViewPreset) return
+            const r = onSaveViewPreset((v.name || '').trim())
+            if (r.ok) {
+              message.success('Saved next to search bar')
+              setSavePresetOpen(false)
+              savePresetForm.resetFields()
+            } else {
+              message.error(r.error || 'Could not save')
+            }
+          }}
+        >
+          <Form.Item
+            name="name"
+            label="Name"
+            rules={[{ required: true, message: 'Enter a name' }]}
+          >
+            <Input placeholder="e.g. My team — this week" maxLength={80} autoFocus />
+          </Form.Item>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Opens /tickets with this filter set. Saved only on this browser for your account.
+          </Text>
+        </Form>
+      </Modal>
     </Sider>
   )
 }

@@ -16,7 +16,8 @@ interface TabGenerateProps {
   usedFieldsInGenerated: string[]
   savingToKb: boolean
   onContentTemplateChange: (templateId: string) => void
-  onSaveToKnowledgeBase: () => void
+  /** Omitted when company Knowledge Base tab is disabled */
+  onSaveToKnowledgeBase?: () => void
 }
 
 export default function TabGenerate({
@@ -103,14 +104,16 @@ export default function TabGenerate({
               >
                 Download HTML
               </Button>
-              <Button
-                type="primary"
-                icon={<SaveOutlined />}
-                onClick={onSaveToKnowledgeBase}
-                loading={savingToKb}
-              >
-                Save to Knowledge Base
-              </Button>
+              {onSaveToKnowledgeBase ? (
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  onClick={onSaveToKnowledgeBase}
+                  loading={savingToKb}
+                >
+                  Save to Knowledge Base
+                </Button>
+              ) : null}
             </Space>
             {usedFieldsInGenerated.length > 0 && (
               <div style={{ marginTop: 8 }}>

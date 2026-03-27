@@ -197,6 +197,7 @@ export default function CommentComposer({
         placeholder={placeholder}
         height="200px"
       />
+      <br />
       {attachments.length > 0 && (
         <Flex gap={8} wrap="wrap" align="center">
           {attachments.map((a, i) => (
@@ -225,7 +226,7 @@ export default function CommentComposer({
         />
         </div>
         
-        <Flex gap={8} style={{ marginTop: 16 }}>
+        <Flex gap={8}>
         <Button
           icon={<PaperClipOutlined />}
           onClick={() => document.getElementById('comment-files-input')?.click()}

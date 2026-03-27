@@ -13,9 +13,9 @@ export interface AutomationActions {
   tag_ids?: string[]
   /** Set visibility: private | team | specific_users | public */
   visibility?: string
-  /** Add an automatic note (comment) to the ticket */
+  /** Add an automatic note (comment) to the ticket — tampil sebagai "Automation", tanpa pilih user */
   add_note?: string
-  /** User ID to attribute the auto note to (required when add_note is set) */
+  /** @deprecated Opsional: kalau diisi, catatan di-atribusi ke user ini; default engine pakai placeholder */
   add_note_user_id?: string
   /** Add checklist items (array of titles) */
   add_checklist_items?: string[]

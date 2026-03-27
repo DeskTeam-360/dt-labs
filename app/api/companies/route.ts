@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
-import { db, companies } from '@/lib/db'
-import { eq, desc } from 'drizzle-orm'
+import { db, companies, tickets } from '@/lib/db'
+import { desc, isNotNull, max } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 /** GET /api/companies - List companies */
@@ -13,10 +13,28 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const isActiveParam = url.searchParams.get('is_active')
 
-  const rows = await db
-    .select()
-    .from(companies)
-    .orderBy(desc(companies.createdAt))
+  const [rows, ticketActivity] = await Promise.all([
+    db.select().from(companies).orderBy(desc(companies.createdAt)),
+    db
+      .select({
+        companyId: tickets.companyId,
+        lastTicketUpdate: max(tickets.updatedAt),
+      })
+      .from(tickets)
+      .where(isNotNull(tickets.companyId))
+      .groupBy(tickets.companyId),
+  ])
+
+  const lastTicketByCompany = new Map<string, string | null>()
+  for (const row of ticketActivity) {
+    const cid = row.companyId
+    if (!cid) continue
+    const v = row.lastTicketUpdate
+    lastTicketByCompany.set(
+      cid,
+      v instanceof Date ? v.toISOString() : v ? String(v) : null
+    )
+  }
 
   let filtered = rows
   if (isActiveParam !== null && isActiveParam !== undefined) {
@@ -32,6 +50,7 @@ export async function GET(request: Request) {
     is_active: r.isActive ?? true,
     created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
     updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
+    last_ticket_updated_at: lastTicketByCompany.get(r.id) ?? null,
   }))
 
   return NextResponse.json({ data })
@@ -75,6 +94,7 @@ export async function POST(request: Request) {
         is_active: row.isActive ?? true,
         created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',
         updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : '',
+        last_ticket_updated_at: null,
       },
       success: true,
     },

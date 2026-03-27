@@ -14,7 +14,7 @@ import {
   companyUsers,
 } from '@/lib/db'
 import { uploadBuffer } from '@/lib/storage-idrive'
-import { runAutomationRules } from '@/lib/automation-engine'
+import { runAutomationRules, runTicketCommentAutomation } from '@/lib/automation-engine'
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import { eq, and, ilike, not, isNull, desc, gte, or, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
@@ -743,6 +743,13 @@ export async function POST(request: NextRequest) {
               }))
             )
           }
+          if (insertedReplyComment) {
+            try {
+              await runTicketCommentAutomation(ticketId, { visibility: 'reply', authorType: 'customer' })
+            } catch (err) {
+              console.error('Automation rules error (ticket_comment_added):', err)
+            }
+          }
           if (isFromCc) {
             sendAutomationLog({
               event: 'email_reply_added',
@@ -1071,6 +1078,13 @@ export async function POST(request: NextRequest) {
                   uploadedBy: commentUserId,
                 }))
               )
+            }
+            if (insertedExtComment) {
+              try {
+                await runTicketCommentAutomation(ticketId, { visibility: 'reply', authorType: 'customer' })
+              } catch (err) {
+                console.error('Automation rules error (ticket_comment_added):', err)
+              }
             }
             sendAutomationLog({
               event: 'email_reply_added',

@@ -315,7 +315,11 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
                     options={[
                       { value: 'ticket_created', label: 'Ticket Created' },
                       { value: 'ticket_updated', label: 'Ticket Updated' },
-                      { value: 'time_trigger', label: 'Time Trigger' },
+                      {
+                        value: 'ticket_comment_added',
+                        label: 'New reply or note (thread / email / internal note)',
+                      },
+                      { value: 'time_trigger', label: 'Time Trigger (not wired yet)' },
                     ]}
                   />
                 </Form.Item>
@@ -347,7 +351,8 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
                   },
                 ]}
               >
-                  <ConditionBuilder onChange={() => {}} />
+                  {/** Jangan kirim onChange kosong — timpa kontrol Form.Item sehingga kondisi tidak tersimpan */}
+                  <ConditionBuilder />
                 </Form.Item>
 
               <Form.Item

@@ -186,3 +186,6 @@ ul#rc-menu-uuid-ticket-attributes-popup, .ant-menu.ant-menu-sub.ant-menu-inline 
   margin-top: 8px;
 }
 
+.ql-editor td{
+  border: none !important;
+}

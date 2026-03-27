@@ -1,10 +1,18 @@
 'use client'
 
-import { Input, Spin } from 'antd'
-import { SearchOutlined } from '@ant-design/icons'
-import { useRouter, usePathname } from 'next/navigation'
+import { Input, Spin, Typography } from 'antd'
+import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SpaNavLink } from '@/components/SpaNavLink'
+import {
+  loadSavedTicketFilterPresets,
+  removeSavedTicketFilterPreset,
+  SAVED_FILTERS_CHANGED_EVENT,
+  type SavedTicketFilterPreset,
+} from '@/lib/ticket-saved-filters'
+
+const { Text } = Typography
 
 const NAV_HEIGHT = 56
 const TITLE = process.env.NEXT_PUBLIC_APP_NAME || 'Deskteam360'
@@ -23,10 +31,13 @@ type TicketPreview = {
 /**
  * Bar di **atas area konten** (kolom kanan sidebar): judul + pencarian tiket.
  * Preview dropdown sampai 5 tiket (nomor, judul, company, priority); klik → detail tiket.
+ * `savedFiltersUserId`: staff/admin — tampilkan pintasan filter tersimpan di samping search.
  */
-export default function TicketSearchNavbar() {
+export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFiltersUserId?: string | null }) {
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const listSearchKey = searchParams.toString()
   const [q, setQ] = useState('')
   const [preview, setPreview] = useState<TicketPreview[]>([])
   const [panelVisible, setPanelVisible] = useState(false)
@@ -35,12 +46,23 @@ export default function TicketSearchNavbar() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
+  const [savedPresets, setSavedPresets] = useState<SavedTicketFilterPreset[]>([])
+
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (!savedFiltersUserId) {
+      setSavedPresets([])
+      return
+    }
+    const load = () => setSavedPresets(loadSavedTicketFilterPresets(savedFiltersUserId))
+    load()
+    window.addEventListener(SAVED_FILTERS_CHANGED_EVENT, load)
+    return () => window.removeEventListener(SAVED_FILTERS_CHANGED_EVENT, load)
+  }, [savedFiltersUserId])
+
+  useEffect(() => {
     if (pathname !== '/tickets' && pathname !== '/tickets/') return
-    const sp = new URLSearchParams(window.location.search)
-    setQ(sp.get('search') ?? '')
-  }, [pathname])
+    setQ(searchParams.get('search') ?? '')
+  }, [pathname, listSearchKey, searchParams])
 
   useEffect(() => {
     const onDocDown = (e: MouseEvent) => {
@@ -163,6 +185,7 @@ export default function TicketSearchNavbar() {
       >
         {TITLE}
       </SpaNavLink>
+
       <div ref={wrapRef} style={{ position: 'relative', flex: 1, maxWidth: 520, minWidth: 0 }}>
         <Input.Search
           allowClear
@@ -291,6 +314,88 @@ export default function TicketSearchNavbar() {
           </div>
         )}
       </div>
+      {savedFiltersUserId && savedPresets.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flex: 1,
+            minWidth: 0,
+            maxWidth: 480,
+          }}
+        >
+          <Text type="secondary" style={{ fontSize: 11, flexShrink: 0, textTransform: 'uppercase', letterSpacing: 0.03 }}>
+            My Filters
+          </Text>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              overflowX: 'auto',
+              flex: 1,
+              minWidth: 0,
+              paddingBottom: 2,
+              scrollbarWidth: 'thin',
+            }}
+          >
+            {savedPresets.map((p) => (
+              <span
+                key={p.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  flexShrink: 0,
+                  background: '#f5f0ff',
+                  border: '1px solid #d3adf7',
+                  borderRadius: 6,
+                  padding: '2px 2px 2px 8px',
+                  fontSize: 13,
+                }}
+              >
+                <SpaNavLink
+                  href={p.query ? `/tickets?${p.query}` : '/tickets'}
+                  title={p.name}
+                  style={{
+                    color: '#2b1252',
+                    maxWidth: 160,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {p.name}
+                </SpaNavLink>
+                <button
+                  type="button"
+                  aria-label={`Remove ${p.name}`}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (savedFiltersUserId) removeSavedTicketFilterPreset(savedFiltersUserId, p.id)
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                    borderRadius: 4,
+                    color: '#8c8c8c',
+                    lineHeight: 1,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <CloseOutlined style={{ fontSize: 10 }} />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      
     </div>
   )
 }

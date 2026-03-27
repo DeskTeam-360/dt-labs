@@ -44,6 +44,14 @@ export const CONDITION_FIELDS: Field[] = [
     { name: 'app', label: 'App (Mobile/External)' },
     { name: 'api', label: 'API' },
   ]},
+  { name: 'comment_visibility', label: 'Comment visibility (reply / note)', valueEditorType: 'select', values: [
+    { name: 'reply', label: 'Reply (thread / email)' },
+    { name: 'note', label: 'Internal note' },
+  ]},
+  { name: 'comment_author_type', label: 'Comment author', valueEditorType: 'select', values: [
+    { name: 'agent', label: 'Agent / staff' },
+    { name: 'customer', label: 'Customer' },
+  ]},
 ]
 
 interface ConditionBuilderProps {

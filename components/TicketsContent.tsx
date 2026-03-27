@@ -11,6 +11,7 @@ import FilterSidebar from './Tickets/FilterSidebar'
 import TicketFormModal from './Tickets/TicketFormModal'
 import { useTicketsData } from './Tickets/useTicketsData'
 import TicketSearchNavbar from './TicketSearchNavbar'
+import { addSavedTicketFilterPreset } from '@/lib/ticket-saved-filters'
 
 interface TicketsContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string }
@@ -81,6 +82,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     tickets,
     userTeamIds,
     lookupReady,
+    getFilterQueryString,
   } = useTicketsData(currentUser.id, isCustomer)
 
   return (
@@ -98,7 +100,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
           minHeight: '100vh',
         }}
       >
-        <TicketSearchNavbar />
+        <TicketSearchNavbar savedFiltersUserId={!isCustomer ? currentUser.id : undefined} />
         <div style={{ padding: 0, minWidth: 0 }}>
           <TicketsHeader
             viewMode={viewMode}
@@ -189,6 +191,11 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         totalCount={filteredTickets.length}
         onClearFilters={clearFilters}
         isCustomer={isCustomer}
+        onSaveViewPreset={
+          !isCustomer
+            ? (name) => addSavedTicketFilterPreset(currentUser.id, name, getFilterQueryString())
+            : undefined
+        }
       />
 
       <TicketFormModal

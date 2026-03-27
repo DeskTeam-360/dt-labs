@@ -19,6 +19,9 @@ import {
   TabContentPlanner,
 } from './CompanyDetail'
 
+/** Temporary: company KB API errors on load — set true to restore tab + fetches */
+const COMPANY_DETAIL_KNOWLEDGE_BASE_ENABLED = false
+
 const { Content } = Layout
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -226,10 +229,12 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
   useEffect(() => {
     fetchDataTemplates()
     fetchContentTemplates()
-    fetchAiSystemTemplates()
     fetchWebsites()
-    fetchKnowledgeBases()
-    fetchGenerationHistory()
+    if (COMPANY_DETAIL_KNOWLEDGE_BASE_ENABLED) {
+      fetchAiSystemTemplates()
+      fetchKnowledgeBases()
+      fetchGenerationHistory()
+    }
   }, [companyData?.id])
 
   useEffect(() => {
@@ -928,42 +933,48 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
           usedFieldsInGenerated={usedFieldsInGenerated}
           savingToKb={savingToKb}
           onContentTemplateChange={handleContentTemplateChange}
-          onSaveToKnowledgeBase={handleSaveToKnowledgeBase}
+          onSaveToKnowledgeBase={
+            COMPANY_DETAIL_KNOWLEDGE_BASE_ENABLED ? handleSaveToKnowledgeBase : undefined
+          }
         />
       ),
     },
-    {
-      key: 'knowledge-base',
-      label: (
-        <span>
-          <ReadOutlined /> Knowledge Base ({knowledgeBases.length})
-        </span>
-      ),
-      children: (
-        <TabKnowledgeBase
-          aiSystemTemplates={aiSystemTemplates}
-          loadingAiSystemTemplates={loadingAiSystemTemplates}
-          ragTemplateId={ragTemplateId}
-          setRagTemplateId={setRagTemplateId}
-          ragPrompt={ragPrompt}
-          setRagPrompt={setRagPrompt}
-          ragLoading={ragLoading}
-          ragResult={ragResult}
-          ragErrorFull={ragErrorFull}
-          onGenerate={handleGenerateFromKb}
-          generationHistory={generationHistory}
-          loadingGenerationHistory={loadingGenerationHistory}
-          generationHistoryError={generationHistoryError}
-          onHistoryPreview={handleHistoryPreview}
-          knowledgeBases={knowledgeBases}
-          loadingKnowledgeBases={loadingKnowledgeBases}
-          onKbPreview={handleKbPreview}
-          embeddingLoadingId={embeddingLoadingId}
-          onAddToOpenAI={handleAddToOpenAI}
-          onDeleteKb={handleDeleteKb}
-        />
-      ),
-    },
+    ...(COMPANY_DETAIL_KNOWLEDGE_BASE_ENABLED
+      ? [
+          {
+            key: 'knowledge-base' as const,
+            label: (
+              <span>
+                <ReadOutlined /> Knowledge Base ({knowledgeBases.length})
+              </span>
+            ),
+            children: (
+              <TabKnowledgeBase
+                aiSystemTemplates={aiSystemTemplates}
+                loadingAiSystemTemplates={loadingAiSystemTemplates}
+                ragTemplateId={ragTemplateId}
+                setRagTemplateId={setRagTemplateId}
+                ragPrompt={ragPrompt}
+                setRagPrompt={setRagPrompt}
+                ragLoading={ragLoading}
+                ragResult={ragResult}
+                ragErrorFull={ragErrorFull}
+                onGenerate={handleGenerateFromKb}
+                generationHistory={generationHistory}
+                loadingGenerationHistory={loadingGenerationHistory}
+                generationHistoryError={generationHistoryError}
+                onHistoryPreview={handleHistoryPreview}
+                knowledgeBases={knowledgeBases}
+                loadingKnowledgeBases={loadingKnowledgeBases}
+                onKbPreview={handleKbPreview}
+                embeddingLoadingId={embeddingLoadingId}
+                onAddToOpenAI={handleAddToOpenAI}
+                onDeleteKb={handleDeleteKb}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       key: 'websites',
       label: (

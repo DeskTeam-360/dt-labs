@@ -85,7 +85,6 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
       ;(next as Record<string, unknown>).tag_ids = []
     } else if (type === 'add_note') {
       ;(next as Record<string, unknown>).add_note = ''
-      ;(next as Record<string, unknown>).add_note_user_id = lookup?.users?.[0]?.id || undefined
     } else if (type === 'add_checklist_items') {
       ;(next as Record<string, unknown>).add_checklist_items = []
     } else {
@@ -97,7 +96,9 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
   const removeAction = (type: ActionType) => {
     const next = { ...actions }
     delete (next as Record<string, unknown>)[type]
-    if (type === 'add_note') delete (next as Record<string, unknown>).add_note_user_id
+    if (type === 'add_note') {
+      delete (next as Record<string, unknown>).add_note_user_id
+    }
     if (type === 'add_checklist_items') delete (next as Record<string, unknown>).add_checklist_items
     onChange(next as AutomationActions)
   }
@@ -208,29 +209,18 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                   </Form.Item>
                 )}
                 {type === 'add_note' && (
-                  <>
-                    <Form.Item label={ACTION_LABELS.add_note} style={{ marginBottom: 8 }}>
-                      <CommentWysiwyg
-                        placeholder="Enter note (rich text). Images upload to draft storage."
-                        height="200px"
-                        value={((actions as Record<string, unknown>).add_note as string | undefined) ?? ''}
-                        onChange={(html) => update('add_note', html)}
-                      />
-                    </Form.Item>
-                    <Form.Item label="Note author" style={{ marginBottom: 0 }}>
-                      <Select
-                        allowClear={false}
-                        placeholder="Select user"
-                        style={{ width: '100%' }}
-                        value={(actions as Record<string, unknown>).add_note_user_id}
-                        onChange={(v) => update('add_note_user_id', v)}
-                        options={(lookup.users || []).map((u) => ({
-                          value: u.id,
-                          label: u.full_name || u.email || u.id,
-                        }))}
-                      />
-                    </Form.Item>
-                  </>
+                  <Form.Item
+                    label={ACTION_LABELS.add_note}
+                    extra="Notes are attributed to Automation (no user picker)."
+                    style={{ marginBottom: 0 }}
+                  >
+                    <CommentWysiwyg
+                      placeholder="Enter note (rich text). Images upload to draft storage."
+                      height="200px"
+                      value={((actions as Record<string, unknown>).add_note as string | undefined) ?? ''}
+                      onChange={(html) => update('add_note', html)}
+                    />
+                  </Form.Item>
                 )}
                 {type === 'add_checklist_items' && (
                   <Form.Item label={ACTION_LABELS.add_checklist_items} style={{ marginBottom: 0 }}>

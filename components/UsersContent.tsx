@@ -19,6 +19,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
 import { SpaNavLink, shouldOpenHrefInNewTab } from './SpaNavLink'
+import { confirmUserCompanyMove } from '@/components/confirm-user-company-move'
 import type { ColumnsType } from 'antd/es/table'
 
 const { Content } = Layout
@@ -183,7 +184,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     }
   }
 
-  const handleSubmit = async (values: any) => {
+  const runUserModalSave = async (values: any) => {
     try {
       if (editingUser) {
         const patchBody: Record<string, unknown> = {
@@ -268,6 +269,23 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     }
   }
 
+  const handleSubmit = async (values: any) => {
+    if (editingUser && !isCustomer && values.role === 'customer') {
+      const newCo = (values.company_id || null) as string | null
+      const oldCo = editingUser.company_id || null
+      if (newCo && oldCo && newCo !== oldCo) {
+        const userLabel = editingUser.full_name || editingUser.email || 'User'
+        confirmUserCompanyMove({
+          userLabel,
+          fromCompanyName: editingUser.company?.name || 'company lain',
+          toCompanyName: companies.find((c) => c.id === newCo)?.name || 'company lain',
+          onOk: () => runUserModalSave(values),
+        })
+        return
+      }
+    }
+    await runUserModalSave(values)
+  }
   const baseColumns: ColumnsType<UserRecord> = [
     {
       title: 'User',

@@ -4,8 +4,8 @@ import { Layout, Card, Descriptions, Avatar, Tag, Typography, Button, Space, Row
 import { ArrowLeftOutlined, UserOutlined, MailOutlined, PhoneOutlined, BankOutlined, IdcardOutlined, GlobalOutlined, TranslationOutlined, CalendarOutlined, ClockCircleOutlined, EditOutlined, SaveOutlined, CloseOutlined, UploadOutlined, HistoryOutlined, LockOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { uploadAvatar } from '@/utils/storage'
 import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
 
@@ -18,6 +18,8 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 import AdminSidebar from './AdminSidebar'
+import { SpaNavLink } from '@/components/SpaNavLink'
+import { confirmUserCompanyMove } from '@/components/confirm-user-company-move'
 import DashboardHourlyActivityCard from './DashboardHourlyActivityCard'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 
@@ -33,9 +35,11 @@ interface UserDetailContentProps {
 }
 
 export default function UserDetailContent({ user: currentUser, userData: initialUserData }: UserDetailContentProps) {
-  const isViewerCustomer = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'customer'
+  const isViewerCustomer = (initialUserData.role ?? '').toLowerCase() === 'customer'
   const isAdmin = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'admin'
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const openedEditFromQueryRef = useRef(false)
   const [collapsed, setCollapsed] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [userData, setUserData] = useState(initialUserData)
@@ -47,7 +51,6 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const [form] = Form.useForm()
   const selectedRole = Form.useWatch('role', form)
   const [timeTrackerData, setTimeTrackerData] = useState<any[]>([])
-  const [allTimeTrackerData, setAllTimeTrackerData] = useState<any[]>([])
   const [timeTrackerLoading, setTimeTrackerLoading] = useState(false)
   const [filterPeriod, setFilterPeriod] = useState<string>('all')
   const [customDateRange, setCustomDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
@@ -136,7 +139,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     if (!userData?.id) return
     try {
       const data = await apiFetch<any[]>(`/api/users/time-tracker?user_id=${userData.id}&filter=all`)
-      setAllTimeTrackerData(data || [])
+
       
       // Calculate overview
       const now = dayjs()
@@ -166,7 +169,6 @@ export default function UserDetailContent({ user: currentUser, userData: initial
         })
         .reduce((sum: number, item: any) => sum + (item.duration_seconds || 0), 0)
 
-      setAllTimeTrackerData(dataArr)
       setOverviewData({
         today: todayTotal,
         thisWeek: weekTotal,
@@ -251,6 +253,32 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     })
   }
 
+  useEffect(() => {
+    openedEditFromQueryRef.current = false
+  }, [userData.id])
+
+  /** Dari company detail: link `/users/{id}?edit=1` langsung buka mode edit. */
+  useEffect(() => {
+    if (openedEditFromQueryRef.current) return
+    if (searchParams.get('edit') !== '1') return
+    openedEditFromQueryRef.current = true
+    setIsEditing(true)
+    form.setFieldsValue({
+      full_name: userData.full_name || '',
+      role: userData.role,
+      status: userData.status,
+      company_id: userData.company_id || undefined,
+      phone: userData.phone || '',
+      department: userData.department || '',
+      position: userData.position || '',
+      bio: userData.bio || '',
+      timezone: userData.timezone || 'UTC',
+      locale: userData.locale || 'en',
+      is_email_verified: userData.is_email_verified || false,
+    })
+    router.replace(`/users/${userData.id}`, { scroll: false })
+  }, [searchParams, userData, form, router])
+
   const handleCancel = () => {
     setIsEditing(false)
     setActiveTabKey('general')
@@ -277,7 +305,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     }
   }
 
-  const handleSubmit = async (values: any) => {
+  const runUserPatch = async (values: any) => {
     setLoading(true)
     try {
       const updateData: any = {
@@ -298,6 +326,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
           updateData.position = values.position || null
           updateData.bio = values.bio || null
         }
+      } else if (isViewerCustomer && isAdmin && !isOwnProfile) {
+        updateData.company_id = values.company_id || null
       }
 
       await apiFetch(`/api/users/${userData.id}`, {
@@ -315,6 +345,34 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSubmit = async (values: any) => {
+    let nextCompanyId: string | null | undefined
+    if (!isViewerCustomer && selectedRole === 'customer') {
+      nextCompanyId = values.company_id || null
+    } else if (isViewerCustomer && isAdmin && !isOwnProfile) {
+      nextCompanyId = values.company_id || null
+    }
+    const prevCompanyId = userData.company_id || null
+    if (
+      nextCompanyId !== undefined &&
+      nextCompanyId &&
+      prevCompanyId &&
+      nextCompanyId !== prevCompanyId
+    ) {
+      const userLabel = userData.full_name || userData.email || 'User'
+      const fromName = userData.company?.name || 'company lain'
+      const toName = companies.find((c) => c.id === nextCompanyId)?.name || 'company lain'
+      confirmUserCompanyMove({
+        userLabel,
+        fromCompanyName: fromName,
+        toCompanyName: toName,
+        onOk: () => runUserPatch(values),
+      })
+      return
+    }
+    await runUserPatch(values)
   }
 
   const handleResetPassword = async (values: { newPassword: string; confirmPassword: string }) => {
@@ -565,6 +623,20 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             {userData.id}
                           </Text>
                         </Descriptions.Item>
+                        {isViewerCustomer &&
+                          (userData.company?.id || userData.company_id) && (
+                          <Descriptions.Item label="Company">
+                            <Space>
+                              <BankOutlined />
+                              <SpaNavLink
+                                href={`/companies/${userData.company?.id ?? userData.company_id}`}
+                                style={{ fontWeight: 500 }}
+                              >
+                                {userData.company?.name ?? 'Open company'}
+                              </SpaNavLink>
+                            </Space>
+                          </Descriptions.Item>
+                        )}
                       </Descriptions>
                     )}
                   </Card>
@@ -718,6 +790,15 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           </Select>
                         </Form.Item>
                       )}
+                      {isCustomer && isAdmin && !isOwnProfile && (
+                        <Form.Item name="company_id" label="Company">
+                          <Select placeholder="Select Company (optional)" allowClear style={{ width: '100%' }}>
+                            {companies.map((c) => (
+                              <Option key={c.id} value={c.id}>{c.name}</Option>
+                            ))}
+                          </Select>
+                        </Form.Item>
+                      )}
                     </Space>
                   ) : (
                     <Descriptions column={1} bordered>
@@ -738,11 +819,9 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           {userData.status?.toUpperCase()}
                         </Tag>
                       </Descriptions.Item>
-                      {!isCustomer && (
-                        <Descriptions.Item label="Company">
-                          <Text>{userData.company?.name ?? '—'}</Text>
-                        </Descriptions.Item>
-                      )}
+                      <Descriptions.Item label="Company">
+                        <Text>{userData.company?.name ?? '—'}</Text>
+                      </Descriptions.Item>
                     </Descriptions>
                   )}
                 </Card>

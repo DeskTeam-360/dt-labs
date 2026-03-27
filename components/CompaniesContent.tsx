@@ -33,6 +33,7 @@ interface CompanyRecord {
   color: string
   created_at: string
   updated_at: string
+  last_ticket_updated_at?: string | null
 }
 
 function ColorPickerWithInput({
@@ -238,6 +239,23 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       sorter: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
       sortDirections: ['ascend', 'descend'],
       render: (date: string) => <DateDisplay date={date} />,
+    },
+    {
+      title: 'Last ticket update',
+      dataIndex: 'last_ticket_updated_at',
+      key: 'last_ticket_updated_at',
+      sorter: (a, b) => {
+        const ta = a.last_ticket_updated_at
+          ? new Date(a.last_ticket_updated_at).getTime()
+          : 0
+        const tb = b.last_ticket_updated_at
+          ? new Date(b.last_ticket_updated_at).getTime()
+          : 0
+        return ta - tb
+      },
+      sortDirections: ['ascend', 'descend'],
+      render: (iso: string | null | undefined) =>
+        iso ? <DateDisplay date={iso} /> : '—',
     },
     {
       title: 'Actions',
