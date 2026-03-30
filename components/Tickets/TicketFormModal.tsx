@@ -80,7 +80,8 @@ export default function TicketFormModal({
   onCancel,
   isCustomer = false,
 }: TicketFormModalProps) {
-  const showSimplifiedForm = isCustomer && !editingTicket
+  /** Customers always use the same compact fields as create (title, description, type, priority). */
+  const showSimplifiedForm = isCustomer
   const selectableTeams = userTeamIds.length > 0 ? teams.filter((t) => userTeamIds.includes(t.id)) : []
 
   return (
@@ -101,9 +102,13 @@ export default function TicketFormModal({
           <Input placeholder="Ticket Title" />
         </Form.Item>
 
-        {!editingTicket && (
+        {(!editingTicket || showSimplifiedForm) && (
           <Form.Item name="description" label="Description">
-            <CommentWysiwyg ticketId={undefined} placeholder="Ticket Description" height={showSimplifiedForm ? '150px' : '150px'} />
+            <CommentWysiwyg
+              ticketId={editingTicket?.id}
+              placeholder="Ticket Description"
+              height="150px"
+            />
           </Form.Item>
         )}
 
@@ -177,7 +182,7 @@ export default function TicketFormModal({
               </Form.Item>
             </Col>
           )}
-          <Col span={8} >
+          <Col span={showSimplifiedForm ? 12 : 8}>
             <Form.Item name="type_id" label="Type">
               <Select placeholder="Select type" allowClear>
                 {ticketTypes.map((t) => (
@@ -200,7 +205,7 @@ export default function TicketFormModal({
             </Form.Item>
           </Col>
 
-          <Col span={8}>
+          <Col span={showSimplifiedForm ? 12 : 8}>
             <Form.Item
               name="priority_id"
               label="Priority"

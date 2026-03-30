@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import {
   Table,
   Tag,
@@ -35,6 +36,16 @@ export default function TicketsListView({
   onDelete,
 }: TicketsListViewProps) {
   const router = useRouter()
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 15 })
+
+  useEffect(() => {
+    setPagination((p) => {
+      const totalPages = Math.max(1, Math.ceil(tickets.length / p.pageSize))
+      if (p.current <= totalPages) return p
+      return { ...p, current: totalPages }
+    })
+  }, [tickets.length, pagination.pageSize])
+
   const getPriorityOrder = (record: TicketRecord) => {
     if (!record.priority) return 999
     const idx = allPriorities.findIndex((p) => p.id === record.priority!.id)
@@ -46,7 +57,17 @@ export default function TicketsListView({
       dataSource={tickets}
       scroll={{ x: 'max-content' }}
       style={{ width: '100%', paddingRight: 24, paddingLeft: 24 }}
-      pagination={{ pageSize: 15, showSizeChanger: true, showTotal: (t) => `Total ${t} tickets` }}
+      pagination={{
+        current: pagination.current,
+        pageSize: pagination.pageSize,
+        total: tickets.length,
+        showSizeChanger: true,
+        pageSizeOptions: ['10', '15', '20', '50'],
+        showTotal: (t) => `Total ${t} tickets`,
+        onChange: (page, ps) =>
+          setPagination((prev) => ({ current: page, pageSize: ps ?? prev.pageSize })),
+        onShowSizeChange: (_page, size) => setPagination({ current: 1, pageSize: size }),
+      }}
       size="middle"
       columns={[
         {
@@ -134,7 +155,7 @@ export default function TicketsListView({
           width: 120,
           sorter: (a: TicketRecord, b: TicketRecord) => (a.type?.title || '').localeCompare(b.type?.title || ''),
           render: (_: unknown, record: TicketRecord) =>
-            record.type ? <Tag style={{ borderRadius: '10px',backgroundColor: '#E8E8E8', padding: '4px 8px', width:'70px', textAlign: 'center', fontWeight: 500, color: record.type.color }}>{record.type.title}</Tag> : '—',
+            record.type ? <Tag style={{ borderRadius: '10px',backgroundColor: '#E8E8E8', padding: '4px 8px', minWidth:'70px', textAlign: 'center', fontWeight: 500, color: record.type.color }}>{record.type.title}</Tag> : '—',
         },
        
         
@@ -200,11 +221,10 @@ export default function TicketsListView({
           title: 'Status',
           dataIndex: 'status',
           key: 'status',
-          width: 120,
           sorter: (a: TicketRecord, b: TicketRecord) => (a.status || '').localeCompare(b.status || ''),
           render: (status: string) => {
             const col = allStatusColumns.find((c) => c.id === status)
-            return col ? <Tag style={{ borderRadius: '10px',backgroundColor: col.color, padding: '4px 16px', width:'100px', textAlign: 'center', fontWeight: 500, color: '#000' }}>{col.title}</Tag> : status
+            return col ? <Tag style={{ borderRadius: '10px',backgroundColor: col.color, padding: '4px 16px', minWidth:'100px', textAlign: 'center', fontWeight: 500, color: '#000' }}>{col.title}</Tag> : status
           },
         },
         {

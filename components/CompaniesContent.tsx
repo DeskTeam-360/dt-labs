@@ -355,7 +355,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 current: pagination.current,
                 pageSize: pagination.pageSize,
                 showSizeChanger: true,
-                pageSizeOptions: ['10', '20', '50', '100'],
+                pageSizeOptions: ['10', '15', '20', '50'],
                 showTotal: (total) => `Total ${total} companies`,
                 onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
               }}
