@@ -45,6 +45,29 @@ function contentDispositionAttachment(fileName: string): string {
 
 type IncomingAttachment = { file_url?: string; file_name: string; file_path?: string }
 
+/** RFC 2047 encode subject when it contains non-ASCII (e.g. ticket title). */
+function encodeSubjectHeader(subject: string): string {
+  if (/^[\x01-\x7F]*$/.test(subject)) return subject
+  return '=?UTF-8?B?' + Buffer.from(subject, 'utf8').toString('base64') + '?='
+}
+
+/**
+ * Build reply subject with ticket id first (after Re:) so inbox lists show e.g. "Re: Ticket #214 - …".
+ * Plain "Ticket #n" (no brackets) tends to stay visible in threaded views better than "[Ticket #n]".
+ */
+function buildReplySubject(ticketId: number, ticketTitleFromClient: string | undefined, titleFromDb: string | null | undefined): string {
+  const lead = `Ticket #${ticketId}`
+  const merged =
+    (typeof ticketTitleFromClient === 'string' ? ticketTitleFromClient.trim() : '') ||
+    (typeof titleFromDb === 'string' ? titleFromDb.trim() : '') ||
+    ''
+  let titlePart = merged.replace(/^(Re:\s*|Fwd:\s*|Fw:\s*)+/gi, '').trim()
+  titlePart = titlePart.replace(new RegExp(`^\\s*\\[Ticket\\s*#${ticketId}\\]\\s*`, 'i'), '').trim()
+  titlePart = titlePart.replace(new RegExp(`^\\s*Ticket\\s*#\\s*${ticketId}\\s*[-–—:]?\\s*`, 'i'), '').trim()
+  if (!titlePart) return `Re: ${lead}`
+  return `Re: ${lead} - ${titlePart}`
+}
+
 async function loadAttachmentBytes(a: IncomingAttachment): Promise<{
   buffer: Buffer
   mime: string
@@ -107,12 +130,17 @@ export async function POST(request: NextRequest) {
 
     const recipientEmail = (typeof toEmailRaw === 'string' ? toEmailRaw.trim() : '') || (typeof companyEmailLegacy === 'string' ? companyEmailLegacy.trim() : '')
 
+    const ticketIdNum =
+      typeof ticketId === 'number' && Number.isFinite(ticketId)
+        ? ticketId
+        : parseInt(String(ticketId ?? ''), 10)
+
     const attachmentList = Array.isArray(rawAttachments) ? rawAttachments : []
     const bodyText = typeof commentBody === 'string' ? commentBody : ''
     const hasText = bodyText.trim().length > 0
     const hasFiles = attachmentList.length > 0
 
-    if (!ticketId || !recipientEmail || (!hasText && !hasFiles)) {
+    if (!Number.isFinite(ticketIdNum) || ticketIdNum < 1 || !recipientEmail || (!hasText && !hasFiles)) {
       return NextResponse.json(
         { error: 'Missing ticketId, recipient email (toEmail), or message body / attachments' },
         { status: 400 }
@@ -182,22 +210,22 @@ export async function POST(request: NextRequest) {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
     const fromEmail = integration.emailAddress || 'noreply@example.com'
-    const subject = ticketTitle
-      ? `Re: [Ticket #${ticketId}] ${ticketTitle}`
-      : `Re: [Ticket #${ticketId}]`
 
     const [ticketRow] = await db
-      .select({ gmailThreadId: tickets.gmailThreadId })
+      .select({ gmailThreadId: tickets.gmailThreadId, title: tickets.title })
       .from(tickets)
-      .where(eq(tickets.id, ticketId))
+      .where(eq(tickets.id, ticketIdNum))
       .limit(1)
+
+    const subjectPlain = buildReplySubject(ticketIdNum, ticketTitle, ticketRow?.title)
+    const subjectMime = encodeSubjectHeader(subjectPlain)
 
     const [lastIncoming] = await db
       .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId })
       .from(emailMessages)
       .where(
         and(
-          eq(emailMessages.ticketId, ticketId),
+          eq(emailMessages.ticketId, ticketIdNum),
           eq(emailMessages.direction, 'incoming'),
           isNotNull(emailMessages.rfcMessageId)
         )
@@ -224,7 +252,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const ticketUrl = `${baseUrl}/tickets/${ticketId}`
+    const ticketUrl = `${baseUrl}/tickets/${ticketIdNum}`
     const portalFooter = `<p style="margin-top:24px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#666;">To view ticket details, please visit our portal: <a href="${ticketUrl}">${ticketUrl}</a></p>`
     const innerHtml =
       hasText
@@ -237,7 +265,7 @@ export async function POST(request: NextRequest) {
     const headers: string[] = [
       'From: ' + fromEmail,
       'To: ' + recipientEmail,
-      'Subject: ' + subject,
+      'Subject: ' + subjectMime,
       'MIME-Version: 1.0',
     ]
     if (ccList.length > 0) headers.push('Cc: ' + ccList.join(', '))
@@ -287,7 +315,15 @@ export async function POST(request: NextRequest) {
       .replace(/=+$/, '')
 
     const requestBody: { raw: string; threadId?: string } = { raw }
-    if (threadId) requestBody.threadId = threadId
+    /**
+     * If both threadId and In-Reply-To are sent, Gmail often keeps the *conversation* subject from
+     * the first message in the thread, so "Re: Ticket #n …" never appears in the inbox UI.
+     * Prefer threading via In-Reply-To / References only when we have a Message-ID to reply to.
+     * When there is no In-Reply-To, pass threadId so follow-ups stay in the same Gmail thread.
+     */
+    if (threadId && !inReplyTo) {
+      requestBody.threadId = threadId
+    }
 
     const sendRes = await gmail.users.messages.send({
       userId: 'me',
@@ -303,16 +339,16 @@ export async function POST(request: NextRequest) {
         threadId: sentThreadId || null,
         fromEmail,
         toEmail: recipientEmail,
-        subject,
+        subject: subjectPlain,
         snippet: bodyText.trim().slice(0, 500) || (hasFiles ? `(${attachmentList.length} attachment(s))` : ''),
-        ticketId,
+        ticketId: ticketIdNum,
         direction: 'outgoing',
       })
-      if (sentThreadId && !ticketRow?.gmailThreadId) {
+      if (sentThreadId && ticketRow && !ticketRow.gmailThreadId) {
         await db
           .update(tickets)
           .set({ gmailThreadId: sentThreadId, updatedAt: new Date() })
-          .where(and(eq(tickets.id, ticketId), isNull(tickets.gmailThreadId)))
+          .where(and(eq(tickets.id, ticketIdNum), isNull(tickets.gmailThreadId)))
       }
     }
 

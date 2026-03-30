@@ -12,7 +12,13 @@ import {
   ticketTypes,
 } from '@/lib/db'
 import { runAutomationRules } from '@/lib/automation-engine'
-import { eq, inArray } from 'drizzle-orm'
+import {
+  diffTicketSnapshots,
+  loadTicketActivitySnapshot,
+  logTicketActivity,
+} from '@/lib/ticket-activity-log'
+import type { TicketActorRole } from '@/lib/ticket-activity-log'
+import { and, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 async function triggerTicketUpdatedAutomation(ticketId: number) {
@@ -68,9 +74,30 @@ export async function PATCH(
 
   const body = await request.json()
 
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+  const actorRole: TicketActorRole = role === 'customer' ? 'customer' : 'agent'
+  const actorUserId = session.user.id!
+
   // Quick path: only status update (e.g. kanban drag)
   if (Object.keys(body).length === 1 && body.status !== undefined) {
+    const [cur] = await db
+      .select({ status: tickets.status })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1)
     await db.update(tickets).set({ status: body.status, updatedAt: new Date() }).where(eq(tickets.id, ticketId))
+    if (cur && cur.status !== body.status) {
+      await logTicketActivity({
+        ticketId,
+        actorUserId,
+        actorRole,
+        action: 'ticket_updated',
+        metadata: {
+          changed_keys: ['status'],
+          changes: { status: { from: cur.status, to: body.status } },
+        },
+      })
+    }
     await triggerTicketUpdatedAutomation(ticketId)
     return NextResponse.json({ ok: true })
   }
@@ -83,10 +110,27 @@ export async function PATCH(
 
   // Quick path: description only (from detail page)
   if (body.description !== undefined && !body.title && !body.assignees && !body.tag_ids) {
+    const [cur] = await db
+      .select({ description: tickets.description })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1)
     await db
       .update(tickets)
       .set({ description: body.description ?? null, updatedAt: new Date() })
       .where(eq(tickets.id, ticketId))
+    if (cur && String(cur.description ?? '') !== String(body.description ?? '')) {
+      await logTicketActivity({
+        ticketId,
+        actorUserId,
+        actorRole,
+        action: 'ticket_updated',
+        metadata: {
+          changed_keys: ['description'],
+          changes: { description: { from: cur.description, to: body.description ?? null } },
+        },
+      })
+    }
     await triggerTicketUpdatedAutomation(ticketId)
     return NextResponse.json({ ok: true })
   }
@@ -107,6 +151,8 @@ export async function PATCH(
     attachments_add = [],
     attachments_delete = [],
   } = body
+
+  const beforeSnapshot = await loadTicketActivitySnapshot(ticketId)
 
   const ticketUpdates: Record<string, unknown> = {
     ...(title !== undefined && { title }),
@@ -151,7 +197,15 @@ export async function PATCH(
     }
   }
 
+  let attachmentsRemovedMeta: { id: string; file_name: string }[] = []
   if (attachments_delete?.length > 0) {
+    const removedRows = await db
+      .select({ id: ticketAttachments.id, fileName: ticketAttachments.fileName })
+      .from(ticketAttachments)
+      .where(
+        and(eq(ticketAttachments.ticketId, ticketId), inArray(ticketAttachments.id, attachments_delete))
+      )
+    attachmentsRemovedMeta = removedRows.map((r) => ({ id: r.id, file_name: r.fileName }))
     await db.delete(ticketAttachments).where(inArray(ticketAttachments.id, attachments_delete))
   }
 
@@ -165,6 +219,32 @@ export async function PATCH(
         uploadedBy: session.user?.id,
       }))
     )
+  }
+
+  if (beforeSnapshot) {
+    const afterSnapshot = await loadTicketActivitySnapshot(ticketId)
+    if (afterSnapshot) {
+      const changes = diffTicketSnapshots(beforeSnapshot, afterSnapshot)
+      const meta: Record<string, unknown> = {}
+      if (Object.keys(changes).length > 0) meta.changes = changes
+      const changedKeys = Object.keys(changes)
+      if (changedKeys.length > 0) meta.changed_keys = changedKeys
+      if (attachments_add.length > 0) {
+        meta.attachments_added = attachments_add.map((a: { file_name?: string }) => ({
+          file_name: a.file_name ?? '',
+        }))
+      }
+      if (attachmentsRemovedMeta.length > 0) meta.attachments_removed = attachmentsRemovedMeta
+      if (Object.keys(meta).length > 0) {
+        await logTicketActivity({
+          ticketId,
+          actorUserId,
+          actorRole,
+          action: 'ticket_updated',
+          metadata: meta,
+        })
+      }
+    }
   }
 
   await triggerTicketUpdatedAutomation(ticketId)
@@ -186,6 +266,16 @@ export async function DELETE(
   if (isNaN(ticketId)) {
     return NextResponse.json({ error: 'Invalid ticket ID' }, { status: 400 })
   }
+
+  const delRole = (session.user as { role?: string }).role?.toLowerCase()
+  const delActorRole: TicketActorRole = delRole === 'customer' ? 'customer' : 'agent'
+  await logTicketActivity({
+    ticketId,
+    actorUserId: session.user.id!,
+    actorRole: delActorRole,
+    action: 'ticket_deleted',
+    metadata: { ticket_ref: ticketId },
+  })
 
   await db.delete(ticketAssignees).where(eq(ticketAssignees.ticketId, ticketId))
   await db.delete(ticketChecklist).where(eq(ticketChecklist.ticketId, ticketId))

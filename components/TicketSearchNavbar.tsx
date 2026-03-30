@@ -1,7 +1,10 @@
 'use client'
 
-import { Input, Spin, Typography } from 'antd'
-import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
+import { Input, Spin, Tooltip, Typography } from 'antd'
+import { CloseOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
+import 'dayjs/locale/en'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SpaNavLink } from '@/components/SpaNavLink'
@@ -11,14 +14,37 @@ import {
   SAVED_FILTERS_CHANGED_EVENT,
   type SavedTicketFilterPreset,
 } from '@/lib/ticket-saved-filters'
+import {
+  formatTicketActivityNavbarLabel,
+  isTicketActivityNavbarPeekRow,
+} from '@/lib/ticket-activity-labels'
+import TicketActivityActorAvatar from '@/components/TicketActivityActorAvatar'
+
+dayjs.extend(relativeTime)
+dayjs.locale('en')
 
 const { Text } = Typography
 
+type ActivityPeekRow = {
+  id: string
+  ticket_id: number
+  ticket_title: string
+  action: string
+  actor_role: string
+  created_at: string
+  actor: { name: string | null; email: string | null; avatar_url?: string | null } | null
+}
+
 const NAV_HEIGHT = 56
+/** Match Ant Design `large` controls so search + history icon align on one line. */
+const NAV_CONTROL_SIZE = 'large' as const
 const TITLE = process.env.NEXT_PUBLIC_APP_NAME || 'Deskteam360'
 const PREVIEW_MIN_CHARS = 2
 const PREVIEW_LIMIT = 5
 const DEBOUNCE_MS = 300
+/** Fetch extra rows so after filtering (created / customer reply / edit) we can still show up to 10. */
+const ACTIVITY_PEEK_FETCH_LIMIT = 40
+const ACTIVITY_PEEK_SHOW = 10
 
 type TicketPreview = {
   id: number
@@ -29,9 +55,9 @@ type TicketPreview = {
 }
 
 /**
- * Bar di **atas area konten** (kolom kanan sidebar): judul + pencarian tiket.
- * Preview dropdown sampai 5 tiket (nomor, judul, company, priority); klik → detail tiket.
- * `savedFiltersUserId`: staff/admin — tampilkan pintasan filter tersimpan di samping search.
+ * Top content bar (right column beside the sidebar): app title + ticket search.
+ * Preview lists up to 5 tickets (id, title, company, priority); click opens ticket detail.
+ * `savedFiltersUserId`: when set (staff/admin), shows saved filter shortcuts next to search.
  */
 export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFiltersUserId?: string | null }) {
   const router = useRouter()
@@ -45,8 +71,31 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
   const wrapRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const historyLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const historyWrapRef = useRef<HTMLDivElement>(null)
 
   const [savedPresets, setSavedPresets] = useState<SavedTicketFilterPreset[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyRows, setHistoryRows] = useState<ActivityPeekRow[]>([])
+
+  const loadHistoryPeek = useCallback(async () => {
+    setHistoryLoading(true)
+    try {
+      const res = await fetch(
+        `/api/ticket-activity?limit=${ACTIVITY_PEEK_FETCH_LIMIT}&offset=0`,
+        { credentials: 'include' }
+      )
+      if (!res.ok) throw new Error('fetch failed')
+      const body = (await res.json()) as { data?: ActivityPeekRow[] }
+      const raw = Array.isArray(body.data) ? body.data : []
+      setHistoryRows(raw.filter(isTicketActivityNavbarPeekRow).slice(0, ACTIVITY_PEEK_SHOW))
+    } catch {
+      setHistoryRows([])
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (!savedFiltersUserId) {
@@ -70,6 +119,12 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
     }
     document.addEventListener('mousedown', onDocDown)
     return () => document.removeEventListener('mousedown', onDocDown)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (historyLeaveTimer.current) clearTimeout(historyLeaveTimer.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -162,6 +217,20 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
     [router]
   )
 
+  const openHistory = useCallback(() => {
+    if (historyLeaveTimer.current) {
+      clearTimeout(historyLeaveTimer.current)
+      historyLeaveTimer.current = null
+    }
+    setHistoryOpen(true)
+    void loadHistoryPeek()
+  }, [loadHistoryPeek])
+
+  const scheduleCloseHistory = useCallback(() => {
+    if (historyLeaveTimer.current) clearTimeout(historyLeaveTimer.current)
+    historyLeaveTimer.current = setTimeout(() => setHistoryOpen(false), 200)
+  }, [])
+
   return (
     <div
       style={{
@@ -177,17 +246,46 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
         top: 0,
         zIndex: 100,
         flexShrink: 0,
+        boxSizing: 'border-box',
       }}
     >
-      <SpaNavLink
-        href="/dashboard"
-        style={{ fontWeight: 600, color: '#2b1252', whiteSpace: 'nowrap', flexShrink: 0 }}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          alignSelf: 'stretch',
+          flexShrink: 0,
+        }}
       >
-        {TITLE}
-      </SpaNavLink>
+        <SpaNavLink
+          href="/dashboard"
+          style={{
+            fontWeight: 600,
+            color: '#2b1252',
+            whiteSpace: 'nowrap',
+            display: 'inline-flex',
+            alignItems: 'center',
+            lineHeight: 1,
+          }}
+        >
+          {TITLE}
+        </SpaNavLink>
+      </div>
 
-      <div ref={wrapRef} style={{ position: 'relative', flex: 1, maxWidth: 520, minWidth: 0 }}>
+      <div
+        ref={wrapRef}
+        style={{
+          position: 'relative',
+          flex: 1,
+          maxWidth: 520,
+          minWidth: 0,
+          display: 'flex',
+          alignItems: 'center',
+          alignSelf: 'stretch',
+        }}
+      >
         <Input.Search
+          size={NAV_CONTROL_SIZE}
           allowClear
           placeholder="Search tickets (title, description)…"
           enterButton={<SearchOutlined />}
@@ -314,11 +412,143 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
           </div>
         )}
       </div>
+
+      <div
+        ref={historyWrapRef}
+        style={{
+          position: 'relative',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          alignSelf: 'stretch',
+        }}
+        onMouseEnter={openHistory}
+        onMouseLeave={scheduleCloseHistory}
+      >
+        <Tooltip title="Ticket activity history">
+          <button
+            type="button"
+            aria-label="Ticket activity history"
+            onClick={() => router.push('/ticket-activity')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 40,
+              height: 40,
+              padding: 0,
+              border: '1px solid #d9d9d9',
+              borderRadius: 8,
+              background: '#fff',
+              color: '#2b1252',
+              cursor: 'pointer',
+            }}
+          >
+            <HistoryOutlined style={{ fontSize: 18 }} />
+          </button>
+        </Tooltip>
+        {historyOpen && (
+          <div
+            role="menu"
+            style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              marginTop: 6,
+              width: 380,
+              maxWidth: 'calc(100vw - 32px)',
+              background: '#fff',
+              borderRadius: 8,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+              border: '1px solid #f0f0f0',
+              zIndex: 220,
+              overflow: 'hidden',
+            }}
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 13 }}>
+              Recent activity
+            </div>
+            {historyLoading ? (
+              <div style={{ padding: 24, textAlign: 'center' }}>
+                <Spin size="small" />
+              </div>
+            ) : historyRows.length === 0 ? (
+              <div style={{ padding: 14, color: '#8c8c8c', fontSize: 13 }}>No activity yet</div>
+            ) : (
+              <div style={{ maxHeight: 360, overflow: 'auto' }}>
+                {historyRows.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setHistoryOpen(false)
+                      router.push(`/tickets/${r.ticket_id}`)
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      alignSelf: 'center',
+                      gap: 10,
+                      width: '100%',
+                      padding: '10px 14px',
+                      border: 'none',
+                      borderBottom: '1px solid #f5f5f5',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      fontSize: 13,
+                    }}
+                  >
+                    <TicketActivityActorAvatar
+                      size={36}
+                      actorRole={r.actor_role}
+                      avatarUrl={r.actor?.avatar_url}
+                      name={r.actor?.name}
+                      email={r.actor?.email}
+                    />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ color: '#8c8c8c', fontSize: 11, marginBottom: 4 }}>
+                        #{r.ticket_id} · {r.created_at ? dayjs(r.created_at).fromNow() : '—'}
+                      </div>
+                      <div style={{ fontWeight: 500, color: '#262626', marginBottom: 2 }}>
+                        {formatTicketActivityNavbarLabel(r.action, r.actor_role)}
+                      </div>
+                      <div
+                        style={{
+                          color: '#595959',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {r.ticket_title || '(No title)'}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div style={{ padding: '8px 12px', borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>
+              <SpaNavLink
+                href="/ticket-activity"
+                style={{ fontSize: 13, fontWeight: 500, color: '#2b1252' }}
+                onClick={() => setHistoryOpen(false)}
+              >
+                See all
+              </SpaNavLink>
+            </div>
+          </div>
+        )}
+      </div>
+
       {savedFiltersUserId && savedPresets.length > 0 && (
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
+            alignSelf: 'stretch',
             gap: 8,
             flex: 1,
             minWidth: 0,
@@ -336,7 +566,6 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
               overflowX: 'auto',
               flex: 1,
               minWidth: 0,
-              paddingBottom: 2,
               scrollbarWidth: 'thin',
             }}
           >

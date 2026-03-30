@@ -167,7 +167,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   const [companies, setCompanies] = useState<Array<{ id: string; name: string; color?: string }>>([])
   const [allTags, setAllTags] = useState<Array<{ id: string; name: string; slug: string; color?: string }>>([])
   const [activeId, setActiveId] = useState<number | null>(null)
-  /** Kosong sampai lookup DB selesai — hindari kolom DEFAULT yang salah saat Show in Kanban = No */
+  
   const [statusColumns, setStatusColumns] = useState<StatusColumn[]>([])
   const [lookupReady, setLookupReady] = useState(false)
   const [allStatusColumns, setAllStatusColumns] = useState<StatusColumn[]>(DEFAULT_ALL_STATUS_COLUMNS)

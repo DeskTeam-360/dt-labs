@@ -38,7 +38,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 }
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
-import { TabGeneral, TabAssignees, TabScreenshots } from './TicketDetail'
+import { TabGeneral, TabAssignees, TabScreenshots, TabActivity } from './TicketDetail'
 import TabGeneralCustomer from './TicketDetail/TabGeneralCustomer'
 import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
 import dayjs from 'dayjs'
@@ -991,40 +991,56 @@ export default function TicketDetailContent({
                         <Divider />
 
                         {isCustomer ? (
-                            <TabGeneralCustomer
-                                ticketData={ticketData}
-                                ticketAttachments={descriptionAttachmentsFromDb}
-                                statusOptions={allStatusesForSelect}
-                                typeOptions={ticketTypes}
-                                priorityOptions={ticketPriorities}
-                                onTypeChange={handleTypeChange}
-                                onPriorityChange={handlePriorityChange}
-                                typeChanging={typeChanging}
-                                priorityChanging={priorityChanging}
-                                totalTimeSeconds={totalTimeSeconds}
-                                activeTimeTracker={activeTimeTracker}
-                                currentTime={currentTime}
-                                formatTime={formatTime}
-                                comments={comments}
-                                currentUserId={currentUser.id}
-                                editingComment={editingComment}
-                                editingCommentValue={editingCommentValue}
-                                onEditComment={(id, value) => {
-                                    setEditingComment(id)
-                                    setEditingCommentValue(value)
-                                }}
-                                onEditingCommentValueChange={setEditingCommentValue}
-                                onSaveEditComment={handleUpdateComment}
-                                onCancelEditComment={() => {
-                                    setEditingComment(null)
-                                    setEditingCommentValue('')
-                                }}
-                                onDeleteComment={handleDeleteComment}
-                                canDeleteComment={canDeleteComment}
-                                onAddComment={handleAddComment}
-                                addCommentLoading={loading}
-                                companyCustomers={companyCustomers}
-                                ticketCcEmails={initialTicketCcEmails}
+                            <Tabs
+                                defaultActiveKey="details"
+                                items={[
+                                    {
+                                        key: 'details',
+                                        label: 'Details',
+                                        children: (
+                                            <TabGeneralCustomer
+                                                ticketData={ticketData}
+                                                ticketAttachments={descriptionAttachmentsFromDb}
+                                                statusOptions={allStatusesForSelect}
+                                                typeOptions={ticketTypes}
+                                                priorityOptions={ticketPriorities}
+                                                onTypeChange={handleTypeChange}
+                                                onPriorityChange={handlePriorityChange}
+                                                typeChanging={typeChanging}
+                                                priorityChanging={priorityChanging}
+                                                totalTimeSeconds={totalTimeSeconds}
+                                                activeTimeTracker={activeTimeTracker}
+                                                currentTime={currentTime}
+                                                formatTime={formatTime}
+                                                comments={comments}
+                                                currentUserId={currentUser.id}
+                                                editingComment={editingComment}
+                                                editingCommentValue={editingCommentValue}
+                                                onEditComment={(id, value) => {
+                                                    setEditingComment(id)
+                                                    setEditingCommentValue(value)
+                                                }}
+                                                onEditingCommentValueChange={setEditingCommentValue}
+                                                onSaveEditComment={handleUpdateComment}
+                                                onCancelEditComment={() => {
+                                                    setEditingComment(null)
+                                                    setEditingCommentValue('')
+                                                }}
+                                                onDeleteComment={handleDeleteComment}
+                                                canDeleteComment={canDeleteComment}
+                                                onAddComment={handleAddComment}
+                                                addCommentLoading={loading}
+                                                companyCustomers={companyCustomers}
+                                                ticketCcEmails={initialTicketCcEmails}
+                                            />
+                                        ),
+                                    },
+                                    {
+                                        key: 'activity',
+                                        label: 'Activity log',
+                                        children: <TabActivity ticketId={ticketData.id} />,
+                                    },
+                                ]}
                             />
                         ) : (
                         <Tabs
@@ -1144,6 +1160,11 @@ export default function TicketDetailContent({
                                             onTimeTrackingChanged={refreshTimeTracking}
                                         />
                                     ),
+                                },
+                                {
+                                    key: 'activity',
+                                    label: 'Activity log',
+                                    children: <TabActivity ticketId={ticketData.id} />,
                                 },
                                 {
                                     key: 'screenshots',

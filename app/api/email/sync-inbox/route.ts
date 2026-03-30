@@ -15,6 +15,7 @@ import {
 } from '@/lib/db'
 import { uploadBuffer } from '@/lib/storage-idrive'
 import { runAutomationRules, runTicketCommentAutomation } from '@/lib/automation-engine'
+import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import { eq, and, ilike, not, isNull, desc, gte, or, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
@@ -29,10 +30,12 @@ function getEmailDateIso(msg: { internalDate?: string }): string | null {
   return new Date(ms).toISOString()
 }
 
-/** Extract ticket ID from subject, e.g. "Re: [Ticket #123] Title" or "[Ticket #123]" */
+/** Extract ticket ID from subject: "[Ticket #123]", "Re: Ticket #123 - …", "Ticket #123 …", etc. */
 function parseTicketIdFromSubject(subject: string): number | null {
-  const match = subject.match(/\[Ticket #(\d+)\]/i)
-  return match ? parseInt(match[1], 10) : null
+  const bracket = subject.match(/\[Ticket\s*#(\d+)\]/i)
+  if (bracket) return parseInt(bracket[1], 10)
+  const plain = subject.match(/\bTicket\s*#\s*(\d+)\b/i)
+  return plain ? parseInt(plain[1], 10) : null
 }
 
 /** Extract email from From header, e.g. "Name <a@b.com>" or "a@b.com" */
@@ -744,6 +747,20 @@ export async function POST(request: NextRequest) {
             )
           }
           if (insertedReplyComment) {
+            await logTicketActivity({
+              ticketId,
+              actorUserId: commentUserId,
+              actorRole: 'customer',
+              action: 'comment_added',
+              relatedCommentId: insertedReplyComment.id,
+              metadata: {
+                visibility: 'reply',
+                author_type: 'customer',
+                source: 'email',
+                sender_email: senderEmail,
+                body_preview: (commentBody || '').slice(0, 200),
+              },
+            })
             try {
               await runTicketCommentAutomation(ticketId, { visibility: 'reply', authorType: 'customer' })
             } catch (err) {
@@ -1080,6 +1097,20 @@ export async function POST(request: NextRequest) {
               )
             }
             if (insertedExtComment) {
+              await logTicketActivity({
+                ticketId,
+                actorUserId: commentUserId,
+                actorRole: 'customer',
+                action: 'comment_added',
+                relatedCommentId: insertedExtComment.id,
+                metadata: {
+                  visibility: 'reply',
+                  author_type: 'customer',
+                  source: 'email',
+                  sender_email: senderEmail,
+                  body_preview: (commentBody || '').slice(0, 200),
+                },
+              })
               try {
                 await runTicketCommentAutomation(ticketId, { visibility: 'reply', authorType: 'customer' })
               } catch (err) {
@@ -1217,6 +1248,19 @@ export async function POST(request: NextRequest) {
               }))
             )
           }
+
+          await logTicketActivity({
+            ticketId: newTicket.id,
+            actorUserId: creatorUserId ?? null,
+            actorRole: creatorUserId ? 'customer' : 'system',
+            action: 'ticket_created',
+            metadata: {
+              created_via: 'email',
+              sender_email: senderEmail,
+              title,
+              attachment_count: processedNew.files.length,
+            },
+          })
 
           createdCount++
           if (isDebug) {

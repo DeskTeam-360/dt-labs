@@ -19,6 +19,7 @@ import { eq, and, desc } from 'drizzle-orm'
 import type { OurCondition, OurConditionGroup, OurConditionLeaf } from './condition-builder-utils'
 import type { AutomationActions } from './automation-actions-types'
 import { AUTOMATION_NOTE_USER_ID } from './automation-constants'
+import { diffTicketSnapshots, loadTicketActivitySnapshot, logTicketActivity } from './ticket-activity-log'
 
 function automationNoteHtmlHasText(html: string | undefined | null): boolean {
   if (!html?.trim()) return false
@@ -240,6 +241,10 @@ export async function runAutomationRules(
       updates.visibility = actions.visibility
     }
 
+    const willMutateTicket =
+      Object.keys(updates).length > 0 || Boolean(actions.tag_ids?.length)
+    const beforeAuto = willMutateTicket ? await loadTicketActivitySnapshot(ctx.id) : null
+
     if (Object.keys(updates).length > 0) {
       await db
         .update(tickets)
@@ -264,15 +269,56 @@ export async function runAutomationRules(
       }
     }
 
+    if (beforeAuto) {
+      const afterAuto = await loadTicketActivitySnapshot(ctx.id)
+      if (afterAuto) {
+        const diff = diffTicketSnapshots(beforeAuto, afterAuto)
+        if (Object.keys(diff).length > 0) {
+          await logTicketActivity({
+            ticketId: ctx.id,
+            actorUserId: null,
+            actorRole: 'automation',
+            action: 'ticket_updated',
+            metadata: {
+              source: 'automation_rule',
+              rule_id: rule.id,
+              rule_name: rule.name ?? null,
+              changed_keys: Object.keys(diff),
+              changes: diff,
+            },
+          })
+        }
+      }
+    }
+
     if (automationNoteHtmlHasText(actions.add_note)) {
       const noteUserId = actions.add_note_user_id?.trim() || AUTOMATION_NOTE_USER_ID
-      await db.insert(ticketComments).values({
-        ticketId: ctx.id,
-        userId: noteUserId,
-        comment: actions.add_note!.trim(),
-        visibility: 'note',
-        authorType: 'automation',
-      })
+      const [noteRow] = await db
+        .insert(ticketComments)
+        .values({
+          ticketId: ctx.id,
+          userId: noteUserId,
+          comment: actions.add_note!.trim(),
+          visibility: 'note',
+          authorType: 'automation',
+        })
+        .returning({ id: ticketComments.id })
+      if (noteRow) {
+        await logTicketActivity({
+          ticketId: ctx.id,
+          actorUserId: noteUserId,
+          actorRole: 'automation',
+          action: 'comment_added',
+          relatedCommentId: noteRow.id,
+          metadata: {
+            visibility: 'note',
+            author_type: 'automation',
+            source: 'automation_rule',
+            rule_id: rule.id,
+            rule_name: rule.name ?? null,
+          },
+        })
+      }
     }
 
     if (actions.add_checklist_items?.length) {
