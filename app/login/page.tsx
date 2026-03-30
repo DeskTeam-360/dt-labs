@@ -15,35 +15,16 @@ interface LoginFormValues {
 
 interface DbCheck {
   ok: boolean
-  host?: string
   error?: string
   code?: string
   detail?: string
   hint?: string
-  userCount?: number
-  usersWithPassword?: number
-  message?: string
 }
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
-  const [dbCheckLoading, setDbCheckLoading] = useState(false)
   const [dbError, setDbError] = useState<DbCheck | null>(null)
   const router = useRouter()
-
-  const checkDb = async () => {
-    setDbCheckLoading(true)
-    setDbError(null)
-    try {
-      const res = await fetch('/api/auth/check-db')
-      const data = (await res.json()) as DbCheck
-      setDbError(data)
-    } catch {
-      setDbError({ ok: false, error: 'Gagal fetch /api/auth/check-db' })
-    } finally {
-      setDbCheckLoading(false)
-    }
-  }
 
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true)
@@ -56,10 +37,13 @@ export default function LoginPage() {
       })
 
       if (result?.error) {
-        // Ambil error detail dari DB saat login gagal
-        const res = await fetch('/api/auth/check-db')
-        const data = (await res.json()) as DbCheck
-        setDbError(data)
+        try {
+          const res = await fetch('/api/auth/check-db')
+          const data = (await res.json()) as DbCheck
+          setDbError(data.ok ? null : data)
+        } catch {
+          setDbError(null)
+        }
 
         const msg = result.error === 'CredentialsSignin' || result.error === 'Configuration'
           ? 'Invalid email or password'
@@ -78,9 +62,12 @@ export default function LoginPage() {
       try {
         const res = await fetch('/api/auth/check-db')
         const data = (await res.json()) as DbCheck
-        setDbError(data)
+        setDbError(data.ok ? null : data)
       } catch {
-        setDbError({ ok: false, error: 'Gagal cek koneksi', hint: 'Pastikan dev server jalan' })
+        setDbError({
+          ok: false,
+          error: 'Could not reach database check endpoint. Is the dev server running?',
+        })
       }
       message.error('An error occurred. Please try again.')
     } finally {
@@ -162,26 +149,18 @@ export default function LoginPage() {
 
       
 
-          {dbError && (
+          {dbError && !dbError.ok && (
             <Alert
-              type={dbError.ok ? 'info' : 'error'}
+              type="error"
               showIcon
-              message={dbError.ok ? 'Database' : 'Error Database/Connection'}
+              message="Cannot connect to database"
               description={
-                dbError.ok ? (
-                  <>
-                    Host: {dbError.host} | Users: {dbError.userCount} | Dengan password: {dbError.usersWithPassword}
-                    <br />
-                    <Text type="secondary">{dbError.message}</Text>
-                  </>
-                ) : (
-                  <>
-                    <Text strong>{dbError.error}</Text>
-                    {dbError.code && <div>Code: {dbError.code}</div>}
-                    {dbError.detail && <div>Detail: {dbError.detail}</div>}
-                    {dbError.hint && <div style={{ marginTop: 8, color: '#fa8c16' }}>💡 {dbError.hint}</div>}
-                  </>
-                )
+                <>
+                  <Text strong>{dbError.error}</Text>
+                  {dbError.code && <div>Code: {dbError.code}</div>}
+                  {dbError.detail && <div>Detail: {dbError.detail}</div>}
+                  {dbError.hint && <div style={{ marginTop: 8, color: '#fa8c16' }}>{dbError.hint}</div>}
+                </>
               }
               style={{ marginTop: 16 }}
             />

@@ -1,6 +1,5 @@
 /**
- * GET /api/auth/check-db - Debug koneksi database
- * Untuk development: tampilkan error dari DB
+ * GET /api/auth/check-db — verify DATABASE_URL / DB connectivity (login page only shows errors).
  */
 import { NextResponse } from 'next/server'
 import postgres from 'postgres'
@@ -51,9 +50,14 @@ export async function GET() {
     })
   } catch (err: unknown) {
     const e = err as Error & { code?: string; address?: string }
-    const message = e?.message || String(err)
+    let message = e?.message || String(err)
     const code = e?.code || (err as { code?: string })?.code
     const cause = e?.cause as Error | undefined
+    const pg = code === '28P01' || /password authentication failed/i.test(message)
+
+    if (pg) {
+      message = 'Wrong password (database). Check the password in DATABASE_URL in .env.'
+    }
 
     return NextResponse.json(
       {
@@ -63,11 +67,13 @@ export async function GET() {
         code,
         detail: cause?.message,
         hint:
-          code === 'ETIMEDOUT' || code === 'ECONNREFUSED'
-            ? 'Cek DATABASE_URL di .env (localhost). Pastikan DB berjalan.'
-            : code === 'ENOTFOUND'
-              ? 'Host tidak ditemukan. Password di URL mungkin salah parse (gunakan %40 untuk @, %23 untuk #)'
-              : undefined,
+          pg
+            ? 'If your password contains @, #, or %, URL-encode them in DATABASE_URL (e.g. %40 for @).'
+            : code === 'ETIMEDOUT' || code === 'ECONNREFUSED'
+              ? 'Check DATABASE_URL in .env and ensure PostgreSQL is running.'
+              : code === 'ENOTFOUND'
+                ? 'Host not found. Special characters in the URL password must be percent-encoded.'
+                : undefined,
       },
       { status: 500 }
     )
