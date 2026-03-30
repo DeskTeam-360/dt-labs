@@ -33,10 +33,13 @@ function automationNoteHtmlHasText(html: string | undefined | null): boolean {
 
 export interface TicketContext {
   id: number
+  /** Ticket title (portal & API). Condition field `subject` also reads this (email-style name). */
   title?: string | null
   description?: string | null
   status?: string | null
   priority_slug?: string | null
+  /** Ticket type slug (ticket_types.slug), for conditions e.g. Type = bug */
+  type_slug?: string | null
   company_id?: string | null
   created_via?: string | null
   team_id?: string | null
@@ -59,40 +62,61 @@ function isLeaf(c: OurCondition): c is OurConditionLeaf {
   return !('conditions' in c) || !Array.isArray((c as OurConditionGroup).conditions)
 }
 
+function isEmptyAutomationValue(raw: unknown): boolean {
+  if (raw === null || raw === undefined) return true
+  if (typeof raw === 'string') return raw.trim() === ''
+  if (Array.isArray(raw)) return raw.length === 0
+  return false
+}
+
 function evalLeaf(leaf: OurConditionLeaf, ctx: TicketContext): boolean {
   const field = String(leaf.field || '').toLowerCase()
-  const op = String(leaf.operator || '=').toLowerCase()
+  const op = String(leaf.operator || '=')
+    .toLowerCase()
+    .replace(/\s+/g, '')
   const expectVal = leaf.value
 
-  const getField = (): unknown => {
+  const getRaw = (): unknown => {
     switch (field) {
       case 'subject':
-        return (ctx.title ?? '') || ''
+      case 'title':
+        return ctx.title ?? null
       case 'description':
-        return (ctx.description ?? '') || ''
+        return ctx.description ?? null
       case 'priority':
-        return (ctx.priority_slug ?? '') || ''
+        return ctx.priority_slug ?? null
+      case 'type':
+      case 'type_slug':
+        return ctx.type_slug ?? null
       case 'status':
-        return (ctx.status ?? '') || ''
+        return ctx.status ?? null
       case 'sender_domain':
-        return (ctx.sender_domain ?? '') || ''
+        return ctx.sender_domain ?? null
       case 'sender_email':
-        return (ctx.sender_email ?? '') || ''
+        return ctx.sender_email ?? null
       case 'assignee_id':
-        return (ctx.assignee_ids ?? [])[0] ?? ''
+        return (ctx.assignee_ids ?? [])[0] ?? null
       case 'created_via':
-        return (ctx.created_via ?? '') || ''
+        return ctx.created_via ?? null
       case 'comment_visibility':
-        return (ctx.comment_visibility ?? '') || ''
+        return ctx.comment_visibility ?? null
       case 'comment_author_type':
-        return (ctx.comment_author_type ?? '') || ''
+        return ctx.comment_author_type ?? null
       default:
-        return ''
+        return null
     }
   }
 
-  const actual = getField()
-  const actualStr = String(actual ?? '').toLowerCase()
+  const raw = getRaw()
+
+  if (op === 'null' || op === 'isnull') {
+    return isEmptyAutomationValue(raw)
+  }
+  if (op === 'notnull' || op === 'isnotnull') {
+    return !isEmptyAutomationValue(raw)
+  }
+
+  const actualStr = raw === null || raw === undefined ? '' : String(raw).toLowerCase()
   const expectStr = String(expectVal ?? '').toLowerCase()
 
   switch (op) {
@@ -107,11 +131,17 @@ function evalLeaf(leaf: OurConditionLeaf, ctx: TicketContext): boolean {
     case 'endswith':
       return actualStr.endsWith(expectStr)
     case 'in': {
-      const list = String(expectVal ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+      const list = String(expectVal ?? '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
       return list.length > 0 && list.includes(actualStr)
     }
     case 'notin': {
-      const list = String(expectVal ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+      const list = String(expectVal ?? '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
       return list.length === 0 || !list.includes(actualStr)
     }
     default:
@@ -139,9 +169,11 @@ export async function loadAutomationTicketContext(ticketId: number): Promise<Tic
     .select({
       t: tickets,
       prioritySlug: ticketPriorities.slug,
+      typeSlug: ticketTypes.slug,
     })
     .from(tickets)
     .leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id))
+    .leftJoin(ticketTypes, eq(tickets.typeId, ticketTypes.id))
     .where(eq(tickets.id, ticketId))
     .limit(1)
   if (!row?.t) return null
@@ -156,6 +188,7 @@ export async function loadAutomationTicketContext(ticketId: number): Promise<Tic
     description: t.description,
     status: t.status,
     priority_slug: row.prioritySlug ?? null,
+    type_slug: row.typeSlug ?? null,
     company_id: t.companyId,
     created_via: t.createdVia,
     team_id: t.teamId,
@@ -352,6 +385,7 @@ export async function runAutomationRules(
       ctx.description = fresh.description
       ctx.status = fresh.status
       ctx.priority_slug = fresh.priority_slug
+      ctx.type_slug = fresh.type_slug
       ctx.company_id = fresh.company_id
       ctx.created_via = fresh.created_via
       ctx.team_id = fresh.team_id

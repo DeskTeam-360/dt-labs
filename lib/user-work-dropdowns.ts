@@ -1,12 +1,12 @@
 /**
  * Department & position options for user forms (create/edit users, profile, user detail).
- * Spelling preserved to match existing DB values (e.g. "Desinger").
+ * Spelling preserved to match existing DB values (e.g. "Designer").
  */
 export const USER_DEPARTMENTS = ['Management', 'Account Manager', 'Production'] as const
 
 export const USER_POSITIONS = [
   'Frontend',
-  'Desinger',
+  'Designer',
   'Backend (Mjolnir)',
   'Account Specialist',
   'HR',

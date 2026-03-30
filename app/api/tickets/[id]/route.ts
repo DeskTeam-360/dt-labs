@@ -45,6 +45,7 @@ async function triggerTicketUpdatedAutomation(ticketId: number) {
       description: row.t.description,
       status: row.t.status,
       priority_slug: row.prioritySlug ?? null,
+      type_slug: row.typeSlug ?? null,
       company_id: row.t.companyId,
       created_via: row.t.createdVia,
       team_id: row.t.teamId,

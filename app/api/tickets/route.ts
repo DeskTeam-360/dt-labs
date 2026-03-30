@@ -16,7 +16,7 @@ import {
   ticketAttachments,
   teamMembers,
 } from '@/lib/db'
-import { runAutomationRules } from '@/lib/automation-engine'
+import { loadAutomationTicketContext, runAutomationRules } from '@/lib/automation-engine'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { isAdmin } from '@/lib/auth-utils'
 import { eq, inArray, desc, and, or, ilike, gte, lte } from 'drizzle-orm'
@@ -392,19 +392,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const assigneesList = Array.isArray(assignees) ? assignees : []
-    await runAutomationRules('ticket_created', {
-      id: newTicket.id,
-      title: title || 'Untitled',
-      description: description || null,
-      status: status || 'to_do',
-      priority_slug: null,
-      company_id: company_id || null,
-      created_via: createdVia,
-      team_id: team_id || null,
-      visibility: visibility || 'private',
-      assignee_ids: assigneesList,
-    })
+    const ctx = await loadAutomationTicketContext(newTicket.id)
+    if (ctx) await runAutomationRules('ticket_created', ctx)
   } catch (autoErr) {
     console.error('Automation rules error:', autoErr)
   }

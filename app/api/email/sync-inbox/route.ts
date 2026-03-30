@@ -14,7 +14,7 @@ import {
   companyUsers,
 } from '@/lib/db'
 import { uploadBuffer } from '@/lib/storage-idrive'
-import { runAutomationRules, runTicketCommentAutomation } from '@/lib/automation-engine'
+import { loadAutomationTicketContext, runAutomationRules, runTicketCommentAutomation } from '@/lib/automation-engine'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import { eq, and, ilike, not, isNull, desc, gte, or, sql } from 'drizzle-orm'
@@ -1277,17 +1277,15 @@ export async function POST(request: NextRequest) {
           }).catch(() => {})
 
           try {
-            await runAutomationRules('ticket_created', {
-              id: ticketId,
-              title,
-              description: finalDescription,
-              status: 'to_do',
-              priority_slug: null,
-              company_id: ticketCompanyId,
-              created_via: 'email',
-              sender_email: senderEmail,
-              sender_domain: senderDomain || null,
-            })
+            const autoCtx = await loadAutomationTicketContext(newTicket.id)
+            if (autoCtx) {
+              await runAutomationRules('ticket_created', {
+                ...autoCtx,
+                description: finalDescription ?? autoCtx.description,
+                sender_email: senderEmail,
+                sender_domain: senderDomain || null,
+              })
+            }
           } catch (autoErr) {
             console.error('Automation rules error:', autoErr)
             sendAutomationLog({

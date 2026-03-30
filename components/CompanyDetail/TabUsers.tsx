@@ -128,9 +128,10 @@ export default function TabUsers({ companyData }: TabUsersProps) {
     <>
       <Space style={{ marginBottom: 16 }} wrap>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setAssignOpen(true)}>
-          Assign customer ke company ini
+          Assign a customer to this company
         </Button>
       </Space>
+      <br />
 
       {companyUsers.length > 0 ? (
         <Descriptions bordered column={1}>

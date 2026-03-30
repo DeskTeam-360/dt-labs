@@ -662,6 +662,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setSelectedTagIds(record.tags?.map((t) => t.id) || [])
     form.setFieldsValue({
       title: record.title,
+      description: record.description ?? '',
       short_note: record.short_note || '',
       status: record.status,
       visibility: record.visibility,
@@ -717,14 +718,17 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         effectiveValues.company_id = userCompanyId ?? null
       }
 
-      if (effectiveValues.visibility === 'specific_users' && selectedAssignees.length === 0) {
-        message.error('Please select at least one user for specific users visibility')
-        return
-      }
+      const customerEditing = Boolean(isCustomer && editingTicket)
+      if (!customerEditing) {
+        if (effectiveValues.visibility === 'specific_users' && selectedAssignees.length === 0) {
+          message.error('Please select at least one user for specific users visibility')
+          return
+        }
 
-      if (effectiveValues.visibility === 'team' && !effectiveValues.team_id) {
-        message.error('Please select a team for team visibility')
-        return
+        if (effectiveValues.visibility === 'team' && !effectiveValues.team_id) {
+          message.error('Please select a team for team visibility')
+          return
+        }
       }
 
       const ticketPayload: Record<string, unknown> = {
@@ -740,51 +744,78 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       }
 
       if (editingTicket) {
-        await apiFetch(`/api/tickets/${editingTicket.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...ticketPayload,
-            assignees: values.visibility === 'specific_users' ? selectedAssignees : [],
-            tag_ids: selectedTagIds,
-            // Edit: no description, no attachments
-          }),
-        })
+        if (customerEditing) {
+          await apiFetch(`/api/tickets/${editingTicket.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: values.title,
+              description: values.description ?? null,
+              type_id: values.type_id ?? null,
+              priority_id: values.priority_id ?? null,
+            }),
+          })
 
-        message.success('Ticket updated successfully')
+          message.success('Ticket updated successfully')
 
-        // Optimistic update
-        const typeId = values.type_id as number | undefined
-        const priorityId = values.priority_id as number | undefined
-        const companyId = values.company_id as string | undefined
-        const teamId = values.team_id as string | undefined
-        const updatedRecord: TicketRecord = {
-          ...editingTicket,
-          title: values.title as string,
-          short_note: (values.short_note as string) || null,
-          status: values.status as TicketRecord['status'],
-          visibility: values.visibility as TicketRecord['visibility'],
-          team_id: teamId ?? null,
-          type_id: typeId ?? null,
-          priority_id: priorityId ?? null,
-          company_id: companyId ?? null,
-          due_date: values.due_date ? (values.due_date as dayjs.Dayjs).toISOString() : null,
-          updated_at: new Date().toISOString(),
-          team_name: teamId ? teams.find((t) => t.id === teamId)?.name ?? undefined : undefined,
-          type: typeId != null ? ticketTypes.find((t) => t.id === typeId) ?? null : null,
-          priority: priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null,
-          company: companyId ? companies.find((c) => c.id === companyId) ?? null : null,
-          tags: allTags.filter((t) => selectedTagIds.includes(t.id)),
-          assignees:
-            values.visibility === 'specific_users'
-              ? selectedAssignees.map((userId) => ({
-                  id: `temp-${userId}`,
-                  user_id: userId,
-                  user_name: users.find((u) => u.id === userId)?.full_name || users.find((u) => u.id === userId)?.email || 'Unknown',
-                }))
-              : [],
+          const typeId = values.type_id as number | undefined
+          const priorityId = values.priority_id as number | undefined
+          const updatedRecord: TicketRecord = {
+            ...editingTicket,
+            title: values.title as string,
+            description: (values.description as string) ?? null,
+            type_id: typeId ?? null,
+            priority_id: priorityId ?? null,
+            updated_at: new Date().toISOString(),
+            type: typeId != null ? ticketTypes.find((t) => t.id === typeId) ?? null : null,
+            priority: priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null,
+          }
+          setTickets((prev) => prev.map((t) => (t.id === editingTicket.id ? updatedRecord : t)))
+        } else {
+          await apiFetch(`/api/tickets/${editingTicket.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...ticketPayload,
+              assignees: values.visibility === 'specific_users' ? selectedAssignees : [],
+              tag_ids: selectedTagIds,
+            }),
+          })
+
+          message.success('Ticket updated successfully')
+
+          const typeId = values.type_id as number | undefined
+          const priorityId = values.priority_id as number | undefined
+          const companyId = values.company_id as string | undefined
+          const teamId = values.team_id as string | undefined
+          const updatedRecord: TicketRecord = {
+            ...editingTicket,
+            title: values.title as string,
+            short_note: (values.short_note as string) || null,
+            status: values.status as TicketRecord['status'],
+            visibility: values.visibility as TicketRecord['visibility'],
+            team_id: teamId ?? null,
+            type_id: typeId ?? null,
+            priority_id: priorityId ?? null,
+            company_id: companyId ?? null,
+            due_date: values.due_date ? (values.due_date as dayjs.Dayjs).toISOString() : null,
+            updated_at: new Date().toISOString(),
+            team_name: teamId ? teams.find((t) => t.id === teamId)?.name ?? undefined : undefined,
+            type: typeId != null ? ticketTypes.find((t) => t.id === typeId) ?? null : null,
+            priority: priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null,
+            company: companyId ? companies.find((c) => c.id === companyId) ?? null : null,
+            tags: allTags.filter((t) => selectedTagIds.includes(t.id)),
+            assignees:
+              values.visibility === 'specific_users'
+                ? selectedAssignees.map((userId) => ({
+                    id: `temp-${userId}`,
+                    user_id: userId,
+                    user_name: users.find((u) => u.id === userId)?.full_name || users.find((u) => u.id === userId)?.email || 'Unknown',
+                  }))
+                : [],
+          }
+          setTickets((prev) => prev.map((t) => (t.id === editingTicket.id ? updatedRecord : t)))
         }
-        setTickets((prev) => prev.map((t) => (t.id === editingTicket.id ? updatedRecord : t)))
       } else {
         const createPayload = {
           ...ticketPayload,
