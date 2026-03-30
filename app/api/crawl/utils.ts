@@ -224,9 +224,6 @@ export async function startCrawlProcess(
       const isRedirect = finalUrl !== currentUrl
       const redirectInfo = isRedirect ? `Redirected from ${currentUrl} to ${finalUrl}` : null
 
-      // Handle failed responses (bukan redirect yang berhasil)
-      // Jika redirect berhasil (response.ok = true), kita akan process HTML-nya
-      // Jadi kita hanya skip jika response tidak OK dan bukan redirect yang berhasil
       if (!response.ok) {
         // Check if this is a broken page (specific HTTP error status codes)
         const isBroken = isBrokenPage(httpStatus)

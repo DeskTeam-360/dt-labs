@@ -1,5 +1,5 @@
 -- Last ticket update per company (mirror logic: GET /api/companies last_ticket_updated_at).
--- Jalankan di DB kedua / staging / prod jika perlu query dari SQL tanpa app.
+-- Run on a secondary DB / staging / prod when you need this from SQL outside the app.
 --
 --   psql "$DATABASE_URL_SECOND" -f drizzle/migrations/005_company_last_ticket_update_view.sql
 --   PowerShell: psql $env:DATABASE_URL -f drizzle/migrations/005_company_last_ticket_update_view.sql
@@ -16,7 +16,7 @@ GROUP BY company_id;
 
 COMMENT ON VIEW company_last_ticket_update IS 'Max tickets.updated_at per company_id; same aggregate as API companies list.';
 
--- Contoh join ke daftar perusahaan (setara kolom "Last ticket update" di UI):
+-- Example join to company list (same as the "Last ticket update" column in the UI):
 -- SELECT c.id, c.name, v.last_ticket_updated_at
 -- FROM public.companies c
 -- LEFT JOIN public.company_last_ticket_update v ON v.company_id = c.id;

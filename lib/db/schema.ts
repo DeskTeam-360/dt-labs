@@ -13,6 +13,7 @@ import {
   bigint,
   primaryKey,
   unique,
+  index,
 } from 'drizzle-orm/pg-core'
 
 const ts = (name: string) => timestamp(name, { withTimezone: true })
@@ -222,6 +223,25 @@ export const ticketComments = pgTable('ticket_comments', {
   bccEmails: text('bcc_emails').array(),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
+
+/** Append-only audit trail for ticket lifecycle (create/update/delete, comments, automation, email). */
+export const ticketActivityLog = pgTable(
+  'ticket_activity_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** SET NULL when ticket row is deleted so history rows remain. */
+    ticketId: integer('ticket_id').references(() => tickets.id, { onDelete: 'set null' }),
+    actorUserId: uuid('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+    actorRole: varchar('actor_role', { length: 32 }).notNull().default('agent'),
+    action: varchar('action', { length: 64 }).notNull(),
+    metadata: jsonb('metadata'),
+    relatedCommentId: uuid('related_comment_id').references(() => ticketComments.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('ticket_activity_log_ticket_id_created_at_idx').on(t.ticketId, t.createdAt)]
+)
 
 export const ticketAttributs = pgTable(
   'ticket_attributs',

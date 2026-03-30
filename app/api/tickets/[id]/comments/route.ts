@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { db, ticketComments, commentAttachments, ticketCcRecipients, tickets, users, companyUsers } from '@/lib/db'
 import { runTicketCommentAutomation } from '@/lib/automation-engine'
+import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { eq, ilike } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { NextResponse } from 'next/server'
@@ -75,6 +76,23 @@ export async function POST(
     .returning()
 
   if (!row) return NextResponse.json({ error: 'Failed to create' }, { status: 500 })
+
+  await logTicketActivity({
+    ticketId,
+    actorUserId: session.user.id,
+    actorRole: isCustomer ? 'customer' : 'agent',
+    action: 'comment_added',
+    relatedCommentId: row.id,
+    metadata: {
+      visibility: effectiveVisibility,
+      author_type: effectiveAuthorType,
+      body_preview: (comment || '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 200),
+    },
+  })
 
   const allCcEmails = [
     ...(Array.isArray(cc_emails) ? cc_emails.filter((e: string) => e?.trim()?.includes('@')) : []),

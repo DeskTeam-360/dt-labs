@@ -17,6 +17,7 @@ import {
   teamMembers,
 } from '@/lib/db'
 import { runAutomationRules } from '@/lib/automation-engine'
+import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { isAdmin } from '@/lib/auth-utils'
 import { eq, inArray, desc, and, or, ilike, gte, lte } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
   const userId = session.user.id!
   const role = (session.user as { role?: string }).role?.toLowerCase()
 
-  // Customer: hanya ticket yang company-nya sama
+  // Customer: only tickets for the same company
   let forcedCompanyIds: string[] = []
   if (role === 'customer') {
     const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
@@ -419,6 +420,21 @@ export async function POST(request: Request) {
       }))
     )
   }
+
+  const activityRole = role === 'customer' ? 'customer' : 'agent'
+  await logTicketActivity({
+    ticketId: newTicket.id,
+    actorUserId: userId,
+    actorRole: activityRole,
+    action: 'ticket_created',
+    metadata: {
+      title: title || 'Untitled',
+      created_via: createdVia,
+      assignee_count: Array.isArray(assignees) ? assignees.length : 0,
+      tag_count: Array.isArray(tag_ids) ? tag_ids.length : 0,
+      attachment_count: Array.isArray(attachments) ? attachments.length : 0,
+    },
+  })
 
   return NextResponse.json({
     id: newTicket.id,
