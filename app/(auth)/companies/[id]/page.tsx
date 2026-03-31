@@ -20,6 +20,14 @@ export default async function CompanyDetailPage({
     redirect('/companies')
   }
 
-  return <CompanyDetailContent user={session.user} companyData={companyData} />
+  const currentUserRole = (session.user as { role?: string }).role
+
+  return (
+    <CompanyDetailContent
+      user={session.user}
+      companyData={companyData}
+      currentUserRole={currentUserRole}
+    />
+  )
 }
 

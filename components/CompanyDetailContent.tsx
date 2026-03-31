@@ -60,9 +60,17 @@ interface CompanyDetailContentProps {
   variant?: 'admin' | 'customer'
   /** When set, render only this section (no tabs). Keys: info, users, tickets, content-planner, data-form, generate, knowledge-base, websites, crawling */
   activeSection?: string
+  /** Used to show portal-admin toggle on Users tab (system admin only) */
+  currentUserRole?: string | null
 }
 
-export default function CompanyDetailContent({ user: currentUser, companyData, variant = 'admin', activeSection }: CompanyDetailContentProps) {
+export default function CompanyDetailContent({
+  user: currentUser,
+  companyData,
+  variant = 'admin',
+  activeSection,
+  currentUserRole,
+}: CompanyDetailContentProps) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [form] = Form.useForm()
@@ -868,7 +876,12 @@ export default function CompanyDetailContent({ user: currentUser, companyData, v
           <TeamOutlined /> Users ({companyData.company_users?.length || 0})
         </span>
       ),
-      children: <TabUsers companyData={companyData} />,
+      children: (
+        <TabUsers
+          companyData={companyData}
+          viewerIsGlobalAdmin={currentUserRole?.toLowerCase() === 'admin'}
+        />
+      ),
     },
     {
       key: 'tickets',

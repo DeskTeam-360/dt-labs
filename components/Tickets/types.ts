@@ -7,6 +7,19 @@ export function formatTicketId(id: number): string {
   return `#${id}`
 }
 
+export interface TicketAttachment {
+  id: string
+  file_url: string
+  file_name: string
+  file_path: string
+}
+
+export interface NewTicketAttachment {
+  url: string
+  file_name: string
+  file_path: string
+}
+
 export interface TicketRecord {
   id: number
   title: string
@@ -36,6 +49,8 @@ export interface TicketRecord {
   checklist_total?: number
   last_read_at?: string | null
   has_unread_replies?: boolean
+  /** Ticket-level files (from GET /api/tickets); used when editing in modal */
+  attachments?: TicketAttachment[]
 }
 
 export interface Team {
@@ -64,19 +79,6 @@ export interface StatusColumn {
   id: string
   title: string
   color: string
-}
-
-export interface TicketAttachment {
-  id: string
-  file_url: string
-  file_name: string
-  file_path: string
-}
-
-export interface NewTicketAttachment {
-  url: string
-  file_name: string
-  file_path: string
 }
 
 export const DEFAULT_KANBAN_COLUMNS: StatusColumn[] = [
