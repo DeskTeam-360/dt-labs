@@ -185,6 +185,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   const [sortOrder, setSortOrder] = useState<TicketSortOrder>(initialState.sortOrder)
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'card' | 'roundrobin'>(initialState.viewMode)
   const [newTicketAttachments, setNewTicketAttachments] = useState<NewTicketAttachment[]>([])
+  const [deletedTicketAttachmentIds, setDeletedTicketAttachmentIds] = useState<string[]>([])
   const [attachmentUploading, setAttachmentUploading] = useState(false)
 
   /** Server returns filtered data - no client-side filtering */
@@ -640,6 +641,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setSelectedAssignees([])
     setSelectedTagIds([])
     setNewTicketAttachments([])
+    setDeletedTicketAttachmentIds([])
     form.resetFields()
     const baseValues: Record<string, unknown> = {
       status: allStatuses[0]?.slug ?? 'to_do',
@@ -654,6 +656,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
   const handleEdit = (record: TicketRecord) => {
     setEditingTicket(record)
+    setNewTicketAttachments([])
+    setDeletedTicketAttachmentIds([])
     let assigneeIds = record.assignees?.map((a) => a.user_id) || []
     if (record.visibility === 'specific_users' && record.created_by && !assigneeIds.includes(record.created_by)) {
       assigneeIds = [record.created_by, ...assigneeIds]
@@ -677,10 +681,13 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
   const handleTicketFilesSelected = async (files: File[] | FileList | null) => {
     const arr = files ? Array.from(files) : []
-    if (!arr.length || editingTicket) return
+    if (!arr.length) return
+    if (editingTicket && !isCustomer) return
     setAttachmentUploading(true)
     try {
-      const companyId = form.getFieldValue('company_id') as string | undefined
+      const companyId = isCustomer
+        ? userCompanyId ?? undefined
+        : (form.getFieldValue('company_id') as string | undefined)
       const companyName = companyId ? companies.find((c) => c.id === companyId)?.name : undefined
       for (let i = 0; i < arr.length; i++) {
         const file = arr[i]
@@ -745,32 +752,31 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
       if (editingTicket) {
         if (customerEditing) {
+          const attachBody: Record<string, unknown> = {
+            title: values.title,
+            description: values.description ?? null,
+            type_id: values.type_id ?? null,
+            priority_id: values.priority_id ?? null,
+          }
+          if (newTicketAttachments.length > 0) {
+            attachBody.attachments_add = newTicketAttachments.map((a) => ({
+              file_url: a.url,
+              file_name: a.file_name,
+              file_path: a.file_path,
+            }))
+          }
+          if (deletedTicketAttachmentIds.length > 0) {
+            attachBody.attachments_delete = deletedTicketAttachmentIds
+          }
+
           await apiFetch(`/api/tickets/${editingTicket.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: values.title,
-              description: values.description ?? null,
-              type_id: values.type_id ?? null,
-              priority_id: values.priority_id ?? null,
-            }),
+            body: JSON.stringify(attachBody),
           })
 
           message.success('Ticket updated successfully')
-
-          const typeId = values.type_id as number | undefined
-          const priorityId = values.priority_id as number | undefined
-          const updatedRecord: TicketRecord = {
-            ...editingTicket,
-            title: values.title as string,
-            description: (values.description as string) ?? null,
-            type_id: typeId ?? null,
-            priority_id: priorityId ?? null,
-            updated_at: new Date().toISOString(),
-            type: typeId != null ? ticketTypes.find((t) => t.id === typeId) ?? null : null,
-            priority: priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null,
-          }
-          setTickets((prev) => prev.map((t) => (t.id === editingTicket.id ? updatedRecord : t)))
+          await fetchTickets()
         } else {
           await apiFetch(`/api/tickets/${editingTicket.id}`, {
             method: 'PATCH',
@@ -881,19 +887,20 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       setSelectedAssignees([])
       setSelectedTagIds([])
       setNewTicketAttachments([])
-      // setDeletedTicketAttachmentIds([])
+      setDeletedTicketAttachmentIds([])
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to save ticket')
     }
   }
 
   const handleModalCancel = async () => {
-    if (!editingTicket && newTicketAttachments.length > 0) {
+    if (newTicketAttachments.length > 0) {
       for (const a of newTicketAttachments) {
         if (a.file_path) await deleteFile(a.file_path)
       }
       setNewTicketAttachments([])
     }
+    setDeletedTicketAttachmentIds([])
     setModalVisible(false)
     form.resetFields()
     setSelectedAssignees([])
@@ -964,6 +971,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     handleDragEnd,
     newTicketAttachments,
     setNewTicketAttachments,
+    deletedTicketAttachmentIds,
+    setDeletedTicketAttachmentIds,
     handleTicketFilesSelected,
     handleRemoveNewAttachment,
     attachmentUploading,

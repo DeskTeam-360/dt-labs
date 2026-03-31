@@ -3,6 +3,7 @@ import { db, companies } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { getCompanyDetail } from '@/lib/company-detail'
+import { customerOwnsCompany } from '@/lib/customer-company'
 
 /** GET /api/companies/[id] - Get company with related data */
 export async function GET(
@@ -15,6 +16,11 @@ export async function GET(
   }
 
   const { id } = await params
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+  if (role === 'customer') {
+    const ok = await customerOwnsCompany(session.user.id!, id)
+    if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const companyData = await getCompanyDetail(id)
   if (!companyData) {
@@ -37,11 +43,18 @@ export async function PUT(
   const { id } = await params
   const body = await request.json()
   const { name, email, is_active, color } = body
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+  const isCustomer = role === 'customer'
+
+  if (isCustomer) {
+    const ok = await customerOwnsCompany(session.user.id!, id)
+    if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const updateData: Record<string, unknown> = {}
   if (name !== undefined) updateData.name = name
   if (email !== undefined) updateData.email = email?.trim() || null
-  if (is_active !== undefined) updateData.isActive = is_active
+  if (!isCustomer && is_active !== undefined) updateData.isActive = is_active
   if (color !== undefined) updateData.color = color
 
   const [row] = await db
@@ -76,6 +89,11 @@ export async function DELETE(
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+  if (role === 'customer') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const { id } = await params

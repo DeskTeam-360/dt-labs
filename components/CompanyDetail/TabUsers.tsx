@@ -1,6 +1,6 @@
 'use client'
 
-import { Descriptions, Space, Typography, Button, Modal, Select, message, Popconfirm } from 'antd'
+import { Descriptions, Space, Typography, Button, Modal, Select, message, Popconfirm, Switch, Tag } from 'antd'
 import { PlusOutlined, DeleteOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -13,7 +13,8 @@ const { Text } = Typography
 interface CompanyUserRow {
   user_id: string
   created_at: string
-  users: { id: string; full_name: string | null; email: string | null }
+  company_role?: string
+  users: { id: string; full_name: string | null; email: string | null; role?: string | null }
 }
 
 interface ApiUser {
@@ -27,6 +28,8 @@ interface ApiUser {
 
 interface TabUsersProps {
   companyData: { id: string; name?: string; company_users?: CompanyUserRow[] }
+  /** System admin: assign which customer can manage portal accounts for this company */
+  viewerIsGlobalAdmin?: boolean
 }
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
@@ -38,7 +41,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-export default function TabUsers({ companyData }: TabUsersProps) {
+export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: TabUsersProps) {
   const router = useRouter()
   const companyId = companyData.id
   const companyName = companyData.name ?? 'company ini'
@@ -154,6 +157,36 @@ export default function TabUsers({ companyData }: TabUsersProps) {
                   <Text>
                     <strong>Email:</strong> {cu.users?.email || 'N/A'}
                   </Text>
+                  {(cu.company_role || 'member') === 'company_admin' ? (
+                    <Tag color="blue">Portal admin</Tag>
+                  ) : null}
+                  {viewerIsGlobalAdmin &&
+                  (cu.users?.role || '').toLowerCase() === 'customer' ? (
+                    <Space size={8} style={{ marginTop: 4 }} align="center">
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        Portal admin (manage users)
+                      </Text>
+                      <Switch
+                        size="small"
+                        checked={(cu.company_role || 'member') === 'company_admin'}
+                        onChange={async (checked) => {
+                          try {
+                            await apiFetch(`/api/companies/${companyId}/portal-members/${cu.user_id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                company_role: checked ? 'company_admin' : 'member',
+                              }),
+                            })
+                            message.success('Updated')
+                            router.refresh()
+                          } catch (e: unknown) {
+                            message.error(e instanceof Error ? e.message : 'Gagal menyimpan')
+                          }
+                        }}
+                      />
+                    </Space>
+                  ) : null}
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     Added: <DateDisplay date={cu.created_at} />
                   </Text>

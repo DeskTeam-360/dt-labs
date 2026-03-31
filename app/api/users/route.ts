@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { db, users, companies, companyUsers } from '@/lib/db'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 /** GET /api/users - List users with company. When customer: only users in same company */
@@ -38,7 +38,21 @@ export async function GET() {
       .orderBy(desc(users.createdAt))
 
     if (role === 'customer' && companyId) {
-      query = query.where(eq(users.companyId, companyId)) as typeof query
+      const [directRows, cuRows] = await Promise.all([
+        db.select({ id: users.id }).from(users).where(eq(users.companyId, companyId)),
+        db
+          .select({ userId: companyUsers.userId })
+          .from(companyUsers)
+          .where(eq(companyUsers.companyId, companyId)),
+      ])
+      const idSet = new Set<string>()
+      for (const r of directRows) idSet.add(r.id)
+      for (const r of cuRows) idSet.add(r.userId)
+      const ids = [...idSet]
+      if (ids.length === 0) {
+        return NextResponse.json([])
+      }
+      query = query.where(inArray(users.id, ids)) as typeof query
     }
 
     const rows = await query

@@ -20,10 +20,7 @@ import {
     Flex,
     notification,
 } from 'antd'
-import {
-    ArrowLeftOutlined,
-    SyncOutlined,
-} from '@ant-design/icons'
+import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadTicketFile } from '@/utils/storage'
@@ -168,7 +165,6 @@ export default function TicketDetailContent({
     const [totalTimeSeconds, setTotalTimeSeconds] = useState<number>(0)
     const [currentTime, setCurrentTime] = useState<number>(0)
     const [statusesFromDb, setStatusesFromDb] = useState<{ slug: string; title: string; color: string }[]>([])
-    const [syncingEmail, setSyncingEmail] = useState(false)
     const [assigneesChanging, setAssigneesChanging] = useState(false)
     const [teamChanging, setTeamChanging] = useState(false)
     const [visibilityChanging, setVisibilityChanging] = useState(false)
@@ -234,21 +230,7 @@ export default function TicketDetailContent({
         fetchStatuses()
     }, [])
 
-    // Auto-sync inbox: company email replies -> comments (admin only, background)
-    useEffect(() => {
-        if (variant !== 'admin' || !ticketData?.company?.email) return
-        let cancelled = false
-        fetch('/api/email/sync-inbox', { method: 'POST' })
-            .then((res) => res.json())
-            .then((data) => {
-                if (cancelled || !data.addedCount) return
-                router.refresh()
-            })
-            .catch(() => {})
-        return () => { cancelled = true }
-    }, [variant, ticketData?.id, router])
-
-    // Realtime removed (was Supabase). User can refresh to see new replies.
+    // Inbox sync: use cron POST /api/email/sync-inbox (not on each ticket open).
 
     // Fetch team members if ticket has a team
     useEffect(() => {
@@ -938,24 +920,6 @@ export default function TicketDetailContent({
     const totalChecklistCount = checklistItems.length
     const isCustomer = variant === 'customer'
 
-    const handleSyncEmail = async () => {
-        setSyncingEmail(true)
-        try {
-            const res = await fetch('/api/email/sync-inbox', { method: 'POST' })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || 'Sync failed')
-            const parts = []
-            if (data.addedCount > 0) parts.push(`${data.addedCount} new comment(s)`)
-            if (data.createdCount > 0) parts.push(`${data.createdCount} new ticket(s)`)
-            message.success(parts.length > 0 ? `Synced: ${parts.join(', ')}` : 'Synced. No new emails.')
-            router.refresh()
-        } catch (err: unknown) {
-            message.error(err instanceof Error ? err.message : 'Failed to sync email')
-        } finally {
-            setSyncingEmail(false)
-        }
-    }
-
     return (
         <Layout style={{ minHeight: '100vh' }}>
             <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
@@ -969,15 +933,6 @@ export default function TicketDetailContent({
                             >
                                 Back to {isCustomer ? 'Portal' : 'Tickets'}
                             </Button>
-                            {/* {isCustomer && (
-                                <Button
-                                    icon={<SyncOutlined />}
-                                    onClick={handleSyncEmail}
-                                    loading={syncingEmail}
-                                >
-                                    Sync Email
-                                </Button>
-                            )} */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{ flex: 1 }}>
                                     <Title level={2} >

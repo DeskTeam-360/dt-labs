@@ -57,11 +57,13 @@ export const companies = pgTable('companies', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
 
+/** member | company_admin — company_admin can add portal users & reset their passwords */
 export const companyUsers = pgTable(
   'company_users',
   {
     companyId: uuid('company_id').notNull(),
     userId: uuid('user_id').notNull(),
+    companyRole: varchar('company_role', { length: 32 }).notNull().default('member'),
     createdAt: ts('created_at').notNull().defaultNow(),
     updatedAt: ts('updated_at').notNull().defaultNow(),
   },

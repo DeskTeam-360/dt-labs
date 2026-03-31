@@ -65,6 +65,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     setSelectedTagIds,
     newTicketAttachments,
     setNewTicketAttachments,
+    deletedTicketAttachmentIds,
+    setDeletedTicketAttachmentIds,
     handleTicketFilesSelected,
     handleRemoveNewAttachment,
     attachmentUploading,
@@ -215,10 +217,10 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         onSelectedAssigneesChange={setSelectedAssignees}
         selectedTagIds={selectedTagIds}
         onSelectedTagIdsChange={setSelectedTagIds}
-        ticketAttachmentsFromDb={[]}
+        ticketAttachmentsFromDb={editingTicket?.attachments ?? []}
         newTicketAttachments={newTicketAttachments}
-        deletedTicketAttachmentIds={[]}
-        onDeletedAttachmentIdsChange={() => {}}
+        deletedTicketAttachmentIds={deletedTicketAttachmentIds}
+        onDeletedAttachmentIdsChange={setDeletedTicketAttachmentIds}
         onNewAttachmentsChange={setNewTicketAttachments}
         onFilesSelected={handleTicketFilesSelected}
         onRemoveNewAttachment={handleRemoveNewAttachment}

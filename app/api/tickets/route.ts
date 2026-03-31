@@ -19,7 +19,8 @@ import {
 import { loadAutomationTicketContext, runAutomationRules } from '@/lib/automation-engine'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { isAdmin } from '@/lib/auth-utils'
-import { eq, inArray, desc, and, or, ilike, gte, lte } from 'drizzle-orm'
+import { getPublicUrl } from '@/lib/storage-idrive'
+import { eq, inArray, desc, asc, and, or, ilike, gte, lte } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
@@ -180,7 +181,7 @@ export async function GET(request: Request) {
 
   const ticketIds = ticketsRows.map((r) => r.ticket.id)
 
-  const [assigneesRows, checklistRows, tagsRows, repliesRows] =
+  const [assigneesRows, checklistRows, tagsRows, repliesRows, attachmentsRows] =
     ticketIds.length > 0
       ? await Promise.all([
           db
@@ -210,8 +211,19 @@ export async function GET(request: Request) {
             .select({ ticketId: ticketComments.ticketId, createdAt: ticketComments.createdAt })
             .from(ticketComments)
             .where(and(eq(ticketComments.visibility, 'reply'), inArray(ticketComments.ticketId, ticketIds))),
+          db
+            .select({
+              ticketId: ticketAttachments.ticketId,
+              id: ticketAttachments.id,
+              fileUrl: ticketAttachments.fileUrl,
+              fileName: ticketAttachments.fileName,
+              filePath: ticketAttachments.filePath,
+            })
+            .from(ticketAttachments)
+            .where(inArray(ticketAttachments.ticketId, ticketIds))
+            .orderBy(asc(ticketAttachments.createdAt)),
         ])
-      : [[], [], [], []]
+      : [[], [], [], [], []]
 
   const latestReplies: Record<number, string> = {}
   repliesRows.forEach((r) => {
@@ -244,6 +256,20 @@ export async function GET(request: Request) {
       id: row.id,
       user_id: row.userId,
       user_name: name,
+    })
+  })
+
+  const attachmentsByTicket: Record<
+    number,
+    Array<{ id: string; file_url: string; file_name: string; file_path: string }>
+  > = {}
+  attachmentsRows.forEach((row) => {
+    if (!attachmentsByTicket[row.ticketId]) attachmentsByTicket[row.ticketId] = []
+    attachmentsByTicket[row.ticketId].push({
+      id: row.id,
+      file_url: row.fileUrl || (row.filePath ? getPublicUrl(row.filePath) : ''),
+      file_name: row.fileName,
+      file_path: row.filePath ?? '',
     })
   })
 
@@ -304,6 +330,7 @@ export async function GET(request: Request) {
       checklist_total: cl.total,
       last_read_at: lastReadAt,
       has_unread_replies: hasUnread,
+      attachments: attachmentsByTicket[t.id] || [],
     }
   })
 

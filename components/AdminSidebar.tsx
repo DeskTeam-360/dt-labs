@@ -58,6 +58,7 @@ function selectedKeysForPathname(pathname: string | null): string[] {
   if (!pathname) return []
   const topLevel = [
     '/dashboard',
+    '/my-company',
     '/users',
     '/companies',
     '/tickets',
@@ -106,6 +107,15 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       icon: <DashboardOutlined />,
       label: linkLabel('/dashboard', 'Dashboard'),
     },
+    ...(isCustomer
+      ? [
+          {
+            key: '/my-company',
+            icon: <InfoCircleOutlined />,
+            label: linkLabel('/my-company', 'Company info'),
+          },
+        ]
+      : []),
     {
       key: '/users',
       icon: <TeamOutlined />,
@@ -150,7 +160,9 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     },
   ].filter((item) => {
     if (isCustomer) {
-      return !['ticket-attributes', '/teams', '/email-integration', '/companies', '/knowledge-base', '/users'].includes(item.key)
+      return !['ticket-attributes', '/teams', '/email-integration', '/companies', '/knowledge-base', '/users'].includes(
+        item.key as string
+      )
     }
     // Role-based: Users, Company, Teams, Email Integration, Knowledge Base = Admin only; Tickets = Admin & Manager
     if (item.key === '/users' && !canAccessUsers(role)) return false

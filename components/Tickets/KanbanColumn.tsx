@@ -56,7 +56,7 @@ export default function KanbanColumn({
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' , paddingRight: 8, paddingLeft: 8 }}>
             <Text strong>{column.title}</Text>
-            <Badge count={columnTickets.length} style={{ backgroundColor: column.color }} />
+            <Badge count={columnTickets.length} color={'white'} style={{ backgroundColor: '#fff', color: '#000' }} />
           </div>
         }
       >

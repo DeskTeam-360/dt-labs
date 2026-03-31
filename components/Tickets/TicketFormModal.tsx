@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import {
   Modal,
   Form,
@@ -82,6 +83,16 @@ export default function TicketFormModal({
 }: TicketFormModalProps) {
   /** Customers always use the same compact fields as create (title, description, type, priority). */
   const showSimplifiedForm = isCustomer
+  /** Customer: attachments on create + edit. Staff: attachments only when creating (full form). */
+  const showAttachmentSection = showSimplifiedForm || !editingTicket
+  const fileInputIdRef = useRef<string | null>(null)
+  if (!fileInputIdRef.current) {
+    fileInputIdRef.current =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? `ticket-files-${crypto.randomUUID()}`
+        : `ticket-files-${Math.random().toString(36).slice(2)}`
+  }
+  const fileInputId = fileInputIdRef.current
   const selectableTeams = userTeamIds.length > 0 ? teams.filter((t) => userTeamIds.includes(t.id)) : []
 
   return (
@@ -118,7 +129,7 @@ export default function TicketFormModal({
           </Form.Item>
         )}
         <br />
-        {!editingTicket && !showSimplifiedForm && (
+        {showAttachmentSection && (
           <Form.Item label="Attachments">
             <Flex vertical style={{ width: '100%' }}>
               {ticketAttachmentsFromDb
@@ -149,7 +160,7 @@ export default function TicketFormModal({
                 type="file"
                 multiple
                 style={{ display: 'none' }}
-                id="ticket-files-input"
+                id={fileInputId}
                 onChange={(e) => {
                   const fileList = e.target.files
                   const filesArray = fileList ? Array.from(fileList) : []
@@ -159,7 +170,7 @@ export default function TicketFormModal({
               />
               <Button
                 icon={<PaperClipOutlined />}
-                onClick={() => document.getElementById('ticket-files-input')?.click()}
+                onClick={() => document.getElementById(fileInputId)?.click()}
                 loading={attachmentUploading}
               >
                 Attach files
