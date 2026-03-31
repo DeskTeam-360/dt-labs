@@ -267,7 +267,7 @@ export default function TabGeneral({
   return (
     <Space orientation="vertical" style={{ width: '100%' }} size="middle">
       <Row gutter={[24, 24]}>
-      <Col xs={14}>
+      <Col xs={16}>
 
 
       <Flex gap="middle" align="flex-start" style={{ padding: 10, marginBottom: 10, borderBottom: '1px solid black',  }}>
@@ -480,7 +480,7 @@ export default function TabGeneral({
           {/* </Card> */}
         </Col>
 
-        <Col xs={10}>
+        <Col xs={8}>
           <Descriptions column={1} bordered>
             <Descriptions.Item label="Short Note">
               {onShortNoteChange ? (
@@ -629,7 +629,7 @@ export default function TabGeneral({
                 <Text>{visibilityOptions.find((o) => o.value === ticketData.visibility)?.label ?? ticketData.visibility}</Text>
               )}
             </Descriptions.Item>
-            {selectedVisibility === 'team' ? (
+            {selectedVisibility === 'team' || selectedVisibility === 'public' ? (
               <Descriptions.Item label="Team">
                 {canEditAssignees ? (
                   <Select
