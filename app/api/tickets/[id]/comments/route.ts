@@ -1,5 +1,15 @@
 import { auth } from '@/auth'
-import { db, ticketComments, commentAttachments, ticketCcRecipients, tickets, users, companyUsers } from '@/lib/db'
+import {
+  db,
+  ticketComments,
+  commentAttachments,
+  ticketCcRecipients,
+  tickets,
+  ticketAssignees,
+  users,
+  companyUsers,
+} from '@/lib/db'
+import { notifyTicketUsers } from '@/lib/firebase/ticket-notifications-server'
 import { runTicketCommentAutomation } from '@/lib/automation-engine'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { eq, ilike } from 'drizzle-orm'
@@ -161,6 +171,65 @@ export async function POST(
     })
   } catch (err) {
     console.error('Automation rules error (ticket_comment_added):', err)
+  }
+
+  try {
+    const [ticketRow] = await db
+      .select({ title: tickets.title, createdBy: tickets.createdBy })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1)
+    const assignRows = await db
+      .select({ userId: ticketAssignees.userId })
+      .from(ticketAssignees)
+      .where(eq(ticketAssignees.ticketId, ticketId))
+    const assigneeIds = assignRows.map((r) => r.userId)
+    const createdBy = ticketRow?.createdBy ?? null
+    const allIds = [
+      ...new Set([
+        ...effectiveTaggedIds,
+        ...assigneeIds,
+        ...(createdBy ? [createdBy] : []),
+      ]),
+    ]
+    const taggedSet = new Set(effectiveTaggedIds)
+    const mentionRecipients = allIds.filter((id) => taggedSet.has(id))
+    const commentRecipients = allIds.filter((id) => !taggedSet.has(id))
+    const actorName = session.user.name || session.user.email || 'Someone'
+    const preview = (comment || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 160)
+    const ticketTitle = ticketRow?.title || 'Ticket'
+    if (mentionRecipients.length > 0) {
+      await notifyTicketUsers({
+        recipientUserIds: mentionRecipients,
+        excludeUserId: session.user.id,
+        ticketId,
+        ticketTitle,
+        type: 'mention',
+        title: `${actorName} mentioned you`,
+        body: preview || 'New note on ticket',
+        actorUserId: session.user.id,
+        actorName,
+      })
+    }
+    if (commentRecipients.length > 0) {
+      await notifyTicketUsers({
+        recipientUserIds: commentRecipients,
+        excludeUserId: session.user.id,
+        ticketId,
+        ticketTitle,
+        type: 'new_comment',
+        title: 'New ticket activity',
+        body: `${actorName}: ${preview || '(attachment)'}`,
+        actorUserId: session.user.id,
+        actorName,
+      })
+    }
+  } catch (e) {
+    console.error('[comments] firebase notify:', e)
   }
 
   return NextResponse.json({

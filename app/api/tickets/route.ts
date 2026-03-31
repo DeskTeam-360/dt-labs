@@ -23,6 +23,7 @@ import { getPublicUrl } from '@/lib/storage-idrive'
 import { eq, inArray, desc, asc, and, or, ilike, gte, lte } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+import { notifyTicketUsers } from '@/lib/firebase/ticket-notifications-server'
 
 const DEFAULT_LIMIT = 500
 const MAX_LIMIT = 1000
@@ -451,6 +452,25 @@ export async function POST(request: Request) {
       attachment_count: Array.isArray(attachments) ? attachments.length : 0,
     },
   })
+
+  if (Array.isArray(assignees) && assignees.length > 0) {
+    try {
+      const actorName = session.user.name || session.user.email || 'Someone'
+      await notifyTicketUsers({
+        recipientUserIds: assignees,
+        excludeUserId: userId,
+        ticketId: newTicket.id,
+        ticketTitle: newTicket.title,
+        type: 'new_ticket_assignee',
+        title: 'New ticket assignment',
+        body: `You were assigned to "${newTicket.title}"`,
+        actorUserId: userId,
+        actorName,
+      })
+    } catch (e) {
+      console.error('[POST ticket] notify assignees:', e)
+    }
+  }
 
   return NextResponse.json({
     id: newTicket.id,

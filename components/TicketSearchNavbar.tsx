@@ -19,6 +19,7 @@ import {
   isTicketActivityNavbarPeekRow,
 } from '@/lib/ticket-activity-labels'
 import TicketActivityActorAvatar from '@/components/TicketActivityActorAvatar'
+import TicketNotificationBell from '@/components/TicketNotificationBell'
 
 dayjs.extend(relativeTime)
 dayjs.locale('en')
@@ -414,6 +415,18 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
       </div>
 
       <div
+        style={{
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          alignSelf: 'stretch',
+          gap: 8,
+        }}
+      >
+        <TicketNotificationBell />
+      </div>
+
+      <div
         ref={historyWrapRef}
         style={{
           position: 'relative',
@@ -425,7 +438,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
         onMouseEnter={openHistory}
         onMouseLeave={scheduleCloseHistory}
       >
-        <Tooltip title="Ticket activity history">
+        {/* <Tooltip title="Ticket activity history"> */}
           <button
             type="button"
             aria-label="Ticket activity history"
@@ -446,7 +459,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
           >
             <HistoryOutlined style={{ fontSize: 18 }} />
           </button>
-        </Tooltip>
+        {/* </Tooltip> */}
         {historyOpen && (
           <div
             role="menu"

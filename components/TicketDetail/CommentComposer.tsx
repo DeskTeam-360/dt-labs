@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button, Flex, Select, message } from 'antd'
 import { CommentOutlined, SendOutlined, PaperClipOutlined, DeleteOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons'
 import CommentWysiwyg from './CommentWysiwyg'
@@ -71,6 +71,29 @@ export default function CommentComposer({
     .filter((e) => !baseCcOptions.some((o) => o.value === e))
     .map((e) => ({ value: e, label: e }))
   const ccOptions = [...baseCcOptions, ...ticketCcOnlyOptions]
+
+  const tagAgentOptions = useMemo(
+    () =>
+      nonCustomerUsers.map((u) => ({
+        value: u.id,
+        label: u.full_name ? `${u.full_name} (${u.email})` : u.email || u.id,
+      })),
+    [nonCustomerUsers]
+  )
+
+  const filterTagAgents = (input: string, option?: { value?: string; label?: unknown }) => {
+    if (!input.trim()) return true
+    const id = option?.value
+    if (!id || typeof id !== 'string') return false
+    const u = nonCustomerUsers.find((x) => x.id === id)
+    if (!u) return false
+    const q = input.trim().toLowerCase()
+    return (
+      (u.full_name || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      u.id.toLowerCase().includes(q)
+    )
+  }
 
   const handleSubmit = async () => {
     if (!draft.trim() && attachments.length === 0) return
@@ -143,14 +166,13 @@ export default function CommentComposer({
           <UserAddOutlined style={{ color: '#666' }} />
           <Select
             mode="multiple"
-            placeholder="Tag agents (optional)"
+            placeholder="Tag agents (optional) — search by name or email"
             value={taggedUserIds}
             onChange={setTaggedUserIds}
-            options={nonCustomerUsers.map((u) => ({
-              value: u.id,
-              label: u.full_name || u.email || u.id,
-            }))}
+            options={tagAgentOptions}
             allowClear
+            showSearch
+            filterOption={filterTagAgents}
             style={{ minWidth: 200, flex: 1 }}
             maxTagCount="responsive"
           />

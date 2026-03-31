@@ -38,6 +38,8 @@ import DateDisplay from './DateDisplay'
 import { TabGeneral, TabAssignees, TabScreenshots, TabActivity } from './TicketDetail'
 import TabGeneralCustomer from './TicketDetail/TabGeneralCustomer'
 import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
+import TicketPresenceBar from './TicketPresenceBar'
+import TicketSearchNavbar from './TicketSearchNavbar'
 import dayjs from 'dayjs'
 
 const { Content } = Layout
@@ -60,7 +62,7 @@ interface Screenshot {
 }
 
 interface TicketDetailContentProps {
-    user: { id: string; email?: string | null; name?: string | null }
+    user: { id: string; email?: string | null; name?: string | null; image?: string | null; role?: string }
     ticketData: any
     checklistItems: any[]
     comments: any[]
@@ -924,21 +926,38 @@ export default function TicketDetailContent({
         <Layout style={{ minHeight: '100vh' }}>
             <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
             <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
-                <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+                <TicketSearchNavbar savedFiltersUserId={!isCustomer ? currentUser.id : undefined} />
+                <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 56px)' }}>
                     <Card style={{  margin: '0 auto' }}>
-                        <Flex gap={16} align='center' style={{ marginBottom: 24 }}>
+                        <Flex gap={16} align="center" wrap="wrap" style={{ marginBottom: 24 }}>
                             <Button
                                 icon={<ArrowLeftOutlined />}
                                 onClick={() => router.push(isCustomer ? '/tickets' : '/tickets')}
                             >
                                 Back to {isCustomer ? 'Portal' : 'Tickets'}
                             </Button>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <div style={{ flex: 1 }}>
-                                    <Title level={2} >
-                                        #{ticketData.id} {ticketData.title}
-                                    </Title>
-                                </div>
+                            <div
+                                style={{
+                                    flex: 1,
+                                    minWidth: 240,
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    justifyContent: 'space-between',
+                                    gap: 12,
+                                    flexWrap: 'wrap',
+                                }}
+                            >
+                                <Title level={2} style={{ margin: 0, flex: '1 1 200px' }}>
+                                    #{ticketData.id} {ticketData.title}
+                                </Title>
+                                <TicketPresenceBar
+                                    ticketId={ticketData.id}
+                                    currentUser={{
+                                        id: currentUser.id,
+                                        name: currentUser.name,
+                                        image: currentUser.image,
+                                    }}
+                                />
                             </div>
                         </Flex>
 

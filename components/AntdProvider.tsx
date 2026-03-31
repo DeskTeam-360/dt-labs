@@ -3,6 +3,7 @@
 import { App, ConfigProvider } from 'antd'
 import { SessionProvider } from 'next-auth/react'
 import type { Session } from 'next-auth'
+import FirebaseSessionBridge from '@/components/FirebaseSessionBridge'
 
 export default function AntdProvider({
   children,
@@ -26,6 +27,7 @@ export default function AntdProvider({
           refetchInterval={0}
           refetchOnWindowFocus={false}
         >
+          <FirebaseSessionBridge />
           {children}
         </SessionProvider>
       </App>

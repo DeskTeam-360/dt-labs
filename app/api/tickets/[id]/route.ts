@@ -20,6 +20,7 @@ import {
 import type { TicketActorRole } from '@/lib/ticket-activity-log'
 import { and, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+import { notifyTicketUsers, diffNewAssignees } from '@/lib/firebase/ticket-notifications-server'
 
 async function triggerTicketUpdatedAutomation(ticketId: number) {
   try {
@@ -98,6 +99,35 @@ export async function PATCH(
           changes: { status: { from: cur.status, to: body.status } },
         },
       })
+      try {
+        const [meta] = await db
+          .select({ title: tickets.title, createdBy: tickets.createdBy })
+          .from(tickets)
+          .where(eq(tickets.id, ticketId))
+          .limit(1)
+        const arows = await db
+          .select({ userId: ticketAssignees.userId })
+          .from(ticketAssignees)
+          .where(eq(ticketAssignees.ticketId, ticketId))
+        const recipients = [...arows.map((r) => r.userId), meta?.createdBy].filter(Boolean) as string[]
+        const actorName =
+          (session.user as { name?: string | null }).name ||
+          session.user.email ||
+          'Someone'
+        await notifyTicketUsers({
+          recipientUserIds: recipients,
+          excludeUserId: actorUserId,
+          ticketId,
+          ticketTitle: meta?.title || 'Ticket',
+          type: 'status_changed',
+          title: 'Ticket status updated',
+          body: `"${meta?.title || 'Ticket'}": ${cur.status} → ${body.status}`,
+          actorUserId,
+          actorName,
+        })
+      } catch (e) {
+        console.error('[PATCH ticket status] notify:', e)
+      }
     }
     await triggerTicketUpdatedAutomation(ticketId)
     return NextResponse.json({ ok: true })
@@ -244,6 +274,36 @@ export async function PATCH(
           action: 'ticket_updated',
           metadata: meta,
         })
+      }
+
+      const assigneeChange = changes.assignee_ids as { from: unknown; to: unknown } | undefined
+      if (
+        assigneeChange &&
+        Array.isArray(assigneeChange.from) &&
+        Array.isArray(assigneeChange.to)
+      ) {
+        const added = diffNewAssignees(assigneeChange.from as string[], assigneeChange.to as string[])
+        if (added.length > 0) {
+          try {
+            const actorName =
+              (session.user as { name?: string | null }).name ||
+              session.user.email ||
+              'Someone'
+            await notifyTicketUsers({
+              recipientUserIds: added,
+              excludeUserId: actorUserId,
+              ticketId,
+              ticketTitle: afterSnapshot.title,
+              type: 'assignee_added',
+              title: 'You were assigned',
+              body: `Added as assignee on "${afterSnapshot.title}"`,
+              actorUserId,
+              actorName,
+            })
+          } catch (e) {
+            console.error('[PATCH ticket assignees] notify:', e)
+          }
+        }
       }
     }
   }
