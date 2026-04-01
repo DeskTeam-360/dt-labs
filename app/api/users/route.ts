@@ -62,6 +62,8 @@ export async function GET() {
     return {
       id: u.id,
       email: u.email,
+      first_name: u.firstName,
+      last_name: u.lastName,
       full_name: u.fullName,
       role: u.role,
       status: u.status,

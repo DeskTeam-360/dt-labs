@@ -23,6 +23,8 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: text('password_hash'),
+  firstName: varchar('first_name', { length: 255 }),
+  lastName: varchar('last_name', { length: 255 }),
   fullName: varchar('full_name', { length: 255 }),
   avatarUrl: text('avatar_url'),
   role: varchar('role', { length: 50 }).notNull().default('user'),
@@ -547,6 +549,26 @@ export const automationRules = pgTable('automation_rules', {
 })
 
 // ============ API Tokens ============
+/** Email / notification / reply templates (seeded; admin edits content & active flag only). */
+export const messageTemplates = pgTable(
+  'message_templates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    type: varchar('type', { length: 64 }).notNull(),
+    templateGroup: varchar('template_group', { length: 128 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull(),
+    key: varchar('key', { length: 128 }).notNull().unique(),
+    status: varchar('status', { length: 32 }).notNull().default('active'),
+    content: text('content'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('message_templates_template_group_idx').on(t.templateGroup),
+    index('message_templates_type_idx').on(t.type),
+  ]
+)
+
 export const apiTokens = pgTable('api_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull(),

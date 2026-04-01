@@ -239,6 +239,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const handleEdit = () => {
     setIsEditing(true)
     form.setFieldsValue({
+      first_name: userData.first_name || '',
+      last_name: userData.last_name || '',
       full_name: userData.full_name || '',
       role: userData.role,
       status: userData.status,
@@ -264,6 +266,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     openedEditFromQueryRef.current = true
     setIsEditing(true)
     form.setFieldsValue({
+      first_name: userData.first_name || '',
+      last_name: userData.last_name || '',
       full_name: userData.full_name || '',
       role: userData.role,
       status: userData.status,
@@ -309,6 +313,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     setLoading(true)
     try {
       const updateData: any = {
+        first_name: values.first_name || null,
+        last_name: values.last_name || null,
         full_name: values.full_name,
         status: values.status,
         avatar_url: avatarUrl,
@@ -584,6 +590,18 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         <Form.Item label="Email">
                           <Input prefix={<MailOutlined />} value={userData.email} disabled />
                         </Form.Item>
+                        <Row gutter={16}>
+                          <Col span={12}>
+                            <Form.Item name="first_name" label="First name">
+                              <Input placeholder="First name" />
+                            </Form.Item>
+                          </Col>
+                          <Col span={12}>
+                            <Form.Item name="last_name" label="Last name">
+                              <Input placeholder="Last name" />
+                            </Form.Item>
+                          </Col>
+                        </Row>
                         <Form.Item
                           name="full_name"
                           label="Full Name"
@@ -605,6 +623,12 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             <MailOutlined />
                             <Text>{userData.email}</Text>
                           </Space>
+                        </Descriptions.Item>
+                        <Descriptions.Item label="First name">
+                          <Text>{userData.first_name || '—'}</Text>
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Last name">
+                          <Text>{userData.last_name || '—'}</Text>
                         </Descriptions.Item>
                         <Descriptions.Item label="Full Name">
                           <Space>

@@ -13,6 +13,8 @@ export default async function ProfilePage() {
   const [userRow] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1)
   const userData = userRow
     ? {
+        first_name: userRow.firstName,
+        last_name: userRow.lastName,
         full_name: userRow.fullName,
         avatar_url: userRow.avatarUrl,
         phone: userRow.phone,

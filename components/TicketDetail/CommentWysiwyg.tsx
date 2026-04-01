@@ -32,6 +32,11 @@ interface CommentWysiwygProps {
   bgColor?: string
   /** Ticket/todo id for image upload path: ticket/{ticketId}/{unixtime}. Omit for draft path (ticket/draft/...). */
   ticketId?: string | number
+  /**
+   * When false, uses `editor.root.innerHTML` instead of `getSemanticHTML()` (react-quill-new default).
+   * Set false for message templates so `{{ placeholders }}` stay literal in HTML.
+   */
+  useSemanticHTML?: boolean
 }
 
 export default function CommentWysiwyg({
@@ -41,6 +46,7 @@ export default function CommentWysiwyg({
   height = '100px',
   bgColor = '#fff',
   ticketId,
+  useSemanticHTML = true,
 }: CommentWysiwygProps) {
   const [mounted, setMounted] = useState(false)
   const quillRef = useRef<{ getEditor: () => QuillEditor } | null>(null)
@@ -110,10 +116,10 @@ export default function CommentWysiwyg({
     placeholder,
     modules,
     formats: QUILL_FORMATS,
-    style: { backgroundColor: bgColor,height: height },
+    style: { backgroundColor: bgColor, height: height },
     ref: quillRef,
-    tabIndex: 10
-
+    tabIndex: 10,
+    useSemanticHTML,
   }
   return (
     <>

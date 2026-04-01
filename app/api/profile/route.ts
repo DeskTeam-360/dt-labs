@@ -13,6 +13,8 @@ export async function PATCH(request: Request) {
   const body = await request.json()
   const {
     full_name,
+    first_name,
+    last_name,
     avatar_url,
     phone,
     department,
@@ -22,10 +24,24 @@ export async function PATCH(request: Request) {
     locale,
   } = body
 
-  const set: { fullName?: string; avatarUrl?: string; phone?: string | null; department?: string | null; position?: string | null; bio?: string | null; timezone?: string; locale?: string; updatedAt: Date } = {
+  const set: {
+    fullName?: string
+    firstName?: string | null
+    lastName?: string | null
+    avatarUrl?: string
+    phone?: string | null
+    department?: string | null
+    position?: string | null
+    bio?: string | null
+    timezone?: string
+    locale?: string
+    updatedAt: Date
+  } = {
     updatedAt: new Date(),
   }
   if (full_name !== undefined) set.fullName = full_name
+  if (first_name !== undefined) set.firstName = first_name || null
+  if (last_name !== undefined) set.lastName = last_name || null
   if (avatar_url !== undefined) set.avatarUrl = avatar_url
   if (phone !== undefined) set.phone = phone
   if (department !== undefined) set.department = department
@@ -47,6 +63,8 @@ export async function PATCH(request: Request) {
   return NextResponse.json({
     success: true,
     user: {
+      first_name: updated.firstName,
+      last_name: updated.lastName,
       full_name: updated.fullName,
       avatar_url: updated.avatarUrl,
       phone: updated.phone,

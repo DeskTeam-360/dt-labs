@@ -23,6 +23,8 @@ type SessionUser = {
 interface ProfileContentProps {
   user: SessionUser
   userData?: {
+    first_name?: string | null
+    last_name?: string | null
     full_name?: string | null
     avatar_url?: string | null
     phone?: string | null
@@ -59,6 +61,8 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
     if (userData) {
       form.setFieldsValue({
         email: user.email,
+        first_name: userData.first_name || '',
+        last_name: userData.last_name || '',
         full_name: userData.full_name || user.user_metadata?.full_name || '',
         phone: userData.phone || '',
         department: userData.department || '',
@@ -158,7 +162,17 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
     }
   }
 
-  const onFinish = async (values: { full_name?: string; phone?: string; department?: string; position?: string; bio?: string; timezone?: string; locale?: string }) => {
+  const onFinish = async (values: {
+    full_name?: string
+    first_name?: string
+    last_name?: string
+    phone?: string
+    department?: string
+    position?: string
+    bio?: string
+    timezone?: string
+    locale?: string
+  }) => {
     setLoading(true)
     try {
       const res = await fetch('/api/profile', {
@@ -166,6 +180,8 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: values.full_name,
+          first_name: values.first_name || null,
+          last_name: values.last_name || null,
           avatar_url: avatarUrl,
           phone: values.phone,
           department: values.department,
@@ -275,6 +291,19 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
                       prefix={<UserOutlined />}
                       placeholder="Full Name"
                     />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item name="first_name" label="First name">
+                    <Input prefix={<UserOutlined />} placeholder="First name" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item name="last_name" label="Last name">
+                    <Input prefix={<UserOutlined />} placeholder="Last name" />
                   </Form.Item>
                 </Col>
               </Row>

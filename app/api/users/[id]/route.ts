@@ -32,6 +32,8 @@ export async function GET(
   return NextResponse.json({
     id: u.id,
     email: u.email,
+    first_name: u.firstName,
+    last_name: u.lastName,
     full_name: u.fullName,
     role: u.role,
     status: u.status,
@@ -69,6 +71,8 @@ export async function PATCH(
 
   const updateData: Record<string, unknown> = {}
   if (body.full_name !== undefined) updateData.fullName = body.full_name
+  if (body.first_name !== undefined) updateData.firstName = body.first_name || null
+  if (body.last_name !== undefined) updateData.lastName = body.last_name || null
   if (body.role !== undefined) updateData.role = body.role
   if (body.status !== undefined) updateData.status = body.status
   if (body.company_id !== undefined) updateData.companyId = body.company_id || null

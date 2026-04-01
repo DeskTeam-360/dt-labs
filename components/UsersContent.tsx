@@ -34,6 +34,8 @@ interface UsersContentProps {
 interface UserRecord {
   id: string
   email: string
+  first_name: string | null
+  last_name: string | null
   full_name: string | null
   role: string
   status: string
@@ -76,6 +78,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       if (searchText.trim()) {
         const q = searchText.trim().toLowerCase()
         const matchesSearch =
+          (u.first_name || '').toLowerCase().includes(q) ||
+          (u.last_name || '').toLowerCase().includes(q) ||
           (u.full_name || '').toLowerCase().includes(q) ||
           (u.email || '').toLowerCase().includes(q) ||
           (u.company?.name || '').toLowerCase().includes(q) ||
@@ -134,6 +138,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     setAvatarUrl(record.avatar_url)
     form.setFieldsValue({
       email: record.email,
+      first_name: record.first_name || '',
+      last_name: record.last_name || '',
       full_name: record.full_name || '',
       role: record.role,
       status: record.status,
@@ -188,6 +194,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     try {
       if (editingUser) {
         const patchBody: Record<string, unknown> = {
+          first_name: values.first_name || null,
+          last_name: values.last_name || null,
           full_name: values.full_name,
           status: values.status,
           avatar_url: avatarUrl,
@@ -224,6 +232,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
         const result = await createUser({
           email: values.email,
           password: values.password,
+          first_name: values.first_name || null,
+          last_name: values.last_name || null,
           full_name: values.full_name,
           role: isCustomer ? 'user' : values.role,
           status: values.status,
@@ -589,6 +599,19 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                   </div>
                 </Form.Item>
               )}
+
+              <Row gutter={24}>
+                <Col span={12}>
+                  <Form.Item name="first_name" label="First name">
+                    <Input placeholder="First name" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="last_name" label="Last name">
+                    <Input placeholder="Last name" />
+                  </Form.Item>
+                </Col>
+              </Row>
 
               <Row gutter={24}>
                 <Col span={12}>

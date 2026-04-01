@@ -1,0 +1,48 @@
+id
+type
+group
+title
+key
+status
+content
+updated_at
+
+
+Group 
+Agent Notification
+- New Ticket Created
+- Ticket Assigned to Team
+- Ticket Assigned to Agent
+- Requester Replies to Ticket
+- Ticket Unattended in Group
+- First Response SLA Violation
+- Resolution Time SLA Violation
+- Note added to ticket
+- First Response SLA Reminder
+- Resolution Time SLA Reminder
+Requester Notification
+
+
+New Ticket Created		Edit
+
+Agent Adds Comment to Ticket		Edit
+
+Agent Solves the Ticket		Edit
+
+Agent Closes the Ticket		Edit
+
+User Activation Email		Edit
+
+Password Reset Email
+CC Notification
+
+
+New Ticket Created		Edit
+
+Note added to ticket
+template
+
+
+Agent Reply Template		Edit
+
+Agent Forward Template

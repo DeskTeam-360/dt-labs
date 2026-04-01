@@ -9,6 +9,8 @@ export async function createUser(formData: {
   email: string
   password: string
   full_name: string
+  first_name?: string | null
+  last_name?: string | null
   role: string
   status: string
 }) {
@@ -18,7 +20,7 @@ export async function createUser(formData: {
   }
 
   try {
-    const { email, password, full_name, role, status } = formData
+    const { email, password, full_name, first_name, last_name, role, status } = formData
 
     const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1)
     if (existing) {
@@ -32,6 +34,8 @@ export async function createUser(formData: {
       .values({
         email,
         passwordHash,
+        firstName: first_name?.trim() ? first_name.trim() : null,
+        lastName: last_name?.trim() ? last_name.trim() : null,
         fullName: full_name || null,
         role: role || 'user',
         status: status || 'active',

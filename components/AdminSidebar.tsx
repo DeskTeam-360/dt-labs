@@ -19,6 +19,7 @@ import {
     MailOutlined,
     ThunderboltOutlined,
     FlagOutlined,
+    FileTextOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect, useMemo } from 'react'
@@ -34,6 +35,7 @@ import {
   canAccessEmailIntegration,
   canAccessKnowledgeBase,
   canAccessUsers,
+  canAccessMessageTemplates,
 } from '@/lib/auth-utils'
 
 const { Sider } = Layout
@@ -68,6 +70,7 @@ function selectedKeysForPathname(pathname: string | null): string[] {
     '/teams',
     '/email-integration',
     '/knowledge-base',
+    '/message-templates',
   ]
   const top = topLevel.find((k) => pathname === k || (k !== '/dashboard' && pathname.startsWith(`${k}/`)))
   if (top) return [top]
@@ -166,6 +169,15 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       icon: <MailOutlined />,
       label: linkLabel('/email-integration', 'Email Integration'),
     },
+    ...(canAccessMessageTemplates(role)
+      ? [
+          {
+            key: '/message-templates',
+            icon: <FileTextOutlined />,
+            label: linkLabel('/message-templates', 'Message templates'),
+          },
+        ]
+      : []),
     {
       key: '/knowledge-base',
       icon: <InfoCircleOutlined />,
@@ -183,6 +195,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     if (item.key === '/tickets' && !canAccessTickets(role)) return false
     if (item.key === '/teams' && !canAccessTeams(role)) return false
     if (item.key === '/email-integration' && !canAccessEmailIntegration(role)) return false
+    if (item.key === '/message-templates' && !canAccessMessageTemplates(role)) return false
     if (item.key === '/knowledge-base' && !canAccessKnowledgeBase(role)) return false
     if (item.key === 'ticket-attributes' && !canAccessTicketAttributes(role)) return false
     return true

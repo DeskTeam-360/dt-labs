@@ -62,3 +62,8 @@ export function canAccessKnowledgeBase(role: string | undefined): boolean {
 export function canAccessUsers(role: string | undefined): boolean {
   return isAdmin(role)
 }
+
+/** Message / email templates (auto-response & notifications): Admin only */
+export function canAccessMessageTemplates(role: string | undefined): boolean {
+  return isAdmin(role)
+}
