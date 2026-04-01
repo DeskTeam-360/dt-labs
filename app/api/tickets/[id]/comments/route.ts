@@ -10,9 +10,10 @@ import {
   companyUsers,
 } from '@/lib/db'
 import { notifyTicketUsers } from '@/lib/firebase/ticket-notifications-server'
+import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 import { runTicketCommentAutomation } from '@/lib/automation-engine'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
-import { eq, ilike } from 'drizzle-orm'
+import { eq, ilike, inArray } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { NextResponse } from 'next/server'
 
@@ -215,7 +216,9 @@ export async function POST(
         actorName,
       })
     }
-    if (commentRecipients.length > 0) {
+    // "New ticket activity" only when the customer replied (they cannot @mention via API).
+    // Agent/agent notes without @mention do not push notifications — only tagged users get `mention` above.
+    if (isCustomer && effectiveTaggedIds.length === 0 && commentRecipients.length > 0) {
       await notifyTicketUsers({
         recipientUserIds: commentRecipients,
         excludeUserId: session.user.id,
@@ -232,6 +235,21 @@ export async function POST(
     console.error('[comments] firebase notify:', e)
   }
 
+  const taggedUserPayload =
+    effectiveTaggedIds.length > 0
+      ? await db
+          .select({ id: users.id, fullName: users.fullName, email: users.email })
+          .from(users)
+          .where(inArray(users.id, effectiveTaggedIds))
+      : []
+  const tagged_users = taggedUserPayload.map((u) => ({
+    id: u.id,
+    full_name: u.fullName,
+    email: u.email,
+  }))
+
+  bumpTicketDataVersion(ticketId)
+
   return NextResponse.json({
     id: row.id,
     ticket_id: row.ticketId,
@@ -241,6 +259,7 @@ export async function POST(
     visibility: row.visibility ?? 'reply',
     author_type: row.authorType ?? 'agent',
     tagged_user_ids: row.taggedUserIds ?? [],
+    tagged_users,
     cc_emails: row.ccEmails ?? [],
     bcc_emails: row.bccEmails ?? [],
     user: { id: session.user.id, full_name: session.user.name, email: session.user.email, avatar_url: session.user.image },

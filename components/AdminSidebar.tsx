@@ -18,6 +18,7 @@ import {
     AppstoreOutlined,
     MailOutlined,
     ThunderboltOutlined,
+    FlagOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect, useMemo } from 'react'
@@ -27,6 +28,8 @@ import { SpaNavLink, shouldOpenHrefInNewTab } from '@/components/SpaNavLink'
 import {
   canAccessCompanies,
   canAccessTickets,
+  canAccessTicketAttributes,
+  canAccessAutomationRules,
   canAccessTeams,
   canAccessEmailIntegration,
   canAccessKnowledgeBase,
@@ -68,7 +71,7 @@ function selectedKeysForPathname(pathname: string | null): string[] {
   ]
   const top = topLevel.find((k) => pathname === k || (k !== '/dashboard' && pathname.startsWith(`${k}/`)))
   if (top) return [top]
-  const ticketAttr = ['/ticket-statuses', '/ticket-types', '/tags', '/automation-rules']
+  const ticketAttr = ['/ticket-statuses', '/ticket-types', '/ticket-priorities', '/tags', '/automation-rules']
   const sub = ticketAttr.find((k) => pathname === k || pathname.startsWith(`${k}/`))
   return sub ? [sub] : []
 }
@@ -87,13 +90,20 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     if (pathname) {
       if (pathname.startsWith('/company-data-templates') || pathname.startsWith('/company-content-templates') || pathname.startsWith('/company-ai-system-templates')) {
         setOpenKeys(['templates'])
-      } else       if (pathname.startsWith('/ticket-statuses') || pathname.startsWith('/ticket-types') || pathname.startsWith('/tags') || pathname.startsWith('/automation-rules')) {
+      } else if (
+        (canAccessTicketAttributes(role) &&
+          (pathname.startsWith('/ticket-statuses') ||
+            pathname.startsWith('/ticket-types') ||
+            pathname.startsWith('/ticket-priorities') ||
+            pathname.startsWith('/tags'))) ||
+        (canAccessAutomationRules(role) && pathname.startsWith('/automation-rules'))
+      ) {
         setOpenKeys(['ticket-attributes'])
       } else if (pathname.startsWith('/content-planner')) {
         setOpenKeys(['content-planner'])
       }
     }
-  }, [pathname])
+  }, [pathname, role])
 
   const linkLabel = (path: string, text: string) => (
     <SpaNavLink href={path} title={text} className="admin-sidebar-menu-link" onClick={(e) => e.stopPropagation()}>
@@ -139,8 +149,11 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       children: [
         { key: '/ticket-statuses', icon: <SettingOutlined />, label: linkLabel('/ticket-statuses', 'Ticket Statuses') },
         { key: '/ticket-types', icon: <AppstoreOutlined />, label: linkLabel('/ticket-types', 'Ticket Types') },
+        { key: '/ticket-priorities', icon: <FlagOutlined />, label: linkLabel('/ticket-priorities', 'Ticket Priorities') },
         { key: '/tags', icon: <TagOutlined />, label: linkLabel('/tags', 'Tags') },
-        { key: '/automation-rules', icon: <ThunderboltOutlined />, label: linkLabel('/automation-rules', 'Automation Rules') },
+        ...(canAccessAutomationRules(role)
+          ? [{ key: '/automation-rules', icon: <ThunderboltOutlined />, label: linkLabel('/automation-rules', 'Automation Rules') }]
+          : []),
       ],
     },
     {
@@ -171,7 +184,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     if (item.key === '/teams' && !canAccessTeams(role)) return false
     if (item.key === '/email-integration' && !canAccessEmailIntegration(role)) return false
     if (item.key === '/knowledge-base' && !canAccessKnowledgeBase(role)) return false
-    if (item.key === 'ticket-attributes' && !canAccessTickets(role)) return false
+    if (item.key === 'ticket-attributes' && !canAccessTicketAttributes(role)) return false
     return true
   })
 

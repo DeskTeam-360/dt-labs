@@ -1,25 +1,27 @@
 import { auth } from '@/auth'
-import { redirect } from 'next/navigation'
 import { getTicketDetail } from '@/lib/ticket-detail'
-import TicketDetailContentClient from '@/components/TicketDetailContentClient'
 import { db } from '@/lib/db'
 import { users, companyUsers } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
 
-export default async function TicketDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+export const dynamic = 'force-dynamic'
+
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'private, no-store, max-age=0, must-revalidate',
+}
+
+/** GET /api/tickets/[id]/detail — full ticket payload (same shape as getTicketDetail) for live refresh */
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user) {
-    redirect('/login')
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_CACHE_HEADERS })
   }
 
   const { id } = await params
   const ticketId = parseInt(id, 10)
   if (isNaN(ticketId)) {
-    redirect('/tickets')
+    return NextResponse.json({ error: 'Invalid ticket ID' }, { status: 400 })
   }
 
   const role = (session.user as { role?: string }).role?.toLowerCase()
@@ -37,37 +39,19 @@ export default async function TicketDetailPage({
       cid = cu?.companyId ?? null
     }
     if (!cid) {
-      redirect('/tickets')
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_CACHE_HEADERS })
     }
     customerCompanyId = cid
   }
 
   const data = await getTicketDetail(ticketId, {
-    screenshotUserId: session.user.id,
+    screenshotUserId: session.user.id!,
     ...(customerCompanyId ? { companyId: customerCompanyId } : {}),
   })
 
   if (!data) {
-    redirect('/tickets')
+    return NextResponse.json({ error: 'Not found' }, { status: 404, headers: NO_CACHE_HEADERS })
   }
 
-  const isCustomer = role === 'customer'
-
-  return (
-    <TicketDetailContentClient
-      user={session.user}
-      ticketData={data.ticketData}
-      checklistItems={data.checklistItems}
-      comments={data.comments}
-      commentsHasOlder={data.comments_has_older}
-      commentsOlderCursor={data.comments_older_cursor}
-      commentsOlderRemaining={data.comments_older_remaining}
-      attributes={data.attributes}
-      screenshots={data.screenshots}
-      tags={data.tags}
-      ticketCcEmails={data.ticketCcEmails ?? []}
-      variant={isCustomer ? 'customer' : 'admin'}
-    />
-  )
+  return NextResponse.json(data, { headers: NO_CACHE_HEADERS })
 }
-

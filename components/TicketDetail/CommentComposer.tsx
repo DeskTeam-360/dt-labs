@@ -27,7 +27,8 @@ interface CommentComposerProps {
     extra?: CommentExtra
   ) => Promise<void>
   loading?: boolean
-  commentVisibility?: 'note' | 'reply'
+  /** When `showNoteOption`, `null` = belum pilih mode (hanya tombol Add note / Reply). */
+  commentVisibility?: 'note' | 'reply' | null
   onCommentVisibilityChange?: (v: 'note' | 'reply') => void
   showNoteOption?: boolean
   /** Non-customer users for tagging in notes (role !== 'customer') */
@@ -43,13 +44,16 @@ export default function CommentComposer({
   companyName,
   onAddComment,
   loading = false,
-  commentVisibility = 'reply',
+  commentVisibility,
   onCommentVisibilityChange,
   showNoteOption = false,
   nonCustomerUsers = [],
   companyCustomers = [],
   ticketCcEmails = [],
 }: CommentComposerProps) {
+  /** Customer / non-agent UI: selalu reply. Agent with note+reply: honor null = pilih dulu. */
+  const mode = showNoteOption ? commentVisibility ?? null : 'reply'
+
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
   const [uploading, setUploading] = useState(false)
@@ -96,13 +100,14 @@ export default function CommentComposer({
   }
 
   const handleSubmit = async () => {
+    if (showNoteOption && mode == null) return
     if (!draft.trim() && attachments.length === 0) return
     try {
       const extra: CommentExtra = {}
-      if (showNoteOption && commentVisibility === 'note' && taggedUserIds.length > 0) {
+      if (showNoteOption && mode === 'note' && taggedUserIds.length > 0) {
         extra.taggedUserIds = taggedUserIds
       }
-      const isReplyMode = (showNoteOption && commentVisibility === 'reply') || !showNoteOption
+      const isReplyMode = (showNoteOption && mode === 'reply') || !showNoteOption
       if (isReplyMode) {
         const cc = ccEmails.filter((e) => e?.trim() && e.includes('@'))
         const bcc = bccEmails.filter((e) => e?.trim() && e.includes('@'))
@@ -140,28 +145,47 @@ export default function CommentComposer({
   }
 
   const placeholder = showNoteOption
-    ? commentVisibility === 'note'
+    ? mode === 'note'
       ? 'Add a note (agent only)...'
       : 'Reply (visible to client)...'
     : 'Add a comment...'
 
-  const isNote = showNoteOption && commentVisibility === 'note'
+  const isNote = showNoteOption && mode === 'note'
   const bgColor = isNote ? '#fffbe6' : '#e6f7ff'
   const borderColor = isNote ? '#ffe5b4' : '#91caff'
 
+  const modePicker =
+    showNoteOption && onCommentVisibilityChange ? (
+      <Flex gap={8} wrap="wrap">
+        <Button
+          type={mode === 'note' ? 'primary' : 'default'}
+          icon={<CommentOutlined />}
+          onClick={() => onCommentVisibilityChange('note')}
+        >
+          Add note
+        </Button>
+        <Button
+          type={mode === 'reply' ? 'primary' : 'default'}
+          icon={<SendOutlined />}
+          onClick={() => onCommentVisibilityChange('reply')}
+        >
+          Reply
+        </Button>
+      </Flex>
+    ) : null
+
+  if (showNoteOption && mode == null) {
+    return (
+      <Flex vertical gap={8} style={{ marginTop: 8 }}>
+        {modePicker}
+      </Flex>
+    )
+  }
+
   return (
     <Flex vertical gap={8} style={{ marginTop: 8, backgroundColor: bgColor, padding: 16, borderRadius: 8, border: `1px solid ${borderColor}` }}>
-      {showNoteOption && onCommentVisibilityChange && (
-        <Flex gap={8}>
-          <Button type="default" icon={<CommentOutlined />} onClick={() => onCommentVisibilityChange('note')}>
-            Add note
-          </Button>
-          <Button type="primary" icon={<SendOutlined />} onClick={() => onCommentVisibilityChange('reply')}>
-            Reply
-          </Button>
-        </Flex>
-      )}
-      {showNoteOption && commentVisibility === 'note' && nonCustomerUsers.length > 0 && (
+      {modePicker}
+      {showNoteOption && mode === 'note' && nonCustomerUsers.length > 0 && (
         <Flex align="center" gap={8}>
           <UserAddOutlined style={{ color: '#666' }} />
           <Select
@@ -178,7 +202,7 @@ export default function CommentComposer({
           />
         </Flex>
       )}
-      {((showNoteOption && commentVisibility === 'reply') || !showNoteOption) && (
+      {((showNoteOption && mode === 'reply') || !showNoteOption) && (
         <Flex vertical gap={6}>
           <Flex align="center" gap={8}>
             <span style={{ fontSize: 12, color: '#666', minWidth: 36 }}>CC</span>
@@ -264,7 +288,7 @@ export default function CommentComposer({
           loading={loading}
           disabled={loading}
         >
-          {showNoteOption ? (commentVisibility === 'note' ? 'Add note' : 'Reply') : 'Reply'}
+          {showNoteOption ? (mode === 'note' ? 'Add note' : 'Reply') : 'Reply'}
         </Button>
         </Flex>
       </Flex>

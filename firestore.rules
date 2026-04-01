@@ -15,5 +15,12 @@ service cloud.firestore {
       allow create, update: if request.auth != null && request.auth.uid == viewerId;
       allow delete: if request.auth != null && request.auth.uid == viewerId;
     }
+
+    // Counter versi saja (bukan isi tiket). Refetch tetap lewat GET /api/tickets/:id/detail (NextAuth cookie).
+    // Tanpa read publik di sini, listener gagal kalau client belum sign-in Firebase (custom token).
+    match /ticket_data_sync/{ticketId} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }

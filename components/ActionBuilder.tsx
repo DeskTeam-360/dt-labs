@@ -6,12 +6,21 @@ import { useEffect, useState } from 'react'
 import type { AutomationActions } from '@/lib/automation-actions-types'
 import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
 
-type ActionType = 'team_id' | 'priority_slug' | 'type_slug' | 'tag_ids' | 'visibility' | 'add_note' | 'add_checklist_items'
+type ActionType =
+  | 'team_id'
+  | 'priority_slug'
+  | 'type_slug'
+  | 'status_slug'
+  | 'tag_ids'
+  | 'visibility'
+  | 'add_note'
+  | 'add_checklist_items'
 
 interface LookupData {
   teams: { id: string; name: string }[]
   ticketTypes: { id: number; title: string; slug: string; color?: string }[]
   ticketPriorities: { id: number; title: string; slug: string; color?: string }[]
+  statuses: { id: number; title: string; slug: string; color?: string }[]
   tags: { id: string; name: string; slug: string; color?: string }[]
   users?: { id: string; full_name?: string; email?: string }[]
 }
@@ -27,6 +36,7 @@ const ACTION_LABELS: Record<ActionType, string> = {
   team_id: 'Assign to Team',
   priority_slug: 'Set Priority',
   type_slug: 'Set Type',
+  status_slug: 'Set Status',
   tag_ids: 'Add Tags',
   visibility: 'Set Visibility',
   add_note: 'Add Note',
@@ -51,7 +61,16 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
     fetchLookup().then(setLookup)
   }, [])
 
-  const ACTION_TYPES: ActionType[] = ['team_id', 'priority_slug', 'type_slug', 'tag_ids', 'visibility', 'add_note', 'add_checklist_items']
+  const ACTION_TYPES: ActionType[] = [
+    'team_id',
+    'priority_slug',
+    'type_slug',
+    'status_slug',
+    'tag_ids',
+    'visibility',
+    'add_note',
+    'add_checklist_items',
+  ]
   const actions = value && typeof value === 'object' ? value : {}
   const shownKeys = ACTION_TYPES.filter(
     (k) => (actions as Record<string, unknown>)[k] !== undefined
@@ -103,9 +122,18 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
     onChange(next as AutomationActions)
   }
 
-  const availableToAdd = (['team_id', 'priority_slug', 'type_slug', 'tag_ids', 'visibility', 'add_note', 'add_checklist_items'] as ActionType[]).filter(
-    (t) => !shownKeys.includes(t)
-  )
+  const availableToAdd = (
+    [
+      'team_id',
+      'priority_slug',
+      'type_slug',
+      'status_slug',
+      'tag_ids',
+      'visibility',
+      'add_note',
+      'add_checklist_items',
+    ] as ActionType[]
+  ).filter((t) => !shownKeys.includes(t))
 
   if (!lookup) {
     return <div style={{ padding: 16, color: '#999' }}>Loading options…</div>
@@ -176,6 +204,21 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                       options={lookup.ticketTypes.map((t) => ({
                         value: t.slug,
                         label: t.title,
+                      }))}
+                    />
+                  </Form.Item>
+                )}
+                {type === 'status_slug' && (
+                  <Form.Item label={ACTION_LABELS.status_slug} style={{ marginBottom: 0 }}>
+                    <Select
+                      allowClear
+                      placeholder="Select status"
+                      style={{ width: '100%' }}
+                      value={(actions as Record<string, unknown>).status_slug}
+                      onChange={(v) => update('status_slug', v)}
+                      options={(lookup.statuses ?? []).map((s) => ({
+                        value: s.slug,
+                        label: s.title,
                       }))}
                     />
                   </Form.Item>

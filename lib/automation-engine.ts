@@ -9,6 +9,7 @@ import {
   tickets,
   ticketPriorities,
   ticketTypes,
+  ticketStatuses,
   ticketAssignees,
   teams,
   ticketTags,
@@ -20,6 +21,7 @@ import type { OurCondition, OurConditionGroup, OurConditionLeaf } from './condit
 import type { AutomationActions } from './automation-actions-types'
 import { AUTOMATION_NOTE_USER_ID } from './automation-constants'
 import { diffTicketSnapshots, loadTicketActivitySnapshot, logTicketActivity } from './ticket-activity-log'
+import { bumpTicketDataVersion } from './firebase/ticket-sync-server'
 
 function automationNoteHtmlHasText(html: string | undefined | null): boolean {
   if (!html?.trim()) return false
@@ -230,6 +232,11 @@ export async function runAutomationRules(
     /** Higher `priority` value runs first; every matching rule runs (not only the first). */
     .orderBy(desc(automationRules.priority))
 
+  let didBumpTicketData = false
+  const requestBump = () => {
+    didBumpTicketData = true
+  }
+
   for (const rule of rows) {
     if (!rule.conditions || typeof rule.conditions !== 'object') continue
     const cond = rule.conditions as OurConditionGroup
@@ -266,6 +273,14 @@ export async function runAutomationRules(
         .limit(1)
       if (t) updates.typeId = t.id
     }
+    if (actions.status_slug) {
+      const [st] = await db
+        .select({ slug: ticketStatuses.slug })
+        .from(ticketStatuses)
+        .where(eq(ticketStatuses.slug, String(actions.status_slug)))
+        .limit(1)
+      if (st) updates.status = st.slug
+    }
     if (actions.team_id) {
       const [tm] = await db.select({ id: teams.id }).from(teams).where(eq(teams.id, actions.team_id)).limit(1)
       if (tm) updates.teamId = tm.id
@@ -283,6 +298,7 @@ export async function runAutomationRules(
         .update(tickets)
         .set({ ...updates, updatedAt: new Date() } as typeof tickets.$inferInsert)
         .where(eq(tickets.id, ctx.id))
+      requestBump()
     }
 
     if (actions.tag_ids?.length) {
@@ -299,6 +315,7 @@ export async function runAutomationRules(
             tagId,
           }))
         )
+        requestBump()
       }
     }
 
@@ -337,6 +354,7 @@ export async function runAutomationRules(
         })
         .returning({ id: ticketComments.id })
       if (noteRow) {
+        requestBump()
         await logTicketActivity({
           ticketId: ctx.id,
           actorUserId: noteUserId,
@@ -375,6 +393,7 @@ export async function runAutomationRules(
               orderIndex: maxOrder + 1 + idx,
             }))
           )
+          requestBump()
         }
       }
     }
@@ -392,5 +411,9 @@ export async function runAutomationRules(
       ctx.visibility = fresh.visibility
       ctx.assignee_ids = fresh.assignee_ids
     }
+  }
+
+  if (didBumpTicketData) {
+    bumpTicketDataVersion(ctx.id)
   }
 }

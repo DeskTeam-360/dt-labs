@@ -26,8 +26,10 @@ export default async function RootLayout({
 }>) {
   const session = await auth()
   return (
-    <html lang="en">
+    // Browser extensions (Grammarly, password managers) mutate the DOM before hydrate; suppress root warnings.
+    <html lang="en" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         // className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AntdProvider session={session}>

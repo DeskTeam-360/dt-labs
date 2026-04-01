@@ -21,6 +21,7 @@ import type { TicketActorRole } from '@/lib/ticket-activity-log'
 import { and, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { notifyTicketUsers, diffNewAssignees } from '@/lib/firebase/ticket-notifications-server'
+import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 
 async function triggerTicketUpdatedAutomation(ticketId: number) {
   try {
@@ -130,6 +131,7 @@ export async function PATCH(
       }
     }
     await triggerTicketUpdatedAutomation(ticketId)
+    bumpTicketDataVersion(ticketId)
     return NextResponse.json({ ok: true })
   }
 
@@ -163,6 +165,7 @@ export async function PATCH(
       })
     }
     await triggerTicketUpdatedAutomation(ticketId)
+    bumpTicketDataVersion(ticketId)
     return NextResponse.json({ ok: true })
   }
 
@@ -309,6 +312,7 @@ export async function PATCH(
   }
 
   await triggerTicketUpdatedAutomation(ticketId)
+  bumpTicketDataVersion(ticketId)
   return NextResponse.json({ ok: true })
 }
 

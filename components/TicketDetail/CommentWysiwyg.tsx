@@ -19,7 +19,7 @@ type QuillEditor = {
 const QUILL_FORMATS = [
   'header',
   'bold', 'italic', 'underline', 'strike',
-  'list', 'bullet',
+  'list',
   'link',
   'image',
 ]
@@ -52,7 +52,7 @@ export default function CommentWysiwyg({
       container: [
         [{ header: [1, 2, 3, false] }],
         ['bold', 'italic', 'underline', 'strike'],
-        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }],
         ['link', 'image'],
         ['clean'],
       ],

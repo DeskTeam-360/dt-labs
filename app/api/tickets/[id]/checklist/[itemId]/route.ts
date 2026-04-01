@@ -1,4 +1,5 @@
 import { auth } from '@/auth'
+import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 import { db, ticketChecklist } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
@@ -13,7 +14,8 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { itemId } = await params
+  const { id, itemId } = await params
+  const ticketId = parseInt(id, 10)
   const body = await request.json()
 
   if (body.is_completed !== undefined) {
@@ -29,6 +31,7 @@ export async function PATCH(
       .where(eq(ticketChecklist.id, itemId))
   }
 
+  if (!isNaN(ticketId)) bumpTicketDataVersion(ticketId)
   return NextResponse.json({ ok: true })
 }
 
@@ -42,7 +45,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { itemId } = await params
+  const { id, itemId } = await params
+  const ticketId = parseInt(id, 10)
   await db.delete(ticketChecklist).where(eq(ticketChecklist.id, itemId))
+  if (!isNaN(ticketId)) bumpTicketDataVersion(ticketId)
   return NextResponse.json({ ok: true })
 }

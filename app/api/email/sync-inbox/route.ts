@@ -17,6 +17,7 @@ import { uploadBuffer } from '@/lib/storage-idrive'
 import { loadAutomationTicketContext, runAutomationRules, runTicketCommentAutomation } from '@/lib/automation-engine'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
+import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 import { eq, and, ilike, not, isNull, desc, gte, or, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { NextRequest, NextResponse } from 'next/server'
@@ -766,6 +767,7 @@ export async function POST(request: NextRequest) {
             } catch (err) {
               console.error('Automation rules error (ticket_comment_added):', err)
             }
+            bumpTicketDataVersion(ticketId)
           }
           if (isFromCc) {
             sendAutomationLog({
@@ -1116,6 +1118,7 @@ export async function POST(request: NextRequest) {
               } catch (err) {
                 console.error('Automation rules error (ticket_comment_added):', err)
               }
+              bumpTicketDataVersion(ticketId)
             }
             sendAutomationLog({
               event: 'email_reply_added',

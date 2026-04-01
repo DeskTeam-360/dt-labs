@@ -5,7 +5,9 @@ import { UserOutlined, ThunderboltOutlined, ClockCircleOutlined, PaperClipOutlin
 import DateDisplay from '../DateDisplay'
 import CommentWysiwyg from './CommentWysiwyg'
 import CommentComposer from './CommentComposer'
+import CommentTaggedCcLines from './CommentTaggedCcLines'
 import TicketUserMention from './TicketUserMention'
+import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
 const { Text, Paragraph } = Typography
 
@@ -25,6 +27,8 @@ interface Comment {
   author_type?: 'customer' | 'agent' | 'automation'
   user?: { id: string; full_name: string | null; email: string; avatar_url?: string | null }
   comment_attachments?: CommentAttachment[] | null
+  tagged_user_ids?: string[]
+  tagged_users?: { id: string; full_name: string | null; email: string }[]
   cc_emails?: string[]
   bcc_emails?: string[]
 }
@@ -68,6 +72,10 @@ interface TabGeneralCustomerProps {
     extra?: { taggedUserIds?: string[]; ccEmails?: string[]; bccEmails?: string[] }
   ) => Promise<void>
   addCommentLoading?: boolean
+  commentsHasOlder?: boolean
+  commentsOlderRemaining?: number
+  onLoadMoreComments?: () => void | Promise<void>
+  loadMoreCommentsLoading?: boolean
   companyCustomers?: Array<{ id: string; full_name: string | null; email: string }>
   /** Emails ever CC'd on this ticket - pre-fill CC on replies */
   ticketCcEmails?: string[]
@@ -99,6 +107,10 @@ export default function TabGeneralCustomer({
   canDeleteComment,
   onAddComment,
   addCommentLoading = false,
+  commentsHasOlder = false,
+  commentsOlderRemaining = 0,
+  onLoadMoreComments,
+  loadMoreCommentsLoading = false,
   companyCustomers = [],
   ticketCcEmails = [],
   totalTimeSeconds,
@@ -138,7 +150,7 @@ export default function TabGeneralCustomer({
             <div
               className="ql-editor comment-html"
               style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
-              dangerouslySetInnerHTML={{ __html: ticketData.description || '<p></p>' }}
+              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(ticketData.description) }}
             />
             {ticketAttachments.length > 0 && (
               <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
@@ -157,6 +169,20 @@ export default function TabGeneralCustomer({
             )}
           </Flex>
         </Flex>
+
+        <div style={{ padding: '0 16px', marginTop: 8, marginBottom: 4 }}>
+          {commentsHasOlder ? (
+            <Button
+              type="link"
+              loading={loadMoreCommentsLoading}
+              onClick={() => onLoadMoreComments?.()}
+              style={{ padding: 0 }}
+            >
+              Load older comments
+              {commentsOlderRemaining > 0 ? ` (${commentsOlderRemaining} belum ditampilkan)` : ''}
+            </Button>
+          ) : null}
+        </div>
 
         <Flex orientation="vertical" style={{ width: '100%', padding: 16 }} gap={30}>
           {comments.length > 0 ? (
@@ -239,6 +265,17 @@ export default function TabGeneralCustomer({
                           </Space>
                         )}
                       </Flex>
+                      <CommentTaggedCcLines
+                        tagged_users={comment.tagged_users}
+                        tagged_user_ids={comment.tagged_user_ids}
+                        cc_emails={comment.cc_emails}
+                        bcc_emails={comment.bcc_emails}
+                        resolveUser={(id) => {
+                          const u = companyCustomers?.find((x) => x.id === id)
+                          if (!u) return null
+                          return { email: u.email, label: u.full_name || u.email }
+                        }}
+                      />
                       <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 4 }}>
                         {editingComment === comment.id ? (
                           <Flex vertical gap={40} style={{ width: '100%' }}>
@@ -259,22 +296,11 @@ export default function TabGeneralCustomer({
                           <div
                             className="ql-editor comment-html"
                             style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
-                            dangerouslySetInnerHTML={{ __html: comment.comment }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(comment.comment) }}
                           />
                         ) : (
                           <Paragraph style={{ margin: 0 }}>{comment.comment}</Paragraph>
                         )}
-                       
-                        {(comment.cc_emails?.length || comment.bcc_emails?.length) ? (
-                          <Flex gap={12} wrap="wrap" style={{ marginTop: 6, fontSize: 12, color: '#666' }}>
-                            {comment.cc_emails?.length ? (
-                              <span>CC: {comment.cc_emails.join(', ')}</span>
-                            ) : null}
-                            {comment.bcc_emails?.length ? (
-                              <span>BCC: {comment.bcc_emails.join(', ')}</span>
-                            ) : null}
-                          </Flex>
-                        ) : null}
 
                         {comment.comment_attachments?.length ? (
                           <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>

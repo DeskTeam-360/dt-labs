@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { db, ticketTimeTracker, users } from '@/lib/db'
 import { eq, and, desc, isNull } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+import { isAdmin } from '@/lib/auth-utils'
 
 /** GET /api/tickets/[id]/time-tracker - List sessions. ?active=1 = current user's active session only */
 export async function GET(
@@ -64,6 +65,9 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const role = (session.user as { role?: string }).role
+  const admin = isAdmin(role)
+
   const { id } = await params
   const ticketId = parseInt(id, 10)
   if (isNaN(ticketId)) {
@@ -119,11 +123,21 @@ export async function POST(
       )
     }
 
+    let targetUserId = session.user.id
+    if (admin && body.user_id != null && String(body.user_id).trim() !== '') {
+      const uid = String(body.user_id).trim()
+      const [target] = await db.select({ id: users.id }).from(users).where(eq(users.id, uid)).limit(1)
+      if (!target) {
+        return NextResponse.json({ error: 'Invalid user_id' }, { status: 400 })
+      }
+      targetUserId = uid
+    }
+
     const [row] = await db
       .insert(ticketTimeTracker)
       .values({
         ticketId,
-        userId: session.user.id,
+        userId: targetUserId,
         trackerType: 'manual',
         startTime,
         stopTime,
@@ -149,7 +163,7 @@ export async function POST(
       .from(ticketTimeTracker)
       .where(eq(ticketTimeTracker.id, session_id))
 
-    if (!active || active.userId !== session.user.id) {
+    if (!active || (active.userId !== session.user.id && !admin)) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
     if (active.trackerType !== 'timer') {
@@ -188,6 +202,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const role = (session.user as { role?: string }).role
+  const admin = isAdmin(role)
+
   const { id } = await params
   const ticketId = parseInt(id, 10)
   if (isNaN(ticketId)) {
@@ -215,7 +232,7 @@ export async function PATCH(
   if (!row || row.ticketId !== ticketId) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 })
   }
-  if (row.userId !== session.user.id) {
+  if (row.userId !== session.user.id && !admin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
   if (!row.stopTime) {
@@ -277,6 +294,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const role = (session.user as { role?: string }).role
+  const admin = isAdmin(role)
+
   const { id } = await params
   const ticketId = parseInt(id, 10)
   if (isNaN(ticketId)) {
@@ -297,7 +317,7 @@ export async function DELETE(
   if (!row || row.ticketId !== ticketId) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 })
   }
-  if (row.userId !== session.user.id) {
+  if (row.userId !== session.user.id && !admin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

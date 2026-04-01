@@ -1,4 +1,5 @@
 import { auth } from '@/auth'
+import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 import { db, ticketAttributs } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
@@ -13,7 +14,8 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { attrId } = await params
+  const { id, attrId } = await params
+  const ticketId = parseInt(id, 10)
   const body = await request.json()
   const { meta_value } = body
 
@@ -22,6 +24,7 @@ export async function PATCH(
     .set({ metaValue: meta_value ?? null, updatedAt: new Date() })
     .where(eq(ticketAttributs.id, attrId))
 
+  if (!isNaN(ticketId)) bumpTicketDataVersion(ticketId)
   return NextResponse.json({ ok: true })
 }
 
@@ -35,7 +38,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { attrId } = await params
+  const { id, attrId } = await params
+  const ticketId = parseInt(id, 10)
   await db.delete(ticketAttributs).where(eq(ticketAttributs.id, attrId))
+  if (!isNaN(ticketId)) bumpTicketDataVersion(ticketId)
   return NextResponse.json({ ok: true })
 }

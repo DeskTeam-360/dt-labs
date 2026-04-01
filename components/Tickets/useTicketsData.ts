@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { useSearchParams, usePathname, useRouter } from 'next/navigation'
 
@@ -129,21 +129,25 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   const pathname = usePathname()
   const router = useRouter()
 
+  /**
+   * SSR + first client render must match: never read localStorage synchronously here.
+   * URL params → same on server & client; otherwise defaults from getInitialFilterStateFromStored(null).
+   * LocalStorage is applied once after mount in useLayoutEffect (before paint / before passive effects).
+   */
   const initialRef = useRef<{ state: ParsedUrlFilters; fromUrl: boolean } | null>(null)
-  if (initialRef.current === null && typeof window !== 'undefined') {
+  if (initialRef.current === null) {
     const fromUrl = parseFiltersFromUrl(searchParams)
     if (fromUrl) {
       let viewMode = fromUrl.viewMode
       if (isCustomer && viewMode === 'roundrobin') viewMode = 'kanban'
       initialRef.current = { state: { ...fromUrl, viewMode }, fromUrl: true }
     } else {
-      const stored = loadFiltersFromStorage()
-      const state = getInitialFilterStateFromStored(stored)
-      const viewMode = getInitialViewModeCustomer(isCustomer, stored)
+      const state = getInitialFilterStateFromStored(null)
+      const viewMode = getInitialViewModeCustomer(isCustomer, null)
       initialRef.current = { state: { ...state, viewMode }, fromUrl: false }
     }
   }
-  const initialState = initialRef.current?.state ?? getInitialFilterStateFromStored(null)
+  const initialState = initialRef.current.state
 
   /** Snapshot kanban slugs terakhir dari lookup — untuk menambahkan status baru (Cancel/Archived dll) ke filter API tanpa timpa penyempitan manual. */
   const lastKanbanSlugsRef = useRef<string[] | null>(null)
@@ -308,6 +312,29 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null)
   const [userTeamIds, setUserTeamIds] = useState<string[]>([])
+
+  const storageHydratedRef = useRef(false)
+  useLayoutEffect(() => {
+    if (storageHydratedRef.current) return
+    storageHydratedRef.current = true
+    if (initialRef.current?.fromUrl) return
+    const stored = loadFiltersFromStorage()
+    if (!stored || Object.keys(stored).length === 0) return
+    const state = getInitialFilterStateFromStored(stored)
+    const vm = getInitialViewModeCustomer(isCustomer, stored)
+    setFilterStatus(state.filterStatus)
+    setFilterTypeIds(state.filterTypeIds)
+    setFilterCompanyIds(state.filterCompanyIds)
+    setFilterTagIds(state.filterTagIds)
+    setFilterVisibilityState(state.filterVisibility)
+    setFilterTeamIds(state.filterTeamIds)
+    setFilterDateRange(state.filterDateRange)
+    setFilterSearch(state.filterSearch)
+    setFilterSidebarCollapsed(state.filterSidebarCollapsed)
+    setViewMode(vm)
+    setSortBy(state.sortBy)
+    setSortOrder(state.sortOrder)
+  }, [isCustomer])
 
   const fetchLookup = async () => {
     try {

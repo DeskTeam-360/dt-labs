@@ -1,6 +1,6 @@
 'use client'
 
-import { App, Badge, Popover, List, Typography, Spin, Empty, Tooltip } from 'antd'
+import { App, Badge, Popover, Typography, Spin, Empty, Tooltip } from 'antd'
 import { BellOutlined } from '@ant-design/icons'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
@@ -290,13 +290,18 @@ export default function TicketNotificationBell() {
       ) : items.length === 0 ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No notifications yet" />
       ) : (
-        <List
-          size="small"
-          dataSource={items}
-          style={{ maxHeight: 380, overflow: 'auto' }}
-          renderItem={(n) => (
-            <List.Item
+        <div style={{ maxHeight: 380, overflow: 'auto' }}>
+          {items.map((n) => (
+            <div
               key={n.id}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onItemClick(n)
+                }
+              }}
               style={{
                 cursor: 'pointer',
                 padding: '10px 8px',
@@ -315,9 +320,9 @@ export default function TicketNotificationBell() {
                   {n.body}
                 </Text>
               </div>
-            </List.Item>
-          )}
-        />
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )

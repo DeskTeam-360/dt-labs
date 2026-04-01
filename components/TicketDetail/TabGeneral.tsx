@@ -39,7 +39,9 @@ import DateDisplay from '../DateDisplay'
 import dayjs from 'dayjs'
 import CommentWysiwyg from './CommentWysiwyg'
 import CommentComposer from './CommentComposer'
+import CommentTaggedCcLines from './CommentTaggedCcLines'
 import TicketUserMention from './TicketUserMention'
+import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
 const { Text, Paragraph } = Typography
 
@@ -63,6 +65,8 @@ interface Comment {
   author_type?: 'customer' | 'agent' | 'automation'
   user?: { id: string; full_name: string | null; email: string; avatar_url?: string | null }
   comment_attachments?: CommentAttachment[] | null
+  tagged_user_ids?: string[]
+  tagged_users?: { id: string; full_name: string | null; email: string }[]
   cc_emails?: string[]
   bcc_emails?: string[]
 }
@@ -152,7 +156,11 @@ interface TabGeneralProps {
     extra?: { taggedUserIds?: string[]; ccEmails?: string[]; bccEmails?: string[] }
   ) => Promise<void>
   addCommentLoading?: boolean
-  commentVisibility?: 'note' | 'reply'
+  commentsHasOlder?: boolean
+  commentsOlderRemaining?: number
+  onLoadMoreComments?: () => void | Promise<void>
+  loadMoreCommentsLoading?: boolean
+  commentVisibility?: 'note' | 'reply' | null
   onCommentVisibilityChange?: (v: 'note' | 'reply') => void
   showNoteOption?: boolean
   nonCustomerUsers?: Array<{ id: string; full_name?: string | null; email: string }>
@@ -236,7 +244,11 @@ export default function TabGeneral({
   canDeleteComment,
   onAddComment,
   addCommentLoading = false,
-  commentVisibility = 'reply',
+  commentsHasOlder = false,
+  commentsOlderRemaining = 0,
+  onLoadMoreComments,
+  loadMoreCommentsLoading = false,
+  commentVisibility = null,
   onCommentVisibilityChange = () => {},
   showNoteOption = false,
   nonCustomerUsers = [],
@@ -292,7 +304,7 @@ export default function TabGeneral({
                             <div
                               className="ql-editor comment-html"
                               style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
-                              dangerouslySetInnerHTML={{ __html: ticketData.description || '<p></p>' }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(ticketData.description) }}
                             />
                             {ticketAttachments.length > 0 && (
                               <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
@@ -305,6 +317,19 @@ export default function TabGeneral({
                             )}
                       </Flex>
                     </Flex>
+
+            <div style={{ padding: '0 16px', marginTop: 8, marginBottom: 4, textAlign: 'center' }}>
+              {commentsHasOlder ? (
+                <Button
+                  type="link"
+                  loading={loadMoreCommentsLoading}
+                  onClick={() => onLoadMoreComments?.()}
+                  style={{ border: '1px solid #d9d9d9', borderRadius: 20, padding: '10px 20px' }}
+                >
+                  {commentsOlderRemaining > 0 ? ` (+${commentsOlderRemaining} Conversations)` : ''}
+                </Button>
+              ) : null}
+            </div>
           
             <Flex orientation="vertical" style={{ width: '100%', padding: 16 }} gap={30}>
               {comments.length > 0 ? (
@@ -400,6 +425,20 @@ export default function TabGeneral({
                             </Space>
                           )}
                         </Flex>
+                        <CommentTaggedCcLines
+                          tagged_users={comment.tagged_users}
+                          tagged_user_ids={comment.tagged_user_ids}
+                          cc_emails={comment.cc_emails}
+                          bcc_emails={comment.bcc_emails}
+                          resolveUser={(id) => {
+                            const u =
+                              nonCustomerUsers?.find((x) => x.id === id) ||
+                              assigneeOptions?.find((x) => x.id === id) ||
+                              companyCustomers?.find((x) => x.id === id)
+                            if (!u) return null
+                            return { email: u.email, label: u.full_name || u.email }
+                          }}
+                        />
                         <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 4 }}>
                         
                           {editingComment === comment.id ? (
@@ -430,21 +469,11 @@ export default function TabGeneral({
                             <div
                               className="ql-editor comment-html"
                               style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14, border: 'none' }}
-                              dangerouslySetInnerHTML={{ __html: comment.comment }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(comment.comment) }}
                             />
                           ) : (
                             <Paragraph style={{ margin: 0 }}>{comment.comment}</Paragraph>
                           )}
-                        {(comment.cc_emails?.length || comment.bcc_emails?.length) ? (
-                          <Flex gap={12} wrap="wrap" style={{ marginTop: 6, fontSize: 12, color: '#666' }}>
-                            {comment.cc_emails?.length ? (
-                              <span>CC: {comment.cc_emails.join(', ')}</span>
-                            ) : null}
-                            {comment.bcc_emails?.length ? (
-                              <span>BCC: {comment.bcc_emails.join(', ')}</span>
-                            ) : null}
-                          </Flex>
-                        ) : null}
                         {comment.comment_attachments?.length ? (
                           <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
                             {comment.comment_attachments.map((att) => (

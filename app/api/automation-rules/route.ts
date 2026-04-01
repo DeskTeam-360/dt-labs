@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { automationRules } from '@/lib/db'
+import { canAccessAutomationRules } from '@/lib/auth-utils'
 import { desc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
@@ -9,6 +10,10 @@ export async function GET() {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const role = (session.user as { role?: string }).role
+  if (!canAccessAutomationRules(role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const rows = await db
@@ -37,6 +42,10 @@ export async function POST(request: Request) {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const role = (session.user as { role?: string }).role
+  if (!canAccessAutomationRules(role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const body = await request.json()

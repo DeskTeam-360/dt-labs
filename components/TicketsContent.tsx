@@ -119,9 +119,10 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
           />
 
           {loading || !lookupReady ? (
-            <div style={{ padding: 48, textAlign: 'center' }}>
-              <Spin size="large" tip="Loading tasks..." />
-            </div>
+          <div style={{ padding: 48, textAlign: 'center' }}>
+          <Spin size="large" />
+          <div style={{ marginTop: 12 }}>Loading tasks...</div>
+        </div>
           ) : viewMode === 'card' ? (
             <TicketsCardView
               tickets={filteredTickets}

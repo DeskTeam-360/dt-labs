@@ -1,8 +1,8 @@
 /**
  * Role-based access control helpers.
  * - Admin: full access
- * - Manager: tickets + dashboard, users, ticket attributes
- * - Staff: dashboard, users, ticket attributes (no companies, teams, email, knowledge-base, tickets)
+ * - Manager: tickets + dashboard, ticket attributes
+ * - Staff: dashboard, users (no companies, teams, email, knowledge-base, tickets, ticket attributes)
  * - Customer: limited (handled separately in sidebar)
  */
 
@@ -31,6 +31,16 @@ export function canAccessCompanies(role: string | undefined): boolean {
 /** Tickets: Admin & Manager */
 export function canAccessTickets(role: string | undefined): boolean {
   return everyOneCanAccess(role)
+}
+
+/** Ticket Attributes menu (statuses, types, priorities, tags): Admin & Manager */
+export function canAccessTicketAttributes(role: string | undefined): boolean {
+  return isAdminOrManager(role)
+}
+
+/** Automation rules UI & API: Admin only */
+export function canAccessAutomationRules(role: string | undefined): boolean {
+  return isAdmin(role)
 }
 
 /** Teams: Admin only */

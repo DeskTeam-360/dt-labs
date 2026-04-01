@@ -478,9 +478,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                   >
                     <Option value="admin">Admin</Option>
                     <Option value="manager">Manager</Option>
-                    <Option value="user">User</Option>
+                    <Option value="staff">Staff</Option>
                     <Option value="customer">Customer</Option>
-                    <Option value="guest">Guest</Option>
                   </Select>
                 )}
                 <Select

@@ -1,4 +1,5 @@
 import { auth } from '@/auth'
+import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 import { db, ticketChecklist } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
@@ -35,6 +36,8 @@ export async function POST(
   if (!row) {
     return NextResponse.json({ error: 'Failed to create' }, { status: 500 })
   }
+
+  bumpTicketDataVersion(ticketId)
 
   return NextResponse.json({
     id: row.id,

@@ -21,12 +21,16 @@ import {
     notification,
 } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadTicketFile } from '@/utils/storage'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...options, credentials: 'include' })
+  const res = await fetch(url, {
+    cache: 'no-store',
+    ...options,
+    credentials: 'include',
+  })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err?.error || res.statusText || 'Request failed')
@@ -35,12 +39,14 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 }
 import AdminSidebar from './AdminSidebar'
 import DateDisplay from './DateDisplay'
-import { TabGeneral, TabAssignees, TabScreenshots, TabActivity } from './TicketDetail'
+import { TabGeneral, TabTimeTracker, TabScreenshots, TabActivity } from './TicketDetail'
 import TabGeneralCustomer from './TicketDetail/TabGeneralCustomer'
 import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
 import TicketPresenceBar from './TicketPresenceBar'
 import TicketSearchNavbar from './TicketSearchNavbar'
 import dayjs from 'dayjs'
+import { isAdmin } from '@/lib/auth-utils'
+import { useTicketDetailLiveSync } from '@/lib/firebase/useTicketDetailLiveSync'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -61,7 +67,7 @@ interface Screenshot {
     updated_at: string
 }
 
-interface TicketDetailContentProps {
+export interface TicketDetailContentProps {
     user: { id: string; email?: string | null; name?: string | null; image?: string | null; role?: string }
     ticketData: any
     checklistItems: any[]
@@ -71,6 +77,12 @@ interface TicketDetailContentProps {
     tags?: Array<{ id: string; name: string; slug: string; color?: string }>
     /** Emails ever CC'd on this ticket - used to pre-fill CC on replies */
     ticketCcEmails?: string[]
+    /** More comments exist older than the initial window */
+    commentsHasOlder?: boolean
+    /** Cursor for GET .../comments/older */
+    commentsOlderCursor?: { created_at: string; id: string } | null
+    /** Count of comments older than the loaded window (same visibility rules as list) */
+    commentsOlderRemaining?: number
     /** 'customer' = navbar layout, back to /customer; 'admin' = sidebar layout (default) */
     variant?: 'admin' | 'customer'
 }
@@ -103,6 +115,10 @@ interface Comment {
         email: string
     }
     comment_attachments?: CommentAttachment[] | null
+    tagged_user_ids?: string[]
+    tagged_users?: { id: string; full_name: string | null; email: string }[]
+    cc_emails?: string[]
+    bcc_emails?: string[]
 }
 
 interface Attribute {
@@ -123,24 +139,60 @@ export default function TicketDetailContent({
     screenshots: initialScreenshots = [],
     tags: initialTags = [],
     ticketCcEmails: initialTicketCcEmails = [],
+    commentsHasOlder: initialCommentsHasOlder = false,
+    commentsOlderCursor: initialCommentsOlderCursor = null,
+    commentsOlderRemaining: initialCommentsOlderRemaining = 0,
     variant = 'admin',
 }: TicketDetailContentProps) {
     const router = useRouter()
+    const [displayTicket, setDisplayTicket] = useState(ticketData)
+    const liveSyncTicketIdRef = useRef<number | undefined>(ticketData?.id)
+    liveSyncTicketIdRef.current = displayTicket?.id
+    const [screenshots, setScreenshots] = useState(initialScreenshots)
+    const [ticketCcEmailsState, setTicketCcEmailsState] = useState(initialTicketCcEmails)
+
+    useEffect(() => {
+        setDisplayTicket(ticketData)
+    }, [ticketData])
+
+    useEffect(() => {
+        setScreenshots(initialScreenshots)
+        setTicketCcEmailsState(initialTicketCcEmails)
+    }, [ticketData?.id, initialScreenshots, initialTicketCcEmails])
+
     const [collapsed, setCollapsed] = useState(false)
     const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(initialChecklistItems)
     const [comments, setComments] = useState<Comment[]>(initialComments)
+    const [commentsHasOlder, setCommentsHasOlder] = useState(initialCommentsHasOlder)
+    const [olderCursor, setOlderCursor] = useState<{ created_at: string; id: string } | null>(
+        initialCommentsOlderCursor,
+    )
+    const [loadingMoreComments, setLoadingMoreComments] = useState(false)
+    const [commentsOlderRemaining, setCommentsOlderRemaining] = useState(initialCommentsOlderRemaining)
     const [attributes, setAttributes] = useState<Attribute[]>(initialAttributes)
-    const [teamMembers, setTeamMembers] = useState<any[]>([])
+
+    useEffect(() => {
+        setCommentsHasOlder(initialCommentsHasOlder)
+        setOlderCursor(initialCommentsOlderCursor)
+        setCommentsOlderRemaining(initialCommentsOlderRemaining)
+    }, [ticketData?.id, initialCommentsHasOlder, initialCommentsOlderCursor, initialCommentsOlderRemaining])
+
     const [loading, setLoading] = useState(false)
-    const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
     const [newChecklistTitle, setNewChecklistTitle] = useState('')
-    const [commentVisibility, setCommentVisibility] = useState<'note' | 'reply'>('reply')
+    const [commentVisibility, setCommentVisibility] = useState<'note' | 'reply' | null>(null)
+    useEffect(() => {
+        setCommentVisibility(null)
+    }, [displayTicket?.id])
     const [editingComment, setEditingComment] = useState<string | null>(null)
     const [editingCommentValue, setEditingCommentValue] = useState('')
     const [editingAttribute, setEditingAttribute] = useState<string | null>(null)
     const [newAttributeKey, setNewAttributeKey] = useState('')
     const [newAttributeValue, setNewAttributeValue] = useState('')
     const [editingDescription, setEditingDescription] = useState(false)
+    const editingDescriptionRef = useRef(false)
+    useEffect(() => {
+        editingDescriptionRef.current = editingDescription
+    }, [editingDescription])
     const [descriptionValue, setDescriptionValue] = useState(() => (typeof ticketData?.description === 'string' ? ticketData.description : '') || '')
     const [editModalVisible, setEditModalVisible] = useState(false)
     const [teams, setTeams] = useState<any[]>([])
@@ -176,28 +228,28 @@ export default function TicketDetailContent({
 
     // Sync optimistic assignees when server data catches up
     useEffect(() => {
-        const serverIds = (ticketData?.assignees || []).map((a: any) => a.user_id || a.user?.id).filter(Boolean) as string[]
+        const serverIds = (displayTicket?.assignees || []).map((a: any) => a.user_id || a.user?.id).filter(Boolean) as string[]
         if (optimisticAssignees && JSON.stringify([...serverIds].sort()) === JSON.stringify([...optimisticAssignees].sort())) {
             setOptimisticAssignees(null)
         }
-    }, [ticketData?.assignees, optimisticAssignees])
+    }, [displayTicket?.assignees, optimisticAssignees])
 
     // Sync optimistic visibility when server data catches up
     useEffect(() => {
-        if (optimisticVisibility && ticketData?.visibility === optimisticVisibility) {
+        if (optimisticVisibility && displayTicket?.visibility === optimisticVisibility) {
             setOptimisticVisibility(null)
         }
-    }, [ticketData?.visibility, optimisticVisibility])
+    }, [displayTicket?.visibility, optimisticVisibility])
 
     // Mark ticket as read when user views it
     useEffect(() => {
-        if (!ticketData?.id) return
-        apiFetch(`/api/tickets/${ticketData.id}`, {
+        if (!displayTicket?.id) return
+        apiFetch(`/api/tickets/${displayTicket.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ mark_read: true }),
         }).catch(() => {})
-    }, [ticketData?.id])
+    }, [displayTicket?.id])
 
     const VISIBILITY_OPTIONS = [
         { value: 'private', label: 'Private' },
@@ -234,28 +286,8 @@ export default function TicketDetailContent({
 
     // Inbox sync: use cron POST /api/email/sync-inbox (not on each ticket open).
 
-    // Fetch team members if ticket has a team
-    useEffect(() => {
-        const fetchTeamMembers = async () => {
-            if (ticketData?.visibility === 'team' && ticketData?.team_id) {
-                setLoadingTeamMembers(true)
-                try {
-                    const data = await apiFetch<any[]>(`/api/tickets/${ticketData.id}/team-members?team_id=${ticketData.team_id}`)
-                    setTeamMembers(data || [])
-                } catch (error) {
-                    console.error('Failed to fetch team members:', error)
-                } finally {
-                    setLoadingTeamMembers(false)
-                }
-            } else {
-                setTeamMembers([])
-            }
-        }
-        fetchTeamMembers()
-    }, [ticketData?.team_id, ticketData?.visibility, ticketData?.id])
-
     // Sync descriptionValue with ticketData.description (only when not editing and value actually changed)
-    const descriptionFromProps = typeof ticketData?.description === 'string' ? ticketData.description : ''
+    const descriptionFromProps = typeof displayTicket?.description === 'string' ? displayTicket.description : ''
     useEffect(() => {
         if (!editingDescription) {
             setDescriptionValue((prev: string) => (prev !== descriptionFromProps ? descriptionFromProps : prev))
@@ -277,7 +309,7 @@ export default function TicketDetailContent({
         }
         const fetchTimeTrackerSessions = async () => {
             try {
-                const data = await apiFetch<any[]>(`/api/tickets/${ticketData.id}/time-tracker`)
+                const data = await apiFetch<any[]>(`/api/tickets/${displayTicket.id}/time-tracker`)
                 setTimeTrackerSessions(data || [])
                 const total = (data || []).reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0)
                 setTotalTimeSeconds(total)
@@ -285,12 +317,12 @@ export default function TicketDetailContent({
         }
         const checkActiveTimeTracker = async () => {
             try {
-                const data = await apiFetch<any>(`/api/tickets/${ticketData.id}/time-tracker?active=1`)
+                const data = await apiFetch<any>(`/api/tickets/${displayTicket.id}/time-tracker?active=1`)
                 setActiveTimeTracker(data || null)
             } catch { setActiveTimeTracker(null) }
         }
         const fetchCompanyUsers = async () => {
-            const cid = ticketData?.company_id
+            const cid = displayTicket?.company_id
             if (!cid) {
                 setCompanyCustomers([])
                 return
@@ -308,7 +340,7 @@ export default function TicketDetailContent({
         fetchTimeTrackerSessions()
         checkActiveTimeTracker()
         fetchCompanyUsers()
-    }, [ticketData?.id, ticketData?.company_id])
+    }, [displayTicket?.id, displayTicket?.company_id])
 
     // Check for active time tracker and update current time
     useEffect(() => {
@@ -325,7 +357,7 @@ export default function TicketDetailContent({
 
     const fetchTimeTrackerSessions = async () => {
         try {
-            const data = await apiFetch<any[]>(`/api/tickets/${ticketData.id}/time-tracker`)
+            const data = await apiFetch<any[]>(`/api/tickets/${displayTicket.id}/time-tracker`)
             setTimeTrackerSessions(data || [])
             const total = (data || []).reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0)
             setTotalTimeSeconds(total)
@@ -335,17 +367,94 @@ export default function TicketDetailContent({
     const refreshTimeTracking = async () => {
         await fetchTimeTrackerSessions()
         try {
-            const data = await apiFetch<any>(`/api/tickets/${ticketData.id}/time-tracker?active=1`)
+            const data = await apiFetch<any>(`/api/tickets/${displayTicket.id}/time-tracker?active=1`)
             setActiveTimeTracker(data || null)
         } catch {
             setActiveTimeTracker(null)
         }
     }
 
+    /** Dipanggil saat Firestore `ticket_data_sync/{id}` berubah: ambil ulang detail + komentar dari API. */
+    const mergeDetailFromServer = useCallback(async () => {
+        const id = liveSyncTicketIdRef.current
+        if (!id) return
+        try {
+            const data = await apiFetch<{
+                ticketData: any
+                checklistItems: ChecklistItem[]
+                comments: Comment[]
+                comments_has_older?: boolean
+                comments_older_cursor?: { created_at: string; id: string } | null
+                comments_older_remaining?: number
+                attributes: Attribute[]
+                screenshots?: Screenshot[]
+                tags?: Array<{ id: string; name: string; slug: string; color?: string }>
+                ticketCcEmails?: string[]
+            }>(`/api/tickets/${id}/detail`)
+            setDisplayTicket(data.ticketData)
+            setChecklistItems(data.checklistItems)
+            setComments(data.comments)
+            if (data.comments_has_older !== undefined) setCommentsHasOlder(data.comments_has_older)
+            if (data.comments_older_cursor !== undefined) setOlderCursor(data.comments_older_cursor ?? null)
+            if (data.comments_older_remaining !== undefined) setCommentsOlderRemaining(data.comments_older_remaining)
+            setAttributes(data.attributes)
+            setScreenshots(data.screenshots ?? [])
+            setTicketCcEmailsState(data.ticketCcEmails ?? [])
+            setSelectedTagIds((data.tags ?? []).map((t) => t.id).filter(Boolean))
+            if (!editingDescriptionRef.current) {
+                setDescriptionValue(
+                    typeof data.ticketData?.description === 'string' ? data.ticketData.description : '',
+                )
+            }
+            setOptimisticAssignees(null)
+            setOptimisticVisibility(null)
+            await refreshTimeTracking()
+            try {
+                const att = await apiFetch<
+                    Array<{ id: string; file_url: string; file_name: string; file_path?: string }>
+                >(`/api/tickets/${id}/attachments`)
+                setDescriptionAttachmentsFromDb((att || []).map((a) => ({ ...a, file_path: a.file_path ?? '' })))
+            } catch {
+                /* ignore */
+            }
+        } catch (e) {
+            console.error('[ticket live sync] refetch failed', e)
+        }
+    }, [variant])
+
+    // User membuka ticket ini → onSnapshot ke ticket_data_sync/{id}; versi naik → mergeDetailFromServer.
+    useTicketDetailLiveSync(displayTicket?.id, mergeDetailFromServer)
+
+    const handleLoadMoreComments = async () => {
+        if (!olderCursor || !displayTicket?.id) return
+        setLoadingMoreComments(true)
+        try {
+            const q = new URLSearchParams({
+                before_created_at: olderCursor.created_at,
+                before_id: olderCursor.id,
+                limit: '10',
+            })
+            const res = await apiFetch<{
+                comments: Comment[]
+                comments_has_older: boolean
+                comments_older_cursor: { created_at: string; id: string } | null
+                comments_older_remaining: number
+            }>(`/api/tickets/${displayTicket.id}/comments/older?${q}`)
+            setComments((prev) => [...res.comments, ...prev])
+            setCommentsHasOlder(res.comments_has_older)
+            setOlderCursor(res.comments_older_cursor)
+            setCommentsOlderRemaining(res.comments_older_remaining)
+        } catch (e: unknown) {
+            message.error(e instanceof Error ? e.message : 'Failed to load older comments')
+        } finally {
+            setLoadingMoreComments(false)
+        }
+    }
+
     const handleStartTimeTracker = async () => {
         setLoading(true)
         try {
-            const data = await apiFetch<any>(`/api/tickets/${ticketData.id}/time-tracker`, {
+            const data = await apiFetch<any>(`/api/tickets/${displayTicket.id}/time-tracker`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'start' }),
@@ -363,7 +472,7 @@ export default function TicketDetailContent({
         if (!activeTimeTracker) return
         setLoading(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}/time-tracker`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}/time-tracker`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'stop', session_id: activeTimeTracker.id }),
@@ -424,7 +533,7 @@ export default function TicketDetailContent({
         setLoading(true)
         try {
             const maxOrder = checklistItems.length > 0 ? Math.max(...checklistItems.map((item) => item.order_index)) : -1
-            const data = await apiFetch<any>(`/api/tickets/${ticketData.id}/checklist`, {
+            const data = await apiFetch<any>(`/api/tickets/${displayTicket.id}/checklist`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title: newChecklistTitle.trim(), order_index: maxOrder + 1 }),
@@ -441,7 +550,7 @@ export default function TicketDetailContent({
 
     const handleToggleChecklistItem = async (itemId: string, currentStatus: boolean) => {
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}/checklist/${itemId}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}/checklist/${itemId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ is_completed: !currentStatus }),
@@ -454,7 +563,7 @@ export default function TicketDetailContent({
 
     const handleDeleteChecklistItem = async (itemId: string) => {
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}/checklist/${itemId}`, { method: 'DELETE' })
+            await apiFetch(`/api/tickets/${displayTicket.id}/checklist/${itemId}`, { method: 'DELETE' })
             setChecklistItems(checklistItems.filter((item) => item.id !== itemId))
             message.success('Checklist item deleted')
         } catch (err: any) {
@@ -471,6 +580,10 @@ export default function TicketDetailContent({
             message.warning('Please enter a comment or attach files')
             return
         }
+        if (variant === 'admin' && (commentVisibility !== 'note' && commentVisibility !== 'reply')) {
+            message.warning('Pilih Add note atau Reply dulu')
+            return
+        }
         setLoading(true)
         try {
             const visibility = variant === 'customer' ? 'reply' : commentVisibility
@@ -484,17 +597,18 @@ export default function TicketDetailContent({
             if (extra?.taggedUserIds?.length) payload.tagged_user_ids = extra.taggedUserIds
             if (extra?.ccEmails?.length) payload.cc_emails = extra.ccEmails
             if (extra?.bccEmails?.length) payload.bcc_emails = extra.bccEmails
-            const data = await apiFetch<any>(`/api/tickets/${ticketData.id}/comments`, {
+            const data = await apiFetch<any>(`/api/tickets/${displayTicket.id}/comments`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             })
             setComments((prev) => [...prev, { ...data, comment_attachments: data.comment_attachments || [] }])
             message.success('Comment added')
+            if (variant === 'admin') setCommentVisibility(null)
 
             const replyRecipientEmail =
-                (typeof ticketData.creator?.email === 'string' && ticketData.creator.email.trim()) ||
-                (typeof ticketData.company?.email === 'string' && ticketData.company.email.trim()) ||
+                (typeof displayTicket.creator?.email === 'string' && displayTicket.creator.email.trim()) ||
+                (typeof displayTicket.company?.email === 'string' && displayTicket.company.email.trim()) ||
                 ''
             if (variant === 'admin' && visibility === 'reply' && author_type === 'agent' && replyRecipientEmail) {
                 try {
@@ -502,9 +616,9 @@ export default function TicketDetailContent({
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            ticketId: ticketData.id,
+                            ticketId: displayTicket.id,
                             commentBody: commentText.trim(),
-                            ticketTitle: ticketData.title,
+                            ticketTitle: displayTicket.title,
                             toEmail: replyRecipientEmail,
                             ccEmails: extra?.ccEmails ?? [],
                             bccEmails: extra?.bccEmails ?? [],
@@ -537,7 +651,7 @@ export default function TicketDetailContent({
         }
         setLoading(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}/comments/${commentId}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}/comments/${commentId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ comment: editingCommentValue.trim() }),
@@ -555,7 +669,7 @@ export default function TicketDetailContent({
 
     const handleDeleteComment = async (commentId: string) => {
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}/comments/${commentId}`, { method: 'DELETE' })
+            await apiFetch(`/api/tickets/${displayTicket.id}/comments/${commentId}`, { method: 'DELETE' })
             setComments(comments.filter((c) => c.id !== commentId))
             message.success('Comment deleted')
         } catch (err: any) {
@@ -577,7 +691,7 @@ export default function TicketDetailContent({
         }
         setLoading(true)
         try {
-            const data = await apiFetch<any>(`/api/tickets/${ticketData.id}/attributes`, {
+            const data = await apiFetch<any>(`/api/tickets/${displayTicket.id}/attributes`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ meta_key: newAttributeKey.trim(), meta_value: newAttributeValue.trim() || null }),
@@ -595,7 +709,7 @@ export default function TicketDetailContent({
 
     const handleUpdateAttribute = async (attributeId: string, newValue: string) => {
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}/attributes/${attributeId}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}/attributes/${attributeId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ meta_value: newValue.trim() || null }),
@@ -610,7 +724,7 @@ export default function TicketDetailContent({
 
     const handleDeleteAttribute = async (attributeId: string) => {
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}/attributes/${attributeId}`, { method: 'DELETE' })
+            await apiFetch(`/api/tickets/${displayTicket.id}/attributes/${attributeId}`, { method: 'DELETE' })
             setAttributes(attributes.filter((attr) => attr.id !== attributeId))
             message.success('Attribute deleted')
         } catch (err: any) {
@@ -621,14 +735,14 @@ export default function TicketDetailContent({
     const handleUpdateDescription = async () => {
         setLoading(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ description: descriptionValue.trim() || null }),
             })
             setEditingDescription(false)
             message.success('Description updated successfully')
-            ;(ticketData as any).description = descriptionValue.trim() || null
+            setDisplayTicket((prev: any) => ({ ...prev, description: descriptionValue.trim() || null }))
         } catch (err: any) {
             message.error(err?.message || 'Failed to update description')
         } finally {
@@ -637,20 +751,20 @@ export default function TicketDetailContent({
     }
 
     const handleCancelEditDescription = () => {
-        setDescriptionValue(ticketData.description || '')
+        setDescriptionValue(displayTicket.description || '')
         setEditingDescription(false)
     }
 
     const handleShortNoteChange = async (value: string | null) => {
         setShortNoteChanging(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ short_note: value }),
             })
             message.success('Short note updated')
-            ;(ticketData as any).short_note = value
+            setDisplayTicket((prev: any) => ({ ...prev, short_note: value }))
             router.refresh()
         } catch (err: unknown) {
             message.error(err instanceof Error ? err.message : 'Failed to update short note')
@@ -662,13 +776,13 @@ export default function TicketDetailContent({
     const handleStatusChange = async (newStatus: string) => {
         setStatusChanging(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus }),
             })
             message.success('Status updated')
-            ;(ticketData as any).status = newStatus
+            setDisplayTicket((prev: any) => ({ ...prev, status: newStatus }))
             router.refresh()
         } catch (err: unknown) {
             message.error(err instanceof Error ? err.message : 'Failed to update status')
@@ -680,14 +794,17 @@ export default function TicketDetailContent({
     const handleTypeChange = async (typeId: number | null) => {
         setTypeChanging(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ type_id: typeId }),
             })
             message.success('Type updated')
-            ;(ticketData as any).type_id = typeId
-            ;(ticketData as any).type = typeId != null ? ticketTypes.find((t) => t.id === typeId) ?? null : null
+            setDisplayTicket((prev: any) => ({
+                ...prev,
+                type_id: typeId,
+                type: typeId != null ? ticketTypes.find((t) => t.id === typeId) ?? null : null,
+            }))
             router.refresh()
         } catch (err: unknown) {
             message.error(err instanceof Error ? err.message : 'Failed to update type')
@@ -699,14 +816,17 @@ export default function TicketDetailContent({
     const handlePriorityChange = async (priorityId: number | null) => {
         setPriorityChanging(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ priority_id: priorityId }),
             })
             message.success('Priority updated')
-            ;(ticketData as any).priority_id = priorityId
-            ;(ticketData as any).priority = priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null
+            setDisplayTicket((prev: any) => ({
+                ...prev,
+                priority_id: priorityId,
+                priority: priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null,
+            }))
             router.refresh()
         } catch (err: unknown) {
             message.error(err instanceof Error ? err.message : 'Failed to update priority')
@@ -718,14 +838,17 @@ export default function TicketDetailContent({
     const handleCompanyChange = async (companyId: string | null) => {
         setCompanyChanging(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ company_id: companyId }),
             })
             message.success('Company updated')
-            ;(ticketData as any).company_id = companyId
-            ;(ticketData as any).company = companyId != null ? companies.find((c) => c.id === companyId) ?? null : null
+            setDisplayTicket((prev: any) => ({
+                ...prev,
+                company_id: companyId,
+                company: companyId != null ? companies.find((c) => c.id === companyId) ?? null : null,
+            }))
             router.refresh()
         } catch (err: unknown) {
             message.error(err instanceof Error ? err.message : 'Failed to update company')
@@ -737,13 +860,13 @@ export default function TicketDetailContent({
     const handleDueDateChange = async (dueDate: string | null) => {
         setDueDateChanging(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ due_date: dueDate }),
             })
             message.success('Due date updated')
-            ;(ticketData as any).due_date = dueDate
+            setDisplayTicket((prev: any) => ({ ...prev, due_date: dueDate }))
             router.refresh()
         } catch (err: unknown) {
             message.error(err instanceof Error ? err.message : 'Failed to update due date')
@@ -758,7 +881,7 @@ export default function TicketDetailContent({
         try {
             const payload: Record<string, unknown> = { visibility, assignees: [] }
             if (visibility !== 'team') payload.team_id = null
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
@@ -776,12 +899,12 @@ export default function TicketDetailContent({
     const handleTeamChange = async (teamId: string | null) => {
         setTeamChanging(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     team_id: teamId,
-                    visibility: teamId ? 'team' : (ticketData.visibility === 'team' ? 'private' : ticketData.visibility),
+                    visibility: teamId ? 'team' : (displayTicket.visibility === 'team' ? 'private' : displayTicket.visibility),
                     assignees: [],
                 }),
             })
@@ -798,13 +921,13 @@ export default function TicketDetailContent({
         setOptimisticAssignees(userIds)
         setAssigneesChanging(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     assignees: userIds,
-                    visibility: userIds.length > 0 ? 'specific_users' : (ticketData.visibility === 'specific_users' ? 'private' : ticketData.visibility),
-                    team_id: userIds.length > 0 ? null : ticketData.team_id,
+                    visibility: userIds.length > 0 ? 'specific_users' : (displayTicket.visibility === 'specific_users' ? 'private' : displayTicket.visibility),
+                    team_id: userIds.length > 0 ? null : displayTicket.team_id,
                 }),
             })
             message.success('Assignees updated')
@@ -820,7 +943,7 @@ export default function TicketDetailContent({
     const handleTagsChange = async (tagIds: string[]) => {
         setTagsChanging(true)
         try {
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tag_ids: tagIds }),
@@ -838,26 +961,26 @@ export default function TicketDetailContent({
   
 
     useEffect(() => {
-        if (!ticketData?.id) return
+        if (!displayTicket?.id) return
         const fetchDescAttachments = async () => {
             try {
-                const data = await apiFetch<Array<{ id: string; file_url: string; file_name: string; file_path?: string }>>(`/api/tickets/${ticketData.id}/attachments`)
+                const data = await apiFetch<Array<{ id: string; file_url: string; file_name: string; file_path?: string }>>(`/api/tickets/${displayTicket.id}/attachments`)
                 setDescriptionAttachmentsFromDb((data || []).map((a) => ({ ...a, file_path: a.file_path ?? '' })))
             } catch {
                 setDescriptionAttachmentsFromDb([])
             }
         }
         fetchDescAttachments()
-    }, [ticketData?.id])
+    }, [displayTicket?.id])
 
     const handleDescriptionFilesSelected = async (files: FileList | null) => {
-        if (!files?.length || !ticketData?.id) return
+        if (!files?.length || !displayTicket?.id) return
         setLoading(true)
         try {
-            const companyName = ticketData?.company?.name ?? 'unknown'
+            const companyName = displayTicket?.company?.name ?? 'unknown'
             for (let i = 0; i < files.length; i++) {
                 const file = files[i]
-                const result = await uploadTicketFile(file, ticketData.id, 'attachments', companyName)
+                const result = await uploadTicketFile(file, displayTicket.id, 'attachments', companyName)
                 if (result.url && result.path) {
                     setNewDescriptionAttachments((prev) => [...prev, { url: result.url!, file_name: file.name, file_path: result.path! }])
                 } else if (result.error) {
@@ -882,7 +1005,7 @@ export default function TicketDetailContent({
                 return
             }
 
-            await apiFetch(`/api/tickets/${ticketData.id}`, {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -903,7 +1026,7 @@ export default function TicketDetailContent({
             })
             setNewDescriptionAttachments([])
             setDeletedDescriptionAttachmentIds([])
-            const refreshed = await apiFetch<Array<{ id: string; file_url: string; file_name: string; file_path?: string }>>(`/api/tickets/${ticketData.id}/attachments`)
+            const refreshed = await apiFetch<Array<{ id: string; file_url: string; file_name: string; file_path?: string }>>(`/api/tickets/${displayTicket.id}/attachments`)
             setDescriptionAttachmentsFromDb((refreshed || []).map((a) => ({ ...a, file_path: a.file_path ?? '' })))
 
             message.success('Ticket updated successfully')
@@ -921,6 +1044,17 @@ export default function TicketDetailContent({
     const completedChecklistCount = checklistItems.filter((item) => item.is_completed).length
     const totalChecklistCount = checklistItems.length
     const isCustomer = variant === 'customer'
+    const isTicketAdmin = isAdmin((currentUser as { role?: string }).role)
+    const timeTrackerManualUserOptions = useMemo(
+        () =>
+            users
+                .filter((u: { role?: string }) => (u?.role ?? '').toLowerCase() !== 'customer')
+                .map((u: { id: string; full_name?: string | null; email?: string | null }) => ({
+                    value: String(u.id),
+                    label: String(u.full_name || u.email || u.id),
+                })),
+        [users],
+    )
 
     return (
         <Layout style={{ minHeight: '100vh' }}>
@@ -948,10 +1082,10 @@ export default function TicketDetailContent({
                                 }}
                             >
                                 <Title level={2} style={{ margin: 0, flex: '1 1 200px' }}>
-                                    #{ticketData.id} {ticketData.title}
+                                    #{displayTicket.id} {displayTicket.title}
                                 </Title>
                                 <TicketPresenceBar
-                                    ticketId={ticketData.id}
+                                    ticketId={displayTicket.id}
                                     currentUser={{
                                         id: currentUser.id,
                                         name: currentUser.name,
@@ -973,7 +1107,7 @@ export default function TicketDetailContent({
                                         label: 'Details',
                                         children: (
                                             <TabGeneralCustomer
-                                                ticketData={ticketData}
+                                                ticketData={displayTicket}
                                                 ticketAttachments={descriptionAttachmentsFromDb}
                                                 statusOptions={allStatusesForSelect}
                                                 typeOptions={ticketTypes}
@@ -1004,15 +1138,19 @@ export default function TicketDetailContent({
                                                 canDeleteComment={canDeleteComment}
                                                 onAddComment={handleAddComment}
                                                 addCommentLoading={loading}
+                                                commentsHasOlder={commentsHasOlder}
+                                                commentsOlderRemaining={commentsOlderRemaining}
+                                                onLoadMoreComments={handleLoadMoreComments}
+                                                loadMoreCommentsLoading={loadingMoreComments}
                                                 companyCustomers={companyCustomers}
-                                                ticketCcEmails={initialTicketCcEmails}
+                                                ticketCcEmails={ticketCcEmailsState}
                                             />
                                         ),
                                     },
                                     {
                                         key: 'activity',
                                         label: 'Activity log',
-                                        children: <TabActivity ticketId={ticketData.id} />,
+                                        children: <TabActivity ticketId={displayTicket.id} />,
                                     },
                                 ]}
                             />
@@ -1025,7 +1163,7 @@ export default function TicketDetailContent({
                                     label: 'General Info',
                                     children: (
                                         <TabGeneral
-                                            ticketData={ticketData}
+                                            ticketData={displayTicket}
                                             ticketAttachments={descriptionAttachmentsFromDb}
                                             getStatusColor={getStatusColor}
                                             getStatusLabel={getStatusLabel}
@@ -1049,19 +1187,19 @@ export default function TicketDetailContent({
                                             onDueDateChange={handleDueDateChange}
                                             dueDateChanging={dueDateChanging}
                                             visibilityOptions={VISIBILITY_OPTIONS}
-                                            selectedVisibility={optimisticVisibility ?? ticketData.visibility ?? 'private'}
+                                            selectedVisibility={optimisticVisibility ?? displayTicket.visibility ?? 'private'}
                                             onVisibilityChange={handleVisibilityChange}
                                             visibilityChanging={visibilityChanging}
                                             teamOptions={teams}
-                                            selectedTeamId={ticketData.team_id ?? null}
+                                            selectedTeamId={displayTicket.team_id ?? null}
                                             onTeamChange={handleTeamChange}
                                             teamChanging={teamChanging}
                                             assigneeOptions={users}
-                                            selectedAssigneeIds={(optimisticAssignees ?? (ticketData.assignees || []).map((a: any) => a.user_id || a.user?.id).filter(Boolean)).map((id: string) => String(id))}
+                                            selectedAssigneeIds={(optimisticAssignees ?? (displayTicket.assignees || []).map((a: any) => a.user_id || a.user?.id).filter(Boolean)).map((id: string) => String(id))}
                                             onAssigneesChange={handleAssigneesChange}
                                             assigneesChanging={assigneesChanging}
                                             canEditAssignees
-                                            shortNote={ticketData.short_note}
+                                            shortNote={displayTicket.short_note}
                                             onShortNoteChange={handleShortNoteChange}
                                             shortNoteChanging={shortNoteChanging}
                                             totalTimeSeconds={totalTimeSeconds}
@@ -1094,7 +1232,11 @@ export default function TicketDetailContent({
                                             canDeleteComment={canDeleteComment}
                                             onAddComment={handleAddComment}
                                             addCommentLoading={loading}
-                                            ticketCcEmails={initialTicketCcEmails}
+                                            commentsHasOlder={commentsHasOlder}
+                                            commentsOlderRemaining={commentsOlderRemaining}
+                                            onLoadMoreComments={handleLoadMoreComments}
+                                            loadMoreCommentsLoading={loadingMoreComments}
+                                            ticketCcEmails={ticketCcEmailsState}
                                             commentVisibility={commentVisibility}
                                             onCommentVisibilityChange={setCommentVisibility}
                                             showNoteOption
@@ -1115,13 +1257,11 @@ export default function TicketDetailContent({
                                     ),
                                 },
                                 {
-                                    key: 'assignees',
-                                    label: 'Assignees',
+                                    key: 'time-tracker',
+                                    label: 'Time Tracker',
                                     children: (
-                                        <TabAssignees
-                                            ticketData={ticketData}
-                                            teamMembers={teamMembers}
-                                            loading={loadingTeamMembers}
+                                        <TabTimeTracker
+                                            ticketData={displayTicket}
                                             totalTimeSeconds={totalTimeSeconds}
                                             activeTimeTracker={activeTimeTracker}
                                             currentTime={currentTime}
@@ -1132,18 +1272,20 @@ export default function TicketDetailContent({
                                             onStopTimeTracker={handleStopTimeTracker}
                                             currentUserId={currentUser.id}
                                             onTimeTrackingChanged={refreshTimeTracking}
+                                            canManageOthersTime={isTicketAdmin}
+                                            manualUserOptions={timeTrackerManualUserOptions}
                                         />
                                     ),
                                 },
                                 {
                                     key: 'activity',
                                     label: 'Activity log',
-                                    children: <TabActivity ticketId={ticketData.id} />,
+                                    children: <TabActivity ticketId={displayTicket.id} />,
                                 },
                                 {
                                     key: 'screenshots',
-                                    label: `Screenshots (${initialScreenshots.length})`,
-                                    children: <TabScreenshots screenshots={initialScreenshots} />,
+                                    label: `Screenshots (${screenshots.length})`,
+                                    children: <TabScreenshots screenshots={screenshots} />,
                                 },
                             ]}
                         />

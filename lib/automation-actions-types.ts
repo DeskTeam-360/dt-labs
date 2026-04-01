@@ -9,6 +9,8 @@ export interface AutomationActions {
   priority_slug?: string
   /** Set ticket type (slug) */
   type_slug?: string
+  /** Set ticket status (slug from ticket_statuses) */
+  status_slug?: string
   /** Add these tags (array of tag uuids) */
   tag_ids?: string[]
   /** Set visibility: private | team | specific_users | public */

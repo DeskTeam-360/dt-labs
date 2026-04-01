@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { db, ticketComments, commentAttachments } from '@/lib/db'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
+import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 import type { TicketActorRole } from '@/lib/ticket-activity-log'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
@@ -48,6 +49,7 @@ export async function PATCH(
     })
   }
 
+  bumpTicketDataVersion(ticketId)
   return NextResponse.json({ ok: true })
 }
 
@@ -80,5 +82,6 @@ export async function DELETE(
 
   await db.delete(commentAttachments).where(eq(commentAttachments.commentId, commentId))
   await db.delete(ticketComments).where(eq(ticketComments.id, commentId))
+  bumpTicketDataVersion(ticketId)
   return NextResponse.json({ ok: true })
 }
