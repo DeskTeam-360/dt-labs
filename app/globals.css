@@ -194,19 +194,26 @@ body {
 
 /*
  * Ticket comments & description (.comment-html = read-only Quill / email HTML).
- * - Tailwind preflight removes list bullets.
- * - Quill v2 uses <ol><li data-list="bullet|ordered"> with markers on .ql-ui — DOMPurify often drops empty .ql-ui spans.
- *   So we draw markers on li[data-list]::before and reset counters per <ol>.
+ * - Tailwind preflight menghilangkan bullet pada ul/ol biasa.
+ * - Quill v2: marker & penomoran bersarang (a., i., dll.) lewat `li > .ql-ui:before` di quill.snow.css.
+ *   Jangan `display:none` pada `.ql-ui` — itu membuat tampilan beda dari mode edit.
+ * - TicketDetailContent mengimpor quill.snow.css agar read-only sejajar dengan editor.
+ * - HTML semantik getSemanticHTML (<ul>/<ol> tanpa data-list) tetap butuh list-style pada li (Quill set li ke none).
  */
 /*
- * Baca + composer memuat quill.snow.css → `.ql-editor li { list-style-type: none }`.
- * Hanya `list-style` pada `ul`/`ol` tidak cukup; harus set pada `li` dengan spesifisitas > `.ql-editor li`.
+ * `.ql-editor li { list-style-type: none }` dari Snow — untuk li non-Quill perlu override di bawah.
  */
-.comment-html ul {
+.comment-html ul,
+.ql-editor.comment-html ul {
   margin: 0.5em 0;
-  padding-left: 1.5em;
+  padding-left: 2.5em;
   list-style: disc;
   list-style-position: outside;
+}
+/* Bullet tepat setelah daftar bernomor: lebih menjorok agar jelas “di bawah” langkah */
+.comment-html ol:not(:has(> li[data-list])) + ul,
+.ql-editor.comment-html ol:not(:has(> li[data-list])) + ul {
+  margin-left: 1.25em;
 }
 .comment-html ul > li:not([data-list]),
 .ql-editor.comment-html ul > li:not([data-list]) {
@@ -215,7 +222,8 @@ body {
   list-style-position: outside;
 }
 
-.comment-html ol:not(:has(> li[data-list])) {
+.comment-html ol:not(:has(> li[data-list])),
+.ql-editor.comment-html ol:not(:has(> li[data-list])) {
   margin: 0.5em 0;
   padding-left: 1.5em;
   list-style: decimal;
@@ -228,21 +236,22 @@ body {
   list-style-position: outside;
 }
 
-.comment-html ol:has(> li[data-list]) {
-  list-style: none;
-  padding-left: 0;
-  margin: 0.5em 0;
-  counter-reset: quill-ordered;
-}
-.comment-html li[data-list] {
+/*
+ * Fallback bila li[data-list] tanpa span.ql-ui (mis. HTML eksternal): marker sederhana.
+ * Bila .ql-ui ada, quill.snow.css yang berlaku — hindari ganda.
+ */
+.comment-html li[data-list]:not(:has(> .ql-ui)) {
   list-style: none;
   display: block;
   position: relative;
   padding-left: 1.5em;
   margin-bottom: 0.25em;
 }
-.comment-html li[data-list="bullet"]::before,
-.comment-html li[data-list="unchecked"]::before {
+.comment-html ol:has(> li[data-list='ordered']:not(:has(> .ql-ui))) {
+  counter-reset: quill-fallback;
+}
+.comment-html li[data-list='bullet']:not(:has(> .ql-ui))::before,
+.comment-html li[data-list='unchecked']:not(:has(> .ql-ui))::before {
   content: '\2022';
   position: absolute;
   left: 0;
@@ -250,7 +259,7 @@ body {
   text-align: right;
   white-space: nowrap;
 }
-.comment-html li[data-list="checked"]::before {
+.comment-html li[data-list='checked']:not(:has(> .ql-ui))::before {
   content: '\2611\00a0 ';
   position: absolute;
   left: 0;
@@ -258,29 +267,42 @@ body {
   text-align: right;
   white-space: nowrap;
 }
-.comment-html li[data-list="ordered"] {
-  counter-increment: quill-ordered;
+.comment-html li[data-list='ordered']:not(:has(> .ql-ui)) {
+  counter-increment: quill-fallback;
 }
-.comment-html li[data-list="ordered"]::before {
-  content: counter(quill-ordered, decimal) '. ';
+.comment-html li[data-list='ordered']:not(:has(> .ql-ui))::before {
+  content: counter(quill-fallback, decimal) '. ';
   position: absolute;
   left: 0;
-  width: 1.2em;
+  width: 2em;
   text-align: right;
   white-space: nowrap;
-}
-.comment-html li[data-list] > .ql-ui {
-  display: none;
 }
 .comment-html li > p {
   margin: 0.35em 0;
 }
+/* Daftar bersarang di dalam satu item (nomor + bullet di bawahnya, atau sebaliknya) */
+.comment-html li > ol,
+.comment-html li > ul {
+  margin-top: 0.35em;
+  margin-bottom: 0.25em;
+}
 .comment-html ul ul,
 .comment-html ol ol,
 .comment-html ul ol,
-.comment-html ol ul {
+.comment-html ol ul,
+.ql-editor.comment-html ul ul,
+.ql-editor.comment-html ol ol,
+.ql-editor.comment-html ul ol,
+.ql-editor.comment-html ol ul {
   margin-top: 0.25em;
   margin-bottom: 0.25em;
+}
+.comment-html ul ul,
+.comment-html ol ul,
+.ql-editor.comment-html ul ul,
+.ql-editor.comment-html ol ul {
+  margin-left: 1em;
 }
 
 .ql-editor td{
