@@ -22,9 +22,23 @@ interface CardViewCardProps {
   allStatusColumns?: StatusColumn[]
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
+  /** Click priority / status / tag chips to apply list filters */
+  onFilterByStatus?: (statusSlug: string) => void
+  onFilterByPriority?: (priorityId: number) => void
+  onFilterByTag?: (tagId: string) => void
+  onFilterByCompany?: (companyId: string) => void
 }
 
-export default function CardViewCard({ ticket, allStatusColumns, onEdit, onDelete }: CardViewCardProps) {
+export default function CardViewCard({
+  ticket,
+  allStatusColumns,
+  onEdit,
+  onDelete,
+  onFilterByStatus,
+  onFilterByPriority,
+  onFilterByTag,
+  onFilterByCompany,
+}: CardViewCardProps) {
   const router = useRouter()
   const statusCols = allStatusColumns?.length ? allStatusColumns : DEFAULT_ALL_STATUS_COLUMNS
   const statusCol = statusCols.find((c) => c.id === ticket.status)
@@ -87,24 +101,99 @@ export default function CardViewCard({ ticket, allStatusColumns, onEdit, onDelet
       </Flex>
       <Flex justify="flex-end" gap={8} align="center" wrap="wrap" style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
         {ticket.priority && (
-          <span style={{ ...tagStyle, background: ticket.priority.color ?? '#e9ecef', color: ticket.priority.color ? '#fff' : '#495057' }}>
+          <span
+            style={{
+              ...tagStyle,
+              background: ticket.priority.color ?? '#e9ecef',
+              color: ticket.priority.color ? '#fff' : '#495057',
+              cursor: onFilterByPriority ? 'pointer' : undefined,
+            }}
+            title={onFilterByPriority ? 'Filter by this priority' : undefined}
+            role={onFilterByPriority ? 'button' : undefined}
+            onClick={
+              onFilterByPriority
+                ? (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onFilterByPriority(ticket.priority!.id)
+                  }
+                : undefined
+            }
+          >
             {ticket.priority.title}
           </span>
         )}
         {ticket.company && (
-          <span style={{ ...tagStyle, background: ticket.company.color ?? '#e9ecef', color: ticket.company.color ? '#fff' : '#495057' }}>
+          <span
+            style={{
+              ...tagStyle,
+              background: ticket.company.color ?? '#e9ecef',
+              color: ticket.company.color ? '#fff' : '#495057',
+              cursor: onFilterByCompany ? 'pointer' : undefined,
+            }}
+            title={onFilterByCompany ? 'Filter by this company' : undefined}
+            role={onFilterByCompany ? 'button' : undefined}
+            onClick={
+              onFilterByCompany
+                ? (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onFilterByCompany(ticket.company!.id)
+                  }
+                : undefined
+            }
+          >
             {ticket.company.name}
           </span>
         )}
         {ticket.tags?.slice(0, 3).map((tag) => (
-          <span key={tag.id} style={{ ...tagStyle, background: tag.color ?? '#e9ecef', color: tag.color ? '#fff' : '#495057' }}>
+          <span
+            key={tag.id}
+            style={{
+              ...tagStyle,
+              background: tag.color ?? '#e9ecef',
+              color: tag.color ? '#fff' : '#495057',
+              cursor: onFilterByTag ? 'pointer' : undefined,
+            }}
+            title={onFilterByTag ? 'Filter by this tag' : undefined}
+            role={onFilterByTag ? 'button' : undefined}
+            onClick={
+              onFilterByTag
+                ? (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onFilterByTag(tag.id)
+                  }
+                : undefined
+            }
+          >
             {tag.name}
           </span>
         ))}
         {ticket.tags && ticket.tags.length > 3 && (
           <span style={{ ...tagStyle, background: '#e9ecef', color: '#495057' }}>+{ticket.tags.length - 3}</span>
         )}
-        <span style={{ ...tagStyle, background: statusColor, color: '#fff' }}>{statusTitle}</span>
+        <span
+          style={{
+            ...tagStyle,
+            background: statusColor,
+            color: '#fff',
+            cursor: onFilterByStatus ? 'pointer' : undefined,
+          }}
+          title={onFilterByStatus ? 'Filter by this status' : undefined}
+          role={onFilterByStatus ? 'button' : undefined}
+          onClick={
+            onFilterByStatus
+              ? (e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onFilterByStatus(ticket.status)
+                }
+              : undefined
+          }
+        >
+          {statusTitle}
+        </span>
         <Dropdown
           menu={{
             items: [

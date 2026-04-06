@@ -9,6 +9,8 @@ export interface AutomationActions {
   priority_slug?: string
   /** Set ticket type (slug) */
   type_slug?: string
+  /** Row classification: support | spam | trash (column ticket_type, not type_id) */
+  ticket_type?: string
   /** Set ticket status (slug from ticket_statuses) */
   status_slug?: string
   /** Add these tags (array of tag uuids) */

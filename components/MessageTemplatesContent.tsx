@@ -1,10 +1,12 @@
 'use client'
 
-import { Layout, Table, Button, Typography, Card, message, Switch, Space, Tag } from 'antd'
-import { EditOutlined, FileTextOutlined } from '@ant-design/icons'
-import { useState, useEffect, useCallback } from 'react'
+import { Layout, Table, Button, Typography, Card, message, Switch, Space, Tag, Tabs } from 'antd'
+import { EditOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
-import { SpaNavLink } from './SpaNavLink'
+import MessageTemplatePreviewModal from './MessageTemplatePreviewModal'
+import { shouldOpenHrefInNewTab } from './SpaNavLink'
 import type { ColumnsType } from 'antd/es/table'
 
 const { Content } = Layout
@@ -36,9 +38,31 @@ export interface MessageTemplateRow {
 }
 
 export default function MessageTemplatesContent({ user: currentUser }: MessageTemplatesContentProps) {
+  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [rows, setRows] = useState<MessageTemplateRow[]>([])
   const [loading, setLoading] = useState(false)
+  const [previewRow, setPreviewRow] = useState<MessageTemplateRow | null>(null)
+  const [activeGroup, setActiveGroup] = useState<string>('')
+
+  const groupsInOrder = useMemo(() => {
+    const seen = new Set<string>()
+    const order: string[] = []
+    for (const r of rows) {
+      const g = r.group || '—'
+      if (!seen.has(g)) {
+        seen.add(g)
+        order.push(g)
+      }
+    }
+    return order
+  }, [rows])
+
+  const resolvedGroup = useMemo(() => {
+    if (groupsInOrder.length === 0) return ''
+    if (activeGroup && groupsInOrder.includes(activeGroup)) return activeGroup
+    return groupsInOrder[0]
+  }, [groupsInOrder, activeGroup])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -73,37 +97,12 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
 
   const columns: ColumnsType<MessageTemplateRow> = [
     {
-      title: 'Group',
-      dataIndex: 'group',
-      key: 'group',
-      width: 200,
-      ellipsis: true,
-    },
-    {
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
       ellipsis: true,
     },
-    {
-      title: 'Type',
-      dataIndex: 'type',
-      key: 'type',
-      width: 160,
-      render: (t: string) => <Tag>{t}</Tag>,
-    },
-    {
-      title: 'Key',
-      dataIndex: 'key',
-      key: 'key',
-      width: 260,
-      ellipsis: true,
-      render: (k: string) => (
-        <Text copyable={{ text: k }} style={{ fontSize: 12 }}>
-          {k}
-        </Text>
-      ),
-    },
+    
     {
       title: 'Content',
       key: 'has_content',
@@ -119,20 +118,49 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
       ),
     },
     {
-      title: '',
+      title: 'Action',
       key: 'actions',
-      width: 90,
-      render: (_: unknown, r) => (
-        <SpaNavLink
-          href={`/message-templates/${r.id}/edit`}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-        >
-          <EditOutlined />
-          Edit
-        </SpaNavLink>
-      ),
+      width: 200,
+      render: (_: unknown, r) => {
+        const editHref = `/message-templates/${r.id}/edit`
+        return (
+          <Space wrap size="small">
+            <Button size="small" icon={<EyeOutlined />} onClick={() => setPreviewRow(r)}>
+              Preview
+            </Button>
+            <Button
+              type="primary"
+              size="small"
+              icon={<EditOutlined />}
+              href={editHref}
+              onClick={(e) => {
+                if (shouldOpenHrefInNewTab(e)) return
+                if (e.button !== 0) return
+                e.preventDefault()
+                router.push(editHref)
+              }}
+            >
+              Edit
+            </Button>
+          </Space>
+        )
+      },
     },
   ]
+
+  const tabItems = useMemo(
+    () =>
+      groupsInOrder.map((g) => ({
+        key: g,
+        label: <span title={g}>{g}</span>,
+      })),
+    [groupsInOrder],
+  )
+
+  const filteredRows = useMemo(
+    () => (resolvedGroup ? rows.filter((r) => (r.group || '—') === resolvedGroup) : []),
+    [rows, resolvedGroup],
+  )
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -149,21 +177,47 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
               </Space>
               <Text type="secondary">
                 Pre-seeded templates only — edit the body on a separate page and toggle Active here. You cannot add or
-                delete rows. Use the <strong>key</strong> in code when wiring automation or email.
+                delete rows. Use the <strong>key</strong> in code when wiring automation or email. Templates are grouped
+                by <strong>Group</strong> in the tabs below.
               </Text>
-              <Table<MessageTemplateRow>
-                rowKey="id"
-                loading={loading}
-                columns={columns}
-                dataSource={rows}
-                pagination={{ pageSize: 50, showSizeChanger: true }}
-                scroll={{ x: 1100 }}
-              />
+              {groupsInOrder.length > 0 ? (
+                <>
+                  <Tabs
+                    activeKey={resolvedGroup}
+                    onChange={setActiveGroup}
+                    items={tabItems}
+                    type="card"
+                    style={{ marginBottom: 0 }}
+                  />
+                  <Table<MessageTemplateRow>
+                    rowKey="id"
+                    loading={loading}
+                    columns={columns}
+                    dataSource={filteredRows}
+                    pagination={{ pageSize: 50, showSizeChanger: true }}
+                    scroll={{ x: 960 }}
+                  />
+                </>
+              ) : (
+                <Table<MessageTemplateRow>
+                  rowKey="id"
+                  loading={loading}
+                  columns={columns}
+                  dataSource={[]}
+                  pagination={false}
+                />
+              )}
             </Space>
           </Card>
         </Content>
       </Layout>
 
+      <MessageTemplatePreviewModal
+        open={!!previewRow}
+        onClose={() => setPreviewRow(null)}
+        templateBody={previewRow?.content ?? ''}
+        title={previewRow ? `Preview: ${previewRow.title}` : 'Preview (sample data)'}
+      />
     </Layout>
   )
 }

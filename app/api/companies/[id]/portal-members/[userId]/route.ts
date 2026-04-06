@@ -1,9 +1,10 @@
 import { auth } from '@/auth'
-import { db, users, companyUsers } from '@/lib/db'
+import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { NextResponse } from 'next/server'
 import { userBelongsToCompany, isCompanyPortalAdmin } from '@/lib/customer-company'
+import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
 
 const COMPANY_ROLES = ['member', 'company_admin'] as const
 type CompanyRole = (typeof COMPANY_ROLES)[number]
@@ -51,17 +52,11 @@ export async function PATCH(
     if (!isCompanyRole(body.company_role)) {
       return NextResponse.json({ error: 'Invalid company_role' }, { status: 400 })
     }
-    await db
-      .insert(companyUsers)
-      .values({
-        companyId,
-        userId: targetUserId,
-        companyRole: body.company_role,
-      })
-      .onConflictDoUpdate({
-        target: [companyUsers.companyId, companyUsers.userId],
-        set: { companyRole: body.company_role, updatedAt: new Date() },
-      })
+    await upsertCompanyUserMembership({
+      companyId,
+      userId: targetUserId,
+      companyRole: body.company_role,
+    })
     didSomething = true
   }
 

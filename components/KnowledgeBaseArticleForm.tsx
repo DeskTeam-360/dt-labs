@@ -6,8 +6,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
 import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
+import { KNOWLEDGE_BASE_ARTICLE_ROLES, normalizeTargetRolesInput } from '@/lib/knowledge-base-article-roles'
 
 const { Content } = Layout
+
+const ROLE_OPTIONS = KNOWLEDGE_BASE_ARTICLE_ROLES.map((value) => ({
+  label: value.charAt(0).toUpperCase() + value.slice(1),
+  value,
+}))
 
 interface KnowledgeBaseArticleFormProps {
   user: { id: string; email?: string | null; name?: string | null }
@@ -19,6 +25,8 @@ interface KnowledgeBaseArticleFormProps {
     description?: string
     category?: string
     sort_order?: number
+    /** Empty = visible to all roles */
+    target_roles?: string[] | null
   }
 }
 
@@ -55,6 +63,7 @@ export default function KnowledgeBaseArticleForm({
         description: (values.description as string)?.trim() || null,
         category: (values.category as string) || 'general',
         sort_order: Number(values.sort_order) ?? 0,
+        target_roles: normalizeTargetRolesInput(values.target_roles ?? null),
       }
 
       if (articleId) {
@@ -113,6 +122,7 @@ export default function KnowledgeBaseArticleForm({
                 description: initialValues?.description ?? '',
                 category: initialValues?.category ?? 'general',
                 sort_order: initialValues?.sort_order ?? 0,
+                target_roles: initialValues?.target_roles?.length ? initialValues.target_roles : [],
               }}
             >
               <Form.Item
@@ -132,6 +142,18 @@ export default function KnowledgeBaseArticleForm({
               </Form.Item>
               <Form.Item name="category" label="Category">
                 <Select options={CATEGORY_OPTIONS} />
+              </Form.Item>
+              <Form.Item
+                name="target_roles"
+                label="Visible to roles"
+                tooltip="Choose who can see this article when it is published. Leave empty for all roles."
+              >
+                <Select
+                  mode="multiple"
+                  allowClear
+                  placeholder="All roles"
+                  options={ROLE_OPTIONS}
+                />
               </Form.Item>
               <Form.Item name="description" label="Description">
                 <CommentWysiwyg

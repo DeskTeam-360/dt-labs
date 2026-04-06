@@ -14,6 +14,8 @@ export type TicketActivitySnapshot = {
   visibility: string
   teamId: string | null
   typeId: number | null
+  /** support | spam | trash */
+  ticketType: string
   priorityId: number | null
   companyId: string | null
   dueDateIso: string | null
@@ -33,6 +35,7 @@ export async function loadTicketActivitySnapshot(
       visibility: tickets.visibility,
       teamId: tickets.teamId,
       typeId: tickets.typeId,
+      ticketType: tickets.ticketType,
       priorityId: tickets.priorityId,
       companyId: tickets.companyId,
       dueDate: tickets.dueDate,
@@ -60,6 +63,7 @@ export async function loadTicketActivitySnapshot(
     visibility: t.visibility,
     teamId: t.teamId ?? null,
     typeId: t.typeId ?? null,
+    ticketType: t.ticketType ?? 'support',
     priorityId: t.priorityId ?? null,
     companyId: t.companyId ?? null,
     dueDateIso: t.dueDate ? new Date(t.dueDate).toISOString() : null,
@@ -81,6 +85,7 @@ export function diffTicketSnapshots(
     'visibility',
     'teamId',
     'typeId',
+    'ticketType',
     'priorityId',
     'companyId',
     'dueDateIso',

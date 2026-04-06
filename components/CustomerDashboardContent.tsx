@@ -45,10 +45,10 @@ interface DashboardData {
   company_id: string | null
   my_tickets_count: number
   tickets_by_type: Array<{ type_title: string; type_id: number | null; count: number; color: string }>
-  priority_counts: Array<{ priority_title: string; count: number; color: string }>
+  priority_counts: Array<{ priority_id: number; priority_title: string; count: number; color: string }>
   time_by_type: Array<{ type_title: string; seconds: number; color: string }>
   total_time_seconds: number
-  status_counts: Array<{ status_title: string; count: number; color: string }>
+  status_counts: Array<{ status_slug: string; status_title: string; count: number; color: string }>
   last_due_date: string | null
   urgent_due_date: string | null
   last_due_ticket?: { id: number; title: string } | null
@@ -58,9 +58,11 @@ interface DashboardData {
     title: string
     due_date: string | null
     updated_at: string
+    status_slug: string
     status_title: string
     customer_title: string
     status_color: string
+    priority_id: number | null
     priority_title: string
     priority_color: string
     assignee_name: string | null
@@ -105,6 +107,16 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
   const [kbDetailModal, setKbDetailModal] = useState<KnowledgeBaseArticle | null>(null)
   const [hourlyStopped, setHourlyStopped] = useState<StoppedTimeSession[]>([])
   const [hourlyActive, setHourlyActive] = useState<Array<{ ticket_id: number; start_time: string }>>([])
+
+  const ticketsNeedActionListHref = useMemo(() => {
+    if (!data?.status_counts?.length) return '/tickets?view=list'
+    const withTickets = data.status_counts.filter((s) => s.count > 0 && s.status_slug)
+    if (withTickets.length === 0) return '/tickets?view=list'
+    const qs = new URLSearchParams()
+    qs.set('view', 'list')
+    qs.set('status', withTickets.map((s) => s.status_slug).join(','))
+    return `/tickets?${qs.toString()}`
+  }, [data?.status_counts])
 
   const fetchHourlyTimeData = useCallback(async () => {
     if (!user?.id) return
@@ -182,6 +194,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
       name: t.type_title,
       count: t.count,
       fill: t.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length],
+      type_id: t.type_id,
     }))
   }, [data?.tickets_by_type])
 
@@ -240,7 +253,23 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                             <XAxis dataKey="name" />
                             <YAxis allowDecimals={false} />
                             <RechartsTooltip />
-                            <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                            <Bar
+                              dataKey="count"
+                              radius={[4, 4, 0, 0]}
+                              cursor={
+                                barChartData.some((d) => d.count > 0 && d.type_id != null)
+                                  ? 'pointer'
+                                  : 'default'
+                              }
+                              onClick={(barProps: { payload?: { type_id?: number | null; count?: number } }) => {
+                                const payload = barProps?.payload
+                                if (!payload || payload.count === 0 || payload.type_id == null) return
+                                const qs = new URLSearchParams()
+                                qs.set('view', 'list')
+                                qs.set('type_ids', String(payload.type_id))
+                                router.push(`/tickets?${qs.toString()}`)
+                              }}
+                            >
                               {barChartData.map((entry, idx) => (
                                 <Cell key={idx} fill={entry.fill} />
                               ))}
@@ -282,8 +311,41 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                     {(data?.priority_counts?.length ?? 0) > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         {data!.priority_counts.map((p, i) => (
-                          <div key={i}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, gap: 8, padding: 8 }}>
+                          <div key={p.priority_id ?? i}>
+                            <div
+                              role={p.count > 0 ? 'link' : undefined}
+                              tabIndex={p.count > 0 ? 0 : undefined}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: 4,
+                                gap: 8,
+                                padding: 8,
+                                cursor: p.count > 0 ? 'pointer' : 'default',
+                                borderRadius: 8,
+                              }}
+                              onClick={() => {
+                                if (p.count === 0) return
+                                const qs = new URLSearchParams()
+                                qs.set('view', 'list')
+                                qs.set('priority_ids', String(p.priority_id))
+                                router.push(`/tickets?${qs.toString()}`)
+                              }}
+                              onKeyDown={
+                                p.count > 0
+                                  ? (e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault()
+                                        const qs = new URLSearchParams()
+                                        qs.set('view', 'list')
+                                        qs.set('priority_ids', String(p.priority_id))
+                                        router.push(`/tickets?${qs.toString()}`)
+                                      }
+                                    }
+                                  : undefined
+                              }
+                            >
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span
                                   style={{
@@ -294,7 +356,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                                     flexShrink: 0,
                                   }}
                                 />
-                                <Text>{p.priority_title}</Text>
+                                <Text style={p.count > 0 ? { color: '#1890ff' } : undefined}>{p.priority_title}</Text>
                               </div>
                               <div
                                 style={{
@@ -419,17 +481,65 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
           <Col xs={24} lg={14}>
             <Card>
               <Flex justify="space-between" style={{ marginBottom: 16 }} align="center">
-                <span style={{ fontWeight: 600, fontSize: 16 }}>Assigned and need action</span>
-                  
+                <span
+                  role="link"
+                  tabIndex={0}
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 16,
+                    color: '#1890ff',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => router.push(ticketsNeedActionListHref)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      router.push(ticketsNeedActionListHref)
+                    }
+                  }}
+                >
+                  Assigned and need action
+                </span>
               </Flex>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {(data?.status_counts?.length ?? 0) > 0 && (
                   <Row gutter={[16, 12]}>
                     {data!.status_counts.map((s, i) => (
-                      <Col xs={24} sm={12} key={`status-${i}`}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Col xs={24} sm={12} key={`status-${s.status_slug}-${i}`}>
+                        <div
+                          role={s.count > 0 ? 'link' : undefined}
+                          tabIndex={s.count > 0 ? 0 : undefined}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            cursor: s.count > 0 ? 'pointer' : 'default',
+                          }}
+                          onClick={() => {
+                            if (s.count === 0 || !s.status_slug) return
+                            const qs = new URLSearchParams()
+                            qs.set('view', 'list')
+                            qs.set('status', s.status_slug)
+                            router.push(`/tickets?${qs.toString()}`)
+                          }}
+                          onKeyDown={
+                            s.count > 0
+                              ? (e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault()
+                                    const qs = new URLSearchParams()
+                                    qs.set('view', 'list')
+                                    qs.set('status', s.status_slug)
+                                    router.push(`/tickets?${qs.toString()}`)
+                                  }
+                                }
+                              : undefined
+                          }
+                        >
                           <span style={{ width: 20, height: 20, background: s.color, flexShrink: 0 }} />
-                          <Text>{s.status_title}: {s.count} tickets</Text>
+                          <Text style={s.count > 0 ? { color: '#1890ff' } : undefined}>
+                            {s.status_title}: {s.count} tickets
+                          </Text>
                         </div>
                       </Col>
                     ))}
@@ -522,7 +632,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
               {(data?.recent_tickets?.length ?? 0) > 0 ? (
                 <Flex vertical justify="center" align="center" gap={12}>
                   {data!.recent_tickets.map((t) => (
-                    <Flex justify="space-between" gap={12}
+                    <Flex key={t.id} justify="space-between" gap={12}
                       style={{
                         width: '100%',
                         padding: 16,
@@ -568,6 +678,8 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                       </Flex>
                       <Flex justify="space-between" gap={12} align="center">
                         <span
+                          role={t.priority_id != null ? 'button' : undefined}
+                          tabIndex={t.priority_id != null ? 0 : undefined}
                           style={{
                             padding: '8px 16px',
                             borderRadius: 6,
@@ -575,7 +687,32 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                             fontWeight: 600,
                             background: t.priority_color,
                             color: '#fff',
+                            cursor: t.priority_id != null ? 'pointer' : 'default',
+                            outline: 'none',
                           }}
+                          title={t.priority_id != null ? 'Filter tickets by this priority' : undefined}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (t.priority_id == null) return
+                            const qs = new URLSearchParams()
+                            qs.set('view', 'list')
+                            qs.set('priority_ids', String(t.priority_id))
+                            router.push(`/tickets?${qs.toString()}`)
+                          }}
+                          onKeyDown={
+                            t.priority_id != null
+                              ? (e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    const qs = new URLSearchParams()
+                                    qs.set('view', 'list')
+                                    qs.set('priority_ids', String(t.priority_id))
+                                    router.push(`/tickets?${qs.toString()}`)
+                                  }
+                                }
+                              : undefined
+                          }
                         >
                           {t.priority_title}
                         </span>
@@ -595,6 +732,8 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                           </span>
                         ))}
                         <span
+                          role="button"
+                          tabIndex={0}
                           style={{
                             padding: '8px 16px',
                             borderRadius: 6,
@@ -602,6 +741,28 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                             fontWeight: 600,
                             background: t.status_color,
                             color: '#fff',
+                            cursor: 'pointer',
+                            outline: 'none',
+                          }}
+                          title="Filter tickets by this status"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!t.status_slug) return
+                            const qs = new URLSearchParams()
+                            qs.set('view', 'list')
+                            qs.set('status', t.status_slug)
+                            router.push(`/tickets?${qs.toString()}`)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              if (!t.status_slug) return
+                              const qs = new URLSearchParams()
+                              qs.set('view', 'list')
+                              qs.set('status', t.status_slug)
+                              router.push(`/tickets?${qs.toString()}`)
+                            }
                           }}
                         >
                           {t.customer_title ?? t.status_title}

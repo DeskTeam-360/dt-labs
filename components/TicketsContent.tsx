@@ -1,6 +1,6 @@
 'use client'
 
-import { Layout, Spin, Empty } from 'antd'
+import { Layout, Spin, Empty, Alert } from 'antd'
 import AdminSidebar from './AdminSidebar'
 import TicketsHeader from './Tickets/TicketsHeader'
 import TicketsCardView from './Tickets/TicketsCardView'
@@ -85,6 +85,13 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     userTeamIds,
     lookupReady,
     getFilterQueryString,
+    filterTicketType,
+    filterPriorityIds,
+    setFilterPriorityIds,
+    filterByStatusFromChip,
+    filterByPriorityFromChip,
+    filterByTagFromChip,
+    filterByCompanyFromChip,
   } = useTicketsData(currentUser.id, isCustomer)
 
   return (
@@ -94,7 +101,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
       <Layout
         style={{
           marginLeft: collapsed ? 80 : 250,
-          marginRight: filterSidebarCollapsed ? 48 : 280,
+          marginRight: filterSidebarCollapsed ? 61 : 280,
           transition: 'margin-left 0.2s, margin-right 0.2s',
           borderRadius: '16px 0 0 16px',
           overflow: 'hidden',
@@ -118,6 +125,25 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             onFilterSearchChange={setFilterSearch}
           />
 
+          {!isCustomer && filterTicketType === 'spam' && (
+            <Alert
+              type="warning"
+              showIcon
+              message="Spam tickets"
+              description="Tickets marked as spam (card view). Use the sidebar to open All tickets or Trash."
+              style={{ marginLeft: '24px', marginRight: '48px', marginBottom: '12px' }}
+            />
+          )}
+          {!isCustomer && filterTicketType === 'trash' && (
+            <Alert
+              type="info"
+              showIcon
+              message="Trash tickets"
+              description="Tickets moved to trash (card view). Use the sidebar to open All tickets or Spam."
+              style={{ marginLeft: '24px', marginRight: '48px', marginBottom: '12px' }}
+            />
+          )}
+
           {loading || !lookupReady ? (
           <div style={{ padding: 48, textAlign: 'center' }}>
           <Spin size="large" />
@@ -132,6 +158,10 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               sortBy={sortBy}
               sortOrder={sortOrder}
               allPriorities={ticketPriorities}
+              onFilterByStatus={filterByStatusFromChip}
+              onFilterByPriority={filterByPriorityFromChip}
+              onFilterByTag={filterByTagFromChip}
+              onFilterByCompany={filterByCompanyFromChip}
             />
           ) : viewMode === 'list' ? (
             <TicketsListView
@@ -140,6 +170,10 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               allPriorities={ticketPriorities}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onFilterByStatus={filterByStatusFromChip}
+              onFilterByPriority={filterByPriorityFromChip}
+              onFilterByTag={filterByTagFromChip}
+              onFilterByCompany={filterByCompanyFromChip}
             />
           ) : viewMode === 'roundrobin' && !isCustomer ? (
             <TicketsRoundRobinView
@@ -160,6 +194,11 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               sortBy={sortBy}
               sortOrder={sortOrder}
               allPriorities={ticketPriorities}
+              allStatusColumns={allStatusColumns}
+              onFilterByStatus={filterByStatusFromChip}
+              onFilterByPriority={filterByPriorityFromChip}
+              onFilterByTag={filterByTagFromChip}
+              onFilterByCompany={filterByCompanyFromChip}
             />
           )}
         </div>
@@ -176,6 +215,9 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         onFilterCompanyIdsChange={setFilterCompanyIds}
         filterTagIds={filterTagIds}
         onFilterTagIdsChange={setFilterTagIds}
+        filterPriorityIds={filterPriorityIds}
+        onFilterPriorityIdsChange={setFilterPriorityIds}
+        ticketPriorities={ticketPriorities}
         filterVisibility={filterVisibility}
         onFilterVisibilityChange={setFilterVisibility}
         filterTeamIds={filterTeamIds}

@@ -187,6 +187,8 @@ export const tickets = pgTable('tickets', {
   createdVia: varchar('created_via', { length: 50 }),
   lastReadAt: ts('last_read_at'),
   typeId: integer('type_id'),
+  /** support | spam | trash — not `type_id` (ticket_types catalog) */
+  ticketType: varchar('ticket_type', { length: 32 }).notNull().default('support'),
   companyId: uuid('company_id'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
@@ -466,6 +468,8 @@ export const knowledgeBaseArticles = pgTable('knowledge_base_articles', {
   description: text('description'),
   category: varchar('category', { length: 100 }).default('general'),
   sortOrder: integer('sort_order').default(0),
+  /** If null or empty, published article is visible to every role. Otherwise only these roles. */
+  targetRoles: text('target_roles').array(),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })

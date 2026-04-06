@@ -19,6 +19,7 @@ import {
 import { eq, and, desc } from 'drizzle-orm'
 import type { OurCondition, OurConditionGroup, OurConditionLeaf } from './condition-builder-utils'
 import type { AutomationActions } from './automation-actions-types'
+import { coerceTicketType, parseTicketType } from './ticket-classification'
 import { AUTOMATION_NOTE_USER_ID } from './automation-constants'
 import { diffTicketSnapshots, loadTicketActivitySnapshot, logTicketActivity } from './ticket-activity-log'
 import { bumpTicketDataVersion } from './firebase/ticket-sync-server'
@@ -42,6 +43,8 @@ export interface TicketContext {
   priority_slug?: string | null
   /** Ticket type slug (ticket_types.slug), for conditions e.g. Type = bug */
   type_slug?: string | null
+  /** Row ticket_type: support | spam | trash */
+  ticket_type?: string | null
   company_id?: string | null
   created_via?: string | null
   team_id?: string | null
@@ -90,6 +93,8 @@ function evalLeaf(leaf: OurConditionLeaf, ctx: TicketContext): boolean {
       case 'type':
       case 'type_slug':
         return ctx.type_slug ?? null
+      case 'ticket_type':
+        return ctx.ticket_type ?? null
       case 'status':
         return ctx.status ?? null
       case 'sender_domain':
@@ -191,6 +196,7 @@ export async function loadAutomationTicketContext(ticketId: number): Promise<Tic
     status: t.status,
     priority_slug: row.prioritySlug ?? null,
     type_slug: row.typeSlug ?? null,
+    ticket_type: coerceTicketType(t.ticketType),
     company_id: t.companyId,
     created_via: t.createdVia,
     team_id: t.teamId,
@@ -287,6 +293,10 @@ export async function runAutomationRules(
     }
     if (actions.visibility) {
       updates.visibility = actions.visibility
+    }
+    if (actions.ticket_type !== undefined && actions.ticket_type !== null && actions.ticket_type !== '') {
+      const cls = parseTicketType(actions.ticket_type)
+      if (cls) updates.ticketType = cls
     }
 
     const willMutateTicket =

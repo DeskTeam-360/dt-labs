@@ -14,6 +14,10 @@ interface TicketsCardViewProps {
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
   allPriorities?: Array<{ id: number }>
+  onFilterByStatus?: (statusSlug: string) => void
+  onFilterByPriority?: (priorityId: number) => void
+  onFilterByTag?: (tagId: string) => void
+  onFilterByCompany?: (companyId: string) => void
 }
 
 export default function TicketsCardView({
@@ -24,6 +28,10 @@ export default function TicketsCardView({
   sortBy = 'updated_at',
   sortOrder = 'desc',
   allPriorities = [],
+  onFilterByStatus,
+  onFilterByPriority,
+  onFilterByTag,
+  onFilterByCompany,
 }: TicketsCardViewProps) {
   const sortedTickets = useMemo(
     () => sortTickets(tickets, sortBy, sortOrder, allPriorities),
@@ -42,7 +50,16 @@ export default function TicketsCardView({
     <Row gutter={24} style={{ width: '100%', paddingRight: 24, paddingLeft: 24 }}>
       {sortedTickets.map((ticket) => (
         <Col span={24} md={24} lg={24} xl={24} style={{ marginBottom:12 }} key={ticket.id}>
-          <CardViewCard ticket={ticket} allStatusColumns={allStatusColumns} onEdit={onEdit} onDelete={onDelete} />
+          <CardViewCard
+            ticket={ticket}
+            allStatusColumns={allStatusColumns}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onFilterByStatus={onFilterByStatus}
+            onFilterByPriority={onFilterByPriority}
+            onFilterByTag={onFilterByTag}
+            onFilterByCompany={onFilterByCompany}
+          />
         </Col>
       ))}
     </Row>

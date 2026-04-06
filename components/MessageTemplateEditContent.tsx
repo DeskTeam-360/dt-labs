@@ -1,18 +1,14 @@
 'use client'
 
-import { Layout, Button, Typography, Card, Space, message, Spin, Modal } from 'antd'
+import { Layout, Button, Typography, Card, Space, message, Spin } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined, EyeOutlined } from '@ant-design/icons'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
 import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
 import MessageTemplatePlaceholdersPanel from './MessageTemplatePlaceholdersPanel'
+import MessageTemplatePreviewModal from './MessageTemplatePreviewModal'
 import type { MessageTemplateRow } from './MessageTemplatesContent'
-import {
-  MESSAGE_TEMPLATE_PREVIEW_SAMPLE_TICKET_ID,
-  previewMessageTemplateHtml,
-} from '@/lib/message-template-preview'
-import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -42,14 +38,6 @@ export default function MessageTemplateEditContent({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [previewHtmlSafe, setPreviewHtmlSafe] = useState('')
-
-  const openPreview = () => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://example.com'
-    const merged = previewMessageTemplateHtml(content, { origin })
-    setPreviewHtmlSafe(merged ? sanitizeRichHtml(merged) : '')
-    setPreviewOpen(true)
-  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -143,7 +131,7 @@ export default function MessageTemplateEditContent({
                   </div>
 
                   <Space wrap>
-                    <Button icon={<EyeOutlined />} onClick={openPreview}>
+                    <Button icon={<EyeOutlined />} onClick={() => setPreviewOpen(true)}>
                       Preview
                     </Button>
                     <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => void save()}>
@@ -152,38 +140,11 @@ export default function MessageTemplateEditContent({
                     <Button onClick={() => router.push('/message-templates')}>Cancel</Button>
                   </Space>
 
-                  <Modal
-                    title="Preview (sample data)"
+                  <MessageTemplatePreviewModal
                     open={previewOpen}
-                    onCancel={() => setPreviewOpen(false)}
-                    footer={
-                      <Button type="primary" onClick={() => setPreviewOpen(false)}>
-                        Close
-                      </Button>
-                    }
-                    width={720}
-                    destroyOnHidden
-                  >
-                    <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                      Sample recipient <strong>John Recipient</strong>, sender <strong>John Sender</strong>, and ticket{' '}
-                      <strong>#{MESSAGE_TEMPLATE_PREVIEW_SAMPLE_TICKET_ID}</strong> (links use this site&apos;s origin).
-                    </Text>
-                    <div
-                      className="ql-snow"
-                      style={{
-                        border: '1px solid #f0f0f0',
-                        borderRadius: 8,
-                        padding: 16,
-                        minHeight: 160,
-                        background: '#fafafa',
-                      }}
-                      dangerouslySetInnerHTML={{
-                        __html:
-                          previewHtmlSafe ||
-                          '<p style="margin:0;color:#999"><em>No body yet.</em></p>',
-                      }}
-                    />
-                  </Modal>
+                    onClose={() => setPreviewOpen(false)}
+                    templateBody={content}
+                  />
                 </>
               )}
             </Space>

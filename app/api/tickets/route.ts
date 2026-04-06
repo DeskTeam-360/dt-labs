@@ -24,6 +24,7 @@ import { eq, inArray, desc, asc, and, or, ilike, gte, lte } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { notifyTicketUsers } from '@/lib/firebase/ticket-notifications-server'
+import { coerceTicketType, DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
 
 const DEFAULT_LIMIT = 500
 const MAX_LIMIT = 1000
@@ -87,11 +88,16 @@ export async function GET(request: Request) {
     : typeIdParam
       ? (() => { const n = parseInt(typeIdParam, 10); return isNaN(n) ? [] : [n] })()
       : []
+  const priorityIdsParam = url.searchParams.get('priority_ids')
+  const priorityIds = priorityIdsParam
+    ? priorityIdsParam.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
+    : []
   const teamIds = teamIdsParam
     ? teamIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
     : teamIdParam
       ? [teamIdParam.trim()]
       : []
+  const ticketTypeFilter = url.searchParams.get('ticket_type')?.trim().toLowerCase()
 
   /**
    * Visibility access (agent/manager, dll.): user can only see tickets they have access to.
@@ -133,6 +139,19 @@ export async function GET(request: Request) {
   }
   if (statusSlugs.length > 0) conditions.push(inArray(tickets.status, statusSlugs))
   if (typeIds.length > 0) conditions.push(inArray(tickets.typeId, typeIds))
+  if (priorityIds.length > 0) conditions.push(inArray(tickets.priorityId, priorityIds))
+  /**
+   * Customers never see spam/trash lists (ignore `ticket_type` query).
+   * Staff: junk folders via explicit `?ticket_type=spam|trash`; else main list = `support` only.
+   */
+  if (
+    role !== 'customer' &&
+    (ticketTypeFilter === 'spam' || ticketTypeFilter === 'trash')
+  ) {
+    conditions.push(eq(tickets.ticketType, ticketTypeFilter))
+  } else {
+    conditions.push(eq(tickets.ticketType, DEFAULT_TICKET_TYPE))
+  }
   if (!isCustomerList) {
     if (teamIds.length > 0) conditions.push(inArray(tickets.teamId, teamIds))
     if (visibilityFilterValues.length > 0) conditions.push(inArray(tickets.visibility, visibilityFilterValues))
@@ -306,6 +325,7 @@ export async function GET(request: Request) {
       visibility: t.visibility,
       team_id: t.teamId,
       type_id: t.typeId,
+      ticket_type: coerceTicketType(t.ticketType),
       priority_id: t.priorityId,
       company_id: t.companyId,
       created_at: t.createdAt ? new Date(t.createdAt).toISOString() : '',

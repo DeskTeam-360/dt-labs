@@ -29,6 +29,7 @@ interface StoredFilter {
   filterSidebarCollapsed?: boolean
   sortBy?: TicketSortField | null
   sortOrder?: TicketSortOrder | null
+  filterPriorityIds?: number[] | null
 }
 
 function loadFiltersFromStorage(): StoredFilter | null {
@@ -94,6 +95,10 @@ function getInitialFilterStateFromStored(stored: StoredFilter | null): ParsedUrl
               : [])
         : [],
     filterTagIds: (stored?.filterTagIds && stored.filterTagIds.length) ? stored.filterTagIds : [],
+    filterPriorityIds:
+      stored?.filterPriorityIds && stored.filterPriorityIds.length
+        ? stored.filterPriorityIds.filter((n) => typeof n === 'number' && !isNaN(n))
+        : [],
     filterVisibility: (stored?.filterVisibility && stored.filterVisibility.length) ? stored.filterVisibility : ['public'],
     filterTeamIds:
       (stored?.filterTeamIds && stored.filterTeamIds.length) || (stored?.filterTeamId != null)
@@ -115,6 +120,7 @@ function getInitialFilterStateFromStored(stored: StoredFilter | null): ParsedUrl
     viewMode: (stored?.viewMode as 'kanban' | 'list' | 'card' | 'roundrobin') || 'kanban',
     sortBy: (stored?.sortBy as TicketSortField) || 'updated_at',
     sortOrder: (stored?.sortOrder as TicketSortOrder) || 'desc',
+    filterTicketType: null,
   }
 }
 
@@ -140,7 +146,14 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     if (fromUrl) {
       let viewMode = fromUrl.viewMode
       if (isCustomer && viewMode === 'roundrobin') viewMode = 'kanban'
-      initialRef.current = { state: { ...fromUrl, viewMode }, fromUrl: true }
+      let filterTicketType = fromUrl.filterTicketType
+      if (
+        isCustomer &&
+        (filterTicketType === 'spam' || filterTicketType === 'trash')
+      ) {
+        filterTicketType = null
+      }
+      initialRef.current = { state: { ...fromUrl, viewMode, filterTicketType }, fromUrl: true }
     } else {
       const state = getInitialFilterStateFromStored(null)
       const viewMode = getInitialViewModeCustomer(isCustomer, null)
@@ -180,6 +193,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   const [filterTypeIds, setFilterTypeIds] = useState<number[]>(initialState.filterTypeIds)
   const [filterCompanyIds, setFilterCompanyIds] = useState<string[]>(initialState.filterCompanyIds)
   const [filterTagIds, setFilterTagIds] = useState<string[]>(initialState.filterTagIds)
+  const [filterPriorityIds, setFilterPriorityIds] = useState<number[]>(initialState.filterPriorityIds ?? [])
   const [filterVisibility, setFilterVisibilityState] = useState<string[]>(initialState.filterVisibility)
   const [filterTeamIds, setFilterTeamIds] = useState<string[]>(initialState.filterTeamIds)
   const [filterDateRange, setFilterDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(initialState.filterDateRange)
@@ -188,6 +202,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   const [sortBy, setSortBy] = useState<TicketSortField>(initialState.sortBy)
   const [sortOrder, setSortOrder] = useState<TicketSortOrder>(initialState.sortOrder)
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'card' | 'roundrobin'>(initialState.viewMode)
+  const [filterTicketType, setFilterTicketType] = useState<'spam' | 'trash' | null>(
+    initialState.filterTicketType ?? null
+  )
   const [newTicketAttachments, setNewTicketAttachments] = useState<NewTicketAttachment[]>([])
   const [deletedTicketAttachmentIds, setDeletedTicketAttachmentIds] = useState<string[]>([])
   const [attachmentUploading, setAttachmentUploading] = useState(false)
@@ -222,9 +239,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
   /** Multi-select Status dikosongkan → kembali ke slug show_in_kanban saja (bukan [] / semua tiket). */
   useEffect(() => {
+    if (filterTicketType) return
     if (!lookupReady || statusColumns.length === 0 || filterStatus.length > 0) return
     setFilterStatus(statusColumns.map((c) => c.id))
-  }, [lookupReady, statusColumns, filterStatus.length])
+  }, [lookupReady, statusColumns, filterStatus.length, filterTicketType])
 
   const hasActiveFilters =
     statusFilterIsRestrictive ||
@@ -234,13 +252,17 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterVisibility.length > 0 ||
     filterTeamIds.length > 0 ||
     (filterDateRange != null && filterDateRange[0] != null && filterDateRange[1] != null) ||
-    filterSearch.trim() !== ''
+    filterSearch.trim() !== '' ||
+    filterTicketType != null ||
+    filterPriorityIds.length > 0
 
   const clearFilters = useCallback(() => {
+    setFilterTicketType(null)
     setFilterStatus(statusColumns.map((c) => c.id))
     setFilterTypeIds([])
     setFilterCompanyIds([])
     setFilterTagIds([])
+    setFilterPriorityIds([])
     setFilterVisibilityState([])
     setFilterTeamIds([])
     setFilterDateRange(null)
@@ -259,6 +281,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         setFilterTypeIds([])
         setFilterCompanyIds([])
         setFilterTagIds([])
+        setFilterPriorityIds([])
         setFilterTeamIds([])
         setFilterDateRange(null)
         setFilterSearch('')
@@ -270,14 +293,28 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
   const fetchTickets = useCallback(async () => {
     const params = new URLSearchParams()
+    const inJunkFolder =
+      !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
+    if (inJunkFolder) params.set('ticket_type', filterTicketType!)
     if (!isCustomer) {
       if (filterCompanyIds.length > 0) params.set('company_ids', filterCompanyIds.join(','))
-      if (filterTagIds.length > 0) params.set('tag_ids', filterTagIds.join(','))
-      if (filterVisibility.length > 0) params.set('visibility', filterVisibility.join(','))
-      if (filterTeamIds.length > 0) params.set('team_ids', filterTeamIds.join(','))
+      if (filterVisibility.length > 0 && !inJunkFolder) params.set('visibility', filterVisibility.join(','))
+      if (filterTeamIds.length > 0 && !inJunkFolder) params.set('team_ids', filterTeamIds.join(','))
     }
-    /** Customer: load all statuses from API (company-wide list); status filter only affects UI columns. */
-    if (!isCustomer && filterStatus.length > 0) params.set('status', filterStatus.join(','))
+    if (filterTagIds.length > 0) params.set('tag_ids', filterTagIds.join(','))
+    if (filterPriorityIds.length > 0) params.set('priority_ids', filterPriorityIds.join(','))
+    /** Staff: always honor status filter. Customer: omit status param when still loading or when filter is "all statuses" (same as unrestricted list). */
+    const customerShowsAllStatuses =
+      isCustomer &&
+      lookupReady &&
+      allStatuses.length > 0 &&
+      filterStatus.length === allStatuses.length &&
+      allStatuses.every((s) => filterStatus.includes(s.slug))
+    const sendStatusToApi =
+      filterStatus.length > 0 &&
+      !inJunkFolder &&
+      (isCustomer ? lookupReady && !customerShowsAllStatuses : true)
+    if (sendStatusToApi) params.set('status', filterStatus.join(','))
     if (filterTypeIds.length > 0) params.set('type_ids', filterTypeIds.join(','))
     if (filterDateRange?.[0] && filterDateRange?.[1]) {
       params.set('date_from', filterDateRange[0].startOf('day').toISOString())
@@ -308,6 +345,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterTeamIds,
     filterDateRange,
     filterSearch,
+    filterTicketType,
+    filterPriorityIds,
+    lookupReady,
+    allStatuses,
   ])
 
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null)
@@ -326,6 +367,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setFilterTypeIds(state.filterTypeIds)
     setFilterCompanyIds(state.filterCompanyIds)
     setFilterTagIds(state.filterTagIds)
+    setFilterPriorityIds(state.filterPriorityIds ?? [])
     setFilterVisibilityState(state.filterVisibility)
     setFilterTeamIds(state.filterTeamIds)
     setFilterDateRange(state.filterDateRange)
@@ -484,14 +526,27 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       if (isCustomer && parsed.viewMode === 'roundrobin') {
         parsed = { ...parsed, viewMode: 'kanban' }
       }
+      if (
+        isCustomer &&
+        (parsed.filterTicketType === 'spam' || parsed.filterTicketType === 'trash')
+      ) {
+        parsed = { ...parsed, filterTicketType: null }
+      }
+      const isJunkUrl = parsed.filterTicketType === 'spam' || parsed.filterTicketType === 'trash'
       let statuses = parsed.filterStatus
-      if (lookupReady && allStatuses.length > 0 && statusColumns.length > 0) {
+      if (
+        !isJunkUrl &&
+        lookupReady &&
+        allStatuses.length > 0 &&
+        statusColumns.length > 0
+      ) {
         const valid = new Set(allStatuses.map((s) => s.slug))
         const pruned = statuses.filter((s) => valid.has(s))
         statuses = pruned.length > 0 ? pruned : statusColumns.map((c) => c.id)
       }
       setFilterStatus(statuses)
       setFilterTypeIds(parsed.filterTypeIds)
+      setFilterPriorityIds(parsed.filterPriorityIds ?? [])
       setFilterCompanyIds(parsed.filterCompanyIds)
       setFilterTagIds(parsed.filterTagIds)
       setFilterVisibilityState(parsed.filterVisibility)
@@ -502,6 +557,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       setSortBy(parsed.sortBy)
       setSortOrder(parsed.sortOrder)
       setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
+      setFilterTicketType(parsed.filterTicketType ?? null)
     } else {
       const fallbackStatus =
         lookupReady && statusColumns.length > 0
@@ -509,6 +565,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
           : DEFAULT_KANBAN_COLUMNS.map((c) => c.id)
       setFilterStatus(fallbackStatus)
       setFilterTypeIds([])
+      setFilterPriorityIds([])
       setFilterCompanyIds([])
       setFilterTagIds([])
       setFilterVisibilityState([])
@@ -519,6 +576,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       setSortBy('updated_at')
       setSortOrder('desc')
       setFilterSidebarCollapsed(true)
+      setFilterTicketType(null)
     }
   }, [
     pathname,
@@ -535,6 +593,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     saveFiltersToStorage({
       filterStatus: filterStatus.length ? filterStatus : null,
       filterTypeIds: filterTypeIds.length ? filterTypeIds : null,
+      filterPriorityIds: filterPriorityIds.length ? filterPriorityIds : null,
       filterCompanyIds: filterCompanyIds.length ? filterCompanyIds : null,
       filterTagIds: filterTagIds.length ? filterTagIds : null,
       filterVisibility: filterVisibility.length ? filterVisibility : null,
@@ -560,6 +619,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       const qs = buildSearchStringFromFilters({
         filterStatus,
         filterTypeIds,
+        filterPriorityIds,
         filterCompanyIds,
         filterTagIds,
         filterVisibility,
@@ -570,6 +630,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         sortBy,
         sortOrder,
         filterSidebarCollapsed,
+        filterTicketType: isCustomer ? null : filterTicketType,
       })
       const url = qs ? `${pathname}?${qs}` : pathname
       const currentUrl = typeof window !== 'undefined' ? window.location.pathname + (window.location.search || '') : ''
@@ -592,12 +653,16 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterSidebarCollapsed,
     sortBy,
     sortOrder,
+    filterTicketType,
+    filterPriorityIds,
+    isCustomer,
   ])
 
   const getFilterQueryString = useCallback(() => {
     return buildSearchStringFromFilters({
       filterStatus,
       filterTypeIds,
+      filterPriorityIds,
       filterCompanyIds,
       filterTagIds,
       filterVisibility,
@@ -608,10 +673,12 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       sortBy,
       sortOrder,
       filterSidebarCollapsed,
+      filterTicketType: isCustomer ? null : filterTicketType,
     })
   }, [
     filterStatus,
     filterTypeIds,
+    filterPriorityIds,
     filterCompanyIds,
     filterTagIds,
     filterVisibility,
@@ -622,7 +689,42 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     sortBy,
     sortOrder,
     filterSidebarCollapsed,
+    filterTicketType,
+    isCustomer,
   ])
+
+  useEffect(() => {
+    if (!isCustomer) return
+    if (filterTicketType === 'spam' || filterTicketType === 'trash') {
+      setFilterTicketType(null)
+    }
+  }, [isCustomer, filterTicketType])
+
+  const filterByStatusFromChip = useCallback((slug: string) => {
+    setFilterStatus([slug])
+  }, [])
+
+  const filterByPriorityFromChip = useCallback((priorityId: number) => {
+    setFilterPriorityIds([priorityId])
+  }, [])
+
+  const filterByTagFromChip = useCallback((tagId: string) => {
+    setFilterTagIds([tagId])
+  }, [])
+
+  const filterByCompanyFromChip = useCallback((companyId: string) => {
+    setFilterCompanyIds([companyId])
+  }, [])
+
+  useEffect(() => {
+    if (
+      !isCustomer &&
+      (filterTicketType === 'spam' || filterTicketType === 'trash') &&
+      viewMode !== 'card'
+    ) {
+      setViewMode('card')
+    }
+  }, [filterTicketType, viewMode, isCustomer])
 
   const handleDragStart: TicketsDragStartHandler = (event) => {
     setActiveId(event.active.id as number)
@@ -971,6 +1073,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setFilterCompanyIds,
     filterTagIds,
     setFilterTagIds,
+    filterPriorityIds,
+    setFilterPriorityIds,
     filterVisibility,
     setFilterVisibility,
     filterTeamIds,
@@ -1006,5 +1110,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     userTeamIds,
     lookupReady,
     getFilterQueryString,
+    filterTicketType,
+    filterByStatusFromChip,
+    filterByPriorityFromChip,
+    filterByTagFromChip,
+    filterByCompanyFromChip,
   }
 }

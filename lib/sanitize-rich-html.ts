@@ -8,7 +8,8 @@ import DOMPurify, { type Config } from 'isomorphic-dompurify'
  */
 const RICH_HTML_CONFIG: Config = {
   USE_PROFILES: { html: true },
-  ADD_ATTR: ['target'],
+  /** data-list: Quill v2 lists; class: ql-ui, ql-indent-* */
+  ADD_ATTR: ['target', 'data-list'],
   FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'base', 'link', 'meta', 'form'],
 }
 

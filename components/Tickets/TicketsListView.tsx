@@ -26,6 +26,10 @@ interface TicketsListViewProps {
   allPriorities?: PriorityOption[]
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
+  onFilterByStatus?: (statusSlug: string) => void
+  onFilterByPriority?: (priorityId: number) => void
+  onFilterByTag?: (tagId: string) => void
+  onFilterByCompany?: (companyId: string) => void
 }
 
 export default function TicketsListView({
@@ -34,6 +38,10 @@ export default function TicketsListView({
   allPriorities = [],
   onEdit,
   onDelete,
+  onFilterByStatus,
+  onFilterByPriority,
+  onFilterByTag,
+  onFilterByCompany,
 }: TicketsListViewProps) {
   const router = useRouter()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 15 })
@@ -111,8 +119,24 @@ export default function TicketsListView({
           sorter: (a: TicketRecord, b: TicketRecord) => (a.company?.name || '').localeCompare(b.company?.name || ''),
           render: (_: unknown, record: TicketRecord) =>
             record.company ? (
-                <>{record.company.name}</>
-              
+              <span
+                style={{
+                  color: onFilterByCompany ? '#1677ff' : undefined,
+                  cursor: onFilterByCompany ? 'pointer' : undefined,
+                  textDecoration: onFilterByCompany ? 'underline' : undefined,
+                }}
+                title={onFilterByCompany ? 'Filter by this company' : undefined}
+                onClick={
+                  onFilterByCompany
+                    ? (e) => {
+                        e.stopPropagation()
+                        onFilterByCompany(record.company!.id)
+                      }
+                    : undefined
+                }
+              >
+                {record.company.name}
+              </span>
             ) : '—',
         },
        
@@ -131,6 +155,7 @@ export default function TicketsListView({
                   width: '60px',
                   textAlign: 'center',
                   fontWeight: 500,
+                  cursor: onFilterByPriority ? 'pointer' : undefined,
                   color:
                      (() => {
                           // Auto-detect text color for contrast
@@ -144,6 +169,15 @@ export default function TicketsListView({
                           return luminance > 0.7 ? '#111' : '#fff'
                         })()
                 }}
+                title={onFilterByPriority ? 'Filter by this priority' : undefined}
+                onClick={
+                  onFilterByPriority
+                    ? (e) => {
+                        e.stopPropagation()
+                        onFilterByPriority(record.priority!.id)
+                      }
+                    : undefined
+                }
               >
                 {record.priority.title}
               </Tag>
@@ -168,7 +202,23 @@ export default function TicketsListView({
             record.tags?.length ? (
               <Flex gap={4} wrap="wrap">
                 {record.tags.slice(0, 3).map((t) => (
-                  <Tag key={t.id} color={t.color ? undefined : 'default'} style={t.color ? { backgroundColor: t.color, borderColor: t.color, color: '#fff' } : undefined}>
+                  <Tag
+                    key={t.id}
+                    color={t.color ? undefined : 'default'}
+                    style={{
+                      ...(t.color ? { backgroundColor: t.color, borderColor: t.color, color: '#fff' } : {}),
+                      cursor: onFilterByTag ? 'pointer' : undefined,
+                    }}
+                    title={onFilterByTag ? 'Filter by this tag' : undefined}
+                    onClick={
+                      onFilterByTag
+                        ? (e) => {
+                            e.stopPropagation()
+                            onFilterByTag(t.id)
+                          }
+                        : undefined
+                    }
+                  >
                     {t.name}
                   </Tag>
                 ))}
@@ -222,9 +272,34 @@ export default function TicketsListView({
           dataIndex: 'status',
           key: 'status',
           sorter: (a: TicketRecord, b: TicketRecord) => (a.status || '').localeCompare(b.status || ''),
-          render: (status: string) => {
+          render: (status: string, record: TicketRecord) => {
             const col = allStatusColumns.find((c) => c.id === status)
-            return col ? <Tag style={{ borderRadius: '10px',backgroundColor: col.color, padding: '4px 16px', minWidth:'100px', textAlign: 'center', fontWeight: 500, color: '#000' }}>{col.title}</Tag> : status
+            if (!col) return status
+            return (
+              <Tag
+                style={{
+                  borderRadius: '10px',
+                  backgroundColor: col.color,
+                  padding: '4px 16px',
+                  minWidth: '100px',
+                  textAlign: 'center',
+                  fontWeight: 500,
+                  color: '#000',
+                  cursor: onFilterByStatus ? 'pointer' : undefined,
+                }}
+                title={onFilterByStatus ? 'Filter by this status' : undefined}
+                onClick={
+                  onFilterByStatus
+                    ? (e) => {
+                        e.stopPropagation()
+                        onFilterByStatus(record.status)
+                      }
+                    : undefined
+                }
+              >
+                {col.title}
+              </Tag>
+            )
           },
         },
         {

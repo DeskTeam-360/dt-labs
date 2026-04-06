@@ -12,6 +12,8 @@
     "db:migrate:both": "node scripts/run-migration-both-dbs.cjs",
     "db:migrate:both:message-templates": "node scripts/run-migration-both-dbs.cjs drizzle/migrations/008_message_templates.sql",
     "db:migrate:both:user-first-last-name": "node scripts/run-migration-both-dbs.cjs drizzle/migrations/009_add_user_first_last_name.sql",
+    "db:migrate:both:company-users": "node scripts/run-migration-both-dbs.cjs drizzle/migrations/010_create_company_users.sql",
+    "db:migrate:both:company-users-pk": "node scripts/run-migration-both-dbs.cjs drizzle/migrations/011_company_users_primary_key.sql",
     "db:push": "drizzle-kit push",
     "db:migrate:todo-to-ticket": "node scripts/run-migrate-todo-to-ticket.cjs",
     "db:studio": "drizzle-kit studio",

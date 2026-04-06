@@ -27,6 +27,11 @@ interface TicketsKanbanViewProps {
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
   allPriorities?: Array<{ id: number }>
+  allStatusColumns?: StatusColumn[]
+  onFilterByStatus?: (statusSlug: string) => void
+  onFilterByPriority?: (priorityId: number) => void
+  onFilterByTag?: (tagId: string) => void
+  onFilterByCompany?: (companyId: string) => void
 }
 
 export default function TicketsKanbanView({
@@ -40,6 +45,11 @@ export default function TicketsKanbanView({
   sortBy = 'updated_at',
   sortOrder = 'desc',
   allPriorities = [],
+  allStatusColumns,
+  onFilterByStatus,
+  onFilterByPriority,
+  onFilterByTag,
+  onFilterByCompany,
 }: TicketsKanbanViewProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -78,6 +88,11 @@ export default function TicketsKanbanView({
             sortBy={sortBy}
             sortOrder={sortOrder}
             allPriorities={allPriorities}
+            allStatusColumns={allStatusColumns}
+            onFilterByStatus={onFilterByStatus}
+            onFilterByPriority={onFilterByPriority}
+            onFilterByTag={onFilterByTag}
+            onFilterByCompany={onFilterByCompany}
           />
         ))}
       </div>

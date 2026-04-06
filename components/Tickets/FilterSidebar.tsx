@@ -29,6 +29,9 @@ interface FilterSidebarProps {
   onFilterCompanyIdsChange: (v: string[]) => void
   filterTagIds: string[]
   onFilterTagIdsChange: (v: string[]) => void
+  filterPriorityIds: number[]
+  onFilterPriorityIdsChange: (v: number[]) => void
+  ticketPriorities: Array<{ id: number; title: string; color: string }>
   filterVisibility: string[]
   onFilterVisibilityChange: (v: string[]) => void
   filterTeamIds: string[]
@@ -63,6 +66,9 @@ export default function FilterSidebar({
   onFilterCompanyIdsChange,
   filterTagIds,
   onFilterTagIdsChange,
+  filterPriorityIds,
+  onFilterPriorityIdsChange,
+  ticketPriorities,
   filterVisibility,
   onFilterVisibilityChange,
   filterTeamIds,
@@ -91,7 +97,7 @@ export default function FilterSidebar({
       trigger={null}
       collapsible
       collapsed={collapsed}
-      collapsedWidth={48}
+      collapsedWidth={61}
       width={280}
       style={{
         overflow: 'auto',
@@ -158,6 +164,27 @@ export default function FilterSidebar({
                     <Space>
                       <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, backgroundColor: t.color }} />
                       {t.title}
+                    </Space>
+                  </Option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Priority</Text>
+              <Select
+                mode="multiple"
+                placeholder="All priorities"
+                allowClear
+                style={{ width: '100%' }}
+                value={filterPriorityIds}
+                onChange={(v) => onFilterPriorityIdsChange(v ?? [])}
+                maxTagCount="responsive"
+              >
+                {ticketPriorities.map((p) => (
+                  <Option key={p.id} value={p.id}>
+                    <Space>
+                      <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, backgroundColor: p.color }} />
+                      {p.title}
                     </Space>
                   </Option>
                 ))}

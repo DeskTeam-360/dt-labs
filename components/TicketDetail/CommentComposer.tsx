@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Flex, Select, message } from 'antd'
 import { CommentOutlined, SendOutlined, PaperClipOutlined, DeleteOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons'
 import CommentWysiwyg from './CommentWysiwyg'
@@ -64,6 +64,43 @@ export default function CommentComposer({
   })
   const [bccEmails, setBccEmails] = useState<string[]>([])
 
+  /** One fetch per ticket per "reply session"; reset after successful send or ticket change. */
+  const agentReplyTemplateConsumedRef = useRef(false)
+
+  useEffect(() => {
+    agentReplyTemplateConsumedRef.current = false
+  }, [ticketId])
+
+  useEffect(() => {
+    if (!showNoteOption || mode !== 'reply') return
+    if (agentReplyTemplateConsumedRef.current) return
+
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(`/api/tickets/${ticketId}/agent-reply-template`, {
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        if (!res.ok || cancelled) return
+        const data = (await res.json()) as { html?: string }
+        const html = typeof data.html === 'string' ? data.html.trim() : ''
+        if (cancelled || !html) return
+        setDraft((prev) => {
+          if (prev.trim()) return prev
+          agentReplyTemplateConsumedRef.current = true
+          return html
+        })
+      } catch {
+        // parent / network handles failures silently for optional prefill
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [ticketId, showNoteOption, mode])
+
   const baseCcOptions = companyCustomers
     .filter((u) => u.email?.trim())
     .map((u) => ({
@@ -120,6 +157,7 @@ export default function CommentComposer({
       setTaggedUserIds([])
       setCcEmails([])
       setBccEmails([])
+      agentReplyTemplateConsumedRef.current = false
     } catch {
       // Error already shown by parent
     }

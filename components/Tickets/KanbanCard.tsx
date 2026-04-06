@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import dayjs from 'dayjs'
-import type { TicketRecord } from './types'
+import type { TicketRecord, StatusColumn } from './types'
+import { DEFAULT_ALL_STATUS_COLUMNS } from './types'
 import { getVisibilityColor, darkenColor } from './types'
 import DateDisplay from '../DateDisplay'
 
@@ -16,9 +17,27 @@ interface KanbanCardProps {
   ticket: TicketRecord
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
+  onFilterByStatus?: (statusSlug: string) => void
+  onFilterByPriority?: (priorityId: number) => void
+  onFilterByTag?: (tagId: string) => void
+  onFilterByCompany?: (companyId: string) => void
+  allStatusColumns?: StatusColumn[]
 }
 
-export default function KanbanCard({ ticket, onEdit, onDelete }: KanbanCardProps) {
+export default function KanbanCard({
+  ticket,
+  onEdit,
+  onDelete,
+  onFilterByStatus,
+  onFilterByPriority,
+  onFilterByTag,
+  onFilterByCompany,
+  allStatusColumns,
+}: KanbanCardProps) {
+  const statusCols = allStatusColumns?.length ? allStatusColumns : DEFAULT_ALL_STATUS_COLUMNS
+  const statusCol = statusCols.find((c) => c.id === ticket.status)
+  const statusTitle = statusCol?.title ?? ticket.status
+  const statusColor = statusCol?.color ?? '#8c8c8c'
   const router = useRouter()
   const {
     attributes,
@@ -52,11 +71,40 @@ export default function KanbanCard({ ticket, onEdit, onDelete }: KanbanCardProps
         styles={{ body: { padding: 14 } }}
         {...listeners}
       >
-        {/* Tags + menu row */}
+        {/* Tags + menu row — stop drag sensor when interacting with filter chips */}
         <Flex justify="space-between" align="flex-start" style={{ marginBottom: 10 }}>
-          <Flex gap={6} wrap="wrap" style={{ flex: 1, minWidth: 0 }}>
+          <Flex
+            gap={6}
+            wrap="wrap"
+            style={{ flex: 1, minWidth: 0 }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
             {ticket.priority && (
-              <Tag color={ticket.priority.color ? undefined : 'default'} style={{ fontSize: 11, margin: 0, borderRadius: 9999, ...(ticket.priority.color ? { backgroundColor: ticket.priority.color, borderColor: darkenColor(ticket.priority.color), color: '#fff' } : {}) }}>
+              <Tag
+                color={ticket.priority.color ? undefined : 'default'}
+                style={{
+                  fontSize: 11,
+                  margin: 0,
+                  borderRadius: 9999,
+                  cursor: onFilterByPriority ? 'pointer' : undefined,
+                  ...(ticket.priority.color
+                    ? {
+                        backgroundColor: ticket.priority.color,
+                        borderColor: darkenColor(ticket.priority.color),
+                        color: '#fff',
+                      }
+                    : {}),
+                }}
+                title={onFilterByPriority ? 'Filter by this priority' : undefined}
+                onClick={
+                  onFilterByPriority
+                    ? (e) => {
+                        e.stopPropagation()
+                        onFilterByPriority(ticket.priority!.id)
+                      }
+                    : undefined
+                }
+              >
                 {ticket.priority.title}
               </Tag>
             )}
@@ -74,7 +122,24 @@ export default function KanbanCard({ ticket, onEdit, onDelete }: KanbanCardProps
             {ticket.company && (
               <Tag
                 color={ticket.company.color ? undefined : 'default'}
-                style={{ margin: 0, fontSize: 11, borderRadius: 9999, ...(ticket.company.color ? { backgroundColor: ticket.company.color, borderColor: darkenColor(ticket.company.color), color: '#fff' } : {}) }}
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  borderRadius: 9999,
+                  cursor: onFilterByCompany ? 'pointer' : undefined,
+                  ...(ticket.company.color
+                    ? { backgroundColor: ticket.company.color, borderColor: darkenColor(ticket.company.color), color: '#fff' }
+                    : {}),
+                }}
+                title={onFilterByCompany ? 'Filter by this company' : undefined}
+                onClick={
+                  onFilterByCompany
+                    ? (e) => {
+                        e.stopPropagation()
+                        onFilterByCompany(ticket.company!.id)
+                      }
+                    : undefined
+                }
               >
                 {ticket.company.name}
               </Tag>
@@ -84,11 +149,46 @@ export default function KanbanCard({ ticket, onEdit, onDelete }: KanbanCardProps
                 <Tag
                   key={t.id}
                   color={t.color ? undefined : 'default'}
-                  style={{ margin: 0, fontSize: 11, borderRadius: 9999, ...(t.color ? { backgroundColor: t.color, borderColor: darkenColor(t.color), color: '#fff' } : {}) }}
+                  style={{
+                    margin: 0,
+                    fontSize: 11,
+                    borderRadius: 9999,
+                    cursor: onFilterByTag ? 'pointer' : undefined,
+                    ...(t.color ? { backgroundColor: t.color, borderColor: darkenColor(t.color), color: '#fff' } : {}),
+                  }}
+                  title={onFilterByTag ? 'Filter by this tag' : undefined}
+                  onClick={
+                    onFilterByTag
+                      ? (e) => {
+                          e.stopPropagation()
+                          onFilterByTag(t.id)
+                        }
+                      : undefined
+                  }
                 >
                   {t.name}
                 </Tag>
               ))
+            )}
+            {onFilterByStatus && (
+              <Tag
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  borderRadius: 9999,
+                  backgroundColor: statusColor,
+                  borderColor: darkenColor(statusColor),
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+                title="Filter by this status"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onFilterByStatus(ticket.status)
+                }}
+              >
+                {statusTitle}
+              </Tag>
             )}
             {Number(ticket.checklist_total) > 0 && (
               <Tag color="green" style={{ fontSize: 11, margin: 0, borderRadius: 9999 }}>

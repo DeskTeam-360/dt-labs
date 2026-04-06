@@ -192,16 +192,18 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
                   </Text>
                 </Space>
                 <Space wrap align="center" style={{ marginLeft: 'auto' }}>
-                  <Button type="link" size="small" style={{ padding: 0 }}>
-                    <SpaNavLink href={`/users/${cu.user_id}`} style={{ color: 'inherit' }}>
-                      <EyeOutlined /> Detail
-                    </SpaNavLink>
-                  </Button>
-                  <Button type="link" size="small" style={{ padding: 0 }}>
-                    <SpaNavLink href={`/users/${cu.user_id}?edit=1`} style={{ color: 'inherit' }}>
-                      <EditOutlined /> Edit
-                    </SpaNavLink>
-                  </Button>
+                  <SpaNavLink
+                    href={`/users/${cu.user_id}`}
+                    style={{ color: '#1677ff', fontSize: 14, lineHeight: '22px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <EyeOutlined /> Detail
+                  </SpaNavLink>
+                  <SpaNavLink
+                    href={`/users/${cu.user_id}?edit=1`}
+                    style={{ color: '#1677ff', fontSize: 14, lineHeight: '22px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <EditOutlined /> Edit
+                  </SpaNavLink>
                   <Popconfirm
                     title="Hapus user dari company ini?"
                     description="Company pada user akan dikosongkan; user tidak dihapus dari sistem."

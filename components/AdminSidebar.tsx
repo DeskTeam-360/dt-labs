@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { Layout, Menu, Avatar, Dropdown, Typography } from 'antd'
+import type { MenuProps } from 'antd'
 import {
     DashboardOutlined,
     UserOutlined,
@@ -14,14 +15,11 @@ import {
     MenuFoldOutlined,
     MenuUnfoldOutlined,
     CheckSquareOutlined,
-    TagOutlined,
-    AppstoreOutlined,
-    MailOutlined,
-    ThunderboltOutlined,
-    FlagOutlined,
-    FileTextOutlined,
+    WarningOutlined,
+    DeleteOutlined,
+    BankOutlined,
 } from '@ant-design/icons'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { signOutAction } from '@/app/actions/auth'
@@ -29,13 +27,10 @@ import { SpaNavLink, shouldOpenHrefInNewTab } from '@/components/SpaNavLink'
 import {
   canAccessCompanies,
   canAccessTickets,
-  canAccessTicketAttributes,
-  canAccessAutomationRules,
   canAccessTeams,
-  canAccessEmailIntegration,
-  canAccessKnowledgeBase,
   canAccessUsers,
-  canAccessMessageTemplates,
+  canAccessSettingsHub,
+  isSettingsHrefPathname,
 } from '@/lib/auth-utils'
 
 const { Sider } = Layout
@@ -59,24 +54,29 @@ interface AdminSidebarProps {
 }
 
 /** Paths that map to a Menu item key (avoid selectedKeys pointing at missing items, e.g. /profile). */
-function selectedKeysForPathname(pathname: string | null): string[] {
+function selectedKeysForPathname(pathname: string | null, ticketsSearch: string): string[] {
   if (!pathname) return []
+  if (pathname === '/tickets' || pathname === '/tickets/') {
+    const qs = ticketsSearch.trim()
+    const sp = new URLSearchParams(qs.startsWith('?') ? qs.slice(1) : qs)
+    const tt = sp.get('ticket_type')?.toLowerCase()
+    if (tt === 'spam') return ['/tickets?ticket_type=spam']
+    if (tt === 'trash') return ['/tickets?ticket_type=trash']
+    return ['/tickets']
+  }
+  if (isSettingsHrefPathname(pathname)) return ['/settings']
   const topLevel = [
     '/dashboard',
     '/my-company',
     '/users',
     '/companies',
-    '/tickets',
     '/teams',
-    '/email-integration',
-    '/knowledge-base',
-    '/message-templates',
   ]
   const top = topLevel.find((k) => pathname === k || (k !== '/dashboard' && pathname.startsWith(`${k}/`)))
   if (top) return [top]
-  const ticketAttr = ['/ticket-statuses', '/ticket-types', '/ticket-priorities', '/tags', '/automation-rules']
-  const sub = ticketAttr.find((k) => pathname === k || pathname.startsWith(`${k}/`))
-  return sub ? [sub] : []
+  const ticketsDetail = pathname.startsWith('/tickets/')
+  if (ticketsDetail) return ['/tickets']
+  return []
 }
 
 export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSidebarProps) {
@@ -86,6 +86,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
   const isCustomer = role === 'customer'
   const router = useRouter()
   const pathname = usePathname()
+  const ticketsListSearch = useSearchParams().toString()
   const [openKeys, setOpenKeys] = useState<string[]>([])
 
   // Set open keys after mount to avoid hydration mismatch
@@ -93,20 +94,24 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     if (pathname) {
       if (pathname.startsWith('/company-data-templates') || pathname.startsWith('/company-content-templates') || pathname.startsWith('/company-ai-system-templates')) {
         setOpenKeys(['templates'])
-      } else if (
-        (canAccessTicketAttributes(role) &&
-          (pathname.startsWith('/ticket-statuses') ||
-            pathname.startsWith('/ticket-types') ||
-            pathname.startsWith('/ticket-priorities') ||
-            pathname.startsWith('/tags'))) ||
-        (canAccessAutomationRules(role) && pathname.startsWith('/automation-rules'))
-      ) {
-        setOpenKeys(['ticket-attributes'])
       } else if (pathname.startsWith('/content-planner')) {
         setOpenKeys(['content-planner'])
+      } else if (
+        canAccessTickets(role) &&
+        !isCustomer &&
+        (pathname === '/tickets' || pathname === '/tickets/' || pathname.startsWith('/tickets/'))
+      ) {
+        setOpenKeys((prev) => (prev.includes('tickets-submenu') ? prev : [...prev, 'tickets-submenu']))
+      } else if (
+        !isCustomer &&
+        (pathname.startsWith('/users') ||
+          pathname.startsWith('/companies') ||
+          pathname.startsWith('/teams'))
+      ) {
+        setOpenKeys((prev) => (prev.includes('users-submenu') ? prev : [...prev, 'users-submenu']))
       }
     }
-  }, [pathname, role])
+  }, [pathname, role, isCustomer])
 
   const linkLabel = (path: string, text: string) => (
     <SpaNavLink href={path} title={text} className="admin-sidebar-menu-link" onClick={(e) => e.stopPropagation()}>
@@ -129,79 +134,95 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           },
         ]
       : []),
-    {
-      key: '/users',
-      icon: <TeamOutlined />,
-      label: linkLabel('/users', 'Users'),
-    },
-    {
-      key: '/companies',
-      icon: <TeamOutlined />,
-      label: linkLabel('/companies', 'Companies'),
-    },
-    {
-      key: '/tickets',
-      icon: <CheckSquareOutlined />,
-      label: linkLabel('/tickets', 'Tickets'),
-    },
-    {
-      key: 'ticket-attributes',
-      icon: <SettingOutlined />,
-      label: 'Ticket Attributes',
-      popupClassName: 'admin-sidebar-ticket-attributes-popup',
-      children: [
-        { key: '/ticket-statuses', icon: <SettingOutlined />, label: linkLabel('/ticket-statuses', 'Ticket Statuses') },
-        { key: '/ticket-types', icon: <AppstoreOutlined />, label: linkLabel('/ticket-types', 'Ticket Types') },
-        { key: '/ticket-priorities', icon: <FlagOutlined />, label: linkLabel('/ticket-priorities', 'Ticket Priorities') },
-        { key: '/tags', icon: <TagOutlined />, label: linkLabel('/tags', 'Tags') },
-        ...(canAccessAutomationRules(role)
-          ? [{ key: '/automation-rules', icon: <ThunderboltOutlined />, label: linkLabel('/automation-rules', 'Automation Rules') }]
-          : []),
-      ],
-    },
-    {
-      key: '/teams',
-      icon: <TeamOutlined />,
-      label: linkLabel('/teams', 'Teams'),
-    },
-    {
-      key: '/email-integration',
-      icon: <MailOutlined />,
-      label: linkLabel('/email-integration', 'Email Integration'),
-    },
-    ...(canAccessMessageTemplates(role)
+    ...(() => {
+      const usersDirectoryChildren: NonNullable<MenuProps['items']> = []
+      if (canAccessUsers(role)) {
+        usersDirectoryChildren.push({
+          key: '/users',
+          icon: <UserOutlined />,
+          label: linkLabel('/users', 'Users'),
+        })
+      }
+      if (canAccessCompanies(role)) {
+        usersDirectoryChildren.push({
+          key: '/companies',
+          icon: <BankOutlined />,
+          label: linkLabel('/companies', 'Companies'),
+        })
+      }
+      if (canAccessTeams(role)) {
+        usersDirectoryChildren.push({
+          key: '/teams',
+          icon: <TeamOutlined />,
+          label: linkLabel('/teams', 'Teams'),
+        })
+      }
+      if (usersDirectoryChildren.length === 0) return []
+      return [
+        {
+          key: 'users-submenu',
+          icon: <UserOutlined />,
+          label: 'Users',
+          children: usersDirectoryChildren,
+        },
+      ]
+    })(),
+    ...(canAccessTickets(role)
+      ? isCustomer
+        ? [
+            {
+              key: '/tickets',
+              icon: <CheckSquareOutlined />,
+              label: linkLabel('/tickets', 'Tickets'),
+            },
+          ]
+        : [
+            {
+              key: 'tickets-submenu',
+              icon: <CheckSquareOutlined />,
+              label: 'Tickets',
+              children: [
+                {
+                  key: '/tickets',
+                  icon: <CheckSquareOutlined />,
+                  label: linkLabel('/tickets', 'All tickets'),
+                },
+                {
+                  key: '/tickets?ticket_type=spam',
+                  icon: <WarningOutlined />,
+                  label: linkLabel('/tickets?ticket_type=spam', 'Spam'),
+                },
+                {
+                  key: '/tickets?ticket_type=trash',
+                  icon: <DeleteOutlined />,
+                  label: linkLabel('/tickets?ticket_type=trash', 'Trash'),
+                },
+              ],
+            },
+          ]
+      : []),
+    ...(canAccessSettingsHub(role)
       ? [
           {
-            key: '/message-templates',
-            icon: <FileTextOutlined />,
-            label: linkLabel('/message-templates', 'Message templates'),
+            key: '/settings',
+            icon: <SettingOutlined />,
+            label: linkLabel('/settings', 'Settings'),
           },
         ]
       : []),
-    {
-      key: '/knowledge-base',
-      icon: <InfoCircleOutlined />,
-      label: linkLabel('/knowledge-base', 'Knowledge Base'),
-    },
   ].filter((item) => {
     if (isCustomer) {
-      return !['ticket-attributes', '/teams', '/email-integration', '/companies', '/knowledge-base', '/users'].includes(
-        item.key as string
-      )
+      return !['users-submenu', '/settings'].includes(item.key as string)
     }
-    // Role-based: Users, Company, Teams, Email Integration, Knowledge Base = Admin only; Tickets = Admin & Manager
-    if (item.key === '/users' && !canAccessUsers(role)) return false
-    if (item.key === '/companies' && !canAccessCompanies(role)) return false
-    if (item.key === '/tickets' && !canAccessTickets(role)) return false
-    if (item.key === '/teams' && !canAccessTeams(role)) return false
-    if (item.key === '/email-integration' && !canAccessEmailIntegration(role)) return false
-    if (item.key === '/message-templates' && !canAccessMessageTemplates(role)) return false
-    if (item.key === '/knowledge-base' && !canAccessKnowledgeBase(role)) return false
-    if (item.key === 'ticket-attributes' && !canAccessTicketAttributes(role)) return false
+    if ((item.key === '/tickets' || item.key === 'tickets-submenu') && !canAccessTickets(role)) return false
+    if (item.key === '/settings' && !canAccessSettingsHub(role)) return false
     return true
   })
 
-  const selectedKeys = useMemo(() => selectedKeysForPathname(pathname), [pathname])
+  const selectedKeys = useMemo(
+    () => selectedKeysForPathname(pathname, pathname?.startsWith('/tickets') ? ticketsListSearch : ''),
+    [pathname, ticketsListSearch]
+  )
 
   const handleLogout = async () => {
     await signOutAction()
@@ -254,7 +275,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       width={250}
       className="admin-sidebar-deskteam"
       style={{
-        overflow: 'auto',
+        overflow: 'hidden',
         height: '100vh',
         position: 'fixed',
         left: 0,

@@ -19,9 +19,8 @@ export async function getCompanyDetail(id: string) {
   if (!companyRow) return null
 
   // Users: `users.company_id` plus `company_users` junction (e.g. email CC)
-  const [usersByCompanyId, cuRows, companyDatasRows, companyWebsitesRows] = await Promise.all([
+  const [usersByCompanyId, companyDatasRows, companyWebsitesRows] = await Promise.all([
     db.select().from(users).where(eq(users.companyId, id)),
-    db.select().from(companyUsers).where(eq(companyUsers.companyId, id)),
     db
       .select({
         data: companyDatas,
@@ -32,6 +31,16 @@ export async function getCompanyDetail(id: string) {
       .where(eq(companyDatas.companyId, id)),
     db.select().from(companyWebsites).where(eq(companyWebsites.companyId, id)),
   ])
+
+  let cuRows: (typeof companyUsers.$inferSelect)[] = []
+  try {
+    cuRows = await db.select().from(companyUsers).where(eq(companyUsers.companyId, id))
+  } catch (err) {
+    console.error(
+      '[getCompanyDetail] company_users query failed — run: npm run db:migrate:both:company-users',
+      err,
+    )
+  }
 
   const byId = new Map(usersByCompanyId.map((u) => [u.id, u]))
   const cuOnlyIds = cuRows.map((r) => r.userId).filter((uid) => !byId.has(uid))

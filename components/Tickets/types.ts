@@ -31,6 +31,8 @@ export interface TicketRecord {
   visibility: 'private' | 'team' | 'specific_users' | 'public'
   team_id: string | null
   type_id: number | null
+  /** DB ticket_type: support | spam | trash (not ticket_types / type_id) */
+  ticket_type?: string
   priority_id: number | null
   company_id: string | null
   created_at: string

@@ -6,7 +6,6 @@ import {
     Tag,
     Typography,
     Button,
-    Space,
     Row,
     Col,
     Divider,
@@ -19,8 +18,15 @@ import {
     Tabs,
     Flex,
     notification,
+    Tooltip,
 } from 'antd'
-import { ArrowLeftOutlined } from '@ant-design/icons'
+import {
+    ArrowLeftOutlined,
+    WarningOutlined,
+    WarningTwoTone,
+    DeleteOutlined,
+    DeleteTwoTone,
+} from '@ant-design/icons'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadTicketFile } from '@/utils/storage'
@@ -178,6 +184,7 @@ export default function TicketDetailContent({
     }, [ticketData?.id, initialCommentsHasOlder, initialCommentsOlderCursor, initialCommentsOlderRemaining])
 
     const [loading, setLoading] = useState(false)
+    const [classifyLoading, setClassifyLoading] = useState<'support' | 'spam' | 'trash' | null>(null)
     const [newChecklistTitle, setNewChecklistTitle] = useState('')
     const [commentVisibility, setCommentVisibility] = useState<'note' | 'reply' | null>(null)
     useEffect(() => {
@@ -1045,6 +1052,36 @@ export default function TicketDetailContent({
     const totalChecklistCount = checklistItems.length
     const isCustomer = variant === 'customer'
     const isTicketAdmin = isAdmin((currentUser as { role?: string }).role)
+    const rowTicketType = (displayTicket?.ticket_type as string | undefined) ?? 'support'
+
+    const patchTicketClassification = useCallback(
+        async (ticket_type: 'support' | 'spam' | 'trash') => {
+            const tid = displayTicket?.id
+            if (tid == null) return
+            setClassifyLoading(ticket_type)
+            try {
+                await apiFetch(`/api/tickets/${tid}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticket_type }),
+                })
+                setDisplayTicket((d: typeof displayTicket) => (d ? { ...d, ticket_type } : d))
+                message.success(
+                    ticket_type === 'support'
+                        ? 'Marked as support'
+                        : ticket_type === 'spam'
+                          ? 'Marked as spam'
+                          : 'Marked as trash',
+                )
+                router.refresh()
+            } catch (e: unknown) {
+                message.error(e instanceof Error ? e.message : 'Failed to update classification')
+            } finally {
+                setClassifyLoading(null)
+            }
+        },
+        [displayTicket?.id, router],
+    )
     const timeTrackerManualUserOptions = useMemo(
         () =>
             users
@@ -1062,7 +1099,7 @@ export default function TicketDetailContent({
             <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
                 <TicketSearchNavbar savedFiltersUserId={!isCustomer ? currentUser.id : undefined} />
                 <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 56px)' }}>
-                    <Card style={{  margin: '0 auto' }}>
+                    <Card style={{ margin: '0 auto' }}>
                         <Flex gap={16} align="center" wrap="wrap" style={{ marginBottom: 24 }}>
                             <Button
                                 icon={<ArrowLeftOutlined />}
@@ -1075,15 +1112,113 @@ export default function TicketDetailContent({
                                     flex: 1,
                                     minWidth: 240,
                                     display: 'flex',
-                                    alignItems: 'flex-start',
+                                    alignItems: 'center',
                                     justifyContent: 'space-between',
                                     gap: 12,
                                     flexWrap: 'wrap',
                                 }}
                             >
-                                <Title level={2} style={{ margin: 0, flex: '1 1 200px' }}>
-                                    #{displayTicket.id} {displayTicket.title}
-                                </Title>
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 12,
+                                        flex: '1 1 200px',
+                                        minWidth: 0,
+                                        flexWrap: 'wrap',
+                                    }}
+                                >
+                                    <Title
+                                        level={2}
+                                        style={{
+                                            margin: 0,
+                                            flex: '1 1 160px',
+                                            minWidth: 0,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 10,
+                                        }}
+                                    >
+                                        {rowTicketType === 'spam' && (
+                                            <Tooltip title="Spam">
+                                                <span style={{ display: 'inline-flex', flexShrink: 0 }}>
+                                                    <WarningTwoTone
+                                                        twoToneColor={['#ff4d4f', '#ffccc7']}
+                                                        style={{ fontSize: 32 }}
+                                                    />
+                                                </span>
+                                            </Tooltip>
+                                        )}
+                                        {rowTicketType === 'trash' && (
+                                            <Tooltip title="Trash">
+                                                <span style={{ display: 'inline-flex', flexShrink: 0 }}>
+                                                    <DeleteTwoTone
+                                                        twoToneColor={['#ff4d4f', '#ffccc7']}
+                                                        style={{ fontSize: 32 }}
+                                                    />
+                                                </span>
+                                            </Tooltip>
+                                        )}
+                                        <span style={{ minWidth: 0 }}>
+                                            #{displayTicket.id} {displayTicket.title}
+                                        </span>
+                                    </Title>
+                                    {!isCustomer && (
+                                        <div
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                flexWrap: 'wrap',
+                                                gap: 8,
+                                            }}
+                                        >
+                                            {/* {rowTicketType !== 'support' && (
+                                                <Tag color={rowTicketType === 'spam' ? 'red' : 'orange'}>
+                                                    {rowTicketType === 'spam' ? 'Spam' : 'Trash'}
+                                                </Tag>
+                                            )} */}
+                                            { rowTicketType !=='spam'&&(
+                                                <Button
+                                                icon={<WarningOutlined />}
+                                                danger={rowTicketType !== 'spam'}
+                                                type={rowTicketType === 'spam' ? 'primary' : 'default'}
+                                                loading={classifyLoading === 'spam'}
+                                                disabled={classifyLoading !== null && classifyLoading !== 'spam'}
+                                                onClick={() => void patchTicketClassification('spam')}
+                                            >
+                                                Spam
+                                            </Button>
+                                            ) }
+                                            
+                                            { rowTicketType !=='trash'&&(
+                                            <Button
+                                            
+                                                icon={<DeleteOutlined />}
+                                                type='primary'
+                                                danger
+                                                loading={classifyLoading === 'trash'}
+                                                disabled={classifyLoading !== null && classifyLoading !== 'trash'}
+                                                onClick={() => void patchTicketClassification('trash')}
+                                            >
+                                                Trash
+                                            </Button>
+                                            ) }
+                                            
+                                            {rowTicketType !== 'support' && (
+                                                <Button
+                                                    type="primary"
+                                                    loading={classifyLoading === 'support'}
+                                                    disabled={
+                                                        classifyLoading !== null && classifyLoading !== 'support'
+                                                    }
+                                                    onClick={() => void patchTicketClassification('support')}
+                                                >
+                                                    Mark as support
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                                 <TicketPresenceBar
                                     ticketId={displayTicket.id}
                                     currentUser={{

@@ -14,6 +14,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
 import type { ColumnsType } from 'antd/es/table'
+import { labelForKnowledgeBaseRoles } from '@/lib/knowledge-base-article-roles'
 
 const { Content } = Layout
 const { Title } = Typography
@@ -29,6 +30,7 @@ interface ArticleRecord {
   description: string
   category: string
   sort_order: number
+  target_roles?: string[] | null
   created_at: string
   updated_at: string
 }
@@ -81,7 +83,7 @@ export default function KnowledgeBaseContent({ user: currentUser }: KnowledgeBas
       title: 'Order',
       dataIndex: 'sort_order',
       key: 'sort_order',
-      width: 80,
+      width: 100,
       sorter: (a, b) => a.sort_order - b.sort_order,
     },
     {
@@ -104,6 +106,17 @@ export default function KnowledgeBaseContent({ user: currentUser }: KnowledgeBas
       width: 100,
       render: (status: string) => (
         <Tag color={status === 'published' ? 'green' : 'default'}>{status}</Tag>
+      ),
+    },
+    {
+      title: 'Roles',
+      key: 'target_roles',
+      width: 160,
+      ellipsis: true,
+      render: (_: unknown, record: ArticleRecord) => (
+        <span title={labelForKnowledgeBaseRoles(record.target_roles)}>
+          {labelForKnowledgeBaseRoles(record.target_roles)}
+        </span>
       ),
     },
     {

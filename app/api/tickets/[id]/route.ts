@@ -22,6 +22,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { notifyTicketUsers, diffNewAssignees } from '@/lib/firebase/ticket-notifications-server'
 import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
+import { coerceTicketType, parseTicketType } from '@/lib/ticket-classification'
 
 async function triggerTicketUpdatedAutomation(ticketId: number) {
   try {
@@ -48,6 +49,7 @@ async function triggerTicketUpdatedAutomation(ticketId: number) {
       status: row.t.status,
       priority_slug: row.prioritySlug ?? null,
       type_slug: row.typeSlug ?? null,
+      ticket_type: coerceTicketType(row.t.ticketType),
       company_id: row.t.companyId,
       created_via: row.t.createdVia,
       team_id: row.t.teamId,
@@ -141,6 +143,41 @@ export async function PATCH(
     return NextResponse.json({ ok: true })
   }
 
+  // Quick path: ticket_type (support | spam | trash) — agents only
+  if (Object.keys(body).length === 1 && body.ticket_type !== undefined) {
+    if (role === 'customer') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const cls = parseTicketType(body.ticket_type)
+    if (!cls) {
+      return NextResponse.json({ error: 'Invalid ticket_type' }, { status: 400 })
+    }
+    const [cur] = await db
+      .select({ ticketType: tickets.ticketType })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1)
+    await db
+      .update(tickets)
+      .set({ ticketType: cls, updatedAt: new Date() })
+      .where(eq(tickets.id, ticketId))
+    if (cur && coerceTicketType(cur.ticketType) !== cls) {
+      await logTicketActivity({
+        ticketId,
+        actorUserId,
+        actorRole,
+        action: 'ticket_updated',
+        metadata: {
+          changed_keys: ['ticket_type'],
+          changes: { ticket_type: { from: coerceTicketType(cur.ticketType), to: cls } },
+        },
+      })
+    }
+    await triggerTicketUpdatedAutomation(ticketId)
+    bumpTicketDataVersion(ticketId)
+    return NextResponse.json({ ok: true, ticket_type: cls })
+  }
+
   // Quick path: description only (from detail page)
   if (body.description !== undefined && !body.title && !body.assignees && !body.tag_ids) {
     const [cur] = await db
@@ -182,11 +219,18 @@ export async function PATCH(
     due_date,
     assignees,
     tag_ids,
+    ticket_type,
     attachments_add = [],
     attachments_delete = [],
   } = body
 
   const beforeSnapshot = await loadTicketActivitySnapshot(ticketId)
+
+  let ticketTypeUpdate: string | undefined
+  if (ticket_type !== undefined && actorRole !== 'customer') {
+    const cls = parseTicketType(ticket_type)
+    if (cls) ticketTypeUpdate = cls
+  }
 
   const ticketUpdates: Record<string, unknown> = {
     ...(title !== undefined && { title }),
@@ -199,6 +243,7 @@ export async function PATCH(
     ...(priority_id !== undefined && { priorityId: priority_id ?? null }),
     ...(company_id !== undefined && { companyId: company_id || null }),
     ...(due_date !== undefined && { dueDate: due_date ? new Date(due_date) : null }),
+    ...(ticketTypeUpdate !== undefined && { ticketType: ticketTypeUpdate }),
   }
   if (Object.keys(ticketUpdates).length > 0) {
     await db

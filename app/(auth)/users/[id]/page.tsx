@@ -4,6 +4,7 @@ import { db, users, companies } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import UserDetailContent from '@/components/UserDetailContent'
 import type { Metadata } from 'next'
+import { canAccessUsers, isAdminOrManager } from '@/lib/auth-utils'
 
 export async function generateMetadata({
   params,
@@ -27,6 +28,16 @@ export default async function UserDetailPage({
   }
 
   const { id } = await params
+  const role = (session.user as { role?: string }).role
+  const r = (role ?? '').toLowerCase()
+  const ownProfile = String(session.user.id) === String(id)
+
+  if (!ownProfile && r === 'customer') {
+    redirect('/dashboard')
+  }
+  if (!ownProfile && !canAccessUsers(role) && !isAdminOrManager(role) && r !== 'staff') {
+    redirect('/dashboard')
+  }
 
   const [row] = await db
     .select({ user: users, company: companies })

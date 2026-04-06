@@ -10,6 +10,7 @@ type ActionType =
   | 'team_id'
   | 'priority_slug'
   | 'type_slug'
+  | 'ticket_type'
   | 'status_slug'
   | 'tag_ids'
   | 'visibility'
@@ -32,10 +33,17 @@ const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public' },
 ]
 
+const TICKET_CLASSIFICATION_OPTIONS = [
+  { value: 'support', label: 'Support' },
+  { value: 'spam', label: 'Spam' },
+  { value: 'trash', label: 'Trash' },
+]
+
 const ACTION_LABELS: Record<ActionType, string> = {
   team_id: 'Assign to Team',
   priority_slug: 'Set Priority',
   type_slug: 'Set Type',
+  ticket_type: 'Set classification (spam / trash)',
   status_slug: 'Set Status',
   tag_ids: 'Add Tags',
   visibility: 'Set Visibility',
@@ -65,6 +73,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
     'team_id',
     'priority_slug',
     'type_slug',
+    'ticket_type',
     'status_slug',
     'tag_ids',
     'visibility',
@@ -106,6 +115,8 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
       ;(next as Record<string, unknown>).add_note = ''
     } else if (type === 'add_checklist_items') {
       ;(next as Record<string, unknown>).add_checklist_items = []
+    } else if (type === 'ticket_type') {
+      ;(next as Record<string, unknown>).ticket_type = 'support'
     } else {
       ;(next as Record<string, unknown>)[type] = ''
     }
@@ -127,6 +138,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
       'team_id',
       'priority_slug',
       'type_slug',
+      'ticket_type',
       'status_slug',
       'tag_ids',
       'visibility',
@@ -205,6 +217,21 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                         value: t.slug,
                         label: t.title,
                       }))}
+                    />
+                  </Form.Item>
+                )}
+                {type === 'ticket_type' && (
+                  <Form.Item
+                    label={ACTION_LABELS.ticket_type}
+                    extra="Maps to DB column ticket_type (not the Type dropdown on tickets)."
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Select
+                      placeholder="Select classification"
+                      style={{ width: '100%' }}
+                      value={(actions as Record<string, unknown>).ticket_type}
+                      onChange={(v) => update('ticket_type', v)}
+                      options={TICKET_CLASSIFICATION_OPTIONS}
                     />
                   </Form.Item>
                 )}

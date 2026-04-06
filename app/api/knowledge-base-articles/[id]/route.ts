@@ -3,6 +3,8 @@ import { db } from '@/lib/db'
 import { knowledgeBaseArticles } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+import { canAccessKnowledgeBase } from '@/lib/auth-utils'
+import { articleVisibleForRole, normalizeTargetRolesInput } from '@/lib/knowledge-base-article-roles'
 
 /** GET /api/knowledge-base-articles/[id] - Get single article */
 export async function GET(
@@ -21,6 +23,15 @@ export async function GET(
     return NextResponse.json({ error: 'Article not found' }, { status: 404 })
   }
 
+  const role = (session.user as { role?: string }).role
+  const isKbAdmin = canAccessKnowledgeBase(role)
+  if (
+    !isKbAdmin &&
+    (row.status !== 'published' || !articleVisibleForRole(row.targetRoles ?? undefined, role))
+  ) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   return NextResponse.json({
     id: row.id,
     title: row.title,
@@ -28,6 +39,7 @@ export async function GET(
     description: row.description ?? '',
     category: row.category ?? 'general',
     sort_order: row.sortOrder ?? 0,
+    target_roles: row.targetRoles ?? null,
     created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',
     updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : '',
   })
@@ -45,7 +57,7 @@ export async function PATCH(
 
   const { id } = await params
   const body = await request.json()
-  const { title, status, description, category, sort_order } = body
+  const { title, status, description, category, sort_order, target_roles } = body
 
   const values: Record<string, unknown> = {}
   if (title !== undefined) values.title = String(title).trim()
@@ -53,6 +65,7 @@ export async function PATCH(
   if (description !== undefined) values.description = description?.trim() || null
   if (category !== undefined) values.category = category?.trim() || 'general'
   if (sort_order !== undefined) values.sortOrder = Number(sort_order) ?? 0
+  if (target_roles !== undefined) values.targetRoles = normalizeTargetRolesInput(target_roles)
 
   if (Object.keys(values).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -75,6 +88,7 @@ export async function PATCH(
     description: updated.description ?? '',
     category: updated.category ?? 'general',
     sort_order: updated.sortOrder ?? 0,
+    target_roles: updated.targetRoles ?? null,
     created_at: updated.createdAt ? new Date(updated.createdAt).toISOString() : '',
     updated_at: updated.updatedAt ? new Date(updated.updatedAt).toISOString() : '',
   })

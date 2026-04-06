@@ -67,3 +67,36 @@ export function canAccessUsers(role: string | undefined): boolean {
 export function canAccessMessageTemplates(role: string | undefined): boolean {
   return isAdmin(role)
 }
+
+/** Settings hub (/settings): any configured admin area the role can open */
+export function canAccessSettingsHub(role: string | undefined): boolean {
+  const r = (role ?? '').toLowerCase()
+  if (r === 'customer' || !role) return false
+  return (
+    canAccessTicketAttributes(role) ||
+    canAccessEmailIntegration(role) ||
+    canAccessMessageTemplates(role) ||
+    canAccessKnowledgeBase(role) ||
+    canAccessAutomationRules(role)
+  )
+}
+
+/** Paths that belong to the Settings hub (sidebar highlights Settings). */
+export const SETTINGS_HUB_PATH_PREFIXES = [
+  '/settings',
+  '/ticket-statuses',
+  '/ticket-types',
+  '/ticket-priorities',
+  '/tags',
+  '/email-integration',
+  '/message-templates',
+  '/automation-rules',
+  '/knowledge-base',
+] as const
+
+export function isSettingsHrefPathname(pathname: string | null): boolean {
+  if (!pathname) return false
+  return SETTINGS_HUB_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
+}

@@ -1,9 +1,9 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import UsersContent from '@/components/UsersContent'
-import { canAccessUsers } from '@/lib/auth-utils'
+import SettingsContent from '@/components/SettingsContent'
+import { canAccessSettingsHub } from '@/lib/auth-utils'
 
-export default async function UsersPage() {
+export default async function SettingsPage() {
   const session = await auth()
 
   if (!session?.user) {
@@ -11,12 +11,9 @@ export default async function UsersPage() {
   }
 
   const role = (session.user as { role?: string }).role
-  if (!canAccessUsers(role)) {
+  if (!canAccessSettingsHub(role)) {
     redirect('/dashboard')
   }
 
-  return <UsersContent user={session.user} />
+  return <SettingsContent user={session.user} />
 }
-
-
-

@@ -29,6 +29,7 @@ export default async function KnowledgeBaseEditPage({
     description: row.description ?? '',
     category: row.category ?? 'general',
     sort_order: row.sortOrder ?? 0,
+    target_roles: row.targetRoles ?? null,
   }
 
   return (

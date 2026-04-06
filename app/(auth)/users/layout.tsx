@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
-import { canAccessUsers } from '@/lib/auth-utils'
 
+/** Auth only — list vs detail access is enforced in `page.tsx` and `[id]/page.tsx`. */
 export default async function UsersLayout({
   children,
 }: {
@@ -9,9 +9,5 @@ export default async function UsersLayout({
 }) {
   const session = await auth()
   if (!session?.user) redirect('/login')
-  const role = (session.user as { role?: string }).role
-  if (!canAccessUsers(role)) {
-    redirect('/dashboard')
-  }
   return <>{children}</>
 }

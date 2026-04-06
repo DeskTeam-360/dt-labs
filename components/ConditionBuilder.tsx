@@ -47,6 +47,11 @@ export const CONDITION_FIELDS: Field[] = [
     { name: 'app', label: 'App (Mobile/External)' },
     { name: 'api', label: 'API' },
   ]},
+  { name: 'ticket_type', label: 'Ticket classification (spam / trash)', valueEditorType: 'select', values: [
+    { name: 'support', label: 'Support' },
+    { name: 'spam', label: 'Spam' },
+    { name: 'trash', label: 'Trash' },
+  ]},
   { name: 'comment_visibility', label: 'Comment visibility (reply / note)', valueEditorType: 'select', values: [
     { name: 'reply', label: 'Reply (thread / email)' },
     { name: 'note', label: 'Internal note' },

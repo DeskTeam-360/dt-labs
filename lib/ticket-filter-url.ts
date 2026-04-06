@@ -17,9 +17,13 @@ export const URL_PARAMS = {
   sort: 'sort',
   order: 'order',
   sidebar: 'sidebar',
+  /** Row classification: spam | trash (junk folders) */
+  ticket_type: 'ticket_type',
+  priority_ids: 'priority_ids',
 } as const
 
 export function hasUrlFilterParams(searchParams: URLSearchParams): boolean {
+  if (searchParams.has(URL_PARAMS.ticket_type)) return true
   return Array.from(Object.values(URL_PARAMS)).some((key) => searchParams.has(key))
 }
 
@@ -36,6 +40,8 @@ export interface ParsedUrlFilters {
   sortBy: TicketSortField
   sortOrder: TicketSortOrder
   filterSidebarCollapsed: boolean
+  filterTicketType: 'spam' | 'trash' | null
+  filterPriorityIds: number[]
 }
 
 export function parseFiltersFromUrl(searchParams: URLSearchParams): ParsedUrlFilters | null {
@@ -43,6 +49,9 @@ export function parseFiltersFromUrl(searchParams: URLSearchParams): ParsedUrlFil
   const split = (s: string | null) => (s ? s.split(',').map((x) => x.trim()).filter(Boolean) : [])
   const status = split(searchParams.get(URL_PARAMS.status))
   const typeIds = split(searchParams.get(URL_PARAMS.type_ids))
+    .map((x) => parseInt(x, 10))
+    .filter((n) => !isNaN(n))
+  const priorityIds = split(searchParams.get(URL_PARAMS.priority_ids))
     .map((x) => parseInt(x, 10))
     .filter((n) => !isNaN(n))
   const companyIds = split(searchParams.get(URL_PARAMS.company_ids))
@@ -73,25 +82,40 @@ export function parseFiltersFromUrl(searchParams: URLSearchParams): ParsedUrlFil
   const sidebarRaw = searchParams.get(URL_PARAMS.sidebar)
   const filterSidebarCollapsed = sidebarRaw === '0' ? false : true
 
+  const ticketTypeRaw = searchParams.get(URL_PARAMS.ticket_type)?.trim().toLowerCase()
+  const filterTicketType: 'spam' | 'trash' | null =
+    ticketTypeRaw === 'spam' || ticketTypeRaw === 'trash' ? ticketTypeRaw : null
+  const inJunkFolder = filterTicketType !== null
+
+  const junkViewMode: 'kanban' | 'list' | 'card' | 'roundrobin' = 'card'
+  const resolvedViewMode = inJunkFolder ? junkViewMode : viewMode
+
   return {
-    filterStatus: status.length > 0 ? status : DEFAULT_KANBAN_COLUMNS.map((c) => c.id),
+    filterStatus: inJunkFolder
+      ? []
+      : status.length > 0
+        ? status
+        : DEFAULT_KANBAN_COLUMNS.map((c) => c.id),
     filterTypeIds: typeIds,
+    filterPriorityIds: priorityIds,
     filterCompanyIds: companyIds,
     filterTagIds: tagIds,
-    filterVisibility: visibility.length > 0 ? visibility : ['public'],
+    filterVisibility: inJunkFolder ? [] : visibility.length > 0 ? visibility : ['public'],
     filterTeamIds: teamIds,
     filterDateRange,
     filterSearch: searchParams.get(URL_PARAMS.search)?.trim() ?? '',
-    viewMode,
+    viewMode: resolvedViewMode,
     sortBy,
     sortOrder,
     filterSidebarCollapsed,
+    filterTicketType,
   }
 }
 
 export function buildSearchStringFromFilters(state: {
   filterStatus: string[]
   filterTypeIds: number[]
+  filterPriorityIds?: number[]
   filterCompanyIds: string[]
   filterTagIds: string[]
   filterVisibility: string[]
@@ -102,10 +126,18 @@ export function buildSearchStringFromFilters(state: {
   sortBy: string
   sortOrder: string
   filterSidebarCollapsed: boolean
+  filterTicketType?: 'spam' | 'trash' | null
 }): string {
   const p = new URLSearchParams()
+  const inJunk = state.filterTicketType === 'spam' || state.filterTicketType === 'trash'
+  if (inJunk) {
+    p.set(URL_PARAMS.ticket_type, state.filterTicketType!)
+    p.set(URL_PARAMS.view, 'card')
+  }
   if (state.filterStatus.length > 0) p.set(URL_PARAMS.status, state.filterStatus.join(','))
   if (state.filterTypeIds.length > 0) p.set(URL_PARAMS.type_ids, state.filterTypeIds.join(','))
+  if ((state.filterPriorityIds?.length ?? 0) > 0)
+    p.set(URL_PARAMS.priority_ids, state.filterPriorityIds!.join(','))
   if (state.filterCompanyIds.length > 0) p.set(URL_PARAMS.company_ids, state.filterCompanyIds.join(','))
   if (state.filterTagIds.length > 0) p.set(URL_PARAMS.tag_ids, state.filterTagIds.join(','))
   if (state.filterVisibility.length > 0) p.set(URL_PARAMS.visibility, state.filterVisibility.join(','))
@@ -115,7 +147,7 @@ export function buildSearchStringFromFilters(state: {
     p.set(URL_PARAMS.date_to, state.filterDateRange[1].toISOString())
   }
   if (state.filterSearch.trim()) p.set(URL_PARAMS.search, state.filterSearch.trim())
-  if (state.viewMode && state.viewMode !== 'kanban') p.set(URL_PARAMS.view, state.viewMode)
+  if (!inJunk && state.viewMode && state.viewMode !== 'kanban') p.set(URL_PARAMS.view, state.viewMode)
   if (state.sortBy && state.sortBy !== 'updated_at') p.set(URL_PARAMS.sort, state.sortBy)
   if (state.sortOrder && state.sortOrder !== 'desc') p.set(URL_PARAMS.order, state.sortOrder)
   if (!state.filterSidebarCollapsed) p.set(URL_PARAMS.sidebar, '0')

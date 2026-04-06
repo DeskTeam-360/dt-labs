@@ -237,7 +237,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 16,
+        gap: 8,
         padding: '0 16px',
         height: NAV_HEIGHT,
         minHeight: NAV_HEIGHT,
@@ -420,7 +420,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
           display: 'flex',
           alignItems: 'center',
           alignSelf: 'stretch',
-          gap: 8,
+          gap: 6,
         }}
       >
         <TicketNotificationBell />

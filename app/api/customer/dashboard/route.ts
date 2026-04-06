@@ -13,8 +13,9 @@ import {
   ticketTags,
   tags,
 } from '@/lib/db'
-import { eq, inArray, asc } from 'drizzle-orm'
+import { eq, inArray, asc, and } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+import { DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
 
 /** GET /api/customer/dashboard - Stats for customer dashboard. Add ?debug=1 to see why Urgent ETA might be missing. */
 export async function GET(request: Request) {
@@ -52,8 +53,19 @@ export async function GET(request: Request) {
     })
   }
 
-  // All tickets belonging to the user's company
-  const myTickets = await db.select({ id: tickets.id, typeId: tickets.typeId, priorityId: tickets.priorityId, status: tickets.status, title: tickets.title, dueDate: tickets.dueDate, updatedAt: tickets.updatedAt }).from(tickets).where(eq(tickets.companyId, companyId))
+  // Support tickets only for company (exclude spam/trash from portal stats)
+  const myTickets = await db
+    .select({
+      id: tickets.id,
+      typeId: tickets.typeId,
+      priorityId: tickets.priorityId,
+      status: tickets.status,
+      title: tickets.title,
+      dueDate: tickets.dueDate,
+      updatedAt: tickets.updatedAt,
+    })
+    .from(tickets)
+    .where(and(eq(tickets.companyId, companyId), eq(tickets.ticketType, DEFAULT_TICKET_TYPE)))
 
   const typeIds = [...new Set(myTickets.map((t) => t.typeId).filter(Boolean))] as number[]
   const typeMap: Record<number, { title: string; color: string }> = {}
@@ -74,7 +86,12 @@ export async function GET(request: Request) {
   const allPriorities = await db.select({ id: ticketPriorities.id, slug: ticketPriorities.slug, title: ticketPriorities.title, color: ticketPriorities.color, sortOrder: ticketPriorities.sortOrder }).from(ticketPriorities).orderBy(ticketPriorities.sortOrder)
   const pCounts: Record<number, number> = {}
   myTickets.forEach((t) => { pCounts[t.priorityId ?? 0] = (pCounts[t.priorityId ?? 0] ?? 0) + 1 })
-  const priorityCounts = allPriorities.map((p) => ({ priority_title: p.title, count: pCounts[p.id] ?? 0, color: p.color ?? '#000' }))
+  const priorityCounts = allPriorities.map((p) => ({
+    priority_id: p.id,
+    priority_title: p.title,
+    count: pCounts[p.id] ?? 0,
+    color: p.color ?? '#000',
+  }))
 
   const myTicketIds = myTickets.map((t) => t.id)
   let timeByType: Array<{ type_title: string; seconds: number; color: string }> = []
@@ -99,7 +116,12 @@ export async function GET(request: Request) {
   const statusRows = await db.select({ slug: ticketStatuses.slug, customerTitle: ticketStatuses.customerTitle, title: ticketStatuses.title, color: ticketStatuses.color, sortOrder: ticketStatuses.sortOrder }).from(ticketStatuses).orderBy(asc(ticketStatuses.sortOrder))
   const sCounts: Record<string, number> = {}
   myTickets.forEach((t) => { sCounts[t.status ?? 'unknown'] = (sCounts[t.status ?? 'unknown'] ?? 0) + 1 })
-  const statusCounts = statusRows.map((s) => ({ status_title: s.customerTitle ?? s.title, count: sCounts[s.slug] ?? 0, color: s.color ?? '#000' }))
+  const statusCounts = statusRows.map((s) => ({
+    status_slug: s.slug,
+    status_title: s.customerTitle ?? s.title,
+    count: sCounts[s.slug] ?? 0,
+    color: s.color ?? '#000',
+  }))
 
   // recent_tickets: 5 tickets, urutkan priority (urgent dulu) lalu due_date (terdekat dulu)
   // Urutan eksplisit: urgent/critical=0, high=1, medium=2, low=3. Fallback: sortOrder dari DB (rendah=tinggi).
@@ -120,7 +142,22 @@ export async function GET(request: Request) {
     return da - db // due_date terdekat dulu
   })
   const recentIds = sortedForRecent.slice(0, 5).map((t) => t.id)
-  let recentTickets: Array<{ id: number; title: string; due_date: string | null; updated_at: string; status_title: string; customer_title: string; status_color: string; priority_title: string; priority_color: string; assignee_name: string | null; company_name: string | null }> = []
+  let recentTickets: Array<{
+    id: number
+    title: string
+    due_date: string | null
+    updated_at: string
+    status_slug: string
+    status_title: string
+    customer_title: string
+    status_color: string
+    priority_id: number | null
+    priority_title: string
+    priority_color: string
+    assignee_name: string | null
+    company_name: string | null
+    tags: Array<{ id: string; name: string; color: string | null }>
+  }> = []
 
   if (recentIds.length > 0) {
     const rows = await db.select({ ticket: tickets, company: companies, priority: ticketPriorities, statusRow: ticketStatuses }).from(tickets).leftJoin(companies, eq(tickets.companyId, companies.id)).leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id)).leftJoin(ticketStatuses, eq(tickets.status, ticketStatuses.slug)).where(inArray(tickets.id, recentIds))
@@ -143,9 +180,11 @@ export async function GET(request: Request) {
       title: r.ticket.title,
       due_date: r.ticket.dueDate ? new Date(r.ticket.dueDate).toISOString() : null,
       updated_at: r.ticket.updatedAt ? new Date(r.ticket.updatedAt).toISOString() : '',
+      status_slug: r.ticket.status,
       status_title: r.statusRow?.customerTitle ?? r.statusRow?.title ?? r.ticket.status,
       customer_title: r.statusRow?.customerTitle ?? 'Unknown',
       status_color: r.statusRow?.color ?? '#000',
+      priority_id: r.ticket.priorityId ?? null,
       priority_title: r.priority?.title ?? 'N/A',
       priority_color: r.priority?.color ?? '#000',
       assignee_name: assigneeByTicket[r.ticket.id] ?? null,

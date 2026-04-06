@@ -4,6 +4,7 @@ import { eq, inArray } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { NextResponse } from 'next/server'
 import { userBelongsToCompany, isCompanyPortalAdmin } from '@/lib/customer-company'
+import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
 
 async function mergedCustomerRows(companyId: string) {
   const byCompanyId = await db.select().from(users).where(eq(users.companyId, companyId))
@@ -109,17 +110,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
   }
 
-  await db
-    .insert(companyUsers)
-    .values({
-      companyId,
-      userId: row.id,
-      companyRole: 'member',
-    })
-    .onConflictDoUpdate({
-      target: [companyUsers.companyId, companyUsers.userId],
-      set: { companyRole: 'member', updatedAt: new Date() },
-    })
+  await upsertCompanyUserMembership({
+    companyId,
+    userId: row.id,
+    companyRole: 'member',
+  })
 
   return NextResponse.json({
     ok: true,

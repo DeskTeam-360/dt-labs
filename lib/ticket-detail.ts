@@ -22,6 +22,7 @@ import {
 } from '@/lib/db'
 import { eq, asc, inArray, and, desc, or, lt, ne, isNull, sql } from 'drizzle-orm'
 import { getPublicUrl } from '@/lib/storage-idrive'
+import { coerceTicketType } from '@/lib/ticket-classification'
 
 /** Initial / per-page comment batch size (newest-first window; UI shows oldest-at-top within batch). */
 export const TICKET_COMMENTS_PAGE_SIZE = 10
@@ -202,6 +203,11 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
   if (options?.companyId && t.companyId !== options.companyId) {
     return null
   }
+  /** Portal customers: hide spam/trash rows even if same company */
+  if (options?.companyId) {
+    const cls = coerceTicketType(t.ticketType)
+    if (cls === 'spam' || cls === 'trash') return null
+  }
 
   const [assigneesRows, checklistRows, attributsRows, screenshotsRows, ticketTagsRows, ccRecipientsRows] =
     await Promise.all([
@@ -280,6 +286,7 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     visibility: t.visibility,
     team_id: t.teamId,
     type_id: t.typeId,
+    ticket_type: coerceTicketType(t.ticketType),
     priority_id: t.priorityId,
     company_id: t.companyId,
     created_at: t.createdAt ? new Date(t.createdAt).toISOString() : '',

@@ -2,7 +2,6 @@
 
 import {
   Button,
-  Card,
   Form,
   Input,
   Modal,
@@ -14,7 +13,7 @@ import {
 import { PlusOutlined, KeyOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useState } from 'react'
 
-const { Text } = Typography
+const { Text, Title } = Typography
 
 type Member = {
   id: string
@@ -88,7 +87,7 @@ export default function CustomerPortalTeamSection({ companyId }: { companyId: st
       key: 'actions',
       width: 140,
       render: (_: unknown, row: Member) => (
-        <Button type="link" size="small" icon={<KeyOutlined />} onClick={() => openReset(row.id)}>
+        <Button type="primary" icon={<KeyOutlined />} onClick={() => openReset(row.id)}>
           Reset password
         </Button>
       ),
@@ -97,16 +96,24 @@ export default function CustomerPortalTeamSection({ companyId }: { companyId: st
 
   return (
     <>
-      <Card
-        size="small"
-        title="Portal accounts"
-        extra={
-          <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => setAddOpen(true)}>
+      <section style={{ marginBottom: 24, marginTop: 24 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          <Title level={5} style={{ margin: 0 }}>
+            Portal accounts
+          </Title>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddOpen(true)}>
             Add account
           </Button>
-        }
-        style={{ marginBottom: 24 }}
-      >
+        </div>
         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
           Create logins for colleagues in your organization and reset their passwords when needed.
         </Text>
@@ -118,7 +125,7 @@ export default function CustomerPortalTeamSection({ companyId }: { companyId: st
           dataSource={members}
           pagination={false}
         />
-      </Card>
+      </section>
 
       <Modal
         title="Add portal user"

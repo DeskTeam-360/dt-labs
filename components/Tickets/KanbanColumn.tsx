@@ -18,6 +18,11 @@ interface KanbanColumnProps {
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
   allPriorities?: Array<{ id: number }>
+  allStatusColumns?: StatusColumn[]
+  onFilterByStatus?: (statusSlug: string) => void
+  onFilterByPriority?: (priorityId: number) => void
+  onFilterByTag?: (tagId: string) => void
+  onFilterByCompany?: (companyId: string) => void
 }
 
 export default function KanbanColumn({
@@ -28,6 +33,11 @@ export default function KanbanColumn({
   sortBy = 'updated_at',
   sortOrder = 'desc',
   allPriorities = [],
+  allStatusColumns,
+  onFilterByStatus,
+  onFilterByPriority,
+  onFilterByTag,
+  onFilterByCompany,
 }: KanbanColumnProps) {
   const columnTickets = useMemo(() => {
     const filtered = tickets.filter((t) => t.status === column.id)
@@ -79,7 +89,17 @@ export default function KanbanColumn({
               </div>
             ) : (
               columnTickets.map((ticket) => (
-                <KanbanCard key={ticket.id} ticket={ticket} onEdit={onEdit} onDelete={onDelete} />
+                <KanbanCard
+                  key={ticket.id}
+                  ticket={ticket}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  allStatusColumns={allStatusColumns}
+                  onFilterByStatus={onFilterByStatus}
+                  onFilterByPriority={onFilterByPriority}
+                  onFilterByTag={onFilterByTag}
+                  onFilterByCompany={onFilterByCompany}
+                />
               ))
             )}
           </SortableContext>
