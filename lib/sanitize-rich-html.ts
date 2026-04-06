@@ -8,8 +8,8 @@ import DOMPurify, { type Config } from 'isomorphic-dompurify'
  */
 const RICH_HTML_CONFIG: Config = {
   USE_PROFILES: { html: true },
-  /** data-list: Quill v2 lists; class: ql-ui, ql-indent-* */
-  ADD_ATTR: ['target', 'data-list'],
+  /** data-list: Quill v2 lists; start: merged sibling <ol> continuation */
+  ADD_ATTR: ['target', 'data-list', 'start'],
   FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'base', 'link', 'meta', 'form'],
 }
 
@@ -102,10 +102,73 @@ function installTicketRichHtmlHooks(): void {
   })
 }
 
+/** <ol> tanpa li[data-list] (HTML semantik / export Quill): penomoran browser selalu mulai 1 per <ol>. */
+function isSemanticOrderedList(el: Element): boolean {
+  if (el.nodeName !== 'OL') return false
+  return el.querySelector(':scope > li[data-list]') == null
+}
+
+/**
+ * Satu checklist sering jadi beberapa <ol> beturut-turut yang dipisah <ul>.
+ * Tanpa ini, tiap <ol> tampil 1. 1. 1. — kita set atribut `start` untuk melanjutkan angka.
+ */
+function mergeSiblingOrderedListStarts(container: ParentNode): void {
+  let nextIndex = 0
+  let prev: Element | null = null
+
+  for (const child of Array.from(container.children)) {
+    /* JSDOM / Node: hindari `instanceof Element` (global tidak selalu ada). */
+    const el = child as Element
+    if (el.nodeName === 'OL') {
+      if (!isSemanticOrderedList(el)) {
+        nextIndex = 0
+        prev = el
+        continue
+      }
+
+      const continueList =
+        prev != null &&
+        (prev.nodeName === 'OL' || prev.nodeName === 'UL') &&
+        (prev.nodeName !== 'OL' || isSemanticOrderedList(prev))
+
+      if (!continueList) {
+        nextIndex = 0
+      }
+
+      const n = el.querySelectorAll(':scope > li').length
+
+      if (nextIndex === 0) {
+        el.removeAttribute('start')
+        nextIndex = n
+      } else {
+        el.setAttribute('start', String(nextIndex + 1))
+        nextIndex += n
+      }
+      prev = el
+      continue
+    }
+
+    prev = el
+  }
+}
+
 export function sanitizeRichHtml(html: string | null | undefined): string {
   installTicketRichHtmlHooks()
   if (html == null || typeof html !== 'string') return '<p></p>'
   const t = html.trim()
   if (!t) return '<p></p>'
-  return DOMPurify.sanitize(t, RICH_HTML_CONFIG)
+
+  const frag = DOMPurify.sanitize(t, {
+    ...RICH_HTML_CONFIG,
+    RETURN_DOM_FRAGMENT: true,
+  }) as unknown as DocumentFragment
+
+  if (frag?.ownerDocument && frag.childNodes.length > 0) {
+    mergeSiblingOrderedListStarts(frag)
+    const holder = frag.ownerDocument.createElement('div')
+    holder.append(...Array.from(frag.childNodes))
+    return String(DOMPurify.sanitize(holder.innerHTML, RICH_HTML_CONFIG))
+  }
+
+  return String(DOMPurify.sanitize(t, RICH_HTML_CONFIG))
 }
