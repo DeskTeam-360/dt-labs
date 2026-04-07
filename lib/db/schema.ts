@@ -183,10 +183,10 @@ export const tickets = pgTable('tickets', {
   visibility: varchar('visibility', { length: 50 }).notNull().default('private'),
   teamId: uuid('team_id'),
   gmailThreadId: varchar('gmail_thread_id', { length: 255 }),
-  priorityId: integer('priority_id'),
+  priorityId: integer('priority_id').references(() => ticketPriorities.id, { onDelete: 'restrict' }),
   createdVia: varchar('created_via', { length: 50 }),
   lastReadAt: ts('last_read_at'),
-  typeId: integer('type_id'),
+  typeId: integer('type_id').references(() => ticketTypes.id, { onDelete: 'restrict' }),
   /** support | spam | trash — not `type_id` (ticket_types catalog) */
   ticketType: varchar('ticket_type', { length: 32 }).notNull().default('support'),
   companyId: uuid('company_id'),
@@ -281,8 +281,8 @@ export const ticketTimeTracker = pgTable('ticket_time_tracker', {
 export const ticketTags = pgTable(
   'ticket_tags',
   {
-    ticketId: integer('ticket_id').notNull(),
-    tagId: uuid('tag_id').notNull(),
+    ticketId: integer('ticket_id').notNull().references(() => tickets.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id').notNull().references(() => tags.id, { onDelete: 'restrict' }),
     createdAt: ts('created_at').notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.ticketId, t.tagId] })]

@@ -59,14 +59,26 @@ export async function DELETE(
 
   const { id } = await params
 
-  const [deleted] = await db
-    .delete(tags)
-    .where(eq(tags.id, id))
-    .returning({ id: tags.id })
+  try {
+    const [deleted] = await db
+      .delete(tags)
+      .where(eq(tags.id, id))
+      .returning({ id: tags.id })
 
-  if (!deleted) {
-    return NextResponse.json({ error: 'Tag not found' }, { status: 404 })
+    if (!deleted) {
+      return NextResponse.json({ error: 'Tag not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg.includes('foreign key') || msg.includes('violates')) {
+      return NextResponse.json(
+        { error: 'Cannot delete: this tag is currently in use on one or more tickets. It must be removed from all tickets before deletion.' },
+        { status: 409 }
+      )
+    }
+    console.error('[DELETE tags]', e)
+    return NextResponse.json({ error: 'Delete failed' }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true })
 }

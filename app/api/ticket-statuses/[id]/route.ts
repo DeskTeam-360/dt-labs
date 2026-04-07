@@ -1,7 +1,7 @@
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { ticketStatuses } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { ticketStatuses, tickets } from '@/lib/db'
+import { eq, count, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
 
@@ -77,14 +77,49 @@ export async function DELETE(
     return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
   }
 
-  const [deleted] = await db
-    .delete(ticketStatuses)
-    .where(eq(ticketStatuses.id, statusId))
-    .returning({ id: ticketStatuses.id })
+  try {
+    // First, get the status to check its slug
+    const status = await db.query.ticketStatuses.findFirst({
+      where: eq(ticketStatuses.id, statusId),
+    })
 
-  if (!deleted) {
-    return NextResponse.json({ error: 'Status not found' }, { status: 404 })
+    if (!status) {
+      return NextResponse.json({ error: 'Status not found' }, { status: 404 })
+    }
+
+    // Check if any tickets use this status
+    const [result] = await db
+      .select({ count: count() })
+      .from(tickets)
+      .where(eq(tickets.status, status.slug))
+
+    if (result && result.count > 0) {
+      return NextResponse.json(
+        { error: 'Cannot delete: this status is currently in use on one or more tickets. It must be removed from all tickets before deletion.' },
+        { status: 409 }
+      )
+    }
+
+    // Delete the status
+    const [deleted] = await db
+      .delete(ticketStatuses)
+      .where(eq(ticketStatuses.id, statusId))
+      .returning({ id: ticketStatuses.id })
+
+    if (!deleted) {
+      return NextResponse.json({ error: 'Status not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg.includes('foreign key') || msg.includes('violates')) {
+      return NextResponse.json(
+        { error: 'Cannot delete: this status is currently in use on one or more tickets. It must be removed from all tickets before deletion.' },
+        { status: 409 }
+      )
+    }
+    console.error('[DELETE ticket-statuses]', e)
+    return NextResponse.json({ error: 'Delete failed' }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true })
 }

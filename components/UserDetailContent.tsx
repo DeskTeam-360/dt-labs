@@ -609,8 +609,21 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         >
                           <Input prefix={<UserOutlined />} placeholder="Full Name" />
                         </Form.Item>
-                        <Form.Item name="phone" label="Phone">
-                          <Input prefix={<PhoneOutlined />} placeholder="Phone Number" />
+                        <Form.Item
+                          name="phone"
+                          label="Phone"
+                          rules={[
+                            {
+                              pattern: /^[0-9+\-\s()]*$/,
+                              message: 'Phone number can only contain numbers, +, -, spaces, and parentheses'
+                            }
+                          ]}
+                        >
+                          <Input
+                            prefix={<PhoneOutlined />}
+                            placeholder="Phone Number"
+                            type="tel"
+                          />
                         </Form.Item>
                         <Form.Item label="User ID">
                           <Input value={userData.id} disabled />

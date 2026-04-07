@@ -313,10 +313,17 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
                   <Form.Item
                     name="phone"
                     label="Phone"
+                    rules={[
+                      {
+                        pattern: /^[0-9+\-\s()]*$/,
+                        message: 'Phone number can only contain numbers, +, -, spaces, and parentheses'
+                      }
+                    ]}
                   >
                     <Input
                       prefix={<PhoneOutlined />}
                       placeholder="Phone Number"
+                      type="tel"
                     />
                   </Form.Item>
                 </Col>

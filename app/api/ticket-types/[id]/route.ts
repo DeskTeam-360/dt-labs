@@ -70,14 +70,26 @@ export async function DELETE(
     return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
   }
 
-  const [deleted] = await db
-    .delete(ticketTypes)
-    .where(eq(ticketTypes.id, typeId))
-    .returning({ id: ticketTypes.id })
+  try {
+    const [deleted] = await db
+      .delete(ticketTypes)
+      .where(eq(ticketTypes.id, typeId))
+      .returning({ id: ticketTypes.id })
 
-  if (!deleted) {
-    return NextResponse.json({ error: 'Ticket type not found' }, { status: 404 })
+    if (!deleted) {
+      return NextResponse.json({ error: 'Ticket type not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg.includes('foreign key') || msg.includes('violates')) {
+      return NextResponse.json(
+        { error: 'Cannot delete: this ticket type is currently in use on one or more tickets. It must be removed from all tickets before deletion.' },
+        { status: 409 }
+      )
+    }
+    console.error('[DELETE ticket-types]', e)
+    return NextResponse.json({ error: 'Delete failed' }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true })
 }
