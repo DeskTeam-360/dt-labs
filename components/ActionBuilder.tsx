@@ -182,6 +182,10 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                   <Form.Item label={ACTION_LABELS.team_id} style={{ marginBottom: 0 }}>
                     <Select
                       allowClear
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
                       placeholder="Select team"
                       style={{ width: '100%' }}
                       value={(actions as Record<string, unknown>).team_id}
@@ -194,6 +198,10 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                   <Form.Item label={ACTION_LABELS.priority_slug} style={{ marginBottom: 0 }}>
                     <Select
                       allowClear
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
                       placeholder="Select priority"
                       style={{ width: '100%' }}
                       value={(actions as Record<string, unknown>).priority_slug}
@@ -209,6 +217,10 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                   <Form.Item label={ACTION_LABELS.type_slug} style={{ marginBottom: 0 }}>
                     <Select
                       allowClear
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
                       placeholder="Select type"
                       style={{ width: '100%' }}
                       value={(actions as Record<string, unknown>).type_slug}
@@ -227,6 +239,10 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                     style={{ marginBottom: 0 }}
                   >
                     <Select
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
                       placeholder="Select classification"
                       style={{ width: '100%' }}
                       value={(actions as Record<string, unknown>).ticket_type}
@@ -239,6 +255,10 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                   <Form.Item label={ACTION_LABELS.status_slug} style={{ marginBottom: 0 }}>
                     <Select
                       allowClear
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
                       placeholder="Select status"
                       style={{ width: '100%' }}
                       value={(actions as Record<string, unknown>).status_slug}
@@ -255,6 +275,10 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                     <Select
                       mode="multiple"
                       allowClear
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
                       placeholder="Select tags"
                       style={{ width: '100%' }}
                       value={(actions as Record<string, unknown>).tag_ids as string[] | undefined}
@@ -270,6 +294,10 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                   <Form.Item label={ACTION_LABELS.visibility} style={{ marginBottom: 0 }}>
                     <Select
                       allowClear
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
                       placeholder="Select visibility"
                       style={{ width: '100%' }}
                       value={(actions as Record<string, unknown>).visibility}
