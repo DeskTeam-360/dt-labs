@@ -99,6 +99,7 @@ export async function POST(
       author_type: effectiveAuthorType,
       body_preview: (comment || '')
         .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
         .replace(/\s+/g, ' ')
         .trim()
         .slice(0, 200),
@@ -199,6 +200,7 @@ export async function POST(
     const actorName = session.user.name || session.user.email || 'Someone'
     const preview = (comment || '')
       .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ') // change the nbsp to normal space
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 160)
