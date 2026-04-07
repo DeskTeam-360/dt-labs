@@ -47,16 +47,6 @@ export default function CardViewCard({
 
   const ticketUrl = `/tickets/${ticket.id}`
   return (
-    <a
-      href={ticketUrl}
-      style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}
-      onClick={(e) => {
-        if (e.button !== 0) return
-        if (e.ctrlKey || e.metaKey) return
-        e.preventDefault()
-        router.push(ticketUrl)
-      }}
-    >
     <Flex
       justify="space-between"
       gap={12}
@@ -68,9 +58,25 @@ export default function CardViewCard({
         borderRadius: 12,
         border: '1px solid #f0f0f0',
         boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-        cursor: 'pointer',
       }}
     >
+      <a
+        href={ticketUrl}
+        style={{
+          display: 'flex',
+          flex: 1,
+          minWidth: 0,
+          color: 'inherit',
+          textDecoration: 'none',
+          cursor: 'pointer',
+        }}
+        onClick={(e) => {
+          if (e.button !== 0) return
+          if (e.ctrlKey || e.metaKey) return
+          e.preventDefault()
+          router.push(ticketUrl)
+        }}
+      >
       <Flex vertical justify="flex-start" align="flex-start" gap={0} style={{ flex: 1, minWidth: 0 }}>
         <Text strong style={{ fontSize: 16, fontWeight: 700, color: '#1f2937', lineHeight: 1.4 }}>
           {ticket.has_unread_replies && (
@@ -99,7 +105,8 @@ export default function CardViewCard({
           </span>
         )}
       </Flex>
-      <Flex justify="flex-end" gap={8} align="center" wrap="wrap" style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+      </a>
+      <Flex justify="flex-end" gap={8} align="center" wrap="wrap" style={{ flexShrink: 0 }}>
         {ticket.priority && (
           <span
             style={{
@@ -217,10 +224,9 @@ export default function CardViewCard({
           }}
           trigger={['click']}
         >
-          <Button type="text" size="small" icon={<MoreOutlined />} onClick={(e) => e.stopPropagation()} style={{ marginLeft: 4 }} />
+          <Button type="text" size="small" icon={<MoreOutlined />} style={{ marginLeft: 4 }} />
         </Dropdown>
       </Flex>
     </Flex>
-    </a>
   )
 }
