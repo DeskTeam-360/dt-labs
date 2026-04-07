@@ -1,19 +1,41 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Button } from 'antd'
+import { Button, Select } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
-import { QueryBuilder, type Field, type RuleGroupType } from 'react-querybuilder'
+import { QueryBuilder, type Field, type RuleGroupType, useValueSelector } from 'react-querybuilder'
 import { QueryBuilderAntD } from '@react-querybuilder/antd'
 import 'react-querybuilder/dist/query-builder.css'
 import { rqbToOurFormat, ourFormatToRQB, defaultRQBQuery, type OurConditionGroup } from '@/lib/condition-builder-utils'
-import type { ActionProps } from 'react-querybuilder'
+import type { ActionProps, VersatileSelectorProps } from 'react-querybuilder'
 
 function AddRuleButton({ handleOnClick, label }: ActionProps) {
   return (
     <Button type="dashed" icon={<PlusOutlined />} block onClick={(e) => handleOnClick(e)}>
       {label ?? 'Add Rule'}
     </Button>
+  )
+}
+
+// Custom value selector with search functionality
+function SearchableValueSelector(props: VersatileSelectorProps) {
+  const { onChange, val } = useValueSelector(props)
+
+  return (
+    <Select
+      showSearch
+      filterOption={(input, option) =>
+        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+      }
+      title={props.title}
+      className={props.className}
+      popupMatchSelectWidth={false}
+      disabled={props.disabled}
+      value={val}
+      onChange={onChange}
+      optionFilterProp="label"
+      options={props.options}
+    />
   )
 }
 
@@ -153,6 +175,7 @@ export default function ConditionBuilder({ value, onChange }: ConditionBuilderPr
           controlElements={{
             addGroupAction: () => null,
             addRuleAction: AddRuleButton,
+            valueSelector: SearchableValueSelector,
           }}
         />
       </QueryBuilderAntD>

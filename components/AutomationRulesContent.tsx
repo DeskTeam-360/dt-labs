@@ -312,6 +312,10 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
                   style={{ marginBottom: 0, minWidth: 180 }}
                 >
                   <Select
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
                     options={[
                       { value: 'ticket_created', label: 'Ticket Created' },
                       { value: 'ticket_updated', label: 'Ticket Updated' },
@@ -329,6 +333,10 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
                 <Form.Item name="company_id" label="Company (optional)" style={{ marginBottom: 0, minWidth: 180 }}>
                   <Select
                     allowClear
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
                     placeholder="Global"
                     options={companies.map((c) => ({ value: c.id, label: c.name }))}
                   />
