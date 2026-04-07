@@ -101,7 +101,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
       <Layout
         style={{
           marginLeft: collapsed ? 80 : 250,
-          marginRight: filterSidebarCollapsed ? 61 : 280,
+          marginRight: filterSidebarCollapsed ? 75 : 280,
           transition: 'margin-left 0.2s, margin-right 0.2s',
           borderRadius: '16px 0 0 16px',
           overflow: 'hidden',
