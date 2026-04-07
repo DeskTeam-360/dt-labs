@@ -13,6 +13,13 @@ dayjs.extend(relativeTime)
 const { Text } = Typography
 const POLL_MS = 12_000
 
+/** Decode HTML entities like &nbsp; to regular characters */
+const decodeHtmlEntities = (text: string): string => {
+  const textarea = document.createElement('textarea')
+  textarea.innerHTML = text
+  return textarea.value
+}
+
 /** Match TicketSearchNavbar history control — subtle hover on white pill */
 const navControlButtonStyle = (base?: CSSProperties): CSSProperties => ({
   display: 'inline-flex',
@@ -87,7 +94,7 @@ export default function TicketNotificationBell() {
       alertedIdsRef.current.add(n.id)
       nApi.info({
         message: n.title,
-        description: n.body,
+        description: decodeHtmlEntities(n.body),
         placement: 'topRight',
         duration: 10,
         onClick: () => {
@@ -97,7 +104,7 @@ export default function TicketNotificationBell() {
       })
       if (typeof window !== 'undefined' && Notification.permission === 'granted') {
         try {
-          new Notification(n.title, { body: n.body.slice(0, 200), tag: `ticket-${n.id}` })
+          new Notification(n.title, { body: decodeHtmlEntities(n.body.slice(0, 200)), tag: `ticket-${n.id}` })
         } catch {
           /* ignore */
         }
@@ -317,7 +324,7 @@ export default function TicketNotificationBell() {
                 </div>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{n.title}</div>
                 <Text type="secondary" style={{ fontSize: 12, display: 'block' }} ellipsis>
-                  {n.body}
+                  {decodeHtmlEntities(n.body)}
                 </Text>
               </div>
             </div>
