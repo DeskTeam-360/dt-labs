@@ -83,6 +83,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
   const [bulkAction, setBulkAction] = useState<'active' | 'inactive' | 'delete' | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const selectedRole = Form.useWatch('role', form)
 
   const bulkDeletableCount = useMemo(
@@ -260,6 +261,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   }
 
   const runUserModalSave = async (values: any) => {
+    setSubmitting(true)
     try {
       if (editingUser) {
         const patchBody: Record<string, unknown> = {
@@ -345,6 +347,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       }
     } catch (error: any) {
       message.error(error.message || 'Failed to save user')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -983,13 +987,13 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
 
               <Form.Item>
                 <Space>
-                  <Button type="primary" htmlType="submit">
+                  <Button type="primary" htmlType="submit" loading={submitting}>
                     {editingUser ? 'Update' : 'Create'}
                   </Button>
                   <Button onClick={() => {
                     setModalVisible(false)
                     form.resetFields()
-                  }}>
+                  }} disabled={submitting}>
                     Cancel
                   </Button>
                 </Space>

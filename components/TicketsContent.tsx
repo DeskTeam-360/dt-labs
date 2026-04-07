@@ -92,6 +92,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     filterByPriorityFromChip,
     filterByTagFromChip,
     filterByCompanyFromChip,
+    submitting,
   } = useTicketsData(currentUser.id, isCustomer)
 
   return (
@@ -268,6 +269,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         onFilesSelected={handleTicketFilesSelected}
         onRemoveNewAttachment={handleRemoveNewAttachment}
         attachmentUploading={attachmentUploading}
+        submitting={submitting}
         onSubmit={handleSubmit}
         onCancel={handleModalCancel}
         isCustomer={isCustomer}

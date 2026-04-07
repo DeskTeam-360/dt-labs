@@ -74,6 +74,7 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
   const [modalVisible, setModalVisible] = useState(false)
   const [editingRule, setEditingRule] = useState<AutomationRuleRecord | null>(null)
   const [form] = Form.useForm()
+  const [submitting, setSubmitting] = useState(false)
 
   const fetchRules = async () => {
     setLoading(true)
@@ -145,6 +146,7 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
   }
 
   const handleSubmit = async (values: Record<string, unknown>) => {
+    setSubmitting(true)
     try {
       const conditionsObj =
         values.conditions && typeof values.conditions === 'object'
@@ -185,6 +187,8 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
       fetchRules()
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to save rule')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -379,10 +383,10 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
 
               <Form.Item>
                 <Space>
-                  <Button type="primary" htmlType="submit">
+                  <Button type="primary" htmlType="submit" loading={submitting}>
                     {editingRule ? 'Update' : 'Create'}
                   </Button>
-                  <Button onClick={() => setModalVisible(false)}>Cancel</Button>
+                  <Button onClick={() => setModalVisible(false)} disabled={submitting}>Cancel</Button>
                 </Space>
               </Form.Item>
             </Form>

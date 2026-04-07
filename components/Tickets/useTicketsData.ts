@@ -198,6 +198,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   const [filterTeamIds, setFilterTeamIds] = useState<string[]>(initialState.filterTeamIds)
   const [filterDateRange, setFilterDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(initialState.filterDateRange)
   const [filterSearch, setFilterSearch] = useState(initialState.filterSearch)
+  const [submitting, setSubmitting] = useState(false)
   const [filterSidebarCollapsed, setFilterSidebarCollapsed] = useState(initialState.filterSidebarCollapsed)
   const [sortBy, setSortBy] = useState<TicketSortField>(initialState.sortBy)
   const [sortOrder, setSortOrder] = useState<TicketSortOrder>(initialState.sortOrder)
@@ -846,6 +847,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   }
 
   const handleSubmit = async (values: Record<string, unknown>) => {
+    setSubmitting(true)
     try {
       const effectiveValues = { ...values }
       if (isCustomer && !editingTicket) {
@@ -1019,6 +1021,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       setDeletedTicketAttachmentIds([])
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to save ticket')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -1115,5 +1119,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterByPriorityFromChip,
     filterByTagFromChip,
     filterByCompanyFromChip,
+    submitting,
   }
 }

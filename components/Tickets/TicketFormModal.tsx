@@ -46,6 +46,7 @@ interface TicketFormModalProps {
   onRemoveNewAttachment?: (attachment: NewTicketAttachment) => void
   onFilesSelected?: (files: File[] | FileList | null) => void
   attachmentUploading?: boolean
+  submitting?: boolean
   onSubmit: (values: Record<string, unknown>) => Promise<void>
   onCancel: () => void
   /** When true, show simplified form: Title, Description, Priority, Type only */
@@ -77,6 +78,7 @@ export default function TicketFormModal({
   onRemoveNewAttachment,
   onFilesSelected,
   attachmentUploading = false,
+  submitting = false,
   onSubmit,
   onCancel,
   isCustomer = false,
@@ -371,10 +373,10 @@ export default function TicketFormModal({
 
         <Form.Item>
           <Space>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" loading={submitting}>
               {editingTicket ? 'Update' : 'Create'}
             </Button>
-            <Button onClick={onCancel}>
+            <Button onClick={onCancel} disabled={submitting}>
               Cancel
             </Button>
           </Space>
