@@ -1,8 +1,18 @@
 'use client'
 
 import { Layout, Table, Button, Space, Typography, Card, Tag, Avatar, Modal, Form, Input, Select, message, Popconfirm, Tooltip, Upload, Switch, InputNumber, Col, Row } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, UploadOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons'
-import { useState, useEffect, useMemo } from 'react'
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  UserOutlined,
+  UploadOutlined,
+  EyeOutlined,
+  SearchOutlined,
+  CheckCircleOutlined,
+  StopOutlined,
+} from '@ant-design/icons'
+import { useState, useEffect, useMemo, type Key } from 'react'
 import { useRouter } from 'next/navigation'
 import { createUser } from '@/app/actions/users'
 import { uploadAvatar } from '@/utils/storage'
@@ -71,7 +81,14 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined)
   const [form] = Form.useForm()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
+  const [bulkAction, setBulkAction] = useState<'active' | 'inactive' | 'delete' | null>(null)
   const selectedRole = Form.useWatch('role', form)
+
+  const bulkDeletableCount = useMemo(
+    () => selectedRowKeys.filter((k) => String(k) !== currentUser.id).length,
+    [selectedRowKeys, currentUser.id]
+  )
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
@@ -184,9 +201,61 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     try {
       await apiFetch(`/api/users/${userId}`, { method: 'DELETE' })
       message.success('User deleted successfully')
+      setSelectedRowKeys((keys) => keys.filter((k) => String(k) !== userId))
       fetchUsers()
     } catch (error: any) {
       message.error(error.message || 'Failed to delete user')
+    }
+  }
+
+  const handleBulkStatus = async (status: 'active' | 'inactive') => {
+    const ids = selectedRowKeys.map(String)
+    if (ids.length === 0) return
+    setBulkAction(status)
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          apiFetch(`/api/users/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status }),
+          })
+        )
+      )
+      const failed = results.filter((r) => r.status === 'rejected').length
+      const ok = results.length - failed
+      if (ok > 0) message.success(`Updated ${ok} user(s) to ${status}`)
+      if (failed > 0) message.error(`${failed} update(s) failed`)
+      setSelectedRowKeys([])
+      fetchUsers()
+    } catch (error: any) {
+      message.error(error.message || 'Bulk update failed')
+    } finally {
+      setBulkAction(null)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const withoutSelf = selectedRowKeys.map(String).filter((id) => id !== currentUser.id)
+    if (withoutSelf.length === 0) {
+      message.warning('Select at least one other user to delete. You cannot remove your own account from this list.')
+      return
+    }
+    setBulkAction('delete')
+    try {
+      const results = await Promise.allSettled(
+        withoutSelf.map((id) => apiFetch(`/api/users/${id}`, { method: 'DELETE' }))
+      )
+      const failed = results.filter((r) => r.status === 'rejected').length
+      const ok = results.length - failed
+      if (ok > 0) message.success(`Deleted ${ok} user(s)`)
+      if (failed > 0) message.error(`${failed} delete(s) failed`)
+      setSelectedRowKeys([])
+      fetchUsers()
+    } catch (error: any) {
+      message.error(error.message || 'Bulk delete failed')
+    } finally {
+      setBulkAction(null)
     }
   }
 
@@ -517,6 +586,77 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               </Space>
             </div>
 
+            {selectedRowKeys.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: '12px 16px',
+                  background: '#e6f4ff',
+                  border: '1px solid #91caff',
+                  borderRadius: 8,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <Typography.Text strong>
+                  {selectedRowKeys.length} selected
+                </Typography.Text>
+                <Space wrap>
+                  <Button
+                    icon={<CheckCircleOutlined />}
+                    loading={bulkAction === 'active'}
+                    disabled={bulkAction !== null && bulkAction !== 'active'}
+                    onClick={() => handleBulkStatus('active')}
+                  >
+                    Set active
+                  </Button>
+                  <Button
+                    icon={<StopOutlined />}
+                    loading={bulkAction === 'inactive'}
+                    disabled={bulkAction !== null && bulkAction !== 'inactive'}
+                    onClick={() => handleBulkStatus('inactive')}
+                  >
+                    Set inactive
+                  </Button>
+                  <Popconfirm
+                    title="Delete selected users?"
+                    description={
+                      bulkDeletableCount > 0
+                        ? `This will permanently delete ${bulkDeletableCount} user(s).`
+                        : 'You cannot delete your own account from this action. Select other users.'
+                    }
+                    okText="Delete"
+                    okButtonProps={{ danger: true }}
+                    cancelText="Cancel"
+                    onConfirm={handleBulkDelete}
+                    disabled={bulkAction !== null || bulkDeletableCount === 0}
+                  >
+                    <span>
+                      <Button
+                        danger
+                        icon={<DeleteOutlined />}
+                        loading={bulkAction === 'delete'}
+                        disabled={
+                          bulkDeletableCount === 0 || (bulkAction !== null && bulkAction !== 'delete')
+                        }
+                      >
+                        Bulk delete
+                      </Button>
+                    </span>
+                  </Popconfirm>
+                  <Button
+                    type="link"
+                    onClick={() => setSelectedRowKeys([])}
+                    disabled={bulkAction !== null}
+                  >
+                    Clear selection
+                  </Button>
+                </Space>
+              </div>
+            )}
+
             <div
               style={{
                 width: '100%',
@@ -530,6 +670,10 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 dataSource={filteredUsers}
                 rowKey="id"
                 loading={loading}
+                rowSelection={{
+                  selectedRowKeys,
+                  onChange: (keys) => setSelectedRowKeys(keys),
+                }}
                 scroll={{ x: 'max-content' }}
                 tableLayout="auto"
                 pagination={{
@@ -561,6 +705,14 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               form={form}
               layout="vertical"
               onFinish={handleSubmit}
+              onValuesChange={(changed) => {
+                if (editingUser) return
+                if (!('first_name' in changed) && !('last_name' in changed)) return
+                const first = String(form.getFieldValue('first_name') ?? '').trim()
+                const last = String(form.getFieldValue('last_name') ?? '').trim()
+                const combined = [first, last].filter(Boolean).join(' ')
+                form.setFieldsValue({ full_name: combined })
+              }}
             >
               {editingUser && (
                 <Form.Item label="Avatar">
@@ -602,12 +754,16 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
 
               <Row gutter={24}>
                 <Col span={12}>
-                  <Form.Item name="first_name" label="First name">
+                  <Form.Item name="first_name" label="First name"
+                  rules={[{ required: true, message: 'Please enter First name!' }]}
+                  >
                     <Input placeholder="First name" />
                   </Form.Item>
                 </Col>
                 <Col span={12}>
-                  <Form.Item name="last_name" label="Last name">
+                  <Form.Item name="last_name" label="Last name"
+                  rules={[{ required: true, message: 'Please enter Last name!' }]}
+                  >
                     <Input placeholder="Last name" />
                   </Form.Item>
                 </Col>

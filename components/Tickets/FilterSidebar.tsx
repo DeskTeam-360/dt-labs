@@ -97,7 +97,7 @@ export default function FilterSidebar({
       trigger={null}
       collapsible
       collapsed={collapsed}
-      collapsedWidth={61}
+      collapsedWidth={75}
       width={280}
       style={{
         overflow: 'auto',
@@ -141,6 +141,8 @@ export default function FilterSidebar({
                 mode="multiple"
                 placeholder="All statuses"
                 allowClear
+                showSearch
+                optionFilterProp="label"
                 style={{ width: '100%' }}
                 value={filterStatus}
                 onChange={(v) => onFilterStatusChange(v ?? [])}
@@ -154,13 +156,15 @@ export default function FilterSidebar({
                 mode="multiple"
                 placeholder="All types"
                 allowClear
+                showSearch
+                optionFilterProp="label"
                 style={{ width: '100%' }}
                 value={filterTypeIds}
                 onChange={(v) => onFilterTypeIdsChange(v ?? [])}
                 maxTagCount="responsive"
               >
                 {ticketTypes.map((t) => (
-                  <Option key={t.id} value={t.id}>
+                  <Option key={t.id} value={t.id} label={t.title}>
                     <Space>
                       <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, backgroundColor: t.color }} />
                       {t.title}
@@ -175,13 +179,15 @@ export default function FilterSidebar({
                 mode="multiple"
                 placeholder="All priorities"
                 allowClear
+                showSearch
+                optionFilterProp="label"
                 style={{ width: '100%' }}
                 value={filterPriorityIds}
                 onChange={(v) => onFilterPriorityIdsChange(v ?? [])}
                 maxTagCount="responsive"
               >
                 {ticketPriorities.map((p) => (
-                  <Option key={p.id} value={p.id}>
+                  <Option key={p.id} value={p.id} label={p.title}>
                     <Space>
                       <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, backgroundColor: p.color }} />
                       {p.title}
@@ -198,6 +204,8 @@ export default function FilterSidebar({
                     mode="multiple"
                     placeholder="All visibility"
                     allowClear
+                    showSearch
+                    optionFilterProp="label"
                     style={{ width: '100%' }}
                     value={filterVisibility}
                     onChange={(v) => onFilterVisibilityChange(v ?? [])}
@@ -211,13 +219,15 @@ export default function FilterSidebar({
                     mode="multiple"
                     placeholder="All teams"
                     allowClear
+                    showSearch
+                    optionFilterProp="label"
                     style={{ width: '100%' }}
                     value={filterTeamIds}
                     onChange={(v) => onFilterTeamIdsChange(v ?? [])}
                     maxTagCount="responsive"
                   >
                     {teams.map((t) => (
-                      <Option key={t.id} value={t.id}>{t.name}</Option>
+                      <Option key={t.id} value={t.id} label={t.name}>{t.name}</Option>
                     ))}
                   </Select>
                 </div>
@@ -227,13 +237,15 @@ export default function FilterSidebar({
                     mode="multiple"
                     placeholder="All companies"
                     allowClear
+                    showSearch
+                    optionFilterProp="label"
                     style={{ width: '100%' }}
                     value={filterCompanyIds}
                     onChange={(v) => onFilterCompanyIdsChange(v ?? [])}
                     maxTagCount="responsive"
                   >
                     {companies.map((c) => (
-                      <Option key={c.id} value={c.id}>{c.name}</Option>
+                      <Option key={c.id} value={c.id} label={c.name}>{c.name}</Option>
                     ))}
                   </Select>
                 </div>
@@ -243,6 +255,8 @@ export default function FilterSidebar({
                     mode="multiple"
                     placeholder="All tags"
                     allowClear
+                    showSearch
+                    optionFilterProp="label"
                     style={{ width: '100%' }}
                     value={filterTagIds}
                     onChange={onFilterTagIdsChange}

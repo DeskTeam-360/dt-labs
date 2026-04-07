@@ -50,6 +50,7 @@ export default function CommentWysiwyg({
 }: CommentWysiwygProps) {
   const [mounted, setMounted] = useState(false)
   const quillRef = useRef<{ getEditor: () => QuillEditor } | null>(null)
+  const normalizedPlainTextForQuillRef = useRef(false)
   const ticketIdRef = useRef(ticketId)
   ticketIdRef.current = ticketId
 
@@ -92,18 +93,43 @@ export default function CommentWysiwyg({
     setMounted(true)
   }, [])
 
-  // Render a consistent placeholder on server and initial client to avoid hydration mismatch.
-  // Only mount ReactQuill after hydration.
+  useEffect(() => {
+    normalizedPlainTextForQuillRef.current = false
+  }, [ticketId])
+
+  /** After swap to Quill, turn multiline plain text (from fallback textarea) into <p> HTML once. */
+  useEffect(() => {
+    if (!mounted || !onChange || normalizedPlainTextForQuillRef.current) return
+    const v = value ?? ''
+    if (!v.includes('\n')) return
+    if (/<[a-z][\s\S]*>/i.test(v)) return
+    normalizedPlainTextForQuillRef.current = true
+    const esc = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const html = v
+      .split('\n')
+      .map((line) => `<p>${line ? esc(line) : '<br>'}</p>`)
+      .join('')
+    onChange(html)
+  }, [mounted, value, onChange])
+
+  // Editable fallback until ReactQuill loads (Enter / plain-text bullets work here).
   if (!mounted) {
+    const parsed = height ? parseInt(height.replace('px', ''), 10) : NaN
+    const minH = Number.isFinite(parsed) ? parsed : 200
     return (
-      <div className="comment-wysiwyg-wrapper" style={{ marginBottom: 8 }}>
+      <div className="comment-wysiwyg-wrapper" style={{ marginBottom: 8 }} suppressHydrationWarning>
         <Input.TextArea
-          placeholder={placeholder}
+          placeholder={`${placeholder} (Enter for new lines; use - or * for bullet lines)`}
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
-          rows={height ? parseInt(height.replace('px', '')) / 20 : 10}
-          readOnly
-          style={{ minHeight: height ? parseInt(height.replace('px', '')) : 200, resize: 'none', pointerEvents: 'none' }}
+          rows={Math.max(4, Math.round(minH / 24))}
+          style={{
+            minHeight: minH,
+            resize: 'vertical',
+            whiteSpace: 'pre-wrap',
+            fontFamily: 'inherit',
+          }}
         />
       </div>
     )
