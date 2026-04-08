@@ -18,6 +18,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { SpaNavLink, shouldOpenHrefInNewTab } from '@/components/SpaNavLink'
+import ThemeToggle from '@/components/ThemeToggle'
 
 const { Header } = Layout
 const { Text } = Typography
@@ -183,6 +184,8 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
             }
           }}
         />
+
+        <ThemeToggle variant="ghostOnDark" />
 
         <Dropdown
           menu={{ items: accountMenuItems }}

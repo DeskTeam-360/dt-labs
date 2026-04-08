@@ -13,6 +13,7 @@ import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import type { ColumnsType } from 'antd/es/table'
 import { labelForKnowledgeBaseRoles } from '@/lib/knowledge-base-article-roles'
 
@@ -66,8 +67,8 @@ export default function KnowledgeBaseContent({ user: currentUser }: KnowledgeBas
     fetchArticles()
   }, [])
 
-  const handleCreate = () => router.push('/knowledge-base/create')
-  const handleEdit = (record: ArticleRecord) => router.push(`/knowledge-base/${record.id}/edit`)
+  const handleCreate = () => router.push('/settings/knowledge-base/create')
+  const handleEdit = (record: ArticleRecord) => router.push(`/settings/knowledge-base/${record.id}/edit`)
   const handleDelete = async (id: string) => {
     try {
       await apiFetch(`/api/knowledge-base-articles/${id}`, { method: 'DELETE' })
@@ -154,14 +155,7 @@ export default function KnowledgeBaseContent({ user: currentUser }: KnowledgeBas
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
-      <Layout
-        style={{
-          marginLeft: collapsed ? 80 : 250,
-          transition: 'margin-left 0.2s',
-          minHeight: '100vh',
-          background: '#f0f2f5',
-        }}
-      >
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
             <Title level={2} style={{ margin: 0 }}>
@@ -180,7 +174,7 @@ export default function KnowledgeBaseContent({ user: currentUser }: KnowledgeBas
             pagination={{ pageSize: 15, showSizeChanger: true, showTotal: (t) => `Total ${t} articles` }}
           />
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

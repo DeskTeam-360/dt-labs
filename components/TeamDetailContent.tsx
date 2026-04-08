@@ -40,6 +40,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs, { Dayjs } from 'dayjs'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import DateDisplay from './DateDisplay'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -561,8 +562,8 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
 
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
-        <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card>
             <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
               <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => router.push('/teams')}>
@@ -645,7 +646,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
             </Modal>
           </Card>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

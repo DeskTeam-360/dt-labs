@@ -20,6 +20,7 @@ import {
 import { PlusOutlined, EditOutlined, DeleteOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import ConditionBuilder from './ConditionBuilder'
 import ActionBuilder from './ActionBuilder'
 import type { ColumnsType } from 'antd/es/table'
@@ -268,7 +269,7 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ margin: '24px' }}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -380,7 +381,7 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
             </Form>
           </Modal>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

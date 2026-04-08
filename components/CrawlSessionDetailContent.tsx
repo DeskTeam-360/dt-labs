@@ -5,6 +5,7 @@ import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOu
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import DateDisplay from './DateDisplay'
 import { getCrawlPages } from '@/app/actions/crawl'
 import type { ColumnsType } from 'antd/es/table'
@@ -568,7 +569,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   style={{
                     width: '100%',
                     height: 262,
-                    background: '#f0f2f5',
+                    background: 'var(--layout-bg)',
                     backgroundImage: `url(${image})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
@@ -580,7 +581,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   style={{
                     width: '100%',
                     height: 262,
-                    background: '#f0f2f5',
+                    background: 'var(--layout-bg)',
                     borderBottom: '1px solid #dadde1',
                     display: 'flex',
                     alignItems: 'center',
@@ -1347,8 +1348,8 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
-        <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card>
             <Space style={{ marginBottom: 24 }}>
               <Button
@@ -1390,7 +1391,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
             <Tabs items={tabItems} />
           </Card>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

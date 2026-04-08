@@ -57,18 +57,19 @@ export default function KanbanCard({
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
       <Card
+        className="kanban-ticket-card"
         size="small"
         style={{
           margin: 6,
           cursor: 'grab',
           borderRadius: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          boxShadow: 'var(--kanban-card-shadow)',
           maxWidth: 300,
           width: '100%',
-          backgroundColor: '#fafafa',
-          border: '1px solid rgba(0,0,0,0.04)',
+          backgroundColor: 'var(--kanban-card-bg)',
+          border: '1px solid var(--kanban-card-border)',
         }}
-        styles={{ body: { padding: 14 } }}
+        styles={{ body: { padding: 14, background: 'transparent' } }}
         {...listeners}
       >
         {/* Tags + menu row — stop drag sensor when interacting with filter chips */}
@@ -227,7 +228,7 @@ export default function KanbanCard({
             <Button
               type="text"
               size="small"
-              icon={<MoreOutlined style={{ fontSize: 16, color: '#8c8c8c' }} />}
+              icon={<MoreOutlined style={{ fontSize: 16, color: 'var(--kanban-card-muted)' }} />}
               onClick={(e) => e.stopPropagation()}
             />
           </Dropdown>
@@ -245,7 +246,7 @@ export default function KanbanCard({
             router.push(`/tickets/${ticket.id}`)
           }}
         >
-          <Text strong style={{ fontSize: 14, color: '#262626', lineHeight: 1.4, display: 'block' }}>
+          <Text strong style={{ fontSize: 14, color: 'var(--kanban-card-title)', lineHeight: 1.4, display: 'block' }}>
             {ticket.has_unread_replies && (
               <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
             )}
@@ -259,23 +260,40 @@ export default function KanbanCard({
         </a>
 
         {/* Bottom: due, updated, comment, avatars */}
-        <Flex justify="space-between" align="center" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.06)' }} wrap="wrap" gap={8}>
+        <Flex
+          justify="space-between"
+          align="center"
+          style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--kanban-card-divider)' }}
+          wrap="wrap"
+          gap={8}
+        >
           <Flex gap={10} align="center" wrap="wrap" style={{ flex: 1, minWidth: 0 }}>
             {ticket.due_date && (
-              <Flex align="center" gap={4} style={{ fontWeight: 700,fontSize: 11, color: dayjs(ticket.due_date).isBefore(dayjs()) && ticket.status !== 'completed' && ticket.status !== 'cancel' ? '#ff4d4f' : '#8c8c8c' }}>
+              <Flex
+                align="center"
+                gap={4}
+                style={{
+                  fontWeight: 700,
+                  fontSize: 11,
+                  color:
+                    dayjs(ticket.due_date).isBefore(dayjs()) && ticket.status !== 'completed' && ticket.status !== 'cancel'
+                      ? '#ff4d4f'
+                      : 'var(--kanban-card-muted)',
+                }}
+              >
                 <FlagOutlined />
                 <span>Due <DateDisplay date={ticket.due_date} format="date-only" /></span>
               </Flex>
             )}
             {ticket.updated_at && (
-              <Flex align="center" gap={4} style={{ color: '#8c8c8c', fontSize: 11 }}>
+              <Flex align="center" gap={4} style={{ color: 'var(--kanban-card-muted)', fontSize: 11 }}>
                 <FieldTimeOutlined />
                 <span>Updated <DateDisplay date={ticket.updated_at} format="date-only" /></span>
               </Flex>
             )}
             {ticket.has_unread_replies && (
               <Tooltip title="Unread replies">
-                <CommentOutlined style={{ color: '#8c8c8c', fontSize: 12 }} />
+                <CommentOutlined style={{ color: 'var(--kanban-card-muted)', fontSize: 12 }} />
               </Tooltip>
             )}
           </Flex>

@@ -24,6 +24,7 @@ import { eq, inArray, desc, asc, and, or, ilike, gte, lte } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { notifyTicketUsers } from '@/lib/firebase/ticket-notifications-server'
+import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
 import { coerceTicketType, DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
 
 const DEFAULT_LIMIT = 500
@@ -491,6 +492,16 @@ export async function POST(request: Request) {
       console.error('[POST ticket] notify assignees:', e)
     }
   }
+
+  void notifySlackTicketEvent('ticket_created', {
+    id: newTicket.id,
+    title: newTicket.title,
+    status: newTicket.status,
+    teamId: newTicket.teamId ?? null,
+    priorityId: newTicket.priorityId ?? null,
+    companyId: newTicket.companyId ?? null,
+    typeId: newTicket.typeId ?? null,
+  })
 
   return NextResponse.json({
     id: newTicket.id,

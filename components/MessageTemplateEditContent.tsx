@@ -5,6 +5,7 @@ import { ArrowLeftOutlined, SaveOutlined, EyeOutlined } from '@ant-design/icons'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
 import MessageTemplatePlaceholdersPanel from './MessageTemplatePlaceholdersPanel'
 import MessageTemplatePreviewModal from './MessageTemplatePreviewModal'
@@ -67,7 +68,7 @@ export default function MessageTemplateEditContent({
       })
       setRow(updated)
       message.success('Template saved')
-      router.push('/message-templates')
+      router.push('/settings/message-templates')
     } catch (e: unknown) {
       message.error((e as Error).message || 'Save failed')
     } finally {
@@ -78,12 +79,12 @@ export default function MessageTemplateEditContent({
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ margin: 24 }}>
           <Card>
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
               <Space wrap>
-                <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/message-templates')}>
+                <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/settings/message-templates')}>
                   Back to list
                 </Button>
               </Space>
@@ -137,7 +138,7 @@ export default function MessageTemplateEditContent({
                     <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => void save()}>
                       Save and return to list
                     </Button>
-                    <Button onClick={() => router.push('/message-templates')}>Cancel</Button>
+                    <Button onClick={() => router.push('/settings/message-templates')}>Cancel</Button>
                   </Space>
 
                   <MessageTemplatePreviewModal
@@ -150,7 +151,7 @@ export default function MessageTemplateEditContent({
             </Space>
           </Card>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

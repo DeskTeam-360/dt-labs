@@ -5,6 +5,7 @@ import { EditOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import MessageTemplatePreviewModal from './MessageTemplatePreviewModal'
 import { shouldOpenHrefInNewTab } from './SpaNavLink'
 import type { ColumnsType } from 'antd/es/table'
@@ -122,7 +123,7 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
       key: 'actions',
       width: 200,
       render: (_: unknown, r) => {
-        const editHref = `/message-templates/${r.id}/edit`
+        const editHref = `/settings/message-templates/${r.id}/edit`
         return (
           <Space wrap size="small">
             <Button size="small" icon={<EyeOutlined />} onClick={() => setPreviewRow(r)}>
@@ -165,7 +166,7 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ margin: 24 }}>
           <Card>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -210,7 +211,7 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
             </Space>
           </Card>
         </Content>
-      </Layout>
+      </AdminMainColumn>
 
       <MessageTemplatePreviewModal
         open={!!previewRow}

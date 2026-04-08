@@ -20,6 +20,7 @@ import { ArrowLeftOutlined, PlayCircleOutlined, SaveOutlined, PictureOutlined } 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import CustomerNavbar from './CustomerNavbar'
 import dayjs from 'dayjs'
 
@@ -273,8 +274,12 @@ export default function ContentPlannerDetailContent({
       ) : (
         <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       )}
-      <Layout style={{ marginLeft: isCustomer ? 0 : (collapsed ? 80 : 250), transition: 'margin-left 0.2s' }}>
-        <div style={{ padding: 24, background: '#f0f2f5', minHeight: '100vh' }}>
+      <AdminMainColumn
+        collapsed={collapsed}
+        user={currentUser}
+        noSidebarInset={isCustomer}
+      >
+        <div style={{ padding: 24, background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Space style={{ marginBottom: 24 }}>
             <Button
               icon={<ArrowLeftOutlined />}
@@ -591,7 +596,7 @@ export default function ContentPlannerDetailContent({
             </Form>
           </Card>
         </div>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

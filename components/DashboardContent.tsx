@@ -15,7 +15,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminSidebar from './AdminSidebar'
-import TicketSearchNavbar from './TicketSearchNavbar'
+import AdminMainColumn from './AdminMainColumn'
 import DashboardHourlyActivityCard from './DashboardHourlyActivityCard'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 
@@ -293,18 +293,15 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={user} collapsed={collapsed} onCollapse={setCollapsed} />
       
-      <Layout
+      <AdminMainColumn
+        collapsed={collapsed}
+        user={user}
         style={{
-          marginLeft: collapsed ? 80 : 250,
-          transition: 'margin-left 0.2s',
           borderRadius: '16px 0 0 16px',
           overflow: 'hidden',
-          background: '#f0f2f5',
-          minHeight: '100vh',
         }}
       >
-        <TicketSearchNavbar savedFiltersUserId={user.id} />
-        <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
         <div style={{ marginBottom: 24 }}>
           <Title level={2}>Welcome!</Title>
           <Text type="secondary">
@@ -613,7 +610,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
           </Col>
         </Row>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

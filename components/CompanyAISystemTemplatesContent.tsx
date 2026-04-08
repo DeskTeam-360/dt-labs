@@ -22,6 +22,7 @@ import {
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import DateDisplay from './DateDisplay'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -220,17 +221,16 @@ export default function CompanyAISystemTemplatesContent({
         collapsed={collapsed}
         onCollapse={setCollapsed}
       />
-      <Layout
-        style={{
-          marginLeft: mounted ? (collapsed ? 80 : 250) : 250,
-          transition: 'margin-left 0.2s',
-        }}
-        suppressHydrationWarning
+      <AdminMainColumn
+        collapsed={collapsed}
+        user={currentUser}
+        style={{ marginLeft: mounted ? (collapsed ? 80 : 250) : 250 }}
+        layoutProps={{ suppressHydrationWarning: true }}
       >
         <Content
           style={{
             padding: '24px',
-            background: '#f0f2f5',
+            background: 'var(--layout-bg)',
             minHeight: '100vh',
           }}
         >
@@ -314,7 +314,7 @@ export default function CompanyAISystemTemplatesContent({
             </Form>
           </Modal>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

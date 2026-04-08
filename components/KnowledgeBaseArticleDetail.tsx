@@ -5,6 +5,7 @@ import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -59,14 +60,7 @@ export default function KnowledgeBaseArticleDetail({ user: currentUser }: Knowle
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
-      <Layout
-        style={{
-          marginLeft: collapsed ? 80 : 250,
-          transition: 'margin-left 0.2s',
-          minHeight: '100vh',
-          background: '#f0f2f5',
-        }}
-      >
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ padding: 24, maxWidth: 800 }}>
           <Button
             type="text"
@@ -103,7 +97,7 @@ export default function KnowledgeBaseArticleDetail({ user: currentUser }: Knowle
             </Card>
           ) : null}
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

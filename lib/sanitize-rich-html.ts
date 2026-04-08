@@ -1,4 +1,5 @@
-import DOMPurify, { type Config } from 'isomorphic-dompurify'
+import DOMPurify from 'isomorphic-dompurify'
+import type { Config } from 'dompurify'
 
 /**
  * HTML untuk ditampilkan di detail tiket (deskripsi + komentar, termasuk dari email).

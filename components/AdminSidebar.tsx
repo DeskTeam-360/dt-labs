@@ -97,12 +97,6 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       } else if (pathname.startsWith('/content-planner')) {
         setOpenKeys(['content-planner'])
       } else if (
-        canAccessTickets(role) &&
-        !isCustomer &&
-        (pathname === '/tickets' || pathname === '/tickets/' || pathname.startsWith('/tickets/'))
-      ) {
-        setOpenKeys((prev) => (prev.includes('tickets-submenu') ? prev : [...prev, 'tickets-submenu']))
-      } else if (
         !isCustomer &&
         (pathname.startsWith('/users') ||
           pathname.startsWith('/companies') ||
@@ -178,26 +172,19 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           ]
         : [
             {
-              key: 'tickets-submenu',
+              key: '/tickets',
               icon: <CheckSquareOutlined />,
-              label: 'Tickets',
-              children: [
-                {
-                  key: '/tickets',
-                  icon: <CheckSquareOutlined />,
-                  label: linkLabel('/tickets', 'All tickets'),
-                },
-                {
-                  key: '/tickets?ticket_type=spam',
-                  icon: <WarningOutlined />,
-                  label: linkLabel('/tickets?ticket_type=spam', 'Spam'),
-                },
-                {
-                  key: '/tickets?ticket_type=trash',
-                  icon: <DeleteOutlined />,
-                  label: linkLabel('/tickets?ticket_type=trash', 'Trash'),
-                },
-              ],
+              label: linkLabel('/tickets', 'All tickets'),
+            },
+            {
+              key: '/tickets?ticket_type=spam',
+              icon: <WarningOutlined />,
+              label: linkLabel('/tickets?ticket_type=spam', 'Spam'),
+            },
+            {
+              key: '/tickets?ticket_type=trash',
+              icon: <DeleteOutlined />,
+              label: linkLabel('/tickets?ticket_type=trash', 'Trash'),
             },
           ]
       : []),
@@ -214,7 +201,8 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     if (isCustomer) {
       return !['users-submenu', '/settings'].includes(item.key as string)
     }
-    if ((item.key === '/tickets' || item.key === 'tickets-submenu') && !canAccessTickets(role)) return false
+    const ticketMenuKeys = ['/tickets', '/tickets?ticket_type=spam', '/tickets?ticket_type=trash']
+    if (ticketMenuKeys.includes(item.key as string) && !canAccessTickets(role)) return false
     if (item.key === '/settings' && !canAccessSettingsHub(role)) return false
     return true
   })
@@ -273,7 +261,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       collapsible
       collapsed={collapsed}
       width={250}
-      className="admin-sidebar-deskteam"
+      className="admin-sidebar-deskteam deskteam-app-sidebar"
       style={{
         overflow: 'hidden',
         height: '100vh',
@@ -293,10 +281,11 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           justifyContent: collapsed ? 'center' : 'space-between',
           padding: collapsed ? '0 16px' : '0 24px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+          gap: 8,
         }}
       >
         {!collapsed && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
             <Image
               src="/deskteam360-logo-white%201.png"
               alt="DeskTeam360"
@@ -304,18 +293,19 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
               width={1000}
               style={{ flexShrink: 0, objectFit: 'contain', width: '100%', height: '100%' }}
             />
-            
           </div>
         )}
-        <div
-          onClick={() => onCollapse(!collapsed)}
-          style={{
-            cursor: 'pointer',
-            color: '#fff',
-            fontSize: 16,
-          }}
-        >
-          {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div
+            onClick={() => onCollapse(!collapsed)}
+            style={{
+              cursor: 'pointer',
+              color: '#fff',
+              fontSize: 16,
+            }}
+          >
+            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          </div>
         </div>
       </div>
 

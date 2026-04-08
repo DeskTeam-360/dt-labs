@@ -27,6 +27,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import DateDisplay from './DateDisplay'
 import { SpaNavLink, shouldOpenHrefInNewTab } from './SpaNavLink'
 import { confirmUserCompanyMove } from '@/components/confirm-user-company-move'
@@ -527,8 +528,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
 
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
-        <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
               <Title level={2} style={{ margin: 0 }}>Users Management</Title>
@@ -997,7 +998,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
             </Form>
           </Modal>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

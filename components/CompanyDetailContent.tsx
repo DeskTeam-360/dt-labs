@@ -5,6 +5,7 @@ import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOu
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import CustomerNavbar from './CustomerNavbar'
 import DateDisplay from './DateDisplay'
 import {
@@ -1034,8 +1035,12 @@ export default function CompanyDetailContent({
         <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       )}
 
-      <Layout style={{ marginLeft: isCustomer ? 0 : (collapsed ? 80 : 250), transition: 'margin-left 0.2s' }}>
-        <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+      <AdminMainColumn
+        collapsed={collapsed}
+        user={currentUser}
+        noSidebarInset={isCustomer}
+      >
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card>
            
 
@@ -1346,7 +1351,7 @@ export default function CompanyDetailContent({
             </Modal>
           </Card>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

@@ -1,9 +1,42 @@
 'use client'
 
-import { App, ConfigProvider } from 'antd'
+import { App, ConfigProvider, theme } from 'antd'
 import { SessionProvider } from 'next-auth/react'
 import type { Session } from 'next-auth'
 import FirebaseSessionBridge from '@/components/FirebaseSessionBridge'
+import { ThemeProvider, useTheme } from '@/components/ThemeProvider'
+
+function ThemedConfig({ children }: { children: React.ReactNode }) {
+  const { resolved } = useTheme()
+  const isDark = resolved === 'dark'
+
+  return (
+    <ConfigProvider
+      theme={{
+        algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        token: {
+          colorPrimary: '#667eea',
+          borderRadius: 8,
+          ...(isDark
+            ? {
+                colorBgElevated: '#1f1f1f',
+                colorBgContainer: '#141414',
+              }
+            : {}),
+        },
+        /** Sidebar always uses `theme="dark"` menu; global darkAlgorithm was forcing white text on the light pill. */
+        components: {
+          Menu: {
+            darkItemSelectedBg: '#f0f2f5',
+            darkItemSelectedColor: '#141414',
+          },
+        },
+      }}
+    >
+      <App>{children}</App>
+    </ConfigProvider>
+  )
+}
 
 export default function AntdProvider({
   children,
@@ -13,15 +46,8 @@ export default function AntdProvider({
   session?: Session | null
 }) {
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: '#667eea',
-          borderRadius: 8,
-        },
-      }}
-    >
-      <App>
+    <ThemeProvider>
+      <ThemedConfig>
         <SessionProvider
           session={session}
           refetchInterval={0}
@@ -30,8 +56,7 @@ export default function AntdProvider({
           <FirebaseSessionBridge />
           {children}
         </SessionProvider>
-      </App>
-    </ConfigProvider>
+      </ThemedConfig>
+    </ThemeProvider>
   )
 }
-

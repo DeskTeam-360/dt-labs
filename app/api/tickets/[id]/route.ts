@@ -23,6 +23,7 @@ import { NextResponse } from 'next/server'
 import { notifyTicketUsers, diffNewAssignees } from '@/lib/firebase/ticket-notifications-server'
 import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 import { coerceTicketType, parseTicketType } from '@/lib/ticket-classification'
+import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
 
 async function triggerTicketUpdatedAutomation(ticketId: number) {
   try {
@@ -130,6 +131,35 @@ export async function PATCH(
         })
       } catch (e) {
         console.error('[PATCH ticket status] notify:', e)
+      }
+      try {
+        const [slackRow] = await db
+          .select({
+            id: tickets.id,
+            title: tickets.title,
+            status: tickets.status,
+            teamId: tickets.teamId,
+            priorityId: tickets.priorityId,
+            companyId: tickets.companyId,
+            typeId: tickets.typeId,
+          })
+          .from(tickets)
+          .where(eq(tickets.id, ticketId))
+          .limit(1)
+        if (slackRow) {
+          void notifySlackTicketEvent('status_changed', {
+            id: slackRow.id,
+            title: slackRow.title,
+            status: slackRow.status,
+            teamId: slackRow.teamId ?? null,
+            priorityId: slackRow.priorityId ?? null,
+            companyId: slackRow.companyId ?? null,
+            typeId: slackRow.typeId ?? null,
+            previousStatus: cur.status,
+          })
+        }
+      } catch (e) {
+        console.error('[PATCH ticket status] slack:', e)
       }
     }
     await triggerTicketUpdatedAutomation(ticketId)
@@ -321,6 +351,24 @@ export async function PATCH(
           actorRole,
           action: 'ticket_updated',
           metadata: meta,
+        })
+      }
+
+      const statusChange = changes.status as { from: unknown; to: unknown } | undefined
+      if (
+        statusChange &&
+        statusChange.from !== statusChange.to &&
+        afterSnapshot
+      ) {
+        void notifySlackTicketEvent('status_changed', {
+          id: ticketId,
+          title: afterSnapshot.title,
+          status: afterSnapshot.status,
+          teamId: afterSnapshot.teamId,
+          priorityId: afterSnapshot.priorityId,
+          companyId: afterSnapshot.companyId,
+          typeId: afterSnapshot.typeId,
+          previousStatus: String(statusChange.from),
         })
       }
 

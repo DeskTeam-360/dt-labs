@@ -20,10 +20,10 @@ const navControlButtonStyle = (base?: CSSProperties): CSSProperties => ({
   justifyContent: 'center',
   padding: '4px 10px',
   minHeight: 28,
-  border: '1px solid #d9d9d9',
+  border: '1px solid var(--ticket-nav-icon-btn-border)',
   borderRadius: 8,
-  background: '#fff',
-  color: '#2b1252',
+  background: 'var(--ticket-nav-icon-btn-bg)',
+  color: 'var(--ticket-nav-icon-btn-color)',
   cursor: 'pointer',
   fontSize: 12,
   lineHeight: 1.3,
@@ -226,10 +226,10 @@ export default function TicketNotificationBell() {
   )
 
   const hoverSurface = (e: React.MouseEvent<HTMLElement>) => {
-    e.currentTarget.style.background = '#fafafa'
+    e.currentTarget.style.background = 'var(--ticket-nav-icon-hover-bg)'
   }
   const hoverSurfaceLeave = (e: React.MouseEvent<HTMLElement>) => {
-    e.currentTarget.style.background = '#fff'
+    e.currentTarget.style.background = 'var(--ticket-nav-icon-btn-bg)'
   }
 
   if (!enabled) return null
@@ -348,10 +348,10 @@ export default function TicketNotificationBell() {
           width: 40,
           height: 40,
           padding: 0,
-          border: '1px solid #d9d9d9',
+          border: '1px solid var(--ticket-nav-icon-btn-border)',
           borderRadius: 8,
-          background: '#fff',
-          color: '#2b1252',
+          background: 'var(--ticket-nav-icon-btn-bg)',
+          color: 'var(--ticket-nav-icon-btn-color)',
           cursor: 'pointer',
         }}
         onMouseEnter={hoverSurface}

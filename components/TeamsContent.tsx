@@ -19,6 +19,7 @@ import { PlusOutlined, EditOutlined, DeleteOutlined, TeamOutlined, EyeOutlined }
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...options, credentials: 'include' })
@@ -231,8 +232,8 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
 
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
-        <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <Title level={2} style={{ margin: 0 }}>
@@ -299,7 +300,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
           </Modal>
 
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

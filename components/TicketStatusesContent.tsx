@@ -18,6 +18,7 @@ import {
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import type { ColumnsType } from 'antd/es/table'
 
 const { Content } = Layout
@@ -275,7 +276,7 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ margin: '24px' }}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -348,7 +349,7 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
             </Form>
           </Modal>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

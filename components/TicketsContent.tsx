@@ -10,7 +10,7 @@ import TicketsRoundRobinView from './Tickets/TicketsRoundRobinView'
 import FilterSidebar from './Tickets/FilterSidebar'
 import TicketFormModal from './Tickets/TicketFormModal'
 import { useTicketsData } from './Tickets/useTicketsData'
-import TicketSearchNavbar from './TicketSearchNavbar'
+import AdminMainColumn from './AdminMainColumn'
 import { addSavedTicketFilterPreset } from '@/lib/ticket-saved-filters'
 
 interface TicketsContentProps {
@@ -98,18 +98,16 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
 
-      <Layout
+      <AdminMainColumn
+        collapsed={collapsed}
+        user={currentUser}
         style={{
-          marginLeft: collapsed ? 80 : 250,
           marginRight: filterSidebarCollapsed ? 75 : 280,
           transition: 'margin-left 0.2s, margin-right 0.2s',
           borderRadius: '16px 0 0 16px',
           overflow: 'hidden',
-          background: '#f0f2f5',
-          minHeight: '100vh',
         }}
       >
-        <TicketSearchNavbar savedFiltersUserId={!isCustomer ? currentUser.id : undefined} />
         <div style={{ padding: 0, minWidth: 0 }}>
           <TicketsHeader
             viewMode={viewMode}
@@ -202,7 +200,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             />
           )}
         </div>
-      </Layout>
+      </AdminMainColumn>
 
       <FilterSidebar
         collapsed={filterSidebarCollapsed}

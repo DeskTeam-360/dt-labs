@@ -20,7 +20,7 @@ export default async function KnowledgeBaseEditPage({
     .limit(1)
 
   if (!row) {
-    redirect('/knowledge-base')
+    redirect('/settings/knowledge-base')
   }
 
   const initialValues = {

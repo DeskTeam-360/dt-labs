@@ -23,7 +23,7 @@ export async function GET() {
 
     if (!clientId) {
       console.error('GOOGLE_CLIENT_ID is not set')
-      return NextResponse.redirect(new URL('/email-integration?error=missing_config', baseUrl))
+      return NextResponse.redirect(new URL('/settings/email-integration?error=missing_config', baseUrl))
     }
 
     const state = Buffer.from(JSON.stringify({ userId: session.user.id })).toString('base64url')
@@ -42,6 +42,6 @@ export async function GET() {
   } catch (error) {
     console.error('Google connect error:', error)
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-    return NextResponse.redirect(new URL('/email-integration?error=connect_failed', baseUrl))
+    return NextResponse.redirect(new URL('/settings/email-integration?error=connect_failed', baseUrl))
   }
 }

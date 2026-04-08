@@ -16,7 +16,7 @@ export default async function MessageTemplateEditPage({
   }
 
   const { id } = await params
-  if (!id) redirect('/message-templates')
+  if (!id) redirect('/settings/message-templates')
 
   return (
     <MessageTemplateEditContent

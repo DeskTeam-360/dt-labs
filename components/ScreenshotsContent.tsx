@@ -4,6 +4,7 @@ import { Layout, Card, Row, Col, Image, Typography, Select, DatePicker, Button, 
 import { PictureOutlined, CopyOutlined, DeleteOutlined, EditOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import dayjs, { Dayjs } from 'dayjs'
 
 type SessionUser = { id: string; email?: string | null; name?: string | null }
@@ -138,8 +139,8 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={user} collapsed={collapsed} onCollapse={setCollapsed} />
       
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
-        <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+      <AdminMainColumn collapsed={collapsed} user={user}>
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card>
             <Title level={2}>
               <PictureOutlined /> Screenshots Gallery
@@ -257,7 +258,7 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
             )}
           </Card>
         </Content>
-      </Layout>
+      </AdminMainColumn>
 
       {/* Modal for screenshot details */}
       <Modal

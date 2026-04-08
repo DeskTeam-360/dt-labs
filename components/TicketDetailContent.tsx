@@ -51,7 +51,7 @@ import { TabGeneral, TabTimeTracker, TabScreenshots, TabActivity } from './Ticke
 import TabGeneralCustomer from './TicketDetail/TabGeneralCustomer'
 import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
 import TicketPresenceBar from './TicketPresenceBar'
-import TicketSearchNavbar from './TicketSearchNavbar'
+import AdminMainColumn from './AdminMainColumn'
 import dayjs from 'dayjs'
 import { isAdmin } from '@/lib/auth-utils'
 import { useTicketDetailLiveSync } from '@/lib/firebase/useTicketDetailLiveSync'
@@ -1098,9 +1098,8 @@ export default function TicketDetailContent({
     return (
         <Layout style={{ minHeight: '100vh' }}>
             <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
-            <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
-                <TicketSearchNavbar savedFiltersUserId={!isCustomer ? currentUser.id : undefined} />
-                <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 56px)' }}>
+            <AdminMainColumn collapsed={collapsed} user={currentUser}>
+                <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: 'calc(100vh - 56px)' }}>
                     <Card style={{ margin: '0 auto' }}>
                         <Flex gap={16} align="center" wrap="wrap" style={{ marginBottom: 24 }}>
                             <Button
@@ -1431,7 +1430,7 @@ export default function TicketDetailContent({
 
                    
                 </Content>
-            </Layout>
+            </AdminMainColumn>
         </Layout>
     )
 }

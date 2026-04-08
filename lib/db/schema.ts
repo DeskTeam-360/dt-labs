@@ -538,6 +538,18 @@ export const emailSkipList = pgTable('email_skip_list', {
   createdAt: ts('created_at').notNull().defaultNow(),
 })
 
+/** Incoming Webhook per rule → one Slack channel; filter JSON matches ticket dimensions & events */
+export const slackTicketNotificationRules = pgTable('slack_ticket_notification_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }),
+  webhookUrl: text('webhook_url').notNull(),
+  isEnabled: boolean('is_enabled').notNull().default(true),
+  filter: jsonb('filter').notNull().default({}),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
 // ============ Automation Rules ============
 export const automationRules = pgTable('automation_rules', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),

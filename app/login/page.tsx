@@ -5,6 +5,7 @@ import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
+import ThemeToggle from '@/components/ThemeToggle'
 
 const { Title, Text } = Typography
 
@@ -76,14 +77,27 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '20px'
-    }}>
+    <div style={{ position: 'relative', minHeight: '100vh' }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          zIndex: 10,
+        }}
+      >
+        <ThemeToggle variant="ghostOnDark" placement="bottomRight" />
+      </div>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          padding: '20px',
+        }}
+      >
       <Card
         style={{
           width: '100%',
@@ -167,6 +181,7 @@ export default function LoginPage() {
           )}
         </Form>
       </Card>
+      </div>
     </div>
   )
 }

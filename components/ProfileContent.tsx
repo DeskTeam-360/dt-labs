@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { uploadAvatar } from '@/utils/storage'
 import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -206,8 +207,8 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={user} collapsed={collapsed} onCollapse={setCollapsed} />
       
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
-        <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+      <AdminMainColumn collapsed={collapsed} user={{ id: user.id }}>
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card>
             <Title level={2}>Edit Profile</Title>
             <Text type="secondary">Update your profile information</Text>
@@ -535,7 +536,7 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
             </div>
           </Card>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

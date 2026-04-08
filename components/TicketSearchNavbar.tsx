@@ -20,6 +20,7 @@ import {
 } from '@/lib/ticket-activity-labels'
 import TicketActivityActorAvatar from '@/components/TicketActivityActorAvatar'
 import TicketNotificationBell from '@/components/TicketNotificationBell'
+import ThemeToggle from '@/components/ThemeToggle'
 
 dayjs.extend(relativeTime)
 dayjs.locale('en')
@@ -234,6 +235,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
 
   return (
     <div
+      className="ticket-search-navbar"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -241,8 +243,8 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
         padding: '0 16px',
         height: NAV_HEIGHT,
         minHeight: NAV_HEIGHT,
-        background: '#fff',
-        borderBottom: '1px solid #f0f0f0',
+        background: 'var(--ticket-nav-bg)',
+        borderBottom: '1px solid var(--ticket-nav-border)',
         position: 'sticky',
         top: 0,
         zIndex: 100,
@@ -262,7 +264,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
           href="/dashboard"
           style={{
             fontWeight: 600,
-            color: '#2b1252',
+            color: 'var(--ticket-nav-brand)',
             whiteSpace: 'nowrap',
             display: 'inline-flex',
             alignItems: 'center',
@@ -309,10 +311,10 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
               right: 0,
               top: '100%',
               marginTop: 4,
-              background: '#fff',
+              background: 'var(--ticket-nav-panel-bg)',
               borderRadius: 8,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-              border: '1px solid #f0f0f0',
+              boxShadow: '0 4px 12px var(--ticket-nav-shadow)',
+              border: '1px solid var(--ticket-nav-panel-border)',
               maxHeight: 360,
               overflow: 'auto',
               zIndex: 200,
@@ -337,7 +339,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
                     width: '100%',
                     padding: '10px 14px',
                     border: 'none',
-                    borderBottom: '1px solid #f5f5f5',
+                    borderBottom: '1px solid var(--ticket-nav-panel-row-border)',
                     background: 'transparent',
                     cursor: 'pointer',
                     textAlign: 'left',
@@ -347,9 +349,14 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
                   onMouseDown={(e) => e.preventDefault()}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, gap: 8 }}>
-                    <span style={{ color: '#8c8c8c', fontSize: 12, flexShrink: 0 }}>#{t.id}</span>
+                    <span style={{ color: 'var(--ticket-nav-muted)', fontSize: 12, flexShrink: 0 }}>#{t.id}</span>
                     <span
-                      style={{ color: '#262626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      style={{
+                        color: 'var(--ticket-nav-text)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
                     >
                       {t.title || '(No title)'}
                     </span>
@@ -408,7 +415,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
                 </button>
               ))
             ) : (
-              <div style={{ padding: 12, color: '#8c8c8c', fontSize: 13 }}>No tickets found</div>
+              <div style={{ padding: 12, color: 'var(--ticket-nav-muted)', fontSize: 13 }}>No tickets found</div>
             )}
           </div>
         )}
@@ -423,6 +430,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
           gap: 6,
         }}
       >
+        <ThemeToggle variant="ticketNav" placement="bottomRight" />
         <TicketNotificationBell />
       </div>
 
@@ -450,10 +458,10 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
               width: 40,
               height: 40,
               padding: 0,
-              border: '1px solid #d9d9d9',
+              border: '1px solid var(--ticket-nav-icon-btn-border)',
               borderRadius: 8,
-              background: '#fff',
-              color: '#2b1252',
+              background: 'var(--ticket-nav-icon-btn-bg)',
+              color: 'var(--ticket-nav-icon-btn-color)',
               cursor: 'pointer',
             }}
           >
@@ -470,16 +478,24 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
               marginTop: 6,
               width: 380,
               maxWidth: 'calc(100vw - 32px)',
-              background: '#fff',
+              background: 'var(--ticket-nav-panel-bg)',
               borderRadius: 8,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-              border: '1px solid #f0f0f0',
+              boxShadow: '0 4px 12px var(--ticket-nav-shadow)',
+              border: '1px solid var(--ticket-nav-panel-border)',
               zIndex: 220,
               overflow: 'hidden',
             }}
             onMouseDown={(e) => e.preventDefault()}
           >
-            <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 13 }}>
+            <div
+              style={{
+                padding: '10px 14px',
+                borderBottom: '1px solid var(--ticket-nav-panel-border)',
+                fontWeight: 600,
+                fontSize: 13,
+                color: 'var(--ticket-nav-text)',
+              }}
+            >
               Recent activity
             </div>
             {historyLoading ? (
@@ -487,7 +503,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
                 <Spin size="small" />
               </div>
             ) : historyRows.length === 0 ? (
-              <div style={{ padding: 14, color: '#8c8c8c', fontSize: 13 }}>No activity yet</div>
+              <div style={{ padding: 14, color: 'var(--ticket-nav-muted)', fontSize: 13 }}>No activity yet</div>
             ) : (
               <div style={{ maxHeight: 360, overflow: 'auto' }}>
                 {historyRows.map((r) => (
@@ -507,7 +523,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
                       width: '100%',
                       padding: '10px 14px',
                       border: 'none',
-                      borderBottom: '1px solid #f5f5f5',
+                      borderBottom: '1px solid var(--ticket-nav-panel-row-border)',
                       background: 'transparent',
                       cursor: 'pointer',
                       textAlign: 'left',
@@ -522,15 +538,15 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
                       email={r.actor?.email}
                     />
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ color: '#8c8c8c', fontSize: 11, marginBottom: 4 }}>
+                      <div style={{ color: 'var(--ticket-nav-muted)', fontSize: 11, marginBottom: 4 }}>
                         #{r.ticket_id} · {r.created_at ? dayjs(r.created_at).fromNow() : '—'}
                       </div>
-                      <div style={{ fontWeight: 500, color: '#262626', marginBottom: 2 }}>
+                      <div style={{ fontWeight: 500, color: 'var(--ticket-nav-text)', marginBottom: 2 }}>
                         {formatTicketActivityNavbarLabel(r.action, r.actor_role)}
                       </div>
                       <div
                         style={{
-                          color: '#595959',
+                          color: 'var(--ticket-nav-text-secondary)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
@@ -543,10 +559,16 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
                 ))}
               </div>
             )}
-            <div style={{ padding: '8px 12px', borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>
+            <div
+              style={{
+                padding: '8px 12px',
+                borderTop: '1px solid var(--ticket-nav-panel-border)',
+                textAlign: 'center',
+              }}
+            >
               <SpaNavLink
                 href="/ticket-activity"
-                style={{ fontSize: 13, fontWeight: 500, color: '#2b1252' }}
+                style={{ fontSize: 13, fontWeight: 500, color: 'var(--ticket-nav-filter-link)' }}
                 onClick={() => setHistoryOpen(false)}
               >
                 See all
@@ -568,7 +590,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
             maxWidth: 480,
           }}
         >
-          <Text type="secondary" style={{ fontSize: 11, flexShrink: 0, textTransform: 'uppercase', letterSpacing: 0.03 }}>
+          <Text style={{ fontSize: 11, flexShrink: 0, textTransform: 'uppercase', letterSpacing: 0.03, color: 'var(--ticket-nav-muted)' }}>
             My Filters
           </Text>
           <div
@@ -590,8 +612,8 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
                   alignItems: 'center',
                   gap: 2,
                   flexShrink: 0,
-                  background: '#f5f0ff',
-                  border: '1px solid #d3adf7',
+                  background: 'var(--ticket-nav-filter-bg)',
+                  border: '1px solid var(--ticket-nav-filter-border)',
                   borderRadius: 6,
                   padding: '2px 2px 2px 8px',
                   fontSize: 13,
@@ -601,7 +623,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
                   href={p.query ? `/tickets?${p.query}` : '/tickets'}
                   title={p.name}
                   style={{
-                    color: '#2b1252',
+                    color: 'var(--ticket-nav-filter-link)',
                     maxWidth: 160,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -624,7 +646,7 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
                     cursor: 'pointer',
                     padding: '4px 6px',
                     borderRadius: 4,
-                    color: '#8c8c8c',
+                    color: 'var(--ticket-nav-muted)',
                     lineHeight: 1,
                     display: 'inline-flex',
                     alignItems: 'center',

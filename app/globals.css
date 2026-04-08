@@ -3,6 +3,84 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --layout-bg: #f0f2f5;
+  --settings-hub-tile-bg: #ffffff;
+  --settings-hub-tile-border: #f0f0f0;
+  --settings-hub-tile-title: rgba(0, 0, 0, 0.88);
+  --settings-hub-tile-desc: rgba(0, 0, 0, 0.45);
+  --settings-hub-tile-hover-bg: #fafafa;
+  /* Top ticket search bar (TicketSearchNavbar) */
+  --ticket-nav-bg: #ffffff;
+  --ticket-nav-border: #f0f0f0;
+  --ticket-nav-brand: #2b1252;
+  --ticket-nav-icon-btn-bg: #ffffff;
+  --ticket-nav-icon-btn-border: #d9d9d9;
+  --ticket-nav-icon-btn-color: #2b1252;
+  --ticket-nav-icon-hover-bg: #fafafa;
+  --ticket-nav-panel-bg: #ffffff;
+  --ticket-nav-panel-border: #f0f0f0;
+  --ticket-nav-panel-row-border: #f5f5f5;
+  --ticket-nav-muted: #8c8c8c;
+  --ticket-nav-text: #262626;
+  --ticket-nav-text-secondary: #595959;
+  --ticket-nav-filter-bg: #f5f0ff;
+  --ticket-nav-filter-border: #d3adf7;
+  --ticket-nav-filter-link: #2b1252;
+  --ticket-nav-shadow: rgba(0, 0, 0, 0.12);
+  /* Kanban board */
+  --kanban-board-bg: transparent;
+  --kanban-column-bg: #f0f0f0;
+  --kanban-column-head-title: #ffffff;
+  --kanban-badge-bg: #ffffff;
+  --kanban-badge-color: #141414;
+  --kanban-card-bg: #fafafa;
+  --kanban-card-border: rgba(0, 0, 0, 0.08);
+  --kanban-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --kanban-card-title: #262626;
+  --kanban-card-muted: #8c8c8c;
+  --kanban-card-divider: rgba(0, 0, 0, 0.08);
+  --kanban-drag-overlay-bg: #fafafa;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --layout-bg: #141414;
+  --settings-hub-tile-bg: #1f1f1f;
+  --settings-hub-tile-border: #424242;
+  --settings-hub-tile-title: rgba(255, 255, 255, 0.88);
+  --settings-hub-tile-desc: rgba(255, 255, 255, 0.45);
+  --settings-hub-tile-hover-bg: #2a2a2a;
+  --ticket-nav-bg: #141414;
+  --ticket-nav-border: #303030;
+  --ticket-nav-brand: #d4c8f0;
+  --ticket-nav-icon-btn-bg: #1f1f1f;
+  --ticket-nav-icon-btn-border: #434343;
+  --ticket-nav-icon-btn-color: #e8e0ff;
+  --ticket-nav-icon-hover-bg: #2a2a2a;
+  --ticket-nav-panel-bg: #1f1f1f;
+  --ticket-nav-panel-border: #434343;
+  --ticket-nav-panel-row-border: #333333;
+  --ticket-nav-muted: #a3a3a3;
+  --ticket-nav-text: #e8e8e8;
+  --ticket-nav-text-secondary: #bfbfbf;
+  --ticket-nav-filter-bg: #2a2438;
+  --ticket-nav-filter-border: #553e7a;
+  --ticket-nav-filter-link: #d4c4f5;
+  --ticket-nav-shadow: rgba(0, 0, 0, 0.45);
+  --kanban-board-bg: var(--layout-bg);
+  --kanban-column-bg: #1f1f1f;
+  --kanban-column-head-title: #ffffff;
+  --kanban-badge-bg: #2a2a2a;
+  --kanban-badge-color: #e8e8e8;
+  --kanban-card-bg: #2a2a2a;
+  --kanban-card-border: rgba(255, 255, 255, 0.12);
+  --kanban-card-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  --kanban-card-title: #e8e8e8;
+  --kanban-card-muted: #a3a3a3;
+  --kanban-card-divider: rgba(255, 255, 255, 0.12);
+  --kanban-drag-overlay-bg: #2a2a2a;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -10,13 +88,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
@@ -72,7 +143,7 @@ body {
   height: 30px;
   background: transparent;
   border-bottom-right-radius: 30px;
-  box-shadow: 15px 15px 0 #e9e9e9;
+  box-shadow: 15px 15px 0 var(--layout-bg);
   pointer-events: none;
 }
 /* cekungan bawah */
@@ -85,7 +156,7 @@ body {
   height: 30px;
   background: transparent;
   border-top-right-radius: 30px;
-  box-shadow: 15px -15px 0 #e9e9e9;
+  box-shadow: 15px -15px 0 var(--layout-bg);
   pointer-events: none;
 }
 .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-submenu .ant-menu-item-selected {
@@ -117,6 +188,53 @@ body {
 .admin-sidebar-deskteam [class*="item-selected"] .anticon {
   color: #35165c !important;
 }
+
+/*
+ * Dark mode (Ant Design darkAlgorithm): menu-dark selected item otherwise gets light text on light pill.
+ * Force dark text + icons on the active “pill” (and links inside SpaNavLink).
+ */
+.dark .admin-sidebar-deskteam .ant-menu-dark .ant-menu-item-selected,
+.dark .admin-sidebar-deskteam .ant-menu-dark .ant-menu-submenu .ant-menu-item-selected {
+  background: #141414 !important;
+  color: #f0f2f5 !important;
+}
+
+.dark .admin-sidebar-deskteam .ant-menu-dark .ant-menu-item-selected .ant-menu-title-content a,
+.dark .admin-sidebar-deskteam .ant-menu-dark .ant-menu-item-selected .ant-menu-title-content{
+  color: #f0f2f5 !important;
+}
+.dark .admin-sidebar-deskteam .ant-menu-dark .ant-menu-item-selected a,
+.dark .admin-sidebar-deskteam .ant-menu-dark .ant-menu-item-selected .admin-sidebar-menu-link {
+  color: #f0f2f5 !important;
+}
+.dark .admin-sidebar-deskteam .ant-menu-dark .ant-menu-item-selected .anticon,
+.dark .admin-sidebar-deskteam .ant-menu-dark .ant-menu-submenu .ant-menu-item-selected .anticon {
+  color: #f0f2f5 !important;
+}
+
+.dark .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected,
+.dark .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-submenu .ant-menu-item-selected {
+  background: #141414 !important;
+  color: #f0f2f5 !important;
+}
+.dark .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected .ant-menu-title-content a,
+.dark .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected .ant-menu-title-content{
+  color: #f0f2f5 !important;
+}
+.dark .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected a,
+.dark .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected .admin-sidebar-menu-link {
+  color: #f0f2f5 !important;
+}
+.dark .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected .anticon,
+.dark .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-submenu .ant-menu-item-selected .anticon {
+  color: #f0f2f5 !important;
+}
+
+/* Backup if any link/span still inherits light text on selected pill */
+html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected a,
+html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-sidebar-menu-link {
+  color: #f0f2f5 !important;
+}
 .admin-sidebar-deskteam .ant-menu-item-selected::before,
 .admin-sidebar-deskteam li.ant-menu-item-selected::before,
 .admin-sidebar-deskteam [class*="item-selected"]::before {
@@ -128,7 +246,7 @@ body {
   height: 50px !important;
   background: transparent !important;
   border-bottom-right-radius: 30px !important;
-  box-shadow: 15px 15px 0 #f0f2f5 !important;
+  box-shadow: 15px 15px 0 var(--layout-bg) !important;
   pointer-events: none !important;
 }
 /* cekungan bawah */
@@ -143,7 +261,7 @@ body {
   height: 50px !important;
   background: transparent !important;
   border-top-right-radius: 30px !important;
-  box-shadow: 15px -15px 0 #f0f2f5 !important;
+  box-shadow: 15px -15px 0 var(--layout-bg) !important;
   pointer-events: none !important;
 }
 
@@ -309,8 +427,35 @@ body {
   border: none !important;
 }
 
-/* Settings hub tiles (no Card — plain blocks) */
+/* Settings hub tiles — bg/text from CSS vars (inline #fff was beating .dark rules) */
 .settings-hub-tile-link:hover .settings-hub-tile {
-  background: #fafafa;
+  background: var(--settings-hub-tile-hover-bg);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.dark .settings-hub-tile-link:hover .settings-hub-tile {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.settings-page .ant-typography.settings-section-heading {
+  color: var(--foreground) !important;
+}
+
+.dark .condition-builder-action-style {
+  --rqb-background-color: #141414;
+  --rqb-border-color: #303030;
+  --rqb-base-color: #bfbfbf;
+}
+.dark .condition-builder-action-style .ruleGroup,
+.dark .condition-builder-action-style .rule.rule-hasSubQuery {
+  background: #141414 !important;
+  border-color: #303030 !important;
+}
+
+/* Kanban: Ant Design Card can inject default light surfaces over inline styles */
+.tickets-kanban-board .kanban-column-card.ant-card {
+  background: var(--kanban-column-bg) !important;
+}
+.tickets-kanban-board .kanban-ticket-card.ant-card {
+  background: var(--kanban-card-bg) !important;
 }

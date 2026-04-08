@@ -1,8 +1,20 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 // import { Geist, Geist_Mono } from "next/font/google";
 import AntdProvider from "@/components/AntdProvider";
 import { auth } from "@/auth";
-import "./globals.css?v=1.0.0";
+import "./globals.css?v=1.0.1";
+
+const themeInitScript = `
+(function(){
+  try {
+    var k = 'deskteam-theme';
+    var s = localStorage.getItem(k) || 'system';
+    var dark = s === 'dark' || (s !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+  } catch (e) {}
+})();`;
 
 // const geistSans = Geist({
 //   variable: "--font-geist-sans",
@@ -32,6 +44,9 @@ export default async function RootLayout({
         suppressHydrationWarning
         // className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Script id="deskteam-theme-init" strategy="beforeInteractive">
+          {themeInitScript}
+        </Script>
         <AntdProvider session={session}>
           {children}
         </AntdProvider>

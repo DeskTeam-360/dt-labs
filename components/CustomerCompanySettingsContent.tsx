@@ -5,6 +5,7 @@ import { SaveOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import TabInfo from './CompanyDetail/TabInfo'
 import CustomerPortalTeamSection from './CustomerPortalTeamSection'
 
@@ -102,14 +103,7 @@ export default function CustomerCompanySettingsContent({
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={user} collapsed={collapsed} onCollapse={setCollapsed} />
-      <Layout
-        style={{
-          marginLeft: collapsed ? 80 : 250,
-          transition: 'margin-left 0.2s',
-          background: '#f0f2f5',
-          minHeight: '100vh',
-        }}
-      >
+      <AdminMainColumn collapsed={collapsed} user={user}>
         <Content style={{ padding: 24 }}>
           <Card>
             <Title level={2} style={{ marginTop: 0 }}>
@@ -157,7 +151,7 @@ export default function CustomerCompanySettingsContent({
             </Form>
           </Card>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

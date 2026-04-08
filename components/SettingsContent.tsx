@@ -11,13 +11,16 @@ import {
   FileTextOutlined,
   ThunderboltOutlined,
   InfoCircleOutlined,
+  BellOutlined,
 } from '@ant-design/icons'
 import { useState } from 'react'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import { SpaNavLink } from './SpaNavLink'
 import {
   canAccessTicketAttributes,
   canAccessEmailIntegration,
+  canAccessSlackNotifications,
   canAccessMessageTemplates,
   canAccessKnowledgeBase,
   canAccessAutomationRules,
@@ -31,12 +34,10 @@ const tileStyle: CSSProperties = {
   height: '100%',
   padding: 20,
   gap: 20,
-  // textAlign: 'center',
-  // justifyContent: 'center',
   alignItems: 'center',
   borderRadius: 12,
-  background: '#fff',
-  border: '1px solid #f0f0f0',
+  background: 'var(--settings-hub-tile-bg)',
+  border: '1px solid var(--settings-hub-tile-border)',
   transition: 'background 0.2s, box-shadow 0.2s',
 }
 
@@ -60,11 +61,11 @@ function HubTile({ title, description, href, icon }: HubTileProps) {
       >
         <div style={{ fontSize: 22, color: '#1890ff', marginBottom: 12 }}>{icon}</div>
         <div>
-        <Text strong style={{ fontSize: 15, display: 'block' }}>
+        <Text strong style={{ fontSize: 15, display: 'block', color: 'var(--settings-hub-tile-title)' }}>
           {title}
         </Text>
         {description ? (
-          <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>
+          <Text style={{ fontSize: 13, display: 'block', color: 'var(--settings-hub-tile-desc)' }}>
             {description}
           </Text>
         ) : null}
@@ -83,7 +84,7 @@ interface SectionProps {
 function Section({ heading, children }: SectionProps) {
   return (
     <section style={{ marginBottom: 32 }}>
-      <Title level={4} style={{ marginTop: 0, marginBottom: 16 }}>
+      <Title level={4} className="settings-section-heading" style={{ marginTop: 0, marginBottom: 16 }}>
         {heading}
       </Title>
       {children}
@@ -110,20 +111,15 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
         onCollapse={setCollapsed}
       />
 
-      <Layout
-        style={{
-          marginLeft: collapsed ? 80 : 250,
-          transition: 'margin-left 0.2s',
-          background: '#f0f2f5',
-          minHeight: '100vh',
-        }}
-      >
-        <Content style={{ padding: 24, margin: '0 auto', width: '100%' }}>
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
+        <Content className="settings-page" style={{ padding: 24, margin: '0 auto', width: '100%' }}>
           <div style={{ marginBottom: 24 }}>
-            <Title level={2} style={{ margin: 0 }}>
+            <Title level={2} className="settings-section-heading" style={{ margin: 0 }}>
               Settings
             </Title>
-            <Text type="secondary">Configure ticket catalogs, automation, and general options</Text>
+            <Text style={{ color: 'var(--settings-hub-tile-desc)' }}>
+              Configure ticket catalogs, automation, and general options
+            </Text>
           </div>
 
           {canAccessTicketAttributes(role) && (
@@ -133,7 +129,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                   <HubTile
                     title="Ticket Statuses"
                     description="Workflow states and kanban columns"
-                    href="/ticket-statuses"
+                    href="/settings/ticket-statuses"
                     icon={<SettingOutlined />}
                   />
                 </Col>
@@ -141,7 +137,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                   <HubTile
                     title="Ticket Types"
                     description="Request categories (bug, feature, …)"
-                    href="/ticket-types"
+                    href="/settings/ticket-types"
                     icon={<AppstoreOutlined />}
                   />
                 </Col>
@@ -149,7 +145,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                   <HubTile
                     title="Ticket Priorities"
                     description="Urgency levels and ordering"
-                    href="/ticket-priorities"
+                    href="/settings/ticket-priorities"
                     icon={<FlagOutlined />}
                   />
                 </Col>
@@ -157,7 +153,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                   <HubTile
                     title="Tags"
                     description="Labels for organizing tickets"
-                    href="/tags"
+                    href="/settings/tags"
                     icon={<TagOutlined />}
                   />
                 </Col>
@@ -166,6 +162,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
           )}
 
           {(canAccessEmailIntegration(role) ||
+            canAccessSlackNotifications(role) ||
             canAccessMessageTemplates(role) ||
             canAccessAutomationRules(role)) && (
             <Section heading="Automation">
@@ -175,8 +172,18 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     <HubTile
                       title="Email Integration"
                       description="Inbound mail and threading"
-                      href="/email-integration"
+                      href="/settings/email-integration"
                       icon={<MailOutlined />}
+                    />
+                  </Col>
+                )}
+                {canAccessSlackNotifications(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Slack notifications"
+                      description="Ticket alerts to a Slack channel"
+                      href="/settings/slack-notifications"
+                      icon={<BellOutlined />}
                     />
                   </Col>
                 )}
@@ -185,7 +192,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     <HubTile
                       title="Message Templates"
                       description="Notification and reply templates"
-                      href="/message-templates"
+                      href="/settings/message-templates"
                       icon={<FileTextOutlined />}
                     />
                   </Col>
@@ -195,7 +202,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     <HubTile
                       title="Automation Rules"
                       description="Triggers and actions on tickets"
-                      href="/automation-rules"
+                      href="/settings/automation-rules"
                       icon={<ThunderboltOutlined />}
                     />
                   </Col>
@@ -211,7 +218,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                   <HubTile
                     title="Knowledge Base"
                     description="Help articles for customers"
-                    href="/knowledge-base"
+                    href="/settings/knowledge-base"
                     icon={<InfoCircleOutlined />}
                   />
                 </Col>
@@ -219,7 +226,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
             </Section>
           )}
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

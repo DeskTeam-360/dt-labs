@@ -15,6 +15,7 @@
     "db:migrate:both:company-users": "node scripts/run-migration-both-dbs.cjs drizzle/migrations/010_create_company_users.sql",
     "db:migrate:both:company-users-pk": "node scripts/run-migration-both-dbs.cjs drizzle/migrations/011_company_users_primary_key.sql",
     "db:push": "drizzle-kit push",
+    "supabase:db:push:both": "node scripts/supabase-db-push-both.cjs",
     "db:migrate:todo-to-ticket": "node scripts/run-migrate-todo-to-ticket.cjs",
     "db:studio": "drizzle-kit studio",
     "db:seed": "npx tsx prisma/seed.ts",

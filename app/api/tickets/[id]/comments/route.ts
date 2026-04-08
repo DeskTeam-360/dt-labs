@@ -16,6 +16,7 @@ import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { eq, ilike, inArray } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { NextResponse } from 'next/server'
+import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
 
 function randomPassword(length = 24): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -249,6 +250,44 @@ export async function POST(
   }))
 
   bumpTicketDataVersion(ticketId)
+
+  if (isCustomer) {
+    try {
+      const [slackTicket] = await db
+        .select({
+          id: tickets.id,
+          title: tickets.title,
+          status: tickets.status,
+          teamId: tickets.teamId,
+          priorityId: tickets.priorityId,
+          companyId: tickets.companyId,
+          typeId: tickets.typeId,
+        })
+        .from(tickets)
+        .where(eq(tickets.id, ticketId))
+        .limit(1)
+      if (slackTicket) {
+        const slackPreview = (comment || '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 220)
+        void notifySlackTicketEvent('client_reply', {
+          id: slackTicket.id,
+          title: slackTicket.title,
+          status: slackTicket.status,
+          teamId: slackTicket.teamId ?? null,
+          priorityId: slackTicket.priorityId ?? null,
+          companyId: slackTicket.companyId ?? null,
+          typeId: slackTicket.typeId ?? null,
+          bodyPreview: slackPreview || undefined,
+          actorName: session.user.name || session.user.email || undefined,
+        })
+      }
+    } catch (err) {
+      console.error('[comments] slack notify:', err)
+    }
+  }
 
   return NextResponse.json({
     id: row.id,

@@ -24,6 +24,7 @@ import {
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import DateDisplay from './DateDisplay'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -207,7 +208,7 @@ export default function CompanyContentTemplatesContent({
   // Avoid hydration mismatch: render same placeholder on server and initial client, then full UI after mount
   if (!mounted) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f2f5' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--layout-bg)' }}>
         <Spin size="large" tip="Loading...">
           <div style={{ padding: 50, background: 'transparent' }} />
         </Spin>
@@ -223,16 +224,11 @@ export default function CompanyContentTemplatesContent({
         onCollapse={setCollapsed}
       />
 
-      <Layout
-        style={{
-          marginLeft: collapsed ? 80 : 250,
-          transition: 'margin-left 0.2s',
-        }}
-      >
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content
           style={{
             padding: '24px',
-            background: '#f0f2f5',
+            background: 'var(--layout-bg)',
             minHeight: '100vh',
           }}
         >
@@ -293,7 +289,7 @@ export default function CompanyContentTemplatesContent({
             </div>
           </Modal>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

@@ -51,22 +51,47 @@ export default function KanbanColumn({
   return (
     <div style={{ minWidth: 320, flexShrink: 0, marginRight: 16, marginBottom: 16 }}>
       <Card
+        className="kanban-column-card"
         style={{
           height: 'calc(100vh - 140px)',
           display: 'flex',
           flexDirection: 'column',
-          background: '#fafafa',
+          background: 'var(--kanban-column-bg)',
           borderRadius: 16,
           border: `3px solid ${column.color}`,
         }}
         styles={{
           header: { backgroundColor: column.color },
-          body: { flex: 1, overflow: 'auto', padding: 0, position: 'relative' },
+          body: {
+            flex: 1,
+            overflow: 'auto',
+            padding: 0,
+            position: 'relative',
+            background: 'transparent',
+          },
         }}
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' , paddingRight: 8, paddingLeft: 8 }}>
-            <Text strong>{column.title}</Text>
-            <Badge count={columnTickets.length} color={'white'} style={{ backgroundColor: '#fff', color: '#000' }} />
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingRight: 8,
+              paddingLeft: 8,
+            }}
+          >
+            <Text strong style={{ color: 'var(--kanban-column-head-title)' }}>
+              {column.title}
+            </Text>
+            <Badge
+              count={columnTickets.length}
+              showZero
+              style={{
+                backgroundColor: 'var(--kanban-badge-bg)',
+                color: 'var(--kanban-badge-color)',
+                boxShadow: 'none',
+              }}
+            />
           </div>
         }
       >

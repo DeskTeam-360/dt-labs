@@ -14,7 +14,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import AdminSidebar from './AdminSidebar'
-import TicketSearchNavbar from './TicketSearchNavbar'
+import AdminMainColumn from './AdminMainColumn'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 import {
   BarChart,
@@ -211,7 +211,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
   const maxPriority = Math.max(...(data?.priority_counts?.map((p) => p.count) ?? [1]), 1)
 
   const content = (
-    <div style={{ padding: 24, background: '#f0f2f5', boxSizing: 'border-box', maxWidth: '100%', overflowX: 'hidden' }}>
+    <div style={{ padding: 24, background: 'var(--layout-bg)', boxSizing: 'border-box', maxWidth: '100%', overflowX: 'hidden' }}>
       {/* Header */}
       <div style={{ marginBottom: 24, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
@@ -839,15 +839,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
     return (
       <Layout style={{ minHeight: '100vh' }}>
         <AdminSidebar user={user} collapsed={collapsed} onCollapse={setCollapsed} />
-        <Layout
-          style={{
-            marginLeft: collapsed ? 80 : 250,
-            transition: 'margin-left 0.2s',
-            minHeight: '100vh',
-            background: '#f0f2f5',
-          }}
-        >
-          <TicketSearchNavbar />
+        <AdminMainColumn collapsed={collapsed} user={user}>
           <Content
             style={{
               padding: 0,
@@ -859,7 +851,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
           >
             {content}
           </Content>
-        </Layout>
+        </AdminMainColumn>
       </Layout>
     )
   }

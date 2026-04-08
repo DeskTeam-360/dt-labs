@@ -17,18 +17,18 @@ export async function GET(request: NextRequest) {
     const redirectUri = `${baseUrl}/api/email/google/callback`
 
     if (errorParam) {
-      return NextResponse.redirect(new URL(`/email-integration?error=${errorParam}`, baseUrl))
+      return NextResponse.redirect(new URL(`/settings/email-integration?error=${errorParam}`, baseUrl))
     }
 
     if (!code) {
-      return NextResponse.redirect(new URL('/email-integration?error=no_code', baseUrl))
+      return NextResponse.redirect(new URL('/settings/email-integration?error=no_code', baseUrl))
     }
 
     const clientId = process.env.GOOGLE_CLIENT_ID
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET
 
     if (!clientId || !clientSecret) {
-      return NextResponse.redirect(new URL('/email-integration?error=missing_config', baseUrl))
+      return NextResponse.redirect(new URL('/settings/email-integration?error=missing_config', baseUrl))
     }
 
     const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     if (!tokenResponse.ok) {
       const errData = await tokenResponse.text()
       console.error('Google token exchange failed:', errData)
-      return NextResponse.redirect(new URL('/email-integration?error=token_exchange_failed', baseUrl))
+      return NextResponse.redirect(new URL('/settings/email-integration?error=token_exchange_failed', baseUrl))
     }
 
     const tokens = await tokenResponse.json()
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     const expiresIn = tokens.expires_in
 
     if (!accessToken) {
-      return NextResponse.redirect(new URL('/email-integration?error=no_access_token', baseUrl))
+      return NextResponse.redirect(new URL('/settings/email-integration?error=no_access_token', baseUrl))
     }
 
     const userInfoResponse = await fetch(GOOGLE_USERINFO_URL, {
@@ -102,13 +102,13 @@ export async function GET(request: NextRequest) {
       }
     } catch (err) {
       console.error('Failed to save email integration:', err)
-      return NextResponse.redirect(new URL('/email-integration?error=save_failed', baseUrl))
+      return NextResponse.redirect(new URL('/settings/email-integration?error=save_failed', baseUrl))
     }
 
-    return NextResponse.redirect(new URL('/email-integration?success=1', baseUrl))
+    return NextResponse.redirect(new URL('/settings/email-integration?success=1', baseUrl))
   } catch (err) {
     console.error('Google callback error:', err)
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-    return NextResponse.redirect(new URL('/email-integration?error=callback_failed', baseUrl))
+    return NextResponse.redirect(new URL('/settings/email-integration?error=callback_failed', baseUrl))
   }
 }

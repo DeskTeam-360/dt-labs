@@ -5,6 +5,7 @@ import { MailOutlined, CheckCircleOutlined, DisconnectOutlined, SyncOutlined } f
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -41,7 +42,7 @@ export default function EmailIntegrationContent({
     const error = searchParams.get('error')
     if (success === '1') {
       message.success('Google account connected successfully!')
-      router.replace('/email-integration', { scroll: false })
+      router.replace('/settings/email-integration', { scroll: false })
       router.refresh()
     }
     if (error) {
@@ -54,7 +55,7 @@ export default function EmailIntegrationContent({
         callback_failed: 'Callback failed. Please try again.',
       }
       message.error(errorMessages[error] || `Error: ${error}`)
-      router.replace('/email-integration', { scroll: false })
+      router.replace('/settings/email-integration', { scroll: false })
     }
   }, [searchParams, router])
 
@@ -120,8 +121,8 @@ export default function EmailIntegrationContent({
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={user} collapsed={collapsed} onCollapse={setCollapsed} />
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
-        <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+      <AdminMainColumn collapsed={collapsed} user={user}>
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card style={{ maxWidth: 600 }}>
             <Space orientation="vertical" size="large" style={{ width: '100%' }}>
               <div>
@@ -201,7 +202,7 @@ export default function EmailIntegrationContent({
             </Space>
           </Card>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

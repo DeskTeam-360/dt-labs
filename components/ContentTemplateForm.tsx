@@ -18,6 +18,7 @@ import { ArrowLeftOutlined, SaveOutlined, CopyOutlined } from '@ant-design/icons
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -346,17 +347,16 @@ export default function ContentTemplateForm({
         onCollapse={setCollapsed}
       />
 
-      <Layout
-        style={{
-          marginLeft: mounted ? (collapsed ? 80 : 250) : 250,
-          transition: 'margin-left 0.2s',
-        }}
-        suppressHydrationWarning
+      <AdminMainColumn
+        collapsed={collapsed}
+        user={currentUser}
+        style={{ marginLeft: mounted ? (collapsed ? 80 : 250) : 250 }}
+        layoutProps={{ suppressHydrationWarning: true }}
       >
         <Content
           style={{
             padding: '24px',
-            background: '#f0f2f5',
+            background: 'var(--layout-bg)',
             minHeight: '100vh',
           }}
         >
@@ -507,7 +507,7 @@ export default function ContentTemplateForm({
             </Form>
           </Card>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

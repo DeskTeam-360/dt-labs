@@ -5,6 +5,7 @@ import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
 import { KNOWLEDGE_BASE_ARTICLE_ROLES, normalizeTargetRolesInput } from '@/lib/knowledge-base-article-roles'
 
@@ -81,7 +82,7 @@ export default function KnowledgeBaseArticleForm({
         })
         message.success('Article created')
       }
-      router.push('/knowledge-base')
+      router.push('/settings/knowledge-base')
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to save')
     } finally {
@@ -94,19 +95,12 @@ export default function KnowledgeBaseArticleForm({
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
-      <Layout
-        style={{
-          marginLeft: collapsed ? 80 : 250,
-          transition: 'margin-left 0.2s',
-          minHeight: '100vh',
-          background: '#f0f2f5',
-        }}
-      >
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ padding: 24, maxWidth: 800 }}>
           <Button
             type="text"
             icon={<ArrowLeftOutlined />}
-            onClick={() => router.push('/knowledge-base')}
+            onClick={() => router.push('/settings/knowledge-base')}
             style={{ marginBottom: 16, paddingLeft: 0 }}
           >
             Back to Knowledge Base
@@ -177,7 +171,7 @@ export default function KnowledgeBaseArticleForm({
             </Form>
           </Card>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

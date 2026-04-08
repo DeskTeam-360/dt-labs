@@ -69,13 +69,16 @@ export default function TicketsKanbanView({
       onDragEnd={onDragEnd}
     >
       <div
+        className="tickets-kanban-board"
         style={{
           paddingLeft: 24,
           paddingRight: 24,
+          paddingBottom: 16,
           display: 'flex',
           flexWrap: 'nowrap',
           overflowX: 'auto',
           overflowY: 'hidden',
+          background: 'var(--kanban-board-bg)',
         }}
       >
         {columnsToShow.map((column) => (
@@ -100,14 +103,19 @@ export default function TicketsKanbanView({
       <DragOverlay>
         {activeTicket ? (
           <Card
+            className="kanban-ticket-card"
             size="small"
             style={{
               width: 280,
-              boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+              boxShadow: 'var(--kanban-card-shadow)',
+              backgroundColor: 'var(--kanban-drag-overlay-bg)',
+              border: '1px solid var(--kanban-card-border)',
             }}
-            bodyStyle={{ padding: 12 }}
+            bodyStyle={{ padding: 12, background: 'transparent' }}
           >
-            <Text strong>#{activeTicket.id} {activeTicket.title}</Text>
+            <Text strong style={{ color: 'var(--kanban-card-title)' }}>
+              #{activeTicket.id} {activeTicket.title}
+            </Text>
           </Card>
         ) : null}
       </DragOverlay>

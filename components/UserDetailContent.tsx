@@ -18,6 +18,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 import AdminSidebar from './AdminSidebar'
+import AdminMainColumn from './AdminMainColumn'
 import { SpaNavLink } from '@/components/SpaNavLink'
 import { confirmUserCompanyMove } from '@/components/confirm-user-company-move'
 import DashboardHourlyActivityCard from './DashboardHourlyActivityCard'
@@ -407,8 +408,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       
-      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
-        <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
+      <AdminMainColumn collapsed={collapsed} user={currentUser}>
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card>
             <div style={{ marginBottom: 20 }}>
               <Title level={3} style={{ margin: 0 }}>
@@ -1203,7 +1204,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
             </Form>
           </Modal>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }

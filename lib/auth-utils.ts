@@ -53,6 +53,11 @@ export function canAccessEmailIntegration(role: string | undefined): boolean {
   return isAdmin(role)
 }
 
+/** Slack ticket notifications (Incoming Webhooks): Admin only */
+export function canAccessSlackNotifications(role: string | undefined): boolean {
+  return isAdmin(role)
+}
+
 /** Knowledge Base: Admin only */
 export function canAccessKnowledgeBase(role: string | undefined): boolean {
   return isAdmin(role)
@@ -75,28 +80,15 @@ export function canAccessSettingsHub(role: string | undefined): boolean {
   return (
     canAccessTicketAttributes(role) ||
     canAccessEmailIntegration(role) ||
+    canAccessSlackNotifications(role) ||
     canAccessMessageTemplates(role) ||
     canAccessKnowledgeBase(role) ||
     canAccessAutomationRules(role)
   )
 }
 
-/** Paths that belong to the Settings hub (sidebar highlights Settings). */
-export const SETTINGS_HUB_PATH_PREFIXES = [
-  '/settings',
-  '/ticket-statuses',
-  '/ticket-types',
-  '/ticket-priorities',
-  '/tags',
-  '/email-integration',
-  '/message-templates',
-  '/automation-rules',
-  '/knowledge-base',
-] as const
-
+/** Settings hub and sub-pages live under `/settings/*` (sidebar highlights Settings). */
 export function isSettingsHrefPathname(pathname: string | null): boolean {
   if (!pathname) return false
-  return SETTINGS_HUB_PATH_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  )
+  return pathname === '/settings' || pathname.startsWith('/settings/')
 }

@@ -8,7 +8,7 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import localizedFormat from 'dayjs/plugin/localizedFormat'
 import 'dayjs/locale/en'
 import AdminSidebar from './AdminSidebar'
-import TicketSearchNavbar from './TicketSearchNavbar'
+import AdminMainColumn from './AdminMainColumn'
 import { SpaNavLink } from '@/components/SpaNavLink'
 import { formatTicketActivityAction } from '@/lib/ticket-activity-labels'
 import { summarizeTicketActivityMetadata } from '@/lib/ticket-activity-metadata'
@@ -106,18 +106,14 @@ export default function TicketActivityHistoryContent({ user: currentUser }: Tick
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
 
-      <Layout
+      <AdminMainColumn
+        collapsed={collapsed}
+        user={currentUser}
         style={{
-          marginLeft: collapsed ? 80 : 250,
-          transition: 'margin-left 0.2s',
           borderRadius: '16px 0 0 16px',
           overflow: 'hidden',
-          background: '#f0f2f5',
-          minHeight: '100vh',
         }}
       >
-        <TicketSearchNavbar savedFiltersUserId={!isCustomer ? currentUser.id : undefined} />
-
         <Content style={{ padding: 24 }}>
           <div style={{ marginBottom: 16 }}>
             <Title level={2} style={{ margin: 0 }}>
@@ -276,7 +272,7 @@ export default function TicketActivityHistoryContent({ user: currentUser }: Tick
             <SpaNavLink href="/tickets">← Back to tickets</SpaNavLink>
           </div>
         </Content>
-      </Layout>
+      </AdminMainColumn>
     </Layout>
   )
 }
