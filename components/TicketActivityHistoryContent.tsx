@@ -214,9 +214,7 @@ export default function TicketActivityHistoryContent({ user: currentUser }: Tick
                   ellipsis: true,
                   render: (_, r) => (
                     <Text type="secondary" style={{ fontSize: 13 }}>
-                      {r.action === 'ticket_updated'
-                        ? summarizeTicketActivityMetadata(r.action, r.metadata) || '—'
-                        : '—'}
+                      {summarizeTicketActivityMetadata(r.action, r.metadata) || '—'}
                     </Text>
                   ),
                 },

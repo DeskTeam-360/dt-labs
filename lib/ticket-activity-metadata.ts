@@ -26,6 +26,12 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
   if (!metadata || typeof metadata !== 'object') return ''
   const m = metadata as Record<string, unknown>
 
+  /** Automation rows: short label only (no field-by-field diff). */
+  if (m.source === 'automation_rule') {
+    const title = typeof m.rule_name === 'string' ? m.rule_name.trim() : ''
+    return title ? `RUN ${title}` : 'RUN'
+  }
+
   if (action === 'ticket_updated') {
     const parts: string[] = []
     const changes = m.changes
@@ -50,9 +56,6 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
         .map((x) => (x && typeof x === 'object' && 'file_name' in x ? String((x as { file_name?: string }).file_name ?? '') : ''))
         .filter(Boolean)
       parts.push(names.length ? `−files: ${names.join(', ')}` : `−${removed.length} file(s)`)
-    }
-    if (m.source === 'automation_rule' && parts.length === 0) {
-      return m.rule_name ? `Rule: ${String(m.rule_name)}` : 'Automation'
     }
     return parts.join(' · ')
   }

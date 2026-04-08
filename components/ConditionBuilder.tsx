@@ -86,7 +86,8 @@ export const CONDITION_FIELDS: Field[] = [
 
 interface ConditionBuilderProps {
   value?: OurConditionGroup | null
-  onChange: (value: OurConditionGroup) => void
+  /** Form.Item injects this; optional for type-check when used as `<ConditionBuilder />` only. */
+  onChange?: (value: OurConditionGroup) => void
 }
 
 function fieldsWithTicketTypes(typeSlugs: { slug: string; title: string }[]): Field[] {
@@ -102,7 +103,7 @@ function fieldsWithTicketTypes(typeSlugs: { slug: string; title: string }[]): Fi
   return next
 }
 
-export default function ConditionBuilder({ value, onChange }: ConditionBuilderProps) {
+export default function ConditionBuilder({ value, onChange = () => {} }: ConditionBuilderProps) {
   const [fields, setFields] = useState<Field[]>(() => CONDITION_FIELDS)
 
   useEffect(() => {
@@ -159,9 +160,9 @@ export default function ConditionBuilder({ value, onChange }: ConditionBuilderPr
       className="condition-builder-action-style"
       style={{
         padding: 16,
-        background: '#fafafa',
+        background: 'var(--automation-builder-panel-bg)',
         borderRadius: 8,
-        border: '1px solid #f0f0f0',
+        border: '1px solid var(--automation-builder-panel-border)',
       }}
     >
       <QueryBuilderAntD>

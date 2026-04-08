@@ -282,7 +282,7 @@ export default function TabGeneral({
       <Col xs={16}>
 
 
-      <Flex gap="middle" align="flex-start" style={{ padding: 10, marginBottom: 10, borderBottom: '1px solid black',  }}>
+      <Flex gap="middle" align="flex-start" style={{ padding: 10, marginBottom: 10, borderBottom: '1px solid var(--ticket-thread-divider)' }}>
                       <TicketUserMention userId={creatorId} email={creatorEmail}>
                         <Avatar style={{ cursor: creatorId ? 'pointer' : undefined }} icon={<UserOutlined />} src={ticketData.creator?.avatar_url} />
                       </TicketUserMention>
@@ -294,7 +294,7 @@ export default function TabGeneral({
                                 {creatorLabel}
                               </Text>
                             </TicketUserMention>
-                            <Text type="secondary" style={{ fontSize: 12 }}>
+                            <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}>
                               <DateDisplay date={ticketData.created_at} />
                             </Text>
                           </Space>
@@ -338,25 +338,61 @@ export default function TabGeneral({
                     const isAutomation = comment.author_type === 'automation'
                     const isCustomer = comment.author_type === 'customer'
                     const isCurrentUser = comment.user_id === currentUserId
-                    const cardBg = isAutomation
-                      ? 'rgba(246, 240, 255, 0.6)'
+                    const borderColor = isAutomation
+                      ? 'var(--ticket-thread-border-automation)'
                       : isCustomer
-                        ? 'rgba(230, 247, 255, 0.5)'
+                        ? 'var(--ticket-thread-border-customer)'
                         : comment.visibility === 'note'
-                          ? '#f5f5f5'
-                          : 'rgba(255, 251, 230, 0.4)'
-                    const borderColor = isAutomation ? '#b37feb91' : isCustomer ? '#91caff' : comment.visibility === 'note' ? '#d9d9d9' : '#ffe58f'
-                    const borderStyle = isCurrentUser
-                      ? { borderRight: `3px solid green` as const }
-                      : { borderLeft: `3px solid ${borderColor}` as const }
+                          ? 'var(--ticket-thread-border-agent-note)'
+                          : 'var(--ticket-thread-border-agent-reply)'
+                    /** Per-side borders: `border` shorthand + only left/right override can drop other sides in some layouts. */
+                    const outline = 'var(--ticket-thread-bubble-outline)'
+                    const threadBubbleBorder = isCurrentUser
+                      ? {
+                          borderTop: `1px solid ${outline}`,
+                          borderBottom: `1px solid ${outline}`,
+                          borderLeft: `1px solid ${outline}`,
+                          borderRight: '3px solid #52c41a',
+                        }
+                      : {
+                          borderTop: `1px solid ${outline}`,
+                          borderBottom: `1px solid ${outline}`,
+                          borderRight: `1px solid ${outline}`,
+                          borderLeft: `3px solid ${borderColor}`,
+                        }
                     const authorLabel = isAutomation
                       ? 'Automation'
                       : isCustomer
                         ? (ticketData.company?.name || 'Customer') + ' - ' + (comment.user?.full_name || comment.user?.email || 'Unknown')
                         : comment.user?.full_name || comment.user?.email || 'Unknown'
+                    const threadRole = isAutomation
+                      ? 'automation'
+                      : isCustomer
+                        ? 'customer'
+                        : comment.visibility === 'note'
+                          ? 'agent-note'
+                          : 'agent-reply'
+                    const threadBgVar =
+                      threadRole === 'automation'
+                        ? 'var(--ticket-thread-bubble-automation)'
+                        : threadRole === 'customer'
+                          ? 'var(--ticket-thread-bubble-customer)'
+                          : threadRole === 'agent-note'
+                            ? 'var(--ticket-thread-bubble-agent-note)'
+                            : 'var(--ticket-thread-bubble-agent-reply)'
                     return (
-                    <Flex key={comment.id} gap="middle" align="flex-start" 
-                    style={{ padding: 20, backgroundColor: cardBg, borderRadius: 10, ...borderStyle }}>
+                    <div
+                      key={comment.id}
+                      className={`ticket-thread-bubble ticket-thread-bubble--${threadRole}`}
+                      style={{
+                        padding: 20,
+                        borderRadius: 10,
+                        color: 'var(--ticket-thread-text)',
+                        backgroundColor: threadBgVar,
+                        ...threadBubbleBorder,
+                      }}
+                    >
+                    <Flex gap="middle" align="flex-start" style={{ width: '100%' }}>
                       {isAutomation ? (
                         <Avatar style={{ backgroundColor: '#722ed1' }} icon={<ThunderboltOutlined />} />
                       ) : (
@@ -372,10 +408,15 @@ export default function TabGeneral({
                         <Flex justify="space-between" align="center" wrap="wrap" gap="small">
                           <Space>
                           {isAutomation ? (
-                            <Text strong>{authorLabel}</Text>
+                            <Text strong style={{ color: 'var(--ticket-thread-text)' }}>
+                              {authorLabel}
+                            </Text>
                           ) : (
                             <TicketUserMention userId={comment.user_id} email={comment.user?.email}>
-                              <Text strong style={{ cursor: comment.user_id ? 'pointer' : undefined }}>
+                              <Text
+                                strong
+                                style={{ cursor: comment.user_id ? 'pointer' : undefined, color: 'var(--ticket-thread-text)' }}
+                              >
                                 {authorLabel}
                               </Text>
                             </TicketUserMention>
@@ -390,7 +431,7 @@ export default function TabGeneral({
                                 {comment.visibility === 'note' ? 'Note' : 'Reply'}
                               </Tag>
                             )}
-                            <Text type="secondary" style={{ fontSize: 12 }}>
+                            <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}>
                               <DateDisplay date={comment.created_at} />
                             </Text>
                           </Space>
@@ -472,7 +513,7 @@ export default function TabGeneral({
                               dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(comment.comment) }}
                             />
                           ) : (
-                            <Paragraph style={{ margin: 0 }}>{comment.comment}</Paragraph>
+                            <Paragraph style={{ margin: 0, color: 'var(--ticket-thread-text)' }}>{comment.comment}</Paragraph>
                           )}
                         {comment.comment_attachments?.length ? (
                           <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
@@ -486,6 +527,7 @@ export default function TabGeneral({
                         </Space>
                       </Flex>
                     </Flex>
+                    </div>
                     )
                   })}
                 </Flex>

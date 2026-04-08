@@ -148,21 +148,26 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
   ).filter((t) => !shownKeys.includes(t))
 
   if (!lookup) {
-    return <div style={{ padding: 16, color: '#999' }}>Loading options…</div>
+    return (
+      <div className="automation-action-builder" style={{ padding: 16, color: 'var(--automation-builder-muted-text)' }}>
+        Loading options…
+      </div>
+    )
   }
 
   return (
     <div
+      className="automation-action-builder"
       style={{
         padding: 16,
-        background: '#fafafa',
+        background: 'var(--automation-builder-panel-bg)',
         borderRadius: 8,
-        border: '1px solid #f0f0f0',
+        border: '1px solid var(--automation-builder-panel-border)',
       }}
     >
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         {shownKeys.length === 0 ? (
-          <div style={{ color: '#999', padding: '8px 0' }}>No actions configured</div>
+          <div style={{ color: 'var(--automation-builder-muted-text)', padding: '8px 0' }}>No actions configured</div>
         ) : (
           shownKeys.map((type) => (
             <div
@@ -172,9 +177,9 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                 alignItems: 'flex-start',
                 gap: 8,
                 padding: 12,
-                background: '#fff',
+                background: 'var(--automation-builder-card-bg)',
                 borderRadius: 6,
-                border: '1px solid #eee',
+                border: '1px solid var(--automation-builder-card-border)',
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -334,13 +339,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                   </Form.Item>
                 )}
               </div>
-              <Button
-                type="primary"
-                color='danger'
-
-                icon={<CloseOutlined />}
-                onClick={() => removeAction(type)}
-              />
+              <Button type="default" danger icon={<CloseOutlined />} onClick={() => removeAction(type)} />
             </div>
           ))
         )}

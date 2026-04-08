@@ -51,6 +51,25 @@
   --customer-dash-subtle-border: rgba(0, 0, 0, 0.08);
   --customer-dash-recharts-grid: #d9d9d9;
   --customer-dash-recharts-axis: #bfbfbf;
+  /* Ticket thread bubbles (TabGeneral / TabGeneralCustomer) */
+  --ticket-thread-divider: rgba(0, 0, 0, 0.12);
+  --ticket-thread-bubble-outline: rgba(0, 0, 0, 0.1);
+  --ticket-thread-bubble-automation: rgba(246, 240, 255, 0.75);
+  --ticket-thread-bubble-customer: rgba(230, 247, 255, 0.65);
+  --ticket-thread-bubble-agent-note: #f0f0f0;
+  --ticket-thread-bubble-agent-reply: rgba(255, 248, 220, 0.85);
+  --ticket-thread-border-automation: rgba(179, 127, 235, 0.75);
+  --ticket-thread-border-customer: rgba(100, 170, 230, 0.9);
+  --ticket-thread-border-agent-note: #bfbfbf;
+  --ticket-thread-border-agent-reply: rgba(217, 165, 32, 0.85);
+  --ticket-thread-meta: rgba(0, 0, 0, 0.5);
+  --ticket-thread-text: var(--foreground);
+  /* Automation rules — ActionBuilder + ConditionBuilder panels */
+  --automation-builder-panel-bg: #fafafa;
+  --automation-builder-panel-border: #f0f0f0;
+  --automation-builder-card-bg: #ffffff;
+  --automation-builder-card-border: #e8e8e8;
+  --automation-builder-muted-text: #8c8c8c;
 }
 
 .dark {
@@ -100,6 +119,24 @@
   --customer-dash-subtle-border: rgba(255, 255, 255, 0.12);
   --customer-dash-recharts-grid: #434343;
   --customer-dash-recharts-axis: #8c8c8c;
+  --ticket-thread-divider: rgba(255, 255, 255, 0.22);
+  --ticket-thread-bubble-outline: rgba(255, 255, 255, 0.2);
+  /* Solid tints — clearly distinct from --layout-bg / card (#1f1f1f) */
+  --ticket-thread-bubble-automation: #3d2d55;
+  --ticket-thread-bubble-customer: #1b4558;
+  --ticket-thread-bubble-agent-note: #34343f;
+  --ticket-thread-bubble-agent-reply: #4a3d2a;
+  --ticket-thread-border-automation: rgba(200, 160, 255, 0.75);
+  --ticket-thread-border-customer: rgba(120, 195, 245, 0.8);
+  --ticket-thread-border-agent-note: #71717a;
+  --ticket-thread-border-agent-reply: rgba(240, 200, 100, 0.75);
+  --ticket-thread-meta: rgba(255, 255, 255, 0.68);
+  --ticket-thread-text: var(--foreground);
+  --automation-builder-panel-bg: #1a1a1a;
+  --automation-builder-panel-border: #363636;
+  --automation-builder-card-bg: #262626;
+  --automation-builder-card-border: #434343;
+  --automation-builder-muted-text: #a3a3a3;
   color-scheme: dark;
 }
 
@@ -305,6 +342,32 @@ html.dark .ql-editor.comment-html {
   color: var(--foreground);
 }
 
+/* Ticket thread: Ant Design `type="secondary"` inside bubbles must stay readable on tinted backgrounds */
+.ticket-thread-bubble .ant-typography-secondary {
+  color: var(--ticket-thread-meta) !important;
+}
+.ticket-thread-bubble a:not(.ant-btn) {
+  color: var(--ticket-nav-filter-link, #1677ff);
+}
+
+/* Thread bubble fill: wrapper div + class; html.dark bumps specificity for theme vars */
+html.dark .ticket-thread-bubble.ticket-thread-bubble--automation,
+.ticket-thread-bubble.ticket-thread-bubble--automation {
+  background-color: var(--ticket-thread-bubble-automation) !important;
+}
+html.dark .ticket-thread-bubble.ticket-thread-bubble--customer,
+.ticket-thread-bubble.ticket-thread-bubble--customer {
+  background-color: var(--ticket-thread-bubble-customer) !important;
+}
+html.dark .ticket-thread-bubble.ticket-thread-bubble--agent-note,
+.ticket-thread-bubble.ticket-thread-bubble--agent-note {
+  background-color: var(--ticket-thread-bubble-agent-note) !important;
+}
+html.dark .ticket-thread-bubble.ticket-thread-bubble--agent-reply,
+.ticket-thread-bubble.ticket-thread-bubble--agent-reply {
+  background-color: var(--ticket-thread-bubble-agent-reply) !important;
+}
+
 /* Admin sidebar - DeskTeam360 style: purple bg, active item light gray with rounded right */
 .admin-sidebar-deskteam-2.ant-layout-sider {
   background: #2B1251 !important;
@@ -500,23 +563,29 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
 .kb-article-content strong { font-weight: 600; }
 .kb-article-content img { max-width: 100%; height: auto; }
 
-/* ConditionBuilder - match ActionBuilder style (white cards, light borders) */
+/* ConditionBuilder + react-querybuilder — surfaces follow theme vars */
 .condition-builder-action-style {
-  --rqb-background-color: #fff;
-  --rqb-border-color: #eee;
-  --rqb-base-color: #666;
+  --rqb-background-color: var(--automation-builder-card-bg);
+  --rqb-border-color: var(--automation-builder-card-border);
+  --rqb-base-color: var(--automation-builder-muted-text);
+  --rqb-branch-color: var(--automation-builder-card-border);
   --rqb-border-radius: 6px;
   --rqb-spacing: 12px;
 }
 .condition-builder-action-style .ruleGroup,
 .condition-builder-action-style .rule.rule-hasSubQuery {
-  background: #fff !important;
-  border: 1px solid #eee !important;
+  background: var(--automation-builder-card-bg) !important;
+  border: 1px solid var(--automation-builder-card-border) !important;
   border-radius: 6px !important;
   padding: 12px !important;
 }
 .condition-builder-action-style .ruleGroup .ruleGroup {
   margin-top: 8px;
+}
+
+.automation-action-builder .ant-form-item-extra,
+.condition-builder-action-style .ant-form-item-extra {
+  color: var(--automation-builder-muted-text);
 }
 
 /*
@@ -530,6 +599,17 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
 /*
  * `.ql-editor li { list-style-type: none }` dari Snow — untuk li non-Quill perlu override di bawah.
  */
+/* Quill / rich HTML: consecutive <p> (e.g. double Enter) need vertical rhythm */
+.comment-html > p,
+.ql-editor.comment-html > p {
+  margin: 0 0 0.65em;
+  min-height: 1em;
+}
+.comment-html > p:last-child,
+.ql-editor.comment-html > p:last-child {
+  margin-bottom: 0;
+}
+
 .comment-html ul,
 .ql-editor.comment-html ul {
   margin: 0.5em 0;
@@ -651,17 +731,6 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
 
 .settings-page .ant-typography.settings-section-heading {
   color: var(--foreground) !important;
-}
-
-.dark .condition-builder-action-style {
-  --rqb-background-color: #141414;
-  --rqb-border-color: #303030;
-  --rqb-base-color: #bfbfbf;
-}
-.dark .condition-builder-action-style .ruleGroup,
-.dark .condition-builder-action-style .rule.rule-hasSubQuery {
-  background: #141414 !important;
-  border-color: #303030 !important;
 }
 
 /* Kanban: Ant Design Card can inject default light surfaces over inline styles */

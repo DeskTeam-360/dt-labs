@@ -34,8 +34,9 @@ interface CommentWysiwygProps {
   /** Ticket/todo id for image upload path: ticket/{ticketId}/{unixtime}. Omit for draft path (ticket/draft/...). */
   ticketId?: string | number
   /**
-   * When false, uses `editor.root.innerHTML` instead of `getSemanticHTML()` (react-quill-new default).
-   * Set false for message templates so `{{ placeholders }}` stay literal in HTML.
+   * When true, uses Quill `getSemanticHTML()` (normalizes HTML; consecutive empty paragraphs often collapse).
+   * When false (default), uses `innerHTML` so double Enter / multiple blank lines are preserved.
+   * Message templates keep `false` so `{{ placeholders }}` stay literal.
    */
   useSemanticHTML?: boolean
 }
@@ -47,7 +48,7 @@ export default function CommentWysiwyg({
   height = '100px',
   bgColor = 'transparent',
   ticketId,
-  useSemanticHTML = true,
+  useSemanticHTML = false,
 }: CommentWysiwygProps) {
   const { resolved } = useTheme()
   const [mounted, setMounted] = useState(false)

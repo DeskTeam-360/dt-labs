@@ -84,7 +84,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return token
       }
 
-      const ok = await fetchUserSessionEligibility(uid)
+      let ok = false
+      try {
+        ok = await fetchUserSessionEligibility(uid)
+      } catch (err) {
+        // Middleware runs on Edge; postgres.js TCP often fails there → JWTSessionError + sudden "logout".
+        // Fail open: keep the session and retry after JWT_USER_RECHECK_MS. Revoke only on successful "not eligible".
+        console.error('[auth] jwt eligibility DB check failed (session kept, will retry):', err)
+        return { ...token, error: undefined, userCheckedAt: now }
+      }
+
       if (!ok) {
         return {
           ...token,

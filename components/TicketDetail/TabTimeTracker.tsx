@@ -388,11 +388,11 @@ export default function TabTimeTracker({
                               (session.user as { email?: string } | undefined)?.email ||
                               'Unknown'}
                           </Text>
-                          {!session.stop_time && <Tag color="processing">Active</Tag>}
+                          {!completed && <Tag color="processing">Active</Tag>}
                           {session.tracker_type === 'manual' && <Tag color="default">Manual</Tag>}
-                          {session.tracker_type === 'timer' && session.stop_time && (
+                          {session.tracker_type === 'timer' && completed ? (
                             <Tag color="blue">Timer</Tag>
-                          )}
+                          ) : null}
                         </Space>
                       }
                       description={
@@ -400,7 +400,7 @@ export default function TabTimeTracker({
                           <Text type="secondary" style={{ fontSize: 11 }}>
                             Started: <DateDisplay date={session.start_time as string} />
                           </Text>
-                          {session.stop_time && (
+                          {completed ? (
                             <>
                               <Text type="secondary" style={{ fontSize: 11 }}>
                                 Stopped: <DateDisplay date={session.stop_time as string} />
@@ -409,7 +409,7 @@ export default function TabTimeTracker({
                                 Duration: {formatTime(Number(session.duration_seconds) || 0)}
                               </Text>
                             </>
-                          )}
+                          ) : null}
                         </Space>
                       }
                     />
