@@ -614,6 +614,9 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
   margin-top: 0.35em;
   margin-bottom: 0.25em;
 }
+.ql-snow .ql-tooltip {
+  z-index: 99 !important;
+}
 .comment-html ul ul,
 .comment-html ol ol,
 .comment-html ul ol,

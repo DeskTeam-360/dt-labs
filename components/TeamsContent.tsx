@@ -68,6 +68,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
   const [modalVisible, setModalVisible] = useState(false)
   const [editingTeam, setEditingTeam] = useState<TeamRecord | null>(null)
   const [form] = Form.useForm()
+  const [submitting, setSubmitting] = useState(false)
 
   const fetchTeams = async () => {
     setLoading(true)
@@ -111,6 +112,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
   }
 
   const handleSubmit = async (values: any) => {
+    setSubmitting(true)
     try {
       if (editingTeam) {
         await apiFetch(`/api/teams/${editingTeam.id}`, {
@@ -135,6 +137,8 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
       }
     } catch (error: any) {
       message.error(error.message || 'Failed to save team')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -283,7 +287,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
 
               <Form.Item>
                 <Space>
-                  <Button type="primary" htmlType="submit">
+                  <Button type="primary" htmlType="submit" loading={submitting}>
                     {editingTeam ? 'Update' : 'Create'}
                   </Button>
                   <Button
@@ -291,6 +295,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
                       setModalVisible(false)
                       form.resetFields()
                     }}
+                    disabled={submitting}
                   >
                     Cancel
                   </Button>
