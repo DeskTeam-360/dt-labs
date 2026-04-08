@@ -42,7 +42,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const authUser = session?.user
+  if (!authUser?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
   const ticketId = parseInt(id, 10)
@@ -67,7 +68,7 @@ export async function POST(
     bcc_emails?: string[]
   }
 
-  const role = (session.user as { role?: string }).role?.toLowerCase()
+  const role = (authUser as { role?: string }).role?.toLowerCase()
   const isCustomer = role === 'customer'
   const effectiveVisibility = isCustomer ? 'reply' : visibility
   const effectiveAuthorType = isCustomer ? 'customer' : author_type
@@ -77,7 +78,7 @@ export async function POST(
     .insert(ticketComments)
     .values({
       ticketId,
-      userId: session.user.id,
+      userId: authUser.id,
       comment: comment || '',
       visibility: effectiveVisibility,
       authorType: effectiveAuthorType,
@@ -91,7 +92,7 @@ export async function POST(
 
   await logTicketActivity({
     ticketId,
-    actorUserId: session.user.id,
+    actorUserId: authUser.id,
     actorRole: isCustomer ? 'customer' : 'agent',
     action: 'comment_added',
     relatedCommentId: row.id,
@@ -161,7 +162,7 @@ export async function POST(
         fileUrl: a.file_url,
         fileName: a.file_name,
         filePath: a.file_path,
-        uploadedBy: session.user.id,
+        uploadedBy: authUser.id,
       }))
     )
   }
@@ -197,7 +198,7 @@ export async function POST(
     const taggedSet = new Set(effectiveTaggedIds)
     const mentionRecipients = allIds.filter((id) => taggedSet.has(id))
     const commentRecipients = allIds.filter((id) => !taggedSet.has(id))
-    const actorName = session.user.name || session.user.email || 'Someone'
+    const actorName = authUser.name || authUser.email || 'Someone'
     const preview = (comment || '')
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
@@ -207,29 +208,50 @@ export async function POST(
     if (mentionRecipients.length > 0) {
       await notifyTicketUsers({
         recipientUserIds: mentionRecipients,
-        excludeUserId: session.user.id,
+        excludeUserId: authUser.id,
         ticketId,
         ticketTitle,
         type: 'mention',
         title: `${actorName} mentioned you`,
         body: preview || 'New note on ticket',
-        actorUserId: session.user.id,
+        actorUserId: authUser.id,
         actorName,
+        actorRole: role ?? null,
       })
     }
-    // "New ticket activity" only when the customer replied (they cannot @mention via API).
-    // Agent/agent notes without @mention do not push notifications — only tagged users get `mention` above.
+    // Customer replied → notify staff on the thread (not customers; filtered in notifyTicketUsers).
     if (isCustomer && effectiveTaggedIds.length === 0 && commentRecipients.length > 0) {
       await notifyTicketUsers({
         recipientUserIds: commentRecipients,
-        excludeUserId: session.user.id,
+        excludeUserId: authUser.id,
         ticketId,
         ticketTitle,
         type: 'new_comment',
         title: 'New ticket activity',
         body: `${actorName}: ${preview || '(attachment)'}`,
-        actorUserId: session.user.id,
+        actorUserId: authUser.id,
         actorName,
+        actorRole: 'customer',
+      })
+    }
+    // Staff/manager/admin reply (conversation) → notify customers on the thread only (filtered in notifyTicketUsers).
+    if (
+      !isCustomer &&
+      effectiveVisibility === 'reply' &&
+      effectiveTaggedIds.length === 0 &&
+      commentRecipients.length > 0
+    ) {
+      await notifyTicketUsers({
+        recipientUserIds: commentRecipients,
+        excludeUserId: authUser.id,
+        ticketId,
+        ticketTitle,
+        type: 'new_comment',
+        title: 'New reply on ticket',
+        body: `${actorName}: ${preview || '(attachment)'}`,
+        actorUserId: authUser.id,
+        actorName,
+        actorRole: role ?? null,
       })
     }
   } catch (e) {
@@ -281,7 +303,7 @@ export async function POST(
           companyId: slackTicket.companyId ?? null,
           typeId: slackTicket.typeId ?? null,
           bodyPreview: slackPreview || undefined,
-          actorName: session.user.name || session.user.email || undefined,
+          actorName: authUser.name || authUser.email || undefined,
         })
       }
     } catch (err) {
@@ -301,7 +323,7 @@ export async function POST(
     tagged_users,
     cc_emails: row.ccEmails ?? [],
     bcc_emails: row.bccEmails ?? [],
-    user: { id: session.user.id, full_name: session.user.name, email: session.user.email, avatar_url: session.user.image },
+    user: { id: authUser.id, full_name: authUser.name, email: authUser.email, avatar_url: authUser.image },
     comment_attachments: attachments.map((a: { file_url: string; file_name: string }) => ({ id: '', file_url: a.file_url, file_name: a.file_name })),
   })
 }

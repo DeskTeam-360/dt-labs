@@ -75,9 +75,12 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-function getInitialFilterStateFromStored(stored: StoredFilter | null): ParsedUrlFilters {
+function getInitialFilterStateFromStored(stored: StoredFilter | null, isCustomer = false): ParsedUrlFilters {
+  const defaultStatus = isCustomer
+    ? []
+    : DEFAULT_KANBAN_COLUMNS.map((c) => c.id)
   return {
-    filterStatus: (stored?.filterStatus && stored.filterStatus.length) ? stored.filterStatus : DEFAULT_KANBAN_COLUMNS.map((c) => c.id),
+    filterStatus: stored?.filterStatus && stored.filterStatus.length ? stored.filterStatus : defaultStatus,
     filterTypeIds:
       (stored?.filterTypeIds && stored.filterTypeIds.length) || (stored?.filterTypeId != null)
         ? (stored?.filterTypeIds && stored.filterTypeIds.length
@@ -142,7 +145,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
    */
   const initialRef = useRef<{ state: ParsedUrlFilters; fromUrl: boolean } | null>(null)
   if (initialRef.current === null) {
-    const fromUrl = parseFiltersFromUrl(searchParams)
+    const fromUrl = parseFiltersFromUrl(searchParams, { isCustomer })
     if (fromUrl) {
       let viewMode = fromUrl.viewMode
       if (isCustomer && viewMode === 'roundrobin') viewMode = 'kanban'
@@ -155,7 +158,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       }
       initialRef.current = { state: { ...fromUrl, viewMode, filterTicketType }, fromUrl: true }
     } else {
-      const state = getInitialFilterStateFromStored(null)
+      const state = getInitialFilterStateFromStored(null, isCustomer)
       const viewMode = getInitialViewModeCustomer(isCustomer, null)
       initialRef.current = { state: { ...state, viewMode }, fromUrl: false }
     }
@@ -234,15 +237,25 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   const statusFilterIsRestrictive = useMemo(() => {
     if (statusColumns.length === 0) return false
     if (filterStatus.length === 0) return false
+    if (
+      isCustomer &&
+      lookupReady &&
+      allStatuses.length > 0 &&
+      filterStatus.length === allStatuses.length &&
+      allStatuses.every((s) => filterStatus.includes(s.slug))
+    ) {
+      return false
+    }
     return [...filterStatus].sort().join(',') !== defaultKanbanStatusKey
-  }, [filterStatus, defaultKanbanStatusKey, statusColumns.length])
+  }, [filterStatus, defaultKanbanStatusKey, statusColumns.length, isCustomer, lookupReady, allStatuses])
 
-  /** Multi-select Status dikosongkan → kembali ke slug show_in_kanban saja (bukan [] / semua tiket). */
+  /** Multi-select Status dikosongkan → staff: slug show_in_kanban. Customer: biarkan fetchLookup / URL isi semua status. */
   useEffect(() => {
     if (filterTicketType) return
+    if (isCustomer) return
     if (!lookupReady || statusColumns.length === 0 || filterStatus.length > 0) return
     setFilterStatus(statusColumns.map((c) => c.id))
-  }, [lookupReady, statusColumns, filterStatus.length, filterTicketType])
+  }, [lookupReady, statusColumns, filterStatus.length, filterTicketType, isCustomer])
 
   const hasActiveFilters =
     statusFilterIsRestrictive ||
@@ -258,7 +271,11 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
   const clearFilters = useCallback(() => {
     setFilterTicketType(null)
-    setFilterStatus(statusColumns.map((c) => c.id))
+    setFilterStatus(
+      isCustomer && allStatuses.length > 0
+        ? allStatuses.map((s) => s.slug)
+        : statusColumns.map((c) => c.id)
+    )
     setFilterTypeIds([])
     setFilterCompanyIds([])
     setFilterTagIds([])
@@ -267,7 +284,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setFilterTeamIds([])
     setFilterDateRange(null)
     setFilterSearch('')
-  }, [statusColumns])
+  }, [statusColumns, isCustomer, allStatuses])
 
   /**
    * Visibility multiselect kosong = "All visibility" (tidak kirim param ke API).
@@ -361,7 +378,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     if (initialRef.current?.fromUrl) return
     const stored = loadFiltersFromStorage()
     if (!stored || Object.keys(stored).length === 0) return
-    const state = getInitialFilterStateFromStored(stored)
+    const state = getInitialFilterStateFromStored(stored, isCustomer)
     const vm = getInitialViewModeCustomer(isCustomer, stored)
     setFilterStatus(state.filterStatus)
     setFilterTypeIds(state.filterTypeIds)
@@ -422,7 +439,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         if (fromUrl) {
           const current = initialRef.current?.state.filterStatus ?? []
           const intersection = current.filter((slug: string) => validSlugs.has(slug))
-          const resolvedStatus = intersection.length > 0 ? intersection : kanbanSlugs
+          const allSlugs = list.map((s) => s.slug)
+          const resolvedStatus =
+            intersection.length > 0 ? intersection : isCustomer ? allSlugs : kanbanSlugs
           setFilterStatus(resolvedStatus)
           lastKanbanSlugsRef.current = kanbanSlugs
           saveFiltersToStorage({ ...(stored || {}), filterStatus: resolvedStatus.length ? resolvedStatus : null } as StoredFilter)
@@ -518,7 +537,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     applyingFromUrlRef.current = true
 
     if (hasUrlFilterParams(searchParams)) {
-      let parsed = parseFiltersFromUrl(searchParams)
+      let parsed = parseFiltersFromUrl(searchParams, { isCustomer })
       if (!parsed) {
         applyingFromUrlRef.current = false
         return
@@ -542,7 +561,13 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       ) {
         const valid = new Set(allStatuses.map((s) => s.slug))
         const pruned = statuses.filter((s) => valid.has(s))
-        statuses = pruned.length > 0 ? pruned : statusColumns.map((c) => c.id)
+        if (pruned.length > 0) {
+          statuses = pruned
+        } else if (isCustomer && allStatuses.length > 0) {
+          statuses = allStatuses.map((s) => s.slug)
+        } else {
+          statuses = statusColumns.map((c) => c.id)
+        }
       }
       setFilterStatus(statuses)
       setFilterTypeIds(parsed.filterTypeIds)
@@ -560,9 +585,13 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       setFilterTicketType(parsed.filterTicketType ?? null)
     } else {
       const fallbackStatus =
-        lookupReady && statusColumns.length > 0
-          ? statusColumns.map((c) => c.id)
-          : DEFAULT_KANBAN_COLUMNS.map((c) => c.id)
+        lookupReady && allStatuses.length > 0 && isCustomer
+          ? allStatuses.map((s) => s.slug)
+          : lookupReady && statusColumns.length > 0
+            ? statusColumns.map((c) => c.id)
+            : isCustomer
+              ? []
+              : DEFAULT_KANBAN_COLUMNS.map((c) => c.id)
       setFilterStatus(fallbackStatus)
       setFilterTypeIds([])
       setFilterPriorityIds([])
@@ -845,6 +874,59 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     }
   }
 
+  const handleBulkMoveToTrash = async (ids: number[]) => {
+    if (!ids.length || isCustomer) return
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          apiFetch(`/api/tickets/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticket_type: 'trash' }),
+          })
+        )
+      )
+      message.success(`Moved ${ids.length} ticket(s) to trash`)
+      await fetchTickets()
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to move tickets to trash')
+      await fetchTickets()
+    }
+  }
+
+  const handleBulkMoveToSpam = async (ids: number[]) => {
+    if (!ids.length || isCustomer) return
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          apiFetch(`/api/tickets/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticket_type: 'spam' }),
+          })
+        )
+      )
+      message.success(`Moved ${ids.length} ticket(s) to spam`)
+      await fetchTickets()
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to move tickets to spam')
+      await fetchTickets()
+    }
+  }
+
+  const handleBulkDelete = async (ids: number[]) => {
+    if (!ids.length || isCustomer) return
+    setTickets((prev) => prev.filter((t) => !ids.includes(t.id)))
+    try {
+      await Promise.all(ids.map((id) => apiFetch(`/api/tickets/${id}`, { method: 'DELETE' })))
+      message.success(`Deleted ${ids.length} ticket(s)`)
+      await fetchTickets()
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Failed to delete tickets')
+      await fetchTickets()
+    }
+  }
+
   const handleSubmit = async (values: Record<string, unknown>) => {
     try {
       const effectiveValues = { ...values }
@@ -1096,6 +1178,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     handleCreate,
     handleEdit,
     handleDelete,
+    handleBulkMoveToTrash,
+    handleBulkMoveToSpam,
+    handleBulkDelete,
     handleSubmit,
     handleModalCancel,
     handleDragStart,

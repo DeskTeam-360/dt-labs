@@ -2,8 +2,7 @@
 
 import { Form, Input, Button, Card, Typography, message, Alert } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import ThemeToggle from '@/components/ThemeToggle'
 
@@ -25,7 +24,15 @@ interface DbCheck {
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [dbError, setDbError] = useState<DbCheck | null>(null)
-  const router = useRouter()
+  const [sessionEndedReason, setSessionEndedReason] = useState(false)
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('reason')
+      setSessionEndedReason(q === 'session_ended')
+    } catch {
+      setSessionEndedReason(false)
+    }
+  }, [])
 
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true)
@@ -121,6 +128,15 @@ export default function LoginPage() {
           layout="vertical"
           size="large"
         >
+          {sessionEndedReason && (
+            <Alert
+              type="warning"
+              showIcon
+              message="Your session has ended"
+              description="Your account was deactivated or removed. Sign in again if you still have access."
+              style={{ marginBottom: 16 }}
+            />
+          )}
           <Form.Item
             name="email"
             label="Email"

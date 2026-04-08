@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 
-/** Auth only — list vs detail access is enforced in `page.tsx` and `[id]/page.tsx`. */
-export default async function UsersLayout({
+export default async function SettingsUsersLayout({
   children,
 }: {
   children: React.ReactNode

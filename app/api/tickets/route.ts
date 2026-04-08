@@ -33,12 +33,13 @@ const MAX_LIMIT = 1000
 /** GET /api/tickets - List tickets with related data (server-side filtering). Customer: only tickets of their company */
 export async function GET(request: Request) {
   const session = await auth()
-  if (!session?.user) {
+  const authUser = session?.user
+  if (!authUser?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const userId = session.user.id!
-  const role = (session.user as { role?: string }).role?.toLowerCase()
+  const userId = authUser.id
+  const role = (authUser as { role?: string }).role?.toLowerCase()
 
   // Customer: only tickets for the same company
   let forcedCompanyIds: string[] = []
@@ -362,7 +363,8 @@ export async function GET(request: Request) {
 /** POST /api/tickets - Create ticket */
 export async function POST(request: Request) {
   const session = await auth()
-  if (!session?.user) {
+  const authUser = session?.user
+  if (!authUser?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -387,8 +389,8 @@ export async function POST(request: Request) {
   /** created_via: 'portal' (admin app) | 'website' (embed/widget) | 'app' (mobile/external) - for automation conditions */
   const createdVia = bodyCreatedVia || 'portal'
 
-  const userId = session.user.id!
-  const role = (session.user as { role?: string }).role?.toLowerCase()
+  const userId = authUser.id
+  const role = (authUser as { role?: string }).role?.toLowerCase()
   let resolvedCompanyId = company_id || null
   if (role === 'customer' && !resolvedCompanyId) {
     const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
@@ -413,7 +415,7 @@ export async function POST(request: Request) {
       priorityId: priority_id ?? null,
       companyId: resolvedCompanyId,
       dueDate: due_date ? new Date(due_date) : null,
-      createdBy: session.user.id,
+      createdBy: authUser.id,
       createdVia,
     })
     .returning()
@@ -454,7 +456,7 @@ export async function POST(request: Request) {
         fileUrl: a.file_url,
         fileName: a.file_name,
         filePath: a.file_path,
-        uploadedBy: session.user.id,
+        uploadedBy: authUser.id,
       }))
     )
   }
@@ -476,7 +478,7 @@ export async function POST(request: Request) {
 
   if (Array.isArray(assignees) && assignees.length > 0) {
     try {
-      const actorName = session.user.name || session.user.email || 'Someone'
+      const actorName = authUser.name || authUser.email || 'Someone'
       await notifyTicketUsers({
         recipientUserIds: assignees,
         excludeUserId: userId,
@@ -487,6 +489,7 @@ export async function POST(request: Request) {
         body: `You were assigned to "${newTicket.title}"`,
         actorUserId: userId,
         actorName,
+        actorRole: role ?? null,
       })
     } catch (e) {
       console.error('[POST ticket] notify assignees:', e)

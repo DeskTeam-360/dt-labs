@@ -1,6 +1,6 @@
 'use client'
 
-import { Layout, Table, Button, Space, Typography, Card, Tag, Avatar, Modal, Form, Input, Select, message, Popconfirm, Tooltip, Upload, Switch, InputNumber, Col, Row } from 'antd'
+import { Layout, Table, Button, Space, Typography, Card, Tag, Avatar, Modal, Form, Input, Select, message, Popconfirm, Tooltip, Upload, Switch, InputNumber, Col, Row, Alert } from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
@@ -34,7 +34,7 @@ import { confirmUserCompanyMove } from '@/components/confirm-user-company-move'
 import type { ColumnsType } from 'antd/es/table'
 
 const { Content } = Layout
-const { Title } = Typography
+const { Title, Text } = Typography
 const { Option } = Select
 const { TextArea } = Input
 
@@ -376,7 +376,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
         <Space align="start">
           <Avatar icon={<UserOutlined />} src={record.avatar_url} />
           <SpaNavLink
-            href={`/users/${record.id}`}
+            href={`/settings/users/${record.id}`}
             style={{ textDecoration: 'none', color: 'inherit' }}
           >
             <div>
@@ -475,13 +475,13 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
             <Button
               type="default"
               icon={<EyeOutlined />}
-              href={`/users/${record.id}`}
+              href={`/settings/users/${record.id}`}
               aria-label="View user details"
               onClick={(e) => {
                 if (shouldOpenHrefInNewTab(e)) return
                 if (e.button !== 0) return
                 e.preventDefault()
-                router.push(`/users/${record.id}`)
+                router.push(`/settings/users/${record.id}`)
               }}
             />
           </Tooltip>
@@ -529,10 +529,49 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
 
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
-        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
+        <Content className="settings-page" style={{ padding: 24, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+          <div style={{ marginBottom: 24 }}>
+            <Title level={2} className="settings-section-heading" style={{ margin: 0 }}>
+              Users
+            </Title>
+            <Text style={{ color: 'var(--settings-hub-tile-desc)' }}>
+              {isCustomer
+                ? 'People who belong to your organization and can sign in to the portal'
+                : 'Manage login accounts, roles, status, and which company a user belongs to'}
+            </Text>
+          </div>
+
+          {isCustomer ? (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Your company"
+              description="This list includes anyone linked to your company: users with your company set as their primary company, plus members added under Companies. Customer users only see tickets for that company."
+            />
+          ) : (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="How users relate to companies"
+              description={
+                <>
+                  <strong>User</strong> is a single sign-in (email, password, role, active/inactive).{' '}
+                  <strong>Company</strong> on a user is their <em>primary</em> company: it controls which tickets{' '}
+                  <strong>customer</strong> role users see in the portal. You can also attach people via{' '}
+                  <strong>company membership</strong> (Companies → portal users); the API merges both when listing
+                  “same company” users. Changing a customer&apos;s company moves their ticket scope—confirm when prompted.
+                </>
+              }
+            />
+          )}
+
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
-              <Title level={2} style={{ margin: 0 }}>Users Management</Title>
+              <Title level={4} style={{ margin: 0 }}>
+                Directory
+              </Title>
               <Space wrap>
                 <Input
                   placeholder="Search by name, email, company..."

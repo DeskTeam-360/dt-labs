@@ -1,4 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore'
+import { inArray } from 'drizzle-orm'
+import { db, users } from '@/lib/db'
 import { getFirebaseAdminFirestore } from '@/lib/firebase/admin'
 
 export type TicketNotificationType =
@@ -13,6 +15,45 @@ export function diffNewAssignees(beforeIds: string[], afterIds: string[]): strin
   return afterIds.filter((id) => id && !before.has(id))
 }
 
+/**
+ * Customers only receive ticket push notifications when:
+ * - status changes, or
+ * - someone who is not a customer posted a public reply (`new_comment` from staff/manager/admin).
+ * Staff still receive `new_comment` when the actor is a customer (unchanged).
+ */
+async function filterRecipientsByRoleAndType(
+  recipientUserIds: string[],
+  type: TicketNotificationType,
+  actorRole: string | null | undefined
+): Promise<string[]> {
+  const actor = (actorRole ?? '').toLowerCase().trim()
+  const actorIsCustomer = actor === 'customer'
+  if (recipientUserIds.length === 0) return []
+
+  const rows = await db
+    .select({ id: users.id, role: users.role })
+    .from(users)
+    .where(inArray(users.id, recipientUserIds))
+  const roleById = new Map(rows.map((r) => [r.id, (r.role ?? '').toLowerCase().trim()]))
+
+  return recipientUserIds.filter((id) => {
+    const rid = String(id).trim()
+    const recipientRole = roleById.get(rid) ?? ''
+    const recipientIsCustomer = recipientRole === 'customer'
+
+    if (!recipientIsCustomer) {
+      if (type === 'new_comment') {
+        return actorIsCustomer
+      }
+      return true
+    }
+
+    if (type === 'status_changed') return true
+    if (type === 'new_comment' && !actorIsCustomer) return true
+    return false
+  })
+}
+
 /** Writes one doc per recipient under `users/{userId}/ticketNotifications/{id}`. */
 export async function notifyTicketUsers(params: {
   recipientUserIds: string[]
@@ -24,9 +65,11 @@ export async function notifyTicketUsers(params: {
   body: string
   actorUserId: string
   actorName: string
+  /** Session role of the actor (e.g. customer, admin, manager, staff). Drives customer vs staff routing for `new_comment`. */
+  actorRole?: string | null
 }): Promise<void> {
-  const db = getFirebaseAdminFirestore()
-  if (!db) {
+  const fsdb = getFirebaseAdminFirestore()
+  if (!fsdb) {
     if (process.env.NODE_ENV === 'development') {
       console.warn('[notifyTicketUsers] skipped: Firebase Admin Firestore not configured (check .env service account)')
     }
@@ -34,15 +77,18 @@ export async function notifyTicketUsers(params: {
   }
 
   const exclude = params.excludeUserId != null ? String(params.excludeUserId).trim() : ''
-  const recipients = [...new Set(params.recipientUserIds.map((id) => String(id).trim()))].filter(
+  const unique = [...new Set(params.recipientUserIds.map((id) => String(id).trim()))].filter(
     (id) => Boolean(id) && id !== exclude
   )
+  if (unique.length === 0) return
+
+  const recipients = await filterRecipientsByRoleAndType(unique, params.type, params.actorRole)
   if (recipients.length === 0) return
 
   const ticketTitle = (params.ticketTitle || 'Ticket').slice(0, 200)
-  const batch = db.batch()
+  const batch = fsdb.batch()
   for (const userId of recipients) {
-    const ref = db.collection('users').doc(userId).collection('ticketNotifications').doc()
+    const ref = fsdb.collection('users').doc(userId).collection('ticketNotifications').doc()
     batch.set(ref, {
       userId,
       ticketId: params.ticketId,

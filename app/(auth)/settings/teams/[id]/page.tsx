@@ -4,7 +4,7 @@ import { eq, asc } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import TeamDetailContent from '@/components/TeamDetailContent'
 
-export default async function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SettingsTeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user) redirect('/login')
 
@@ -17,7 +17,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
     .where(eq(teams.id, id))
     .limit(1)
 
-  if (!teamRow) redirect('/teams')
+  if (!teamRow) redirect('/settings/teams')
 
   const membersRows = await db
     .select({ member: teamMembers, user: users })

@@ -75,6 +75,9 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     handleCreate,
     handleEdit,
     handleDelete,
+    handleBulkMoveToTrash,
+    handleBulkMoveToSpam,
+    handleBulkDelete,
     handleSubmit,
     handleModalCancel,
     handleDragStart,
@@ -166,8 +169,13 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               tickets={filteredTickets}
               allStatusColumns={allStatusColumns}
               allPriorities={ticketPriorities}
+              isCustomer={isCustomer}
+              filterTicketType={filterTicketType}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onBulkMoveToSpam={!isCustomer ? handleBulkMoveToSpam : undefined}
+              onBulkMoveToTrash={!isCustomer ? handleBulkMoveToTrash : undefined}
+              onBulkDelete={!isCustomer ? handleBulkDelete : undefined}
               onFilterByStatus={filterByStatusFromChip}
               onFilterByPriority={filterByPriorityFromChip}
               onFilterByTag={filterByTagFromChip}

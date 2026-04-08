@@ -45,16 +45,19 @@ export default function MessageTemplatePreviewModal({
         <strong>#{MESSAGE_TEMPLATE_PREVIEW_SAMPLE_TICKET_ID}</strong> (links use this site&apos;s origin).
       </Text>
       <div
-        className="ql-snow"
+        className="ql-snow message-template-preview-ql"
         style={{
-          border: '1px solid #f0f0f0',
+          border: '1px solid var(--ticket-nav-panel-border)',
           borderRadius: 8,
           padding: 16,
           minHeight: 160,
-          background: '#fafafa',
+          background: 'var(--ticket-nav-panel-bg)',
+          color: 'var(--foreground)',
         }}
         dangerouslySetInnerHTML={{
-          __html: previewHtmlSafe || '<p style="margin:0;color:#999"><em>No body yet.</em></p>',
+          __html:
+            previewHtmlSafe ||
+            '<p style="margin:0;color:var(--ticket-nav-muted)"><em>No body yet.</em></p>',
         }}
       />
     </Modal>

@@ -17,7 +17,7 @@ export async function generateMetadata({
   return { title: own ? 'My Profile' : 'User details' }
 }
 
-export default async function UserDetailPage({
+export default async function SettingsUserDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -46,7 +46,7 @@ export default async function UserDetailPage({
     .where(eq(users.id, id))
 
   if (!row?.user) {
-    redirect('/users')
+    redirect('/settings/users')
   }
 
   const u = row.user
@@ -76,4 +76,3 @@ export default async function UserDetailPage({
 
   return <UserDetailContent user={session.user} userData={userData} />
 }
-

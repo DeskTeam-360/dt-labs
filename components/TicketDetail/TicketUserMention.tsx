@@ -12,14 +12,14 @@ type TicketUserMentionProps = {
 }
 
 /**
- * Hover: email. Click: profile /users/[id] (when userId present).
+ * Hover: email. Click: profile /settings/users/[id] (when userId present).
  */
 export default function TicketUserMention({ userId, email, children, className }: TicketUserMentionProps) {
   const tip = email?.trim() ? email.trim() : 'Email tidak tersedia'
   const body =
     userId ? (
       <SpaNavLink
-        href={`/users/${userId}`}
+        href={`/settings/users/${userId}`}
         className={className}
         style={{ color: 'inherit', textDecoration: 'none' }}
       >

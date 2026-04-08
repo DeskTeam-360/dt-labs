@@ -260,7 +260,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     openedEditFromQueryRef.current = false
   }, [userData.id])
 
-  /** Dari company detail: link `/users/{id}?edit=1` langsung buka mode edit. */
+  /** Dari company detail: link `/settings/users/{id}?edit=1` langsung buka mode edit. */
   useEffect(() => {
     if (openedEditFromQueryRef.current) return
     if (searchParams.get('edit') !== '1') return
@@ -281,7 +281,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       locale: userData.locale || 'en',
       is_email_verified: userData.is_email_verified || false,
     })
-    router.replace(`/users/${userData.id}`, { scroll: false })
+    router.replace(`/settings/users/${userData.id}`, { scroll: false })
   }, [searchParams, userData, form, router])
 
   const handleCancel = () => {
@@ -409,10 +409,10 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
-        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
+        <Content className="settings-page" style={{ padding: 24, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
           <Card>
             <div style={{ marginBottom: 20 }}>
-              <Title level={3} style={{ margin: 0 }}>
+              <Title level={3} className="settings-section-heading" style={{ margin: 0 }}>
                 {isOwnProfile ? 'My Profile' : 'User details'}
               </Title>
               {isOwnProfile ? (
@@ -424,7 +424,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
             <Space style={{ marginBottom: 24 }} wrap>
               <Button
                 icon={<ArrowLeftOutlined />}
-                onClick={() => router.push(isOwnProfile ? '/dashboard' : '/users')}
+                onClick={() => router.push(isOwnProfile ? '/dashboard' : '/settings/users')}
               >
                 {isOwnProfile ? 'Back to dashboard' : 'Back to Users'}
               </Button>
@@ -654,7 +654,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             <Space>
                               <BankOutlined />
                               <SpaNavLink
-                                href={`/companies/${userData.company?.id ?? userData.company_id}`}
+                                href={`/settings/companies/${userData.company?.id ?? userData.company_id}`}
                                 style={{ fontWeight: 500 }}
                               >
                                 {userData.company?.name ?? 'Open company'}

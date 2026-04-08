@@ -21,7 +21,7 @@ function toSnake(obj: Record<string, unknown>): Record<string, unknown> {
   return out
 }
 
-export default async function ContentPlannerDetailPage({
+export default async function SettingsContentPlannerDetailPage({
   params,
 }: {
   params: Promise<{ id: string; plannerId: string }>
@@ -40,7 +40,7 @@ export default async function ContentPlannerDetailPage({
     .limit(1)
 
   if (!companyRow) {
-    redirect('/companies')
+    redirect('/settings/companies')
   }
 
   const companyData = { id: companyRow.id, name: companyRow.name }
@@ -61,7 +61,7 @@ export default async function ContentPlannerDetailPage({
     .limit(1)
 
   if (!plannerRow?.planner) {
-    redirect(`/companies/${companyId}`)
+    redirect(`/settings/companies/${companyId}`)
   }
 
   const p = plannerRow.planner

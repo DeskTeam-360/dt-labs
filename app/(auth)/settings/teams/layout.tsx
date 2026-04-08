@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { canAccessTeams } from '@/lib/auth-utils'
 
-export default async function TeamsLayout({
+export default async function SettingsTeamsLayout({
   children,
 }: {
   children: React.ReactNode

@@ -566,7 +566,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
         <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card>
             <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
-              <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => router.push('/teams')}>
+              <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => router.push('/settings/teams')}>
                 Back
               </Button>
               {isCreator && (

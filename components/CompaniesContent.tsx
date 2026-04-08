@@ -267,7 +267,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
             <Button
               type="default"
               icon={<EyeOutlined />}
-              onClick={() => router.push(`/companies/${record.id}`)}
+              onClick={() => router.push(`/settings/companies/${record.id}`)}
             >
               Details
             </Button>

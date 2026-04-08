@@ -51,7 +51,7 @@ const CTA_TYPE_OPTIONS = [
 
 interface TabContentPlannerProps {
   companyData: { id: string; name?: string }
-  /** When set (e.g. /customer), links go to basePath/content-planner/[id]; else /companies/[id]/content-planner/[id] */
+  /** When set (e.g. /customer), links go to basePath/content-planner/[id]; else /settings/companies/[id]/content-planner/[id] */
   basePath?: string
 }
 
@@ -389,7 +389,7 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
   const handleReview = (record: ContentPlannerRecord) => {
     const url = basePath
       ? `${basePath}/content-planner/${record.id}`
-      : `/companies/${companyData.id}/content-planner/${record.id}`
+      : `/settings/companies/${companyData.id}/content-planner/${record.id}`
     router.push(url)
   }
 

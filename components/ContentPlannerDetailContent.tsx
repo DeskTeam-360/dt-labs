@@ -258,7 +258,7 @@ export default function ContentPlannerDetailContent({
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed to delete')
       message.success('Deleted')
-      router.push(variant === 'customer' ? '/customer' : `/companies/${companyData.id}`)
+      router.push(variant === 'customer' ? '/customer' : `/settings/companies/${companyData.id}`)
     } catch (e: unknown) {
       const err = e as { message?: string }
       message.error(err?.message || 'Failed to delete')
@@ -283,7 +283,7 @@ export default function ContentPlannerDetailContent({
           <Space style={{ marginBottom: 24 }}>
             <Button
               icon={<ArrowLeftOutlined />}
-              onClick={() => router.push(isCustomer ? '/tickets' : `/companies/${companyData.id}`)}
+              onClick={() => router.push(isCustomer ? '/tickets' : `/settings/companies/${companyData.id}`)}
             >
               Back to {isCustomer ? 'Portal' : (companyData.name || 'Company')}
             </Button>

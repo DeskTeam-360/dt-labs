@@ -193,13 +193,13 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
                 </Space>
                 <Space wrap align="center" style={{ marginLeft: 'auto' }}>
                   <SpaNavLink
-                    href={`/users/${cu.user_id}`}
+                    href={`/settings/users/${cu.user_id}`}
                     style={{ color: '#1677ff', fontSize: 14, lineHeight: '22px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                   >
                     <EyeOutlined /> Detail
                   </SpaNavLink>
                   <SpaNavLink
-                    href={`/users/${cu.user_id}?edit=1`}
+                    href={`/settings/users/${cu.user_id}?edit=1`}
                     style={{ color: '#1677ff', fontSize: 14, lineHeight: '22px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                   >
                     <EditOutlined /> Edit

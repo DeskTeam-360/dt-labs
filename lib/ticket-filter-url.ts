@@ -44,8 +44,12 @@ export interface ParsedUrlFilters {
   filterPriorityIds: number[]
 }
 
-export function parseFiltersFromUrl(searchParams: URLSearchParams): ParsedUrlFilters | null {
+export function parseFiltersFromUrl(
+  searchParams: URLSearchParams,
+  opts?: { isCustomer?: boolean }
+): ParsedUrlFilters | null {
   if (!hasUrlFilterParams(searchParams)) return null
+  const isCustomer = opts?.isCustomer ?? false
   const split = (s: string | null) => (s ? s.split(',').map((x) => x.trim()).filter(Boolean) : [])
   const status = split(searchParams.get(URL_PARAMS.status))
   const typeIds = split(searchParams.get(URL_PARAMS.type_ids))
@@ -95,7 +99,9 @@ export function parseFiltersFromUrl(searchParams: URLSearchParams): ParsedUrlFil
       ? []
       : status.length > 0
         ? status
-        : DEFAULT_KANBAN_COLUMNS.map((c) => c.id),
+        : isCustomer
+          ? []
+          : DEFAULT_KANBAN_COLUMNS.map((c) => c.id),
     filterTypeIds: typeIds,
     filterPriorityIds: priorityIds,
     filterCompanyIds: companyIds,

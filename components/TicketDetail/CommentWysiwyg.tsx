@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { Input } from 'antd'
+import { useTheme } from '@/components/ThemeProvider'
 import { uploadTicketImage } from '@/utils/storage'
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false })
@@ -44,10 +45,11 @@ export default function CommentWysiwyg({
   onChange,
   placeholder = 'Add a comment...',
   height = '100px',
-  bgColor = '#fff',
+  bgColor = 'transparent',
   ticketId,
   useSemanticHTML = true,
 }: CommentWysiwygProps) {
+  const { resolved } = useTheme()
   const [mounted, setMounted] = useState(false)
   const quillRef = useRef<{ getEditor: () => QuillEditor } | null>(null)
   const normalizedPlainTextForQuillRef = useRef(false)
@@ -113,6 +115,12 @@ export default function CommentWysiwyg({
     onChange(html)
   }, [mounted, value, onChange])
 
+  const editorMinPx = useMemo(() => {
+    if (!height) return 99
+    const n = parseInt(String(height).replace('px', ''), 10)
+    return Number.isFinite(n) ? Math.max(40, n - 1) : 99
+  }, [height])
+
   // Editable fallback until ReactQuill loads (Enter / plain-text bullets work here).
   if (!mounted) {
     const parsed = height ? parseInt(height.replace('px', ''), 10) : NaN
@@ -135,6 +143,8 @@ export default function CommentWysiwyg({
     )
   }
 
+  const shellBg = resolved === 'dark' ? 'transparent' : bgColor
+
   const quillProps = {
     theme: 'snow',
     value,
@@ -142,7 +152,7 @@ export default function CommentWysiwyg({
     placeholder,
     modules,
     formats: QUILL_FORMATS,
-    style: { backgroundColor: bgColor, height: height },
+    style: { backgroundColor: shellBg, height: height },
     ref: quillRef,
     tabIndex: 10,
     useSemanticHTML,
@@ -150,14 +160,11 @@ export default function CommentWysiwyg({
   return (
     <>
     <style>{`
-      .ql-editor {
-        min-height: ${height ? (parseInt(height.replace('px', '')) - 1) : '990'}px;
-        
+      .comment-wysiwyg-wrapper .ql-editor {
+        min-height: ${editorMinPx}px;
       }
-        .ql-container .ql-editor{
-        background-color: white;}
     `}</style>
-    
+
     <div className="comment-wysiwyg-wrapper" style={{ marginBottom: 20, height: height, }}>
       {/* ref passed for image handler; react-quill-new types omit ref */}
       <ReactQuill {...(quillProps as React.ComponentProps<typeof ReactQuill>)} />

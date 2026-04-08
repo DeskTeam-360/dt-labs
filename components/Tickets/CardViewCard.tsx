@@ -54,10 +54,10 @@ export default function CardViewCard({
       style={{
         width: '100%',
         padding: 16,
-        background: '#fff',
+        background: 'var(--kanban-card-bg)',
         borderRadius: 12,
-        border: '1px solid #f0f0f0',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+        border: '1px solid var(--kanban-card-border)',
+        boxShadow: 'var(--kanban-card-shadow)',
       }}
     >
       <a
@@ -78,7 +78,7 @@ export default function CardViewCard({
         }}
       >
       <Flex vertical justify="flex-start" align="flex-start" gap={0} style={{ flex: 1, minWidth: 0 }}>
-        <Text strong style={{ fontSize: 16, fontWeight: 700, color: '#1f2937', lineHeight: 1.4 }}>
+        <Text strong style={{ fontSize: 16, fontWeight: 700, color: 'var(--kanban-card-title)', lineHeight: 1.4 }}>
           {ticket.has_unread_replies && (
             <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
           )}
@@ -89,18 +89,18 @@ export default function CardViewCard({
         </Text>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginTop: 4 }}>
           {ticket.due_date && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--kanban-card-muted)' }}>
               <FlagOutlined style={{ fontSize: 12 }} />
               Due {dayjs(ticket.due_date).format('MMM DD, YYYY').toUpperCase()}
             </span>
           )}
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--kanban-card-muted)' }}>
             <ClockCircleOutlined style={{ fontSize: 12 }} />
             Updated {dayjs(ticket.updated_at).format('MMM DD, YYYY').toUpperCase()}
           </span>
         </div>
         {Number(ticket.checklist_total) > 0 && (
-          <span style={{ marginTop: 4, fontSize: 12, color: '#9ca3af' }}>
+          <span style={{ marginTop: 4, fontSize: 12, color: 'var(--kanban-card-muted)' }}>
             Checklist: {ticket.checklist_completed}/{ticket.checklist_total}
           </span>
         )}
@@ -111,8 +111,8 @@ export default function CardViewCard({
           <span
             style={{
               ...tagStyle,
-              background: ticket.priority.color ?? '#e9ecef',
-              color: ticket.priority.color ? '#fff' : '#495057',
+              background: ticket.priority.color ?? 'var(--ticket-row-chip-neutral-bg)',
+              color: ticket.priority.color ? '#fff' : 'var(--ticket-row-chip-neutral-fg)',
               cursor: onFilterByPriority ? 'pointer' : undefined,
             }}
             title={onFilterByPriority ? 'Filter by this priority' : undefined}
@@ -134,8 +134,8 @@ export default function CardViewCard({
           <span
             style={{
               ...tagStyle,
-              background: ticket.company.color ?? '#e9ecef',
-              color: ticket.company.color ? '#fff' : '#495057',
+              background: ticket.company.color ?? 'var(--ticket-row-chip-neutral-bg)',
+              color: ticket.company.color ? '#fff' : 'var(--ticket-row-chip-neutral-fg)',
               cursor: onFilterByCompany ? 'pointer' : undefined,
             }}
             title={onFilterByCompany ? 'Filter by this company' : undefined}
@@ -158,8 +158,8 @@ export default function CardViewCard({
             key={tag.id}
             style={{
               ...tagStyle,
-              background: tag.color ?? '#e9ecef',
-              color: tag.color ? '#fff' : '#495057',
+              background: tag.color ?? 'var(--ticket-row-chip-neutral-bg)',
+              color: tag.color ? '#fff' : 'var(--ticket-row-chip-neutral-fg)',
               cursor: onFilterByTag ? 'pointer' : undefined,
             }}
             title={onFilterByTag ? 'Filter by this tag' : undefined}
@@ -178,7 +178,7 @@ export default function CardViewCard({
           </span>
         ))}
         {ticket.tags && ticket.tags.length > 3 && (
-          <span style={{ ...tagStyle, background: '#e9ecef', color: '#495057' }}>+{ticket.tags.length - 3}</span>
+          <span style={{ ...tagStyle, background: 'var(--ticket-row-chip-neutral-bg)', color: 'var(--ticket-row-chip-neutral-fg)' }}>+{ticket.tags.length - 3}</span>
         )}
         <span
           style={{

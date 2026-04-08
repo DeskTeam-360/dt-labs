@@ -144,7 +144,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
       dataIndex: 'name',
       key: 'name',
       render: (name: string, record: TeamRecord) => (
-        <Link href={`/teams/${record.id}`} style={{ fontWeight: 600 }}>
+        <Link href={`/settings/teams/${record.id}`} style={{ fontWeight: 600 }}>
           {name}
         </Link>
       ),
@@ -182,7 +182,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
       render: (_, record) => (
         <Space>
           <Tooltip title="View team detail">
-            <Link href={`/teams/${record.id}`}>
+            <Link href={`/settings/teams/${record.id}`}>
               <Button type="default" icon={<EyeOutlined />}> Details</Button> 
             </Link>
           </Tooltip>

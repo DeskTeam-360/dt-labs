@@ -83,7 +83,10 @@ export function canAccessSettingsHub(role: string | undefined): boolean {
     canAccessSlackNotifications(role) ||
     canAccessMessageTemplates(role) ||
     canAccessKnowledgeBase(role) ||
-    canAccessAutomationRules(role)
+    canAccessAutomationRules(role) ||
+    canAccessUsers(role) ||
+    canAccessCompanies(role) ||
+    canAccessTeams(role)
   )
 }
 

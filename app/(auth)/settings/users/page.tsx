@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import UsersContent from '@/components/UsersContent'
 import { canAccessUsers } from '@/lib/auth-utils'
 
-export default async function UsersPage() {
+export default async function SettingsUsersPage() {
   const session = await auth()
 
   if (!session?.user) {
@@ -17,6 +17,3 @@ export default async function UsersPage() {
 
   return <UsersContent user={session.user} />
 }
-
-
-

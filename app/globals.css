@@ -40,6 +40,17 @@
   --kanban-card-muted: #8c8c8c;
   --kanban-card-divider: rgba(0, 0, 0, 0.08);
   --kanban-drag-overlay-bg: #fafafa;
+  /* Ticket card view & dashboard preview rows — chips without custom color */
+  --ticket-row-chip-neutral-bg: #e9ecef;
+  --ticket-row-chip-neutral-fg: #495057;
+  /* Customer dashboard charts / panels */
+  --customer-dash-chart-surface: #f4f5ff;
+  --customer-dash-chart-legend-bg: #f8f9fb;
+  --customer-dash-priority-track: #f0f0f0;
+  --customer-dash-eta-banner: #ffe0e5;
+  --customer-dash-subtle-border: rgba(0, 0, 0, 0.08);
+  --customer-dash-recharts-grid: #d9d9d9;
+  --customer-dash-recharts-axis: #bfbfbf;
 }
 
 .dark {
@@ -80,7 +91,32 @@
   --kanban-card-muted: #a3a3a3;
   --kanban-card-divider: rgba(255, 255, 255, 0.12);
   --kanban-drag-overlay-bg: #2a2a2a;
+  --ticket-row-chip-neutral-bg: #3a3a46;
+  --ticket-row-chip-neutral-fg: #e8e8e8;
+  --customer-dash-chart-surface: #1e1e26;
+  --customer-dash-chart-legend-bg: #252530;
+  --customer-dash-priority-track: #33333f;
+  --customer-dash-eta-banner: #352428;
+  --customer-dash-subtle-border: rgba(255, 255, 255, 0.12);
+  --customer-dash-recharts-grid: #434343;
+  --customer-dash-recharts-axis: #8c8c8c;
   color-scheme: dark;
+}
+
+/* Customer dashboard — Recharts grid / axes follow theme */
+.customer-dash-recharts .recharts-cartesian-grid-horizontal line,
+.customer-dash-recharts .recharts-cartesian-grid-vertical line {
+  stroke: var(--customer-dash-recharts-grid);
+}
+.customer-dash-recharts .recharts-cartesian-axis-tick-value {
+  fill: var(--foreground);
+}
+.customer-dash-recharts .recharts-cartesian-axis-line {
+  stroke: var(--customer-dash-recharts-axis);
+}
+.customer-dash-recharts .recharts-wrapper,
+.customer-dash-recharts .recharts-surface {
+  background: transparent !important;
 }
 
 @theme inline {
@@ -94,6 +130,179 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Quill Snow — dark mode (class on html from ThemeProvider) */
+html.dark .ql-toolbar.ql-snow,
+html.dark .ql-snow .ql-toolbar {
+  background: var(--ticket-nav-panel-bg);
+  border-color: var(--ticket-nav-panel-border);
+}
+html.dark .ql-container.ql-snow,
+html.dark .ql-snow .ql-container {
+  background: var(--ticket-nav-panel-bg);
+  border-color: var(--ticket-nav-panel-border);
+  color: var(--foreground);
+}
+html.dark .ql-snow .ql-editor {
+  background: var(--ticket-nav-panel-bg);
+  color: var(--foreground);
+}
+html.dark .ql-snow .ql-editor.ql-blank::before {
+  color: var(--ticket-nav-muted);
+}
+html.dark .ql-snow .ql-editor a {
+  color: var(--ticket-nav-filter-link);
+}
+html.dark .ql-snow .ql-editor blockquote {
+  border-left-color: var(--ticket-nav-panel-border);
+  color: var(--ticket-nav-text-secondary);
+}
+html.dark .ql-snow .ql-editor code {
+  background-color: var(--ticket-nav-icon-hover-bg);
+  color: var(--foreground);
+}
+html.dark .ql-snow .ql-editor li[data-list='checked'] > .ql-ui,
+html.dark .ql-snow .ql-editor li[data-list='unchecked'] > .ql-ui {
+  color: var(--ticket-nav-muted);
+}
+html.dark .ql-snow .ql-stroke {
+  stroke: var(--ticket-nav-text-secondary);
+}
+html.dark .ql-snow .ql-stroke-miter {
+  stroke: var(--ticket-nav-text-secondary);
+}
+html.dark .ql-snow .ql-fill,
+html.dark .ql-snow .ql-stroke.ql-fill {
+  fill: var(--ticket-nav-text-secondary);
+}
+html.dark .ql-snow .ql-picker {
+  color: var(--ticket-nav-text-secondary);
+}
+html.dark .ql-snow .ql-picker-options {
+  background-color: var(--ticket-nav-panel-bg);
+  border-color: var(--ticket-nav-panel-border);
+}
+html.dark .ql-snow .ql-picker-item {
+  color: var(--foreground);
+}
+html.dark .ql-toolbar.ql-snow .ql-picker-options {
+  box-shadow: 0 2px 8px var(--ticket-nav-shadow);
+}
+html.dark .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-label {
+  border-color: var(--ticket-nav-panel-border);
+}
+html.dark .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-options {
+  border-color: var(--ticket-nav-panel-border);
+}
+html.dark .ql-snow .ql-picker.ql-expanded .ql-picker-label {
+  color: var(--ticket-nav-muted);
+}
+html.dark .ql-snow .ql-picker.ql-expanded .ql-picker-label .ql-fill {
+  fill: var(--ticket-nav-muted);
+}
+html.dark .ql-snow .ql-picker.ql-expanded .ql-picker-label .ql-stroke {
+  stroke: var(--ticket-nav-muted);
+}
+html.dark .ql-snow.ql-toolbar button:hover,
+html.dark .ql-snow .ql-toolbar button:hover,
+html.dark .ql-snow.ql-toolbar button:focus,
+html.dark .ql-snow .ql-toolbar button:focus,
+html.dark .ql-snow.ql-toolbar button.ql-active,
+html.dark .ql-snow .ql-toolbar button.ql-active,
+html.dark .ql-snow.ql-toolbar .ql-picker-label:hover,
+html.dark .ql-snow .ql-toolbar .ql-picker-label:hover,
+html.dark .ql-snow.ql-toolbar .ql-picker-label.ql-active,
+html.dark .ql-snow .ql-toolbar .ql-picker-label.ql-active,
+html.dark .ql-snow.ql-toolbar .ql-picker-item:hover,
+html.dark .ql-snow .ql-toolbar .ql-picker-item:hover,
+html.dark .ql-snow.ql-toolbar .ql-picker-item.ql-selected,
+html.dark .ql-snow .ql-toolbar .ql-picker-item.ql-selected {
+  color: var(--ticket-nav-filter-link);
+}
+html.dark .ql-snow.ql-toolbar button:hover .ql-fill,
+html.dark .ql-snow .ql-toolbar button:hover .ql-fill,
+html.dark .ql-snow.ql-toolbar button:focus .ql-fill,
+html.dark .ql-snow .ql-toolbar button:focus .ql-fill,
+html.dark .ql-snow.ql-toolbar button.ql-active .ql-fill,
+html.dark .ql-snow .ql-toolbar button.ql-active .ql-fill,
+html.dark .ql-snow.ql-toolbar .ql-picker-label:hover .ql-fill,
+html.dark .ql-snow .ql-toolbar .ql-picker-label:hover .ql-fill,
+html.dark .ql-snow.ql-toolbar .ql-picker-label.ql-active .ql-fill,
+html.dark .ql-snow .ql-toolbar .ql-picker-label.ql-active .ql-fill,
+html.dark .ql-snow.ql-toolbar .ql-picker-item:hover .ql-fill,
+html.dark .ql-snow .ql-toolbar .ql-picker-item:hover .ql-fill,
+html.dark .ql-snow.ql-toolbar .ql-picker-item.ql-selected .ql-fill,
+html.dark .ql-snow .ql-toolbar .ql-picker-item.ql-selected .ql-fill,
+html.dark .ql-snow.ql-toolbar button:hover .ql-stroke.ql-fill,
+html.dark .ql-snow .ql-toolbar button:hover .ql-stroke.ql-fill,
+html.dark .ql-snow.ql-toolbar button:focus .ql-stroke.ql-fill,
+html.dark .ql-snow .ql-toolbar button:focus .ql-stroke.ql-fill,
+html.dark .ql-snow.ql-toolbar button.ql-active .ql-stroke.ql-fill,
+html.dark .ql-snow .ql-toolbar button.ql-active .ql-stroke.ql-fill,
+html.dark .ql-snow.ql-toolbar .ql-picker-label:hover .ql-stroke.ql-fill,
+html.dark .ql-snow .ql-toolbar .ql-picker-label:hover .ql-stroke.ql-fill,
+html.dark .ql-snow.ql-toolbar .ql-picker-label.ql-active .ql-stroke.ql-fill,
+html.dark .ql-snow .ql-toolbar .ql-picker-label.ql-active .ql-stroke.ql-fill,
+html.dark .ql-snow.ql-toolbar .ql-picker-item:hover .ql-stroke.ql-fill,
+html.dark .ql-snow .ql-toolbar .ql-picker-item:hover .ql-stroke.ql-fill,
+html.dark .ql-snow.ql-toolbar .ql-picker-item.ql-selected .ql-stroke.ql-fill,
+html.dark .ql-snow .ql-toolbar .ql-picker-item.ql-selected .ql-stroke.ql-fill {
+  fill: var(--ticket-nav-filter-link);
+}
+html.dark .ql-snow.ql-toolbar button:hover .ql-stroke,
+html.dark .ql-snow .ql-toolbar button:hover .ql-stroke,
+html.dark .ql-snow.ql-toolbar button:focus .ql-stroke,
+html.dark .ql-snow .ql-toolbar button:focus .ql-stroke,
+html.dark .ql-snow.ql-toolbar button.ql-active .ql-stroke,
+html.dark .ql-snow .ql-toolbar button.ql-active .ql-stroke,
+html.dark .ql-snow.ql-toolbar .ql-picker-label:hover .ql-stroke,
+html.dark .ql-snow .ql-toolbar .ql-picker-label:hover .ql-stroke,
+html.dark .ql-snow.ql-toolbar .ql-picker-label.ql-active .ql-stroke,
+html.dark .ql-snow .ql-toolbar .ql-picker-label.ql-active .ql-stroke,
+html.dark .ql-snow.ql-toolbar .ql-picker-item:hover .ql-stroke,
+html.dark .ql-snow .ql-toolbar .ql-picker-item:hover .ql-stroke,
+html.dark .ql-snow.ql-toolbar .ql-picker-item.ql-selected .ql-stroke,
+html.dark .ql-snow .ql-toolbar .ql-picker-item.ql-selected .ql-stroke,
+html.dark .ql-snow.ql-toolbar button:hover .ql-stroke-miter,
+html.dark .ql-snow .ql-toolbar button:hover .ql-stroke-miter,
+html.dark .ql-snow.ql-toolbar button:focus .ql-stroke-miter,
+html.dark .ql-snow .ql-toolbar button:focus .ql-stroke-miter,
+html.dark .ql-snow.ql-toolbar button.ql-active .ql-stroke-miter,
+html.dark .ql-snow .ql-toolbar button.ql-active .ql-stroke-miter,
+html.dark .ql-snow.ql-toolbar .ql-picker-label:hover .ql-stroke-miter,
+html.dark .ql-snow .ql-toolbar .ql-picker-label:hover .ql-stroke-miter,
+html.dark .ql-snow.ql-toolbar .ql-picker-label.ql-active .ql-stroke-miter,
+html.dark .ql-snow .ql-toolbar .ql-picker-label.ql-active .ql-stroke-miter,
+html.dark .ql-snow.ql-toolbar .ql-picker-item:hover .ql-stroke-miter,
+html.dark .ql-snow .ql-toolbar .ql-picker-item:hover .ql-stroke-miter,
+html.dark .ql-snow.ql-toolbar .ql-picker-item.ql-selected .ql-stroke-miter,
+html.dark .ql-snow .ql-toolbar .ql-picker-item.ql-selected .ql-stroke-miter {
+  stroke: var(--ticket-nav-filter-link);
+}
+html.dark .ql-snow .ql-tooltip {
+  background-color: var(--ticket-nav-panel-bg);
+  border-color: var(--ticket-nav-panel-border);
+  color: var(--foreground);
+  box-shadow: 0 0 8px var(--ticket-nav-shadow);
+}
+html.dark .ql-snow .ql-tooltip a {
+  color: var(--ticket-nav-filter-link);
+}
+html.dark .ql-snow .ql-tooltip input[type='text'] {
+  background: var(--ticket-nav-bg);
+  border-color: var(--ticket-nav-panel-border);
+  color: var(--foreground);
+}
+html.dark .ql-snow .ql-tooltip a.ql-action::after {
+  border-right-color: var(--ticket-nav-panel-border);
+}
+html.dark .ql-snow a {
+  color: var(--ticket-nav-filter-link);
+}
+/* Read-only Quill HTML in tickets */
+html.dark .ql-editor.comment-html {
+  color: var(--foreground);
 }
 
 /* Admin sidebar - DeskTeam360 style: purple bg, active item light gray with rounded right */

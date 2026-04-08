@@ -3,6 +3,10 @@ import Credentials from 'next-auth/providers/credentials'
 import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
+import { fetchUserSessionEligibility, userRowAllowsSession } from '@/lib/auth-user-session'
+
+/** Re-check DB at most this often (ms) per JWT to limit load. */
+const JWT_USER_RECHECK_MS = 60_000
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -37,6 +41,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null
           }
 
+          if (!userRowAllowsSession({ status: user.status, deletedAt: user.deletedAt })) {
+            console.error('[Auth] User inactive or removed:', email)
+            return null
+          }
+
           return {
             id: user.id,
             email: user.email,
@@ -53,15 +62,54 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
+      if (token.error === 'AccessRevoked') {
+        return token
+      }
+
       if (user) {
         token.id = user.id
         token.email = user.email
         token.role = (user as { role?: string }).role
+        token.userCheckedAt = 0
       }
-      return token
+
+      const uid = token.id as string | undefined
+      if (!uid) {
+        return token
+      }
+
+      const now = Date.now()
+      const last = typeof token.userCheckedAt === 'number' ? token.userCheckedAt : 0
+      if (now - last < JWT_USER_RECHECK_MS) {
+        return token
+      }
+
+      const ok = await fetchUserSessionEligibility(uid)
+      if (!ok) {
+        return {
+          ...token,
+          sub: undefined,
+          id: undefined,
+          email: undefined,
+          role: undefined,
+          name: undefined,
+          picture: undefined,
+          error: 'AccessRevoked',
+          userCheckedAt: now,
+        }
+      }
+
+      return { ...token, error: undefined, userCheckedAt: now }
     },
     async session({ session, token }) {
-      if (session.user) {
+      if (token.error === 'AccessRevoked') {
+        return {
+          ...session,
+          user: undefined,
+          error: 'AccessRevoked',
+        }
+      }
+      if (session.user && token.id) {
         session.user.id = token.id as string
         session.user.email = token.email as string
         ;(session.user as { role?: string }).role = token.role as string

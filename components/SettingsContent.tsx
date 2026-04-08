@@ -12,6 +12,9 @@ import {
   ThunderboltOutlined,
   InfoCircleOutlined,
   BellOutlined,
+  UserOutlined,
+  BankOutlined,
+  TeamOutlined,
 } from '@ant-design/icons'
 import { useState } from 'react'
 import AdminSidebar from './AdminSidebar'
@@ -24,6 +27,9 @@ import {
   canAccessMessageTemplates,
   canAccessKnowledgeBase,
   canAccessAutomationRules,
+  canAccessUsers,
+  canAccessCompanies,
+  canAccessTeams,
 } from '@/lib/auth-utils'
 
 const { Content } = Layout
@@ -204,6 +210,43 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                       description="Triggers and actions on tickets"
                       href="/settings/automation-rules"
                       icon={<ThunderboltOutlined />}
+                    />
+                  </Col>
+                )}
+              </Row>
+            </Section>
+          )}
+
+          {(canAccessUsers(role) || canAccessCompanies(role) || canAccessTeams(role)) && (
+            <Section heading="People & access">
+              <Row gutter={[16, 16]}>
+                {canAccessUsers(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Users"
+                      description="Login accounts, roles, and company assignment"
+                      href="/settings/users"
+                      icon={<UserOutlined />}
+                    />
+                  </Col>
+                )}
+                {canAccessCompanies(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Companies"
+                      description="Organizations, portal members, and company data"
+                      href="/settings/companies"
+                      icon={<BankOutlined />}
+                    />
+                  </Col>
+                )}
+                {canAccessTeams(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Teams"
+                      description="Groups for assignments and ticket visibility"
+                      href="/settings/teams"
+                      icon={<TeamOutlined />}
                     />
                   </Col>
                 )}

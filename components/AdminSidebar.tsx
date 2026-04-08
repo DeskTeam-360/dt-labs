@@ -10,28 +10,19 @@ import {
     LockOutlined,
     HomeOutlined,
     InfoCircleOutlined,
-    TeamOutlined,
     SettingOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
     CheckSquareOutlined,
     WarningOutlined,
     DeleteOutlined,
-    BankOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { signOutAction } from '@/app/actions/auth'
 import { SpaNavLink, shouldOpenHrefInNewTab } from '@/components/SpaNavLink'
-import {
-  canAccessCompanies,
-  canAccessTickets,
-  canAccessTeams,
-  canAccessUsers,
-  canAccessSettingsHub,
-  isSettingsHrefPathname,
-} from '@/lib/auth-utils'
+import { canAccessTickets, canAccessSettingsHub, isSettingsHrefPathname } from '@/lib/auth-utils'
 
 const { Sider } = Layout
 const { Text } = Typography
@@ -65,13 +56,7 @@ function selectedKeysForPathname(pathname: string | null, ticketsSearch: string)
     return ['/tickets']
   }
   if (isSettingsHrefPathname(pathname)) return ['/settings']
-  const topLevel = [
-    '/dashboard',
-    '/my-company',
-    '/users',
-    '/companies',
-    '/teams',
-  ]
+  const topLevel = ['/dashboard', '/my-company']
   const top = topLevel.find((k) => pathname === k || (k !== '/dashboard' && pathname.startsWith(`${k}/`)))
   if (top) return [top]
   const ticketsDetail = pathname.startsWith('/tickets/')
@@ -96,13 +81,6 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         setOpenKeys(['templates'])
       } else if (pathname.startsWith('/content-planner')) {
         setOpenKeys(['content-planner'])
-      } else if (
-        !isCustomer &&
-        (pathname.startsWith('/users') ||
-          pathname.startsWith('/companies') ||
-          pathname.startsWith('/teams'))
-      ) {
-        setOpenKeys((prev) => (prev.includes('users-submenu') ? prev : [...prev, 'users-submenu']))
       }
     }
   }, [pathname, role, isCustomer])
@@ -128,39 +106,6 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           },
         ]
       : []),
-    ...(() => {
-      const usersDirectoryChildren: NonNullable<MenuProps['items']> = []
-      if (canAccessUsers(role)) {
-        usersDirectoryChildren.push({
-          key: '/users',
-          icon: <UserOutlined />,
-          label: linkLabel('/users', 'Users'),
-        })
-      }
-      if (canAccessCompanies(role)) {
-        usersDirectoryChildren.push({
-          key: '/companies',
-          icon: <BankOutlined />,
-          label: linkLabel('/companies', 'Companies'),
-        })
-      }
-      if (canAccessTeams(role)) {
-        usersDirectoryChildren.push({
-          key: '/teams',
-          icon: <TeamOutlined />,
-          label: linkLabel('/teams', 'Teams'),
-        })
-      }
-      if (usersDirectoryChildren.length === 0) return []
-      return [
-        {
-          key: 'users-submenu',
-          icon: <UserOutlined />,
-          label: 'Users',
-          children: usersDirectoryChildren,
-        },
-      ]
-    })(),
     ...(canAccessTickets(role)
       ? isCustomer
         ? [
@@ -199,7 +144,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       : []),
   ].filter((item) => {
     if (isCustomer) {
-      return !['users-submenu', '/settings'].includes(item.key as string)
+      return item.key !== '/settings'
     }
     const ticketMenuKeys = ['/tickets', '/tickets?ticket_type=spam', '/tickets?ticket_type=trash']
     if (ticketMenuKeys.includes(item.key as string) && !canAccessTickets(role)) return false

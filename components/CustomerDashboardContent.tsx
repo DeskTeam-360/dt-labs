@@ -10,7 +10,7 @@ import {
   EditOutlined,
   DeleteOutlined,
 } from '@ant-design/icons'
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import AdminSidebar from './AdminSidebar'
@@ -40,6 +40,13 @@ function formatTime(seconds: number) {
 }
 
 const DEFAULT_COLORS = ['#1890ff', '#eb2f96', '#faad14', '#52c41a', '#13c2c2', '#722ed1']
+
+const RECHARTS_TOOLTIP_STYLE: CSSProperties = {
+  background: 'var(--ticket-nav-panel-bg)',
+  border: '1px solid var(--ticket-nav-panel-border)',
+  borderRadius: 8,
+  color: 'var(--foreground)',
+}
 
 interface DashboardData {
   company_id: string | null
@@ -242,17 +249,17 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
               </Flex>
               <Row gutter={24}>
                 <Col xs={24} lg={12} style={{ padding: 16, borderRadius: 8 }}>
-                  <div style={{ background: "#F4F5FF", padding: 16, borderRadius: 8 }}>
+                  <div style={{ background: 'var(--customer-dash-chart-surface)', padding: 16, borderRadius: 8 }}>
 
 
                     {barChartData.length > 0 ? (
-                      <div style={{ height: 300 }}>
+                      <div className="customer-dash-recharts" style={{ height: 300 }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={barChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" />
                             <YAxis allowDecimals={false} />
-                            <RechartsTooltip />
+                            <RechartsTooltip contentStyle={RECHARTS_TOOLTIP_STYLE} />
                             <Bar
                               dataKey="count"
                               radius={[4, 4, 0, 0]}
@@ -285,9 +292,9 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                   </div>
                 </Col>
                 <Col xs={24} lg={12} style={{ padding: 16, borderRadius: 8 }}>
-                  <div style={{ background: "#F4F5FF", padding: 16, borderRadius: 8, height: '100%' }}>
+                  <div style={{ position: 'relative', background: 'var(--customer-dash-chart-surface)', padding: 16, borderRadius: 8, height: '100%' }}>
                     {/* Last Due Date - My Ticket */}
-                    <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', position: 'absolute', top: 16, right: 40, gap: 4, background: "#FFE0E5", padding: '8px 16px', borderRadius: "0 0 10px 10px " }}>
+                    <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', position: 'absolute', top: 16, right: 40, gap: 4, background: 'var(--customer-dash-eta-banner)', padding: '8px 16px', borderRadius: '0 0 10px 10px' }}>
                       <Tooltip title={data?.last_due_ticket ? `#${data.last_due_ticket.id} ${data.last_due_ticket.title}` : undefined}>
                         <Text
                           type="danger"
@@ -363,7 +370,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                                   width: '80%',
                                   height: 8,
                                   borderRadius: 4,
-                                  background: '#f0f0f0',
+                                  background: 'var(--customer-dash-priority-track)',
                                   overflow: 'hidden',
                                 }}
                               >
@@ -419,7 +426,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                 </div>
               </Flex>
               {donutData.length > 0 ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                <div className="customer-dash-recharts" style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
                   <div style={{ width: 140, height: 140, flexShrink: 0 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -436,14 +443,17 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                             <Cell key={idx} fill={entry.fill} />
                           ))}
                         </Pie>
-                        <RechartsTooltip formatter={(v: number | undefined) => formatTime(v ?? 0)} />
+                        <RechartsTooltip
+                          formatter={(v: number | undefined) => formatTime(v ?? 0)}
+                          contentStyle={RECHARTS_TOOLTIP_STYLE}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
                   <div
                     style={{
                       flex: 1,
-                      background: '#F8F9FB',
+                      background: 'var(--customer-dash-chart-legend-bg)',
                       borderRadius: 8,
                       padding: 16,
                     }}
@@ -457,7 +467,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                           justifyContent: 'space-between',
                           gap: 12,
                           padding: i < donutData.length - 1 ? '10px 0' : '0 0 0 0',
-                          borderBottom: i < donutData.length - 1 ? '1px solid rgb(0, 0, 0)' : 'none',
+                          borderBottom: i < donutData.length - 1 ? '1px solid var(--customer-dash-subtle-border)' : 'none',
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -636,16 +646,16 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                       style={{
                         width: '100%',
                         padding: 16,
-                        background: '#fff',
+                        background: 'var(--kanban-card-bg)',
                         borderRadius: 12,
-                        border: '1px solid #f0f0f0',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                        border: '1px solid var(--kanban-card-border)',
+                        boxShadow: 'var(--kanban-card-shadow)',
                         cursor: 'pointer',
                       }}
                       onClick={() => router.push(`/tickets/${t.id}`)}
                     >
                       <Flex vertical justify="left" align="left" gap={0}>
-                        <Text strong style={{ flex: 1, fontSize: 16, fontWeight: 700, color: '#1f2937', lineHeight: 1.4 }}>
+                        <Text strong style={{ flex: 1, fontSize: 16, fontWeight: 700, color: 'var(--kanban-card-title)', lineHeight: 1.4 }}>
                         #{t.id} {t.title}
                         </Text>
                         <Text style={{ fontSize: 13, color: '#1890ff', display: 'block', }}>
@@ -655,7 +665,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                           {t.due_date && (() => {
                             const today = dayjs().startOf('day');
                             const dueDay = dayjs(t.due_date).startOf('day');
-                            let color = '#9ca3af'; // default gray
+                            let color: string = 'var(--kanban-card-muted)' // default gray
                             if (dueDay.isBefore(today)) {
                               color = '#ff4d4f'; // red (overdue)
                             } else if (dueDay.isSame(today)) {
@@ -670,7 +680,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                               </span>
                             )
                           })()}
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--kanban-card-muted)' }}>
                             <ClockCircleOutlined style={{ fontSize: 12 }} />
                             Last Updated {dayjs(t.updated_at).format('MMM DD, YYYY')}
                           </span>
@@ -724,8 +734,8 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                               borderRadius: 6,
                               fontSize: 12,
                               fontWeight: 600,
-                              background: tag.color || '#e9ecef',
-                              color: tag.color ? '#fff' : '#495057',
+                              background: tag.color || 'var(--ticket-row-chip-neutral-bg)',
+                              color: tag.color ? '#fff' : 'var(--ticket-row-chip-neutral-fg)',
                             }}
                           >
                             {tag.name}

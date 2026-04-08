@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import CompanyDetailContent from '@/components/CompanyDetailContent'
 import { getCompanyDetail } from '@/lib/company-detail'
 
-export default async function CompanyDetailPage({
+export default async function SettingsCompanyDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -17,7 +17,7 @@ export default async function CompanyDetailPage({
 
   const companyData = await getCompanyDetail(id)
   if (!companyData) {
-    redirect('/companies')
+    redirect('/settings/companies')
   }
 
   const currentUserRole = (session.user as { role?: string }).role
@@ -30,4 +30,3 @@ export default async function CompanyDetailPage({
     />
   )
 }
-

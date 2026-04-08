@@ -2,7 +2,7 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import CompaniesContent from '@/components/CompaniesContent'
 
-export default async function CompaniesPage() {
+export default async function SettingsCompaniesPage() {
   const session = await auth()
   if (!session?.user) {
     redirect('/login')
@@ -10,4 +10,3 @@ export default async function CompaniesPage() {
 
   return <CompaniesContent user={session.user} />
 }
-

@@ -4,6 +4,7 @@ import { App, ConfigProvider, theme } from 'antd'
 import { SessionProvider } from 'next-auth/react'
 import type { Session } from 'next-auth'
 import FirebaseSessionBridge from '@/components/FirebaseSessionBridge'
+import SessionAccessGuard from '@/components/SessionAccessGuard'
 import { ThemeProvider, useTheme } from '@/components/ThemeProvider'
 
 function ThemedConfig({ children }: { children: React.ReactNode }) {
@@ -50,9 +51,10 @@ export default function AntdProvider({
       <ThemedConfig>
         <SessionProvider
           session={session}
-          refetchInterval={0}
-          refetchOnWindowFocus={false}
+          refetchInterval={60}
+          refetchOnWindowFocus
         >
+          <SessionAccessGuard />
           <FirebaseSessionBridge />
           {children}
         </SessionProvider>

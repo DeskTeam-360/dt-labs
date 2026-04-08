@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import type { Key } from 'react'
 import {
   Table,
   Tag,
@@ -12,7 +13,14 @@ import {
   Modal,
   Flex,
 } from 'antd'
-import { EditOutlined, DeleteOutlined, UserOutlined, MoreOutlined } from '@ant-design/icons'
+import {
+  EditOutlined,
+  DeleteOutlined,
+  UserOutlined,
+  MoreOutlined,
+  InboxOutlined,
+  WarningOutlined,
+} from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
 import DateDisplay from '../DateDisplay'
 import type { TicketRecord, StatusColumn } from './types'
@@ -24,8 +32,13 @@ interface TicketsListViewProps {
   tickets: TicketRecord[]
   allStatusColumns: StatusColumn[]
   allPriorities?: PriorityOption[]
+  isCustomer?: boolean
+  filterTicketType?: 'spam' | 'trash' | null
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
+  onBulkMoveToSpam?: (ids: number[]) => void | Promise<void>
+  onBulkMoveToTrash?: (ids: number[]) => void | Promise<void>
+  onBulkDelete?: (ids: number[]) => void | Promise<void>
   onFilterByStatus?: (statusSlug: string) => void
   onFilterByPriority?: (priorityId: number) => void
   onFilterByTag?: (tagId: string) => void
@@ -36,8 +49,13 @@ export default function TicketsListView({
   tickets,
   allStatusColumns,
   allPriorities = [],
+  isCustomer = false,
+  filterTicketType = null,
   onEdit,
   onDelete,
+  onBulkMoveToSpam,
+  onBulkMoveToTrash,
+  onBulkDelete,
   onFilterByStatus,
   onFilterByPriority,
   onFilterByTag,
@@ -45,6 +63,7 @@ export default function TicketsListView({
 }: TicketsListViewProps) {
   const router = useRouter()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 15 })
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
 
   useEffect(() => {
     setPagination((p) => {
@@ -59,12 +78,98 @@ export default function TicketsListView({
     const idx = allPriorities.findIndex((p) => p.id === record.priority!.id)
     return idx >= 0 ? idx : 999
   }
+
+  const bulkEnabled = !isCustomer && (onBulkMoveToSpam || onBulkMoveToTrash || onBulkDelete)
+  const inSpamFolder = filterTicketType === 'spam'
+  const inTrashFolder = filterTicketType === 'trash'
+  const selectedIds = selectedRowKeys.map((k) => Number(k)).filter((n) => !Number.isNaN(n))
+
+  const runBulkSpam = () => {
+    if (!onBulkMoveToSpam || selectedIds.length === 0) return
+    Modal.confirm({
+      title: 'Move to spam',
+      content: `Mark ${selectedIds.length} ticket(s) as spam? Open Spam from the sidebar to review or move them to trash.`,
+      okText: 'Move to spam',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        await onBulkMoveToSpam(selectedIds)
+        setSelectedRowKeys([])
+      },
+    })
+  }
+
+  const runBulkTrash = () => {
+    if (!onBulkMoveToTrash || selectedIds.length === 0) return
+    Modal.confirm({
+      title: 'Move to trash',
+      content: `Move ${selectedIds.length} ticket(s) to trash? You can open Trash from the sidebar to delete them permanently later.`,
+      okText: 'Move to trash',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        await onBulkMoveToTrash(selectedIds)
+        setSelectedRowKeys([])
+      },
+    })
+  }
+
+  const runBulkDelete = () => {
+    if (!onBulkDelete || selectedIds.length === 0) return
+    Modal.confirm({
+      title: 'Delete tickets permanently',
+      content: `Permanently delete ${selectedIds.length} ticket(s)? This cannot be undone.`,
+      okText: 'Delete',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancel',
+      onOk: async () => {
+        await onBulkDelete(selectedIds)
+        setSelectedRowKeys([])
+      },
+    })
+  }
+
   return (
+    <div style={{ width: '100%' }}>
+      {bulkEnabled && selectedIds.length > 0 ? (
+        <Flex
+          align="center"
+          wrap="wrap"
+          gap={8}
+          style={{ padding: '0 24px 12px' }}
+        >
+          <span style={{ color: 'var(--ant-color-text-secondary, #8c8c8c)', fontSize: 13 }}>
+            {selectedIds.length} selected
+          </span>
+          {!inSpamFolder && onBulkMoveToSpam ? (
+            <Button type="default" icon={<WarningOutlined />} onClick={runBulkSpam}>
+              Move to spam
+            </Button>
+          ) : null}
+          {!inTrashFolder && onBulkMoveToTrash ? (
+            <Button type="default" icon={<InboxOutlined />} onClick={runBulkTrash}>
+              Move to trash
+            </Button>
+          ) : null}
+          {onBulkDelete ? (
+            <Button type="primary" danger icon={<DeleteOutlined />} onClick={runBulkDelete}>
+              Delete permanently
+            </Button>
+          ) : null}
+        </Flex>
+      ) : null}
     <Table
       rowKey="id"
       dataSource={tickets}
       scroll={{ x: 'max-content' }}
       style={{ width: '100%', paddingRight: 24, paddingLeft: 24 }}
+      rowSelection={
+        bulkEnabled
+          ? {
+              selectedRowKeys,
+              onChange: (keys) => setSelectedRowKeys(keys),
+              columnWidth: 40,
+            }
+          : undefined
+      }
       pagination={{
         current: pagination.current,
         pageSize: pagination.pageSize,
@@ -340,5 +445,6 @@ export default function TicketsListView({
         },
       ]}
     />
+    </div>
   )
 }

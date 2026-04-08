@@ -128,6 +128,7 @@ export async function PATCH(
           body: `"${meta?.title || 'Ticket'}": ${cur.status} → ${body.status}`,
           actorUserId,
           actorName,
+          actorRole: role ?? null,
         })
       } catch (e) {
         console.error('[PATCH ticket status] notify:', e)
@@ -370,6 +371,36 @@ export async function PATCH(
           typeId: afterSnapshot.typeId,
           previousStatus: String(statusChange.from),
         })
+        try {
+          const [meta] = await db
+            .select({ createdBy: tickets.createdBy })
+            .from(tickets)
+            .where(eq(tickets.id, ticketId))
+            .limit(1)
+          const arows = await db
+            .select({ userId: ticketAssignees.userId })
+            .from(ticketAssignees)
+            .where(eq(ticketAssignees.ticketId, ticketId))
+          const recipients = [...arows.map((r) => r.userId), meta?.createdBy].filter(Boolean) as string[]
+          const actorName =
+            (session.user as { name?: string | null }).name ||
+            session.user.email ||
+            'Someone'
+          await notifyTicketUsers({
+            recipientUserIds: recipients,
+            excludeUserId: actorUserId,
+            ticketId,
+            ticketTitle: afterSnapshot.title,
+            type: 'status_changed',
+            title: 'Ticket status updated',
+            body: `"${afterSnapshot.title}": ${statusChange.from} → ${statusChange.to}`,
+            actorUserId,
+            actorName,
+            actorRole: role ?? null,
+          })
+        } catch (e) {
+          console.error('[PATCH ticket full] status notify:', e)
+        }
       }
 
       const assigneeChange = changes.assignee_ids as { from: unknown; to: unknown } | undefined
@@ -395,6 +426,7 @@ export async function PATCH(
               body: `Added as assignee on "${afterSnapshot.title}"`,
               actorUserId,
               actorName,
+              actorRole: role ?? null,
             })
           } catch (e) {
             console.error('[PATCH ticket assignees] notify:', e)
