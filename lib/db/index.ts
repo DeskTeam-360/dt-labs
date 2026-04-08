@@ -13,6 +13,8 @@ function getConnectionString() {
 
 const connectionString = getConnectionString()
 
-const client = postgres(connectionString, { prepare: false, max: 3 })
+// Default pool: avoid queuing when many API routes hit DB in parallel (max: 3 often felt “stuck”).
+const poolMax = Math.min(50, Math.max(3, Number(process.env.DATABASE_POOL_MAX) || 15))
+const client = postgres(connectionString, { prepare: false, max: poolMax })
 
 export const db = drizzle(client, { schema })
