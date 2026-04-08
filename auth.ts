@@ -1,11 +1,7 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
-import { db, users } from '@/lib/db'
-import { eq } from 'drizzle-orm'
-import bcrypt from 'bcryptjs'
-import { fetchUserSessionEligibility, userRowAllowsSession } from '@/lib/auth-user-session'
 
-/** Re-check DB at most this often (ms) per JWT to limit load. */
+/** Re-check DB at most this often (ms) per JWT to limit load (hanya di Node, bukan Edge). */
 const JWT_USER_RECHECK_MS = 60_000
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -17,46 +13,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        try {
-          if (!credentials?.email || !credentials?.password) return null
-
-          const email = (credentials.email as string).trim().toLowerCase()
-          const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1)
-
-          if (!user) {
-            console.error('[Auth] User not found:', email)
-            return null
-          }
-          if (!user.passwordHash) {
-            console.error('[Auth] User has no password_hash:', email)
-            return null
-          }
-
-          const valid = await bcrypt.compare(
-            credentials.password as string,
-            user.passwordHash
-          )
-          if (!valid) {
-            console.error('[Auth] Invalid password for:', email)
-            return null
-          }
-
-          if (!userRowAllowsSession({ status: user.status, deletedAt: user.deletedAt })) {
-            console.error('[Auth] User inactive or removed:', email)
-            return null
-          }
-
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.fullName || user.email,
-            image: user.avatarUrl || undefined,
-            role: user.role,
-          }
-        } catch (err) {
-          console.error('[Auth] authorize error:', err)
-          return null
-        }
+        const { authorizeWithCredentials } = await import('@/lib/auth-credentials-authorize')
+        return authorizeWithCredentials(
+          credentials as Record<'email' | 'password', string> | undefined
+        )
       },
     }),
   ],
@@ -68,13 +28,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       if (user) {
         token.id = user.id
-        token.email = user.email
+        token.email = user.email ?? undefined
         token.role = (user as { role?: string }).role
         token.userCheckedAt = 0
       }
 
       const uid = token.id as string | undefined
       if (!uid) {
+        return token
+      }
+
+      // Edge: jangan load postgres / Drizzle (middleware sudah pakai getToken, bukan auth()).
+      if (process.env.NEXT_RUNTIME === 'edge') {
         return token
       }
 
@@ -86,10 +51,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       let ok = false
       try {
+        const { fetchUserSessionEligibility } = await import('@/lib/auth-user-session')
         ok = await fetchUserSessionEligibility(uid)
       } catch (err) {
-        // Middleware runs on Edge; postgres.js TCP often fails there → JWTSessionError + sudden "logout".
-        // Fail open: keep the session and retry after JWT_USER_RECHECK_MS. Revoke only on successful "not eligible".
         console.error('[auth] jwt eligibility DB check failed (session kept, will retry):', err)
         return { ...token, error: undefined, userCheckedAt: now }
       }

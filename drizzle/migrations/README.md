@@ -28,12 +28,6 @@ psql $env:DATABASE_URL -f drizzle/migrations/001_rename_todo_tables_to_ticket.sq
 
 Migrasi **001** hanya perlu sekali pada database yang masih memakai nama `todo_*`. Jika schema sudah `ticket_*`, lewati 001.
 
-## Skrip npm
-
-- `npm run db:migrate:todo-to-ticket` — menjalankan **001** saja (lihat `scripts/run-migrate-todo-to-ticket.cjs`).
-
----
-
 # Application SQL migrations (ordered, single place)
 
 Manual migration scripts for the app database live here. Filenames use a **three-digit prefix** (`001_`, `002_`, …) for a clear execution order.
