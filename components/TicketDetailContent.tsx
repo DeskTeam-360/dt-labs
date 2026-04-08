@@ -53,7 +53,7 @@ import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
 import TicketPresenceBar from './TicketPresenceBar'
 import AdminMainColumn from './AdminMainColumn'
 import dayjs from 'dayjs'
-import { isAdmin } from '@/lib/auth-utils'
+import { isAdmin, isAdminOrManager } from '@/lib/auth-utils'
 import { useTicketDetailLiveSync } from '@/lib/firebase/useTicketDetailLiveSync'
 
 const { Content } = Layout
@@ -320,7 +320,11 @@ export default function TicketDetailContent({
             try {
                 const data = await apiFetch<any[]>(`/api/tickets/${displayTicket.id}/time-tracker`)
                 setTimeTrackerSessions(data || [])
-                const total = (data || []).reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0)
+                const total = (data || []).reduce((sum: number, s: any) => {
+                    const r = s.reported_duration_seconds
+                    if (r != null && Number.isFinite(Number(r))) return sum + Number(r)
+                    return sum + (s.duration_seconds || 0)
+                }, 0)
                 setTotalTimeSeconds(total)
             } catch { /* ignore */ }
         }
@@ -368,7 +372,11 @@ export default function TicketDetailContent({
         try {
             const data = await apiFetch<any[]>(`/api/tickets/${displayTicket.id}/time-tracker`)
             setTimeTrackerSessions(data || [])
-            const total = (data || []).reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0)
+            const total = (data || []).reduce((sum: number, s: any) => {
+                const r = s.reported_duration_seconds
+                if (r != null && Number.isFinite(Number(r))) return sum + Number(r)
+                return sum + (s.duration_seconds || 0)
+            }, 0)
             setTotalTimeSeconds(total)
         } catch { /* ignore */ }
     }
@@ -1054,6 +1062,7 @@ export default function TicketDetailContent({
     const totalChecklistCount = checklistItems.length
     const isCustomer = variant === 'customer'
     const isTicketAdmin = isAdmin((currentUser as { role?: string }).role)
+    const canAdjustReportedDuration = isAdminOrManager((currentUser as { role?: string }).role)
     const rowTicketType = (displayTicket?.ticket_type as string | undefined) ?? 'support'
 
     const patchTicketClassification = useCallback(
@@ -1410,6 +1419,7 @@ export default function TicketDetailContent({
                                             onTimeTrackingChanged={refreshTimeTracking}
                                             canManageOthersTime={isTicketAdmin}
                                             manualUserOptions={timeTrackerManualUserOptions}
+                                            canAdjustReportedDuration={canAdjustReportedDuration}
                                         />
                                     ),
                                 },

@@ -17,6 +17,7 @@ export async function GET() {
     id: r.id,
     slug: r.slug,
     title: r.title,
+    description: r.description ?? '',
     color: r.color ?? '#000000',
     sort_order: r.sortOrder ?? 0,
     created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { title, slug, color, sort_order } = body
+  const { title, slug, color, sort_order, description } = body
 
   if (!title || !slug) {
     return NextResponse.json({ error: 'title and slug required' }, { status: 400 })
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
     .values({
       title: String(title).trim(),
       slug: String(slug).trim().toLowerCase().replace(/\s+/g, '_'),
+      description: typeof description === 'string' ? description : '',
       color: color || '#000000',
       ...(sort_order !== undefined && { sortOrder: Number(sort_order) ?? 0 }),
     })
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
     id: inserted.id,
     slug: inserted.slug,
     title: inserted.title,
+    description: inserted.description ?? '',
     color: inserted.color ?? '#000000',
     sort_order: inserted.sortOrder ?? 0,
     created_at: inserted.createdAt ? new Date(inserted.createdAt).toISOString() : '',

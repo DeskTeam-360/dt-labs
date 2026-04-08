@@ -1,14 +1,22 @@
 import { auth } from '@/auth'
+import { canAccessTeams, canAdminTeams } from '@/lib/auth-utils'
 import { db } from '@/lib/db'
 import { teams, users, teamMembers } from '@/lib/db'
 import { eq, desc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+function sessionRole(session: { user?: { role?: string } } | null) {
+  return (session?.user as { role?: string } | undefined)?.role
+}
 
 /** GET /api/teams - List all teams with creator and member count */
 export async function GET() {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!canAccessTeams(sessionRole(session))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const teamsRows = await db
@@ -68,11 +76,14 @@ export async function GET() {
   return NextResponse.json(result)
 }
 
-/** POST /api/teams - Create a new team */
+/** POST /api/teams - Create a new team (admin only) */
 export async function POST(request: Request) {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!canAdminTeams(sessionRole(session))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const body = await request.json()

@@ -91,6 +91,8 @@ export interface TabTimeTrackerProps {
   /** Admin: edit/delete/add manual for any user on this ticket */
   canManageOthersTime?: boolean
   manualUserOptions?: TimeTrackerManualUserOption[]
+  /** Admin/manager: override reported duration (billing) without changing tracked time */
+  canAdjustReportedDuration?: boolean
 }
 
 export default function TabTimeTracker({
@@ -107,6 +109,7 @@ export default function TabTimeTracker({
   onTimeTrackingChanged,
   canManageOthersTime = false,
   manualUserOptions = [],
+  canAdjustReportedDuration = false,
 }: TabTimeTrackerProps) {
   const ticketId = ticketData?.id as number
   const [manualOpen, setManualOpen] = useState(false)
@@ -115,6 +118,9 @@ export default function TabTimeTracker({
   const [mutating, setMutating] = useState(false)
   const [manualForm] = Form.useForm()
   const [editForm] = Form.useForm()
+  const [adjustOpen, setAdjustOpen] = useState(false)
+  const [adjustSession, setAdjustSession] = useState<Record<string, unknown> | null>(null)
+  const [adjustForm] = Form.useForm()
 
   const isOwner = (session: Record<string, unknown>) =>
     String(
@@ -230,6 +236,46 @@ export default function TabTimeTracker({
     }
   }
 
+  const openAdjustReported = (session: Record<string, unknown>) => {
+    setAdjustSession(session)
+    let rep = 0
+    if (session.reported_duration_seconds != null && Number.isFinite(Number(session.reported_duration_seconds))) {
+      rep = Number(session.reported_duration_seconds)
+    } else if (session.duration_adjustment != null && Number.isFinite(Number(session.duration_adjustment))) {
+      rep = Number(session.duration_adjustment)
+    } else {
+      rep = Number(session.duration_seconds) || 0
+    }
+    adjustForm.setFieldsValue({ reportedSeconds: Math.max(0, Math.floor(rep)) })
+    setAdjustOpen(true)
+  }
+
+  const submitAdjustReported = async () => {
+    if (!adjustSession) return
+    const v = await adjustForm.validateFields()
+    const secs = Math.max(0, Math.floor(Number(v.reportedSeconds) || 0))
+    setMutating(true)
+    try {
+      await apiFetch(`/api/tickets/${ticketId}/time-tracker`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: adjustSession.id,
+          duration_adjustment: secs,
+        }),
+      })
+      message.success('Reported duration updated')
+      setAdjustOpen(false)
+      setAdjustSession(null)
+      await onTimeTrackingChanged()
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Failed to update')
+      throw e
+    } finally {
+      setMutating(false)
+    }
+  }
+
   const deleteSession = async (session: Record<string, unknown>) => {
     setMutating(true)
     try {
@@ -271,7 +317,7 @@ export default function TabTimeTracker({
             <ClockCircleOutlined />
             <Text strong>Time Tracker</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Total: {formatTime(totalTimeSeconds + (activeTimeTracker ? currentTime : 0))}
+              Total (reported): {formatTime(totalTimeSeconds + (activeTimeTracker ? currentTime : 0))}
             </Text>
           </Space>
           <Button type="default" size="small" icon={<PlusOutlined />} onClick={openManual}>
@@ -353,6 +399,19 @@ export default function TabTimeTracker({
                                   </Button>,
                                 ]
                               : []),
+                            ...(completed && canAdjustReportedDuration
+                              ? [
+                                  <Button
+                                    type="link"
+                                    size="small"
+                                    key="adj"
+                                    onClick={() => openAdjustReported(session)}
+                                    disabled={mutating}
+                                  >
+                                    Reported time
+                                  </Button>,
+                                ]
+                              : []),
                             <Popconfirm
                               key="del"
                               title="Remove this time entry?"
@@ -406,7 +465,19 @@ export default function TabTimeTracker({
                                 Stopped: <DateDisplay date={session.stop_time as string} />
                               </Text>
                               <Text strong style={{ fontSize: 12 }}>
-                                Duration: {formatTime(Number(session.duration_seconds) || 0)}
+                                Tracked: {formatTime(Number(session.duration_seconds) || 0)}
+                                {Number(session.reported_duration_seconds) !==
+                                Number(session.duration_seconds) ? (
+                                  <>
+                                    {' '}
+                                    · Reported:{' '}
+                                    {formatTime(
+                                      Number(session.reported_duration_seconds) ||
+                                        Number(session.duration_seconds) ||
+                                        0
+                                    )}
+                                  </>
+                                ) : null}
                               </Text>
                             </>
                           ) : null}
@@ -530,6 +601,37 @@ export default function TabTimeTracker({
               disabledDate={disabledDateNotAfterToday}
               disabledTime={(d) => getDisabledTimeNotAfterNow(d)}
             />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Adjust reported duration"
+        open={adjustOpen}
+        onCancel={() => {
+          setAdjustOpen(false)
+          setAdjustSession(null)
+        }}
+        onOk={submitAdjustReported}
+        confirmLoading={mutating}
+        destroyOnClose
+        width={480}
+      >
+        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+          This value is used for billing and customer time reports. Tracked time on the entry is unchanged.
+        </Text>
+        {adjustSession ? (
+          <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+            Tracked duration: {formatTime(Number(adjustSession.duration_seconds) || 0)}
+          </Text>
+        ) : null}
+        <Form form={adjustForm} layout="vertical">
+          <Form.Item
+            name="reportedSeconds"
+            label="Reported duration (seconds)"
+            rules={[{ required: true, message: 'Enter seconds' }]}
+          >
+            <InputNumber min={0} max={2147483647} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
       </Modal>

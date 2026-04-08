@@ -27,6 +27,10 @@
   --ticket-nav-filter-border: #d3adf7;
   --ticket-nav-filter-link: #2b1252;
   --ticket-nav-shadow: rgba(0, 0, 0, 0.12);
+  /* Global announcement marquee (under top nav) */
+  --global-announcement-bg: #fff7e6;
+  --global-announcement-border: #ffd591;
+  --global-announcement-text: #613400;
   /* Kanban board */
   --kanban-board-bg: transparent;
   --kanban-column-bg: #f0f0f0;
@@ -98,6 +102,9 @@
   --ticket-nav-filter-border: #553e7a;
   --ticket-nav-filter-link: #d4c4f5;
   --ticket-nav-shadow: rgba(0, 0, 0, 0.45);
+  --global-announcement-bg: #2b2111;
+  --global-announcement-border: #594214;
+  --global-announcement-text: #ffe7ba;
   --kanban-board-bg: var(--layout-bg);
   --kanban-column-bg: #1f1f1f;
   --kanban-column-head-title: #ffffff;
@@ -739,4 +746,54 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
 }
 .tickets-kanban-board .kanban-ticket-card.ant-card {
   background: var(--kanban-card-bg) !important;
+}
+
+/* Global announcement — running text below layout margin, above ticket navbar */
+.global-announcement-bar {
+  overflow: hidden;
+  width: 100%;
+  flex-shrink: 0;
+  background: var(--global-announcement-bg);
+  border-bottom: 1px solid var(--global-announcement-border);
+  color: var(--global-announcement-text);
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 6px 0;
+}
+.global-announcement-track {
+  display: flex;
+  width: max-content;
+  animation: global-announcement-scroll 10s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .global-announcement-track {
+    animation: none;
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+    box-sizing: border-box;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+.global-announcement-text {
+  flex-shrink: 0;
+  padding-right: 3rem;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .global-announcement-text {
+    white-space: normal;
+    padding-right: 0;
+  }
+}
+@keyframes global-announcement-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }

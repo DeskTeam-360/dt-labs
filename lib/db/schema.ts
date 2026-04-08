@@ -131,6 +131,8 @@ export const ticketTypes = pgTable('ticket_types', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
   slug: varchar('slug', { length: 50 }).notNull().unique(),
   title: varchar('title', { length: 100 }).notNull(),
+  /** Shown on the Reference page and in glossary-style help. */
+  description: text('description').default(''),
   color: varchar('color', { length: 20 }).default('#000000'),
   sortOrder: integer('sort_order').default(0),
   companyId: uuid('company_id'),
@@ -142,6 +144,8 @@ export const ticketPriorities = pgTable('ticket_priorities', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
   slug: varchar('slug', { length: 50 }).notNull().unique(),
   title: varchar('title', { length: 100 }).notNull(),
+  /** Shown on the Reference page and in glossary-style help. */
+  description: text('description').default(''),
   color: varchar('color', { length: 20 }).default('#000000'),
   sortOrder: integer('sort_order').default(0),
   createdAt: ts('created_at').notNull().defaultNow(),
@@ -275,6 +279,8 @@ export const ticketTimeTracker = pgTable('ticket_time_tracker', {
   startTime: ts('start_time').notNull(),
   stopTime: ts('stop_time'),
   durationSeconds: integer('duration_seconds'),
+  /** Reporting/billable seconds; defaults to duration_seconds; admin/manager may override. */
+  durationAdjustment: integer('duration_adjustment'),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
 
@@ -595,4 +601,31 @@ export const apiTokens = pgTable('api_tokens', {
   isActive: boolean('is_active').default(true),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
+/** Singleton row: global running-text announcement (see GLOBAL_ANNOUNCEMENT_ROW_ID). */
+export const globalAnnouncement = pgTable('global_announcement', {
+  id: uuid('id').primaryKey(),
+  message: text('message').notNull().default(''),
+  isEnabled: boolean('is_enabled').notNull().default(false),
+  startsAt: ts('starts_at'),
+  endsAt: ts('ends_at'),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  updatedBy: uuid('updated_by'),
+})
+
+/** Dashboard announcements: title preview on dashboard, full body in modal; optional role targeting (see KB roles). */
+export const dashboardAnnouncements = pgTable('dashboard_announcements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 500 }).notNull(),
+  body: text('body').notNull().default(''),
+  /** Null or empty = all roles; else only listed roles (lowercase). */
+  targetRoles: text('target_roles').array(),
+  isPublished: boolean('is_published').notNull().default(false),
+  startsAt: ts('starts_at'),
+  endsAt: ts('ends_at'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  createdBy: uuid('created_by'),
 })

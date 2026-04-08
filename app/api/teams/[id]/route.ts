@@ -1,14 +1,22 @@
 import { auth } from '@/auth'
+import { canAccessTeams, canAdminTeams } from '@/lib/auth-utils'
 import { db } from '@/lib/db'
 import { teams, users, teamMembers } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-/** PATCH /api/teams/[id] - Update team */
+function sessionRole(session: { user?: { role?: string; id?: string } } | null) {
+  return (session?.user as { role?: string } | undefined)?.role
+}
+
+/** PATCH /api/teams/[id] - Update team (name/type: admin only; created_by: admin only, must be existing member) */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!canAccessTeams(sessionRole(session))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const { id } = await params
@@ -17,11 +25,30 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const body = await request.json()
-  const { name, type } = body
+  const { name, type, created_by: createdByBody } = body
+
+  if (!canAdminTeams(sessionRole(session))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const values: Record<string, unknown> = {}
   if (name !== undefined) values.name = typeof name === 'string' ? name.trim() : null
   if (type !== undefined) values.type = type && typeof type === 'string' ? type.trim() || null : null
+
+  if (createdByBody !== undefined && createdByBody !== null) {
+    if (typeof createdByBody !== 'string') {
+      return NextResponse.json({ error: 'created_by must be a user id' }, { status: 400 })
+    }
+    const [memberRow] = await db
+      .select({ id: teamMembers.id })
+      .from(teamMembers)
+      .where(and(eq(teamMembers.teamId, id), eq(teamMembers.userId, createdByBody)))
+      .limit(1)
+    if (!memberRow) {
+      return NextResponse.json({ error: 'New creator must be a member of this team' }, { status: 400 })
+    }
+    values.createdBy = createdByBody
+  }
 
   if (Object.keys(values).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -29,7 +56,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const [updated] = await db
     .update(teams)
-    .set(values)
+    .set(values as typeof teams.$inferInsert)
     .where(eq(teams.id, id))
     .returning()
 
@@ -68,11 +95,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   })
 }
 
-/** DELETE /api/teams/[id] - Delete team and its members */
+/** DELETE /api/teams/[id] - Delete team and its members (admin only) */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!canAdminTeams(sessionRole(session))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const { id } = await params

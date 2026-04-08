@@ -15,7 +15,7 @@ import {
   Popconfirm,
   Tooltip,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, TeamOutlined, EyeOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, TeamOutlined, EyeOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import AdminSidebar from './AdminSidebar'
@@ -31,12 +31,13 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 }
 import DateDisplay from './DateDisplay'
 import type { ColumnsType } from 'antd/es/table'
+import { canAdminTeams } from '@/lib/auth-utils'
 
 const { Content } = Layout
 const { Title } = Typography
 
 interface TeamsContentProps {
-  user: { id: string; email?: string | null; name?: string | null }
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
 }
 
 interface TeamRecord {
@@ -62,6 +63,7 @@ interface TeamMember {
 }
 
 export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
+  const isAdmin = canAdminTeams(currentUser.role)
   const [collapsed, setCollapsed] = useState(false)
   const [teams, setTeams] = useState<TeamRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -200,32 +202,20 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
               Members
             </Button>
           </Tooltip> */}
-          {record.created_by === currentUser.id && (
-            <>
-              {/* <Tooltip title="Edit">
-                <Button
-                  type="default"
-                  icon={<EditOutlined />}
-                  size="small"
-                  onClick={() => handleEdit(record)}
-                />
-              </Tooltip> */}
-              <Popconfirm
-                title="Delete Team"
-                description="Are you sure you want to delete this team? All members will be removed."
-                onConfirm={() => handleDelete(record.id)}
-                okText="Yes"
-                cancelText="No"
-              >
-                <Tooltip title="Delete">
-                  <Button
-                    type="primary"
-                    danger
-                    icon={<DeleteOutlined />}
-                  > Delete</Button>
-                </Tooltip>
-              </Popconfirm>
-            </>
+          {isAdmin && (
+            <Popconfirm
+              title="Delete Team"
+              description="Are you sure you want to delete this team? All members will be removed."
+              onConfirm={() => handleDelete(record.id)}
+              okText="Yes"
+              cancelText="No"
+            >
+              <Tooltip title="Delete">
+                <Button type="primary" danger icon={<DeleteOutlined />}>
+                  Delete
+                </Button>
+              </Tooltip>
+            </Popconfirm>
           )}
         </Space>
       ),
@@ -243,9 +233,11 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
               <Title level={2} style={{ margin: 0 }}>
                 Teams Management
               </Title>
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                Create Team
-              </Button>
+              {isAdmin && (
+                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                  Create Team
+                </Button>
+              )}
             </div>
 
             <Table

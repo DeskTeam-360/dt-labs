@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import AdminSidebar from './AdminSidebar'
 import AdminMainColumn from './AdminMainColumn'
+import DashboardAnnouncementsSection from './DashboardAnnouncementsSection'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 import {
   BarChart,
@@ -226,6 +227,8 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
         </div>
         
       </div>
+
+      <DashboardAnnouncementsSection />
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 48 }}>

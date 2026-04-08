@@ -40,6 +40,7 @@ interface TicketPriorityRecord {
   id: number
   slug: string
   title: string
+  description?: string
   color: string
   sort_order: number
   created_at: string
@@ -130,6 +131,7 @@ export default function TicketPrioritiesContent({ user: currentUser }: TicketPri
       slug: record.slug,
       color: record.color,
       sort_order: record.sort_order,
+      description: record.description ?? '',
     })
     setModalVisible(true)
   }
@@ -158,6 +160,7 @@ export default function TicketPrioritiesContent({ user: currentUser }: TicketPri
         slug: String(values.slug || '').trim().toLowerCase().replace(/\s+/g, '_'),
         color: (values.color as string) || '#000000',
         sort_order: Number(values.sort_order) ?? 0,
+        description: typeof values.description === 'string' ? values.description : '',
       }
 
       if (editing) {
@@ -203,6 +206,17 @@ export default function TicketPrioritiesContent({ user: currentUser }: TicketPri
       render: (slug: string) => (
         <Typography.Text code copyable>
           {slug}
+        </Typography.Text>
+      ),
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      ellipsis: true,
+      render: (d: string | undefined) => (
+        <Typography.Text type="secondary" ellipsis>
+          {(d ?? '').trim() || '—'}
         </Typography.Text>
       ),
     },
@@ -302,6 +316,12 @@ export default function TicketPrioritiesContent({ user: currentUser }: TicketPri
               </Form.Item>
               <Form.Item name="sort_order" label="Sort order" rules={[{ required: true }]}>
                 <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="description" label="Reference description">
+                <Input.TextArea
+                  rows={3}
+                  placeholder="Shown on Reference page (priorities tab) for all users who can open tickets"
+                />
               </Form.Item>
               <Form.Item>
                 <Space>

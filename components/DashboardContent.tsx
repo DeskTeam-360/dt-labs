@@ -17,6 +17,7 @@ import Link from 'next/link'
 import AdminSidebar from './AdminSidebar'
 import AdminMainColumn from './AdminMainColumn'
 import DashboardHourlyActivityCard from './DashboardHourlyActivityCard'
+import DashboardAnnouncementsSection from './DashboardAnnouncementsSection'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
@@ -308,6 +309,8 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
             This is your dashboard. Start managing your data and activities here.
           </Text>
         </div>
+
+        <DashboardAnnouncementsSection />
 
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} lg={6}>

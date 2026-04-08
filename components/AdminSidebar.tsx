@@ -16,6 +16,7 @@ import {
     CheckSquareOutlined,
     WarningOutlined,
     DeleteOutlined,
+  ReadOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useMemo } from 'react'
@@ -55,6 +56,7 @@ function selectedKeysForPathname(pathname: string | null, ticketsSearch: string)
     if (tt === 'trash') return ['/tickets?ticket_type=trash']
     return ['/tickets']
   }
+  if (pathname === '/reference' || pathname.startsWith('/reference/')) return ['/reference']
   if (isSettingsHrefPathname(pathname)) return ['/settings']
   const topLevel = ['/dashboard', '/my-company']
   const top = topLevel.find((k) => pathname === k || (k !== '/dashboard' && pathname.startsWith(`${k}/`)))
@@ -107,31 +109,38 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         ]
       : []),
     ...(canAccessTickets(role)
-      ? isCustomer
-        ? [
-            {
-              key: '/tickets',
-              icon: <CheckSquareOutlined />,
-              label: linkLabel('/tickets', 'Tickets'),
-            },
-          ]
-        : [
-            {
-              key: '/tickets',
-              icon: <CheckSquareOutlined />,
-              label: linkLabel('/tickets', 'All tickets'),
-            },
-            {
-              key: '/tickets?ticket_type=spam',
-              icon: <WarningOutlined />,
-              label: linkLabel('/tickets?ticket_type=spam', 'Spam'),
-            },
-            {
-              key: '/tickets?ticket_type=trash',
-              icon: <DeleteOutlined />,
-              label: linkLabel('/tickets?ticket_type=trash', 'Trash'),
-            },
-          ]
+      ? [
+          ...(isCustomer
+            ? [
+                {
+                  key: '/tickets',
+                  icon: <CheckSquareOutlined />,
+                  label: linkLabel('/tickets', 'Tickets'),
+                },
+              ]
+            : [
+                {
+                  key: '/tickets',
+                  icon: <CheckSquareOutlined />,
+                  label: linkLabel('/tickets', 'All tickets'),
+                },
+                {
+                  key: '/tickets?ticket_type=spam',
+                  icon: <WarningOutlined />,
+                  label: linkLabel('/tickets?ticket_type=spam', 'Spam'),
+                },
+                {
+                  key: '/tickets?ticket_type=trash',
+                  icon: <DeleteOutlined />,
+                  label: linkLabel('/tickets?ticket_type=trash', 'Trash'),
+                },
+              ]),
+          {
+            key: '/reference',
+            icon: <ReadOutlined />,
+            label: linkLabel('/reference', 'Reference'),
+          },
+        ]
       : []),
     ...(canAccessSettingsHub(role)
       ? [

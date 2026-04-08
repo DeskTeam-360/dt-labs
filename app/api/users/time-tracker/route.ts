@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { db, ticketTimeTracker, tickets } from '@/lib/db'
+import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 import { eq, and, desc, gte, lte, isNull, isNotNull } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
@@ -60,6 +61,11 @@ export async function GET(request: Request) {
     start_time: r.tracker.startTime ? new Date(r.tracker.startTime).toISOString() : null,
     stop_time: r.tracker.stopTime ? new Date(r.tracker.stopTime).toISOString() : null,
     duration_seconds: r.tracker.durationSeconds,
+    duration_adjustment: r.tracker.durationAdjustment,
+    reported_duration_seconds: reportedDurationSeconds({
+      durationSeconds: r.tracker.durationSeconds,
+      durationAdjustment: r.tracker.durationAdjustment,
+    }),
     created_at: r.tracker.createdAt ? new Date(r.tracker.createdAt).toISOString() : null,
     ticket: r.ticket
       ? {

@@ -15,6 +15,8 @@ import {
   UserOutlined,
   BankOutlined,
   TeamOutlined,
+  NotificationOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons'
 import { useState } from 'react'
 import AdminSidebar from './AdminSidebar'
@@ -30,6 +32,9 @@ import {
   canAccessUsers,
   canAccessCompanies,
   canAccessTeams,
+  canManageGlobalAnnouncement,
+  canManageDashboardAnnouncements,
+  canAccessCustomerTimeReport,
 } from '@/lib/auth-utils'
 
 const { Content } = Layout
@@ -254,17 +259,56 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
             </Section>
           )}
 
-          {canAccessKnowledgeBase(role) && (
-            <Section heading="General">
+          {canAccessCustomerTimeReport(role) && (
+            <Section heading="Reports">
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12} md={8}>
                   <HubTile
-                    title="Knowledge Base"
-                    description="Help articles for customers"
-                    href="/settings/knowledge-base"
-                    icon={<InfoCircleOutlined />}
+                    title="Customer time report"
+                    description="Per-company tickets, reported duration, urgent and completed counts"
+                    href="/settings/customer-time-report"
+                    icon={<BarChartOutlined />}
                   />
                 </Col>
+              </Row>
+            </Section>
+          )}
+
+          {(canAccessKnowledgeBase(role) ||
+            canManageGlobalAnnouncement(role) ||
+            canManageDashboardAnnouncements(role)) && (
+            <Section heading="General">
+              <Row gutter={[16, 16]}>
+                {canAccessKnowledgeBase(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Knowledge Base"
+                      description="Help articles for customers"
+                      href="/settings/knowledge-base"
+                      icon={<InfoCircleOutlined />}
+                    />
+                  </Col>
+                )}
+                {canManageGlobalAnnouncement(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Global announcement"
+                      description="Running banner with start and end schedule"
+                      href="/settings/global-announcement"
+                      icon={<NotificationOutlined />}
+                    />
+                  </Col>
+                )}
+                {canManageDashboardAnnouncements(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Dashboard announcements"
+                      description="Title on dashboard, full text in a modal; by role"
+                      href="/settings/dashboard-announcements"
+                      icon={<BellOutlined />}
+                    />
+                  </Col>
+                )}
               </Row>
             </Section>
           )}

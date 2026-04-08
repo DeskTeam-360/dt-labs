@@ -3,6 +3,7 @@
 import { Layout } from 'antd'
 import type { CSSProperties, ReactNode } from 'react'
 import TicketSearchNavbar from '@/components/TicketSearchNavbar'
+import GlobalAnnouncementBar from '@/components/GlobalAnnouncementBar'
 
 export type AdminMainColumnUser = {
   id: string
@@ -39,6 +40,7 @@ export default function AdminMainColumn({
   }
   return (
     <Layout style={layoutStyle} {...layoutProps}>
+      <GlobalAnnouncementBar />
       <TicketSearchNavbar savedFiltersUserId={!isCustomer ? user.id : undefined} />
       {children}
     </Layout>

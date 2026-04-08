@@ -1,16 +1,24 @@
 import { auth } from '@/auth'
+import { canAccessTeams, canAdminTeams } from '@/lib/auth-utils'
 import { db } from '@/lib/db'
-import { teamMembers, users } from '@/lib/db'
+import { teams, teamMembers, users } from '@/lib/db'
 import { eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 const TEAM_INELIGIBLE_ROLES = ['customer', 'guest']
+
+function sessionRole(session: { user?: { role?: string; id?: string } } | null) {
+  return (session?.user as { role?: string } | undefined)?.role
+}
 
 /** GET /api/teams/[id]/members - List team members */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!canAccessTeams(sessionRole(session))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const { id: teamId } = await params
@@ -41,16 +49,33 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   return NextResponse.json(result)
 }
 
-/** POST /api/teams/[id]/members - Add members to team */
+/** POST /api/teams/[id]/members - Add members (admin or team creator) */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  if (!canAccessTeams(sessionRole(session))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const { id: teamId } = await params
   if (!teamId) {
     return NextResponse.json({ error: 'Team ID required' }, { status: 400 })
+  }
+
+  const [teamRow] = await db
+    .select({ createdBy: teams.createdBy })
+    .from(teams)
+    .where(eq(teams.id, teamId))
+    .limit(1)
+  if (!teamRow) {
+    return NextResponse.json({ error: 'Team not found' }, { status: 404 })
+  }
+  const sessionUserRole = sessionRole(session)
+  const uid = session.user.id
+  if (!canAdminTeams(sessionUserRole) && uid !== teamRow.createdBy) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const body = await request.json()

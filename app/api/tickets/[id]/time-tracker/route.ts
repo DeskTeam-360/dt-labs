@@ -2,7 +2,32 @@ import { auth } from '@/auth'
 import { db, ticketTimeTracker, users } from '@/lib/db'
 import { eq, and, desc, isNull } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
-import { isAdmin } from '@/lib/auth-utils'
+import { isAdmin, isAdminOrManager } from '@/lib/auth-utils'
+import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
+
+function mapTrackerRow(
+  t: typeof ticketTimeTracker.$inferSelect,
+  user: typeof users.$inferSelect | null = null
+) {
+  return {
+    id: t.id,
+    ticketId: t.ticketId,
+    userId: t.userId,
+    tracker_type: t.trackerType,
+    start_time: t.startTime,
+    stop_time: t.stopTime,
+    duration_seconds: t.durationSeconds,
+    duration_adjustment: t.durationAdjustment,
+    reported_duration_seconds: reportedDurationSeconds({
+      durationSeconds: t.durationSeconds,
+      durationAdjustment: t.durationAdjustment,
+    }),
+    created_at: t.createdAt,
+    user: user
+      ? { id: user.id, full_name: user.fullName, email: user.email, avatar_url: user.avatarUrl }
+      : null,
+  }
+}
 
 /** GET /api/tickets/[id]/time-tracker - List sessions. ?active=1 = current user's active session only */
 export async function GET(
@@ -43,14 +68,7 @@ export async function GET(
     .orderBy(desc(ticketTimeTracker.createdAt))
     .limit(activeOnly ? 1 : 100)
 
-  const result = rows.map((r) => ({
-    ...r.tracker,
-    tracker_type: r.tracker.trackerType,
-    start_time: r.tracker.startTime,
-    stop_time: r.tracker.stopTime,
-    duration_seconds: r.tracker.durationSeconds,
-    user: r.user ? { id: r.user.id, full_name: r.user.fullName, email: r.user.email } : null,
-  }))
+  const result = rows.map((r) => mapTrackerRow(r.tracker, r.user))
 
   return NextResponse.json(activeOnly ? (result[0] ?? null) : result)
 }
@@ -88,13 +106,7 @@ export async function POST(
       })
       .returning()
 
-    return NextResponse.json({
-      ...row,
-      tracker_type: row.trackerType,
-      start_time: row.startTime,
-      stop_time: row.stopTime,
-      duration_seconds: row.durationSeconds,
-    })
+    return NextResponse.json(mapTrackerRow(row, null))
   }
 
   if (action === 'manual') {
@@ -142,16 +154,11 @@ export async function POST(
         startTime,
         stopTime,
         durationSeconds: capped,
+        durationAdjustment: capped,
       })
       .returning()
 
-    return NextResponse.json({
-      ...row,
-      tracker_type: row.trackerType,
-      start_time: row.startTime,
-      stop_time: row.stopTime,
-      duration_seconds: row.durationSeconds,
-    })
+    return NextResponse.json(mapTrackerRow(row, null))
   }
 
   if (action === 'stop') {
@@ -181,7 +188,7 @@ export async function POST(
 
     await db
       .update(ticketTimeTracker)
-      .set({ stopTime, durationSeconds })
+      .set({ stopTime, durationSeconds, durationAdjustment: durationSeconds })
       .where(eq(ticketTimeTracker.id, session_id))
 
     return NextResponse.json({ ok: true })
@@ -215,10 +222,57 @@ export async function PATCH(
   const sessionId = body.session_id as string | undefined
   const startRaw = body.start_time as string | undefined
   const stopRaw = body.stop_time as string | undefined
+  const adjustOnly =
+    sessionId &&
+    body.duration_adjustment !== undefined &&
+    startRaw === undefined &&
+    stopRaw === undefined
+
+  if (adjustOnly) {
+    if (!isAdminOrManager(role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const adjRaw = body.duration_adjustment
+    const adj =
+      typeof adjRaw === 'number' ? Math.floor(adjRaw) : parseInt(String(adjRaw), 10)
+    if (!Number.isFinite(adj) || adj < 0) {
+      return NextResponse.json({ error: 'duration_adjustment must be a non-negative integer' }, { status: 400 })
+    }
+    const MAX = 2147483647
+    const capped = Math.min(adj, MAX)
+
+    const [row] = await db
+      .select()
+      .from(ticketTimeTracker)
+      .where(eq(ticketTimeTracker.id, sessionId))
+      .limit(1)
+
+    if (!row || row.ticketId !== ticketId) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    }
+    if (!row.stopTime || row.durationSeconds == null) {
+      return NextResponse.json(
+        { error: 'Only completed sessions can have reported duration adjusted' },
+        { status: 400 }
+      )
+    }
+
+    const [updated] = await db
+      .update(ticketTimeTracker)
+      .set({ durationAdjustment: capped })
+      .where(eq(ticketTimeTracker.id, sessionId))
+      .returning()
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Update failed' }, { status: 500 })
+    }
+
+    return NextResponse.json(mapTrackerRow(updated, null))
+  }
 
   if (!sessionId || !startRaw || !stopRaw) {
     return NextResponse.json(
-      { error: 'session_id, start_time, and stop_time are required' },
+      { error: 'session_id, start_time, and stop_time are required (or session_id + duration_adjustment for managers)' },
       { status: 400 }
     )
   }
@@ -267,7 +321,13 @@ export async function PATCH(
 
   const [updated] = await db
     .update(ticketTimeTracker)
-    .set({ startTime, stopTime, durationSeconds, trackerType: 'manual' })
+    .set({
+      startTime,
+      stopTime,
+      durationSeconds,
+      durationAdjustment: durationSeconds,
+      trackerType: 'manual',
+    })
     .where(eq(ticketTimeTracker.id, sessionId))
     .returning()
 
@@ -275,13 +335,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   }
 
-  return NextResponse.json({
-    ...updated,
-    tracker_type: updated.trackerType,
-    start_time: updated.startTime,
-    stop_time: updated.stopTime,
-    duration_seconds: updated.durationSeconds,
-  })
+  return NextResponse.json(mapTrackerRow(updated, null))
 }
 
 /** DELETE — remove entry (own rows). Query: ?session_id=uuid. Active timer rows can be deleted to discard. */

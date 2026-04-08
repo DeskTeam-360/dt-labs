@@ -35,6 +35,7 @@ import {
   PlusOutlined,
   UserDeleteOutlined,
   EditOutlined,
+  UserSwitchOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
@@ -42,6 +43,7 @@ import dayjs, { Dayjs } from 'dayjs'
 import AdminSidebar from './AdminSidebar'
 import AdminMainColumn from './AdminMainColumn'
 import DateDisplay from './DateDisplay'
+import { canAdminTeams } from '@/lib/auth-utils'
 import type { ColumnsType } from 'antd/es/table'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
@@ -58,6 +60,9 @@ const { Title, Text } = Typography
 const { RangePicker } = DatePicker
 
 type ReportPeriod = 'week' | 'month' | 'custom'
+
+/** How the report table aggregates rows */
+type ReportGroupBy = 'session' | 'day' | 'person'
 
 interface TeamMember {
   id: string
@@ -90,10 +95,19 @@ interface ReportRow {
   start_time: string
   stop_time: string | null
   duration_seconds: number | null
+  duration_adjustment?: number | null
+  reported_duration_seconds?: number | null
+}
+
+function reportedSessionSeconds(s: ReportRow): number {
+  if (s.reported_duration_seconds != null && Number.isFinite(s.reported_duration_seconds)) {
+    return s.reported_duration_seconds
+  }
+  return s.duration_seconds ?? 0
 }
 
 interface TeamDetailContentProps {
-  user: { id: string; email?: string | null; name?: string | null }
+  user: { id: string; email?: string | null; name?: string | null; role?: string }
   team: TeamData
 }
 
@@ -132,9 +146,16 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editLoading, setEditLoading] = useState(false)
   const [editForm] = Form.useForm()
+  const [transferModalOpen, setTransferModalOpen] = useState(false)
+  const [newCreatorUserId, setNewCreatorUserId] = useState<string | null>(null)
+  const [transferLoading, setTransferLoading] = useState(false)
+  const [reportMemberUserId, setReportMemberUserId] = useState<string | null>(null)
+  const [reportGroupBy, setReportGroupBy] = useState<ReportGroupBy>('session')
 
   const memberUserIds = useMemo(() => members.map((m) => m.user_id), [members])
   const isCreator = currentUser.id === team.created_by
+  const isAdmin = canAdminTeams(currentUser.role)
+  const canManageMembers = isAdmin || isCreator
 
   // Sync display when team prop changes
   useEffect(() => {
@@ -146,6 +167,12 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
   useEffect(() => {
     setMembers(team.members)
   }, [team.id, team.members.length])
+
+  useEffect(() => {
+    if (reportMemberUserId && !memberUserIds.includes(reportMemberUserId)) {
+      setReportMemberUserId(null)
+    }
+  }, [memberUserIds, reportMemberUserId])
 
   const fetchUsers = async () => {
     setUsersLoading(true)
@@ -252,6 +279,29 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
     }
   }
 
+  const handleTransferCreator = async () => {
+    if (!newCreatorUserId) {
+      message.warning('Select a team member to be the new creator')
+      return
+    }
+    setTransferLoading(true)
+    try {
+      await apiFetch(`/api/teams/${team.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ created_by: newCreatorUserId }),
+      })
+      message.success('Creator updated')
+      setTransferModalOpen(false)
+      router.refresh()
+    } catch (e: unknown) {
+      const err = e as { message?: string }
+      message.error(err?.message || 'Failed to transfer creator')
+    } finally {
+      setTransferLoading(false)
+    }
+  }
+
   const { rangeStart, rangeEnd } = useMemo(() => {
     const now = dayjs()
     if (reportPeriod === 'week') {
@@ -284,9 +334,11 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
     try {
       const startIso = rangeStart.toISOString()
       const endIso = rangeEnd.toISOString()
-      const rows = await apiFetch<ReportRow[]>(
-        `/api/teams/${team.id}/time-report?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
-      )
+      let url = `/api/teams/${team.id}/time-report?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
+      if (reportMemberUserId) {
+        url += `&userId=${encodeURIComponent(reportMemberUserId)}`
+      }
+      const rows = await apiFetch<ReportRow[]>(url)
       setReportSessions(rows)
     } catch {
       setReportSessions([])
@@ -298,9 +350,17 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
   useEffect(() => {
     if (rangeStart && rangeEnd) fetchReport()
     else if (!rangeStart && !rangeEnd && memberUserIds.length > 0) setReportSessions([])
-  }, [reportPeriod, customRange, memberUserIds.length, rangeStart?.toISOString(), rangeEnd?.toISOString()])
+  }, [
+    reportPeriod,
+    customRange,
+    memberUserIds.length,
+    rangeStart?.toISOString(),
+    rangeEnd?.toISOString(),
+    reportMemberUserId,
+    team.id,
+  ])
 
-  const reportColumns: ColumnsType<ReportRow> = [
+  const reportSessionColumns: ColumnsType<ReportRow> = [
     {
       title: 'User',
       key: 'user',
@@ -325,10 +385,23 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
       ),
     },
     {
-      title: 'Duration',
-      dataIndex: 'duration_seconds',
+      title: 'Duration (reported)',
       key: 'duration',
-      render: (v: number | null) => formatDuration(v),
+      render: (_, r) => {
+        const rep = reportedSessionSeconds(r)
+        const tr = r.duration_seconds ?? 0
+        const diff = tr !== rep
+        return (
+          <Space orientation="vertical" size={0}>
+            <Text>{formatDuration(rep)}</Text>
+            {diff ? (
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                Tracked {formatDuration(tr)}
+              </Text>
+            ) : null}
+          </Space>
+        )
+      },
     },
     {
       title: 'Start',
@@ -344,13 +417,154 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
     },
   ]
 
+  interface ReportDayGroupRow {
+    dateKey: string
+    totalSeconds: number
+    sessionCount: number
+    ticketCount: number
+    peopleLabel: string
+  }
+
+  interface ReportPersonGroupRow {
+    user_id: string
+    user_name: string
+    user_email?: string
+    totalSeconds: number
+    sessionCount: number
+    ticketCount: number
+  }
+
+  const reportByDay = useMemo((): ReportDayGroupRow[] => {
+    const map = new Map<
+      string,
+      { totalSeconds: number; sessionCount: number; tickets: Set<number>; names: Set<string> }
+    >()
+    for (const s of reportSessions) {
+      const dateKey = dayjs(s.start_time).format('YYYY-MM-DD')
+      const sec = reportedSessionSeconds(s)
+      let g = map.get(dateKey)
+      if (!g) {
+        g = { totalSeconds: 0, sessionCount: 0, tickets: new Set(), names: new Set() }
+        map.set(dateKey, g)
+      }
+      g.totalSeconds += sec
+      g.sessionCount += 1
+      g.tickets.add(s.ticket_id)
+      g.names.add(s.user_name || s.user_id)
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => (a > b ? -1 : 1))
+      .map(([dateKey, g]) => ({
+        dateKey,
+        totalSeconds: g.totalSeconds,
+        sessionCount: g.sessionCount,
+        ticketCount: g.tickets.size,
+        peopleLabel: [...g.names].sort().join(', '),
+      }))
+  }, [reportSessions])
+
+  const reportByPerson = useMemo((): ReportPersonGroupRow[] => {
+    const map = new Map<
+      string,
+      { user_name: string; user_email?: string; totalSeconds: number; sessionCount: number; tickets: Set<number> }
+    >()
+    for (const s of reportSessions) {
+      const uid = s.user_id
+      let g = map.get(uid)
+      if (!g) {
+        g = {
+          user_name: s.user_name,
+          user_email: s.user_email,
+          totalSeconds: 0,
+          sessionCount: 0,
+          tickets: new Set(),
+        }
+        map.set(uid, g)
+      }
+      g.totalSeconds += reportedSessionSeconds(s)
+      g.sessionCount += 1
+      g.tickets.add(s.ticket_id)
+    }
+    return [...map.entries()]
+      .sort(([, a], [, b]) => b.totalSeconds - a.totalSeconds)
+      .map(([user_id, g]) => ({
+        user_id,
+        user_name: g.user_name,
+        user_email: g.user_email,
+        totalSeconds: g.totalSeconds,
+        sessionCount: g.sessionCount,
+        ticketCount: g.tickets.size,
+      }))
+  }, [reportSessions])
+
+  const reportDayColumns: ColumnsType<ReportDayGroupRow> = [
+    {
+      title: 'Date',
+      dataIndex: 'dateKey',
+      key: 'date',
+      render: (_, r) => dayjs(r.dateKey).format('MMM D, YYYY'),
+    },
+    {
+      title: 'Total time',
+      key: 'total',
+      render: (_, r) => formatDuration(r.totalSeconds),
+    },
+    {
+      title: 'Sessions',
+      dataIndex: 'sessionCount',
+      key: 'sessions',
+    },
+    {
+      title: 'Tickets',
+      dataIndex: 'ticketCount',
+      key: 'tickets',
+    },
+    {
+      title: 'People',
+      dataIndex: 'peopleLabel',
+      key: 'people',
+      ellipsis: true,
+    },
+  ]
+
+  const reportPersonColumns: ColumnsType<ReportPersonGroupRow> = [
+    {
+      title: 'User',
+      key: 'user',
+      render: (_, r) => (
+        <Space>
+          <Avatar size="small" icon={<UserOutlined />} />
+          <div>
+            <div>{r.user_name}</div>
+            {r.user_email && <Text type="secondary" style={{ fontSize: 12 }}>{r.user_email}</Text>}
+          </div>
+        </Space>
+      ),
+    },
+    {
+      title: 'Total time',
+      key: 'total',
+      render: (_, r) => formatDuration(r.totalSeconds),
+    },
+    {
+      title: 'Sessions',
+      dataIndex: 'sessionCount',
+      key: 'sessions',
+    },
+    {
+      title: 'Tickets',
+      dataIndex: 'ticketCount',
+      key: 'tickets',
+    },
+  ]
+
   const summaryByUser = useMemo(() => {
     const map: Record<string, { name: string; seconds: number; tickets: Set<number> }> = {}
     reportSessions.forEach((s) => {
       if (!map[s.user_id]) {
         map[s.user_id] = { name: s.user_name, seconds: 0, tickets: new Set() }
       }
-      map[s.user_id].seconds += s.duration_seconds ?? 0
+      map[s.user_id].seconds += reportedSessionSeconds(s)
       map[s.user_id].tickets.add(s.ticket_id)
     })
     return Object.entries(map).map(([userId, v]) => ({
@@ -361,7 +575,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
     }))
   }, [reportSessions])
 
-  const totalSeconds = reportSessions.reduce((sum, s) => sum + (s.duration_seconds ?? 0), 0)
+  const totalSeconds = reportSessions.reduce((sum, s) => sum + reportedSessionSeconds(s), 0)
 
   const tabItems = [
   {
@@ -410,7 +624,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
       <Card
         title="Members"
         extra={
-          isCreator ? (
+          canManageMembers ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal}>
               Add member
             </Button>
@@ -419,7 +633,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
       >
         {members.length === 0 ? (
           <Empty description="No members yet">
-            {isCreator && (
+            {canManageMembers && (
               <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal}>
                 Add member
               </Button>
@@ -432,7 +646,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
             renderItem={(m) => (
               <List.Item
                 actions={
-                  isCreator && m.user_id !== team.created_by
+                  canManageMembers && m.user_id !== team.created_by
                     ? [
                         <Button
                           key="remove"
@@ -491,6 +705,36 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
                 ]}
               />
             </Col>
+            <Col>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+                Member
+              </Text>
+              <Select
+                allowClear
+                placeholder="All members"
+                style={{ minWidth: 220 }}
+                value={reportMemberUserId ?? undefined}
+                onChange={(v) => setReportMemberUserId(v ?? null)}
+                options={members.map((m) => ({
+                  value: m.user_id,
+                  label: m.user_name || m.user_email || m.user_id,
+                }))}
+              />
+            </Col>
+            <Col>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+                Group by
+              </Text>
+              <Segmented
+                value={reportGroupBy}
+                onChange={(v) => setReportGroupBy(v as ReportGroupBy)}
+                options={[
+                  { label: 'Sessions', value: 'session' },
+                  { label: 'Per day', value: 'day' },
+                  { label: 'Per person', value: 'person' },
+                ]}
+              />
+            </Col>
             {reportPeriod === 'custom' && (
               <Col>
                 <RangePicker
@@ -522,7 +766,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
             </Row>
           )}
 
-          {summaryByUser.length > 0 && (
+          {summaryByUser.length > 0 && reportGroupBy !== 'person' && (
             <div>
               <Text strong>Summary by user</Text>
               <Row gutter={16} style={{ marginTop: 8 }}>
@@ -543,14 +787,36 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
           )}
 
           <Spin spinning={reportLoading}>
-            <Table
-              size="small"
-              columns={reportColumns}
-              dataSource={reportSessions}
-              rowKey="id"
-              pagination={{ pageSize: 10, showTotal: (t) => `Total ${t} sessions` }}
-              locale={{ emptyText: 'No time tracker data for this period' }}
-            />
+            {reportGroupBy === 'session' && (
+              <Table
+                size="small"
+                columns={reportSessionColumns}
+                dataSource={reportSessions}
+                rowKey="id"
+                pagination={{ pageSize: 10, showTotal: (t) => `Total ${t} sessions` }}
+                locale={{ emptyText: 'No time tracker data for this period' }}
+              />
+            )}
+            {reportGroupBy === 'day' && (
+              <Table
+                size="small"
+                columns={reportDayColumns}
+                dataSource={reportByDay}
+                rowKey="dateKey"
+                pagination={{ pageSize: 10, showTotal: (t) => `Total ${t} days` }}
+                locale={{ emptyText: 'No time tracker data for this period' }}
+              />
+            )}
+            {reportGroupBy === 'person' && (
+              <Table
+                size="small"
+                columns={reportPersonColumns}
+                dataSource={reportByPerson}
+                rowKey="user_id"
+                pagination={{ pageSize: 10, showTotal: (t) => `Total ${t} people` }}
+                locale={{ emptyText: 'No time tracker data for this period' }}
+              />
+            )}
           </Spin>
         </Space>
       </Card>
@@ -569,10 +835,22 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
               <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => router.push('/settings/teams')}>
                 Back
               </Button>
-              {isCreator && (
-                <Button type="default" icon={<EditOutlined />} onClick={openEditModal}>
-                  Edit team
-                </Button>
+              {isAdmin && (
+                <Space>
+                  <Button type="default" icon={<EditOutlined />} onClick={openEditModal}>
+                    Edit team
+                  </Button>
+                  <Button
+                    type="default"
+                    icon={<UserSwitchOutlined />}
+                    onClick={() => {
+                      setNewCreatorUserId(null)
+                      setTransferModalOpen(true)
+                    }}
+                  >
+                    Transfer creator
+                  </Button>
+                </Space>
               )}
             </Flex>
             <Title level={3} style={{ marginTop: 0 }}>
@@ -601,6 +879,30 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
                   <Input placeholder="e.g. Engineering, Support" />
                 </Form.Item>
               </Form>
+            </Modal>
+            <Modal
+              title="Transfer team creator"
+              open={transferModalOpen}
+              onOk={handleTransferCreator}
+              onCancel={() => setTransferModalOpen(false)}
+              confirmLoading={transferLoading}
+              okText="Transfer"
+            >
+              <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+                Choose an existing member. Only admins can change the team creator.
+              </Text>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Select member"
+                value={newCreatorUserId ?? undefined}
+                onChange={(v) => setNewCreatorUserId(v)}
+                options={members
+                  .filter((m) => m.user_id !== team.created_by)
+                  .map((m) => ({
+                    value: m.user_id,
+                    label: m.user_name || m.user_email || m.user_id,
+                  }))}
+              />
             </Modal>
             <Modal
               title="Add team member"

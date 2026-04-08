@@ -2,7 +2,7 @@
  * Role-based access control helpers.
  * - Admin: full access
  * - Manager: tickets + dashboard, ticket attributes
- * - Staff: dashboard, users (no companies, teams, email, knowledge-base, tickets, ticket attributes)
+ * - Staff: dashboard (no companies, teams, email, knowledge-base, tickets, ticket attributes)
  * - Customer: limited (handled separately in sidebar)
  */
 
@@ -43,8 +43,13 @@ export function canAccessAutomationRules(role: string | undefined): boolean {
   return isAdmin(role)
 }
 
-/** Teams: Admin only */
+/** Teams settings: Admin & Manager (view list/detail & reports; Manager cannot create teams) */
 export function canAccessTeams(role: string | undefined): boolean {
+  return isAdminOrManager(role)
+}
+
+/** Create/delete team, transfer creator, edit team name/type (API + UI) */
+export function canAdminTeams(role: string | undefined): boolean {
   return isAdmin(role)
 }
 
@@ -61,6 +66,21 @@ export function canAccessSlackNotifications(role: string | undefined): boolean {
 /** Knowledge Base: Admin only */
 export function canAccessKnowledgeBase(role: string | undefined): boolean {
   return isAdmin(role)
+}
+
+/** Global running-text announcement (Settings): Admin only */
+export function canManageGlobalAnnouncement(role: string | undefined): boolean {
+  return isAdmin(role)
+}
+
+/** Dashboard announcements (role-targeted, Settings): Admin only */
+export function canManageDashboardAnnouncements(role: string | undefined): boolean {
+  return isAdmin(role)
+}
+
+/** Customer (company) time & ticket summary report: Admin & Manager */
+export function canAccessCustomerTimeReport(role: string | undefined): boolean {
+  return isAdminOrManager(role)
 }
 
 /** Users: Admin only */
@@ -83,10 +103,13 @@ export function canAccessSettingsHub(role: string | undefined): boolean {
     canAccessSlackNotifications(role) ||
     canAccessMessageTemplates(role) ||
     canAccessKnowledgeBase(role) ||
+    canManageGlobalAnnouncement(role) ||
+    canManageDashboardAnnouncements(role) ||
     canAccessAutomationRules(role) ||
     canAccessUsers(role) ||
     canAccessCompanies(role) ||
-    canAccessTeams(role)
+    canAccessTeams(role) ||
+    canAccessCustomerTimeReport(role)
   )
 }
 
