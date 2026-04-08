@@ -1,8 +1,16 @@
 'use client'
 
 import { Layout, Table, Button, Space, Typography, Card, Tag, Modal, Form, Input, Switch, message, Popconfirm, Tooltip, Select } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons'
-import { useState, useEffect, useMemo } from 'react'
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+  SearchOutlined,
+  CheckCircleOutlined,
+  StopOutlined,
+} from '@ant-design/icons'
+import { useState, useEffect, useMemo, type Key } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
 import AdminMainColumn from './AdminMainColumn'
@@ -16,6 +24,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 import DateDisplay from './DateDisplay'
+import { SpaNavLink, shouldOpenHrefInNewTab } from './SpaNavLink'
 import type { ColumnsType } from 'antd/es/table'
 
 const { Content } = Layout
@@ -83,6 +92,8 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
   const [filterStatus, setFilterStatus] = useState<boolean | undefined>(undefined)
   const [form] = Form.useForm()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
+  const [bulkAction, setBulkAction] = useState<'active' | 'inactive' | 'delete' | null>(null)
 
   const filteredCompanies = useMemo(() => {
     return companies.filter((c) => {
@@ -140,9 +151,59 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
     try {
       await apiFetch(`/api/companies/${companyId}`, { method: 'DELETE' })
       message.success('Company deleted successfully')
+      setSelectedRowKeys((keys) => keys.filter((k) => String(k) !== companyId))
       fetchCompanies()
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to delete company')
+    }
+  }
+
+  const handleBulkStatus = async (is_active: boolean) => {
+    const ids = selectedRowKeys.map(String)
+    if (ids.length === 0) return
+    setBulkAction(is_active ? 'active' : 'inactive')
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          apiFetch(`/api/companies/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active }),
+          })
+        )
+      )
+      const failed = results.filter((r) => r.status === 'rejected').length
+      const ok = results.length - failed
+      const label = is_active ? 'active' : 'inactive'
+      if (ok > 0) message.success(`Updated ${ok} compan${ok === 1 ? 'y' : 'ies'} to ${label}`)
+      if (failed > 0) message.error(`${failed} update(s) failed`)
+      setSelectedRowKeys([])
+      fetchCompanies()
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Bulk update failed')
+    } finally {
+      setBulkAction(null)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = selectedRowKeys.map(String)
+    if (ids.length === 0) return
+    setBulkAction('delete')
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => apiFetch(`/api/companies/${id}`, { method: 'DELETE' }))
+      )
+      const failed = results.filter((r) => r.status === 'rejected').length
+      const ok = results.length - failed
+      if (ok > 0) message.success(`Deleted ${ok} compan${ok === 1 ? 'y' : 'ies'}`)
+      if (failed > 0) message.error(`${failed} delete(s) failed`)
+      setSelectedRowKeys([])
+      fetchCompanies()
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Bulk delete failed')
+    } finally {
+      setBulkAction(null)
     }
   }
 
@@ -186,20 +247,21 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
 
   const columns: ColumnsType<CompanyRecord> = [
     {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name',
+      title: 'Company',
+      key: 'company',
       sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
       sortDirections: ['ascend', 'descend'],
-      render: (name: string) => <strong>{name}</strong>,
-    },
-    {
-      title: 'Email',
-      dataIndex: 'email',
-      key: 'email',
-      sorter: (a, b) => (a.email || '').localeCompare(b.email || ''),
-      sortDirections: ['ascend', 'descend'],
-      render: (email: string) => email ? <a href={`mailto:${email}`}>{email}</a> : '—',
+      render: (_, record) => (
+        <SpaNavLink
+          href={`/companies/${record.id}`}
+          style={{ textDecoration: 'none', color: 'inherit' }}
+        >
+          <div>
+            <div style={{ fontWeight: 500 }}>{record.name}</div>
+            <div style={{ fontSize: 12, color: '#999' }}>{record.email || '—'}</div>
+          </div>
+        </SpaNavLink>
+      ),
     },
     {
       title: 'Status',
@@ -239,7 +301,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       key: 'created_at',
       sorter: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
       sortDirections: ['ascend', 'descend'],
-      render: (date: string) => <DateDisplay date={date} />,
+      render: (date: string) => <DateDisplay date={date} format="date-only" />,
     },
     {
       title: 'Last ticket update',
@@ -267,19 +329,18 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
             <Button
               type="default"
               icon={<EyeOutlined />}
-              onClick={() => router.push(`/companies/${record.id}`)}
-            >
-              Details
-            </Button>
+              href={`/companies/${record.id}`}
+              aria-label="View company details"
+              onClick={(e) => {
+                if (shouldOpenHrefInNewTab(e)) return
+                if (e.button !== 0) return
+                e.preventDefault()
+                router.push(`/companies/${record.id}`)
+              }}
+            />
           </Tooltip>
           <Tooltip title="Edit">
-            <Button
-              type="primary"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-            >
-              Edit
-            </Button>
+            <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
           </Tooltip>
           <Popconfirm
             title="Delete Company"
@@ -289,13 +350,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
             cancelText="No"
           >
             <Tooltip title="Delete">
-              <Button
-                type="primary"
-                danger
-                icon={<DeleteOutlined />}
-              >
-                Delete
-              </Button>
+              <Button type="primary" danger icon={<DeleteOutlined />} />
             </Tooltip>
           </Popconfirm>
         </Space>
@@ -347,20 +402,101 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
               </Space>
             </div>
 
-            <Table
-              columns={columns}
-              dataSource={filteredCompanies}
-              rowKey="id"
-              loading={loading}
-              pagination={{
-                current: pagination.current,
-                pageSize: pagination.pageSize,
-                showSizeChanger: true,
-                pageSizeOptions: ['10', '15', '20', '50'],
-                showTotal: (total) => `Total ${total} companies`,
-                onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
+            {selectedRowKeys.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: '12px 16px',
+                  background: '#e6f4ff',
+                  border: '1px solid #91caff',
+                  borderRadius: 8,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <Typography.Text strong>
+                  {selectedRowKeys.length} selected
+                </Typography.Text>
+                <Space wrap>
+                  <Button
+                    icon={<CheckCircleOutlined />}
+                    loading={bulkAction === 'active'}
+                    disabled={bulkAction !== null && bulkAction !== 'active'}
+                    onClick={() => handleBulkStatus(true)}
+                  >
+                    Set active
+                  </Button>
+                  <Button
+                    icon={<StopOutlined />}
+                    loading={bulkAction === 'inactive'}
+                    disabled={bulkAction !== null && bulkAction !== 'inactive'}
+                    onClick={() => handleBulkStatus(false)}
+                  >
+                    Set inactive
+                  </Button>
+                  <Popconfirm
+                    title="Delete selected companies?"
+                    description={`This will permanently delete ${selectedRowKeys.length} compan${selectedRowKeys.length === 1 ? 'y' : 'ies'}.`}
+                    okText="Delete"
+                    okButtonProps={{ danger: true }}
+                    cancelText="Cancel"
+                    onConfirm={handleBulkDelete}
+                    disabled={bulkAction !== null}
+                  >
+                    <span>
+                      <Button
+                        danger
+                        icon={<DeleteOutlined />}
+                        loading={bulkAction === 'delete'}
+                        disabled={bulkAction !== null && bulkAction !== 'delete'}
+                      >
+                        Bulk delete
+                      </Button>
+                    </span>
+                  </Popconfirm>
+                  <Button
+                    type="link"
+                    onClick={() => setSelectedRowKeys([])}
+                    disabled={bulkAction !== null}
+                  >
+                    Clear selection
+                  </Button>
+                </Space>
+              </div>
+            )}
+
+            <div
+              style={{
+                width: '100%',
+                maxWidth: '100%',
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
               }}
-            />
+            >
+              <Table<CompanyRecord>
+                columns={columns}
+                dataSource={filteredCompanies}
+                rowKey="id"
+                loading={loading}
+                rowSelection={{
+                  selectedRowKeys,
+                  onChange: (keys) => setSelectedRowKeys(keys),
+                }}
+                scroll={{ x: 'max-content' }}
+                tableLayout="auto"
+                pagination={{
+                  current: pagination.current,
+                  pageSize: pagination.pageSize,
+                  showSizeChanger: true,
+                  pageSizeOptions: ['10', '15', '20', '50'],
+                  showTotal: (total) => `Total ${total} companies`,
+                  onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
+                  responsive: true,
+                }}
+              />
+            </div>
           </Card>
 
           <Modal

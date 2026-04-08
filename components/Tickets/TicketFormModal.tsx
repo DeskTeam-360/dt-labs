@@ -183,9 +183,9 @@ export default function TicketFormModal({
           {!showSimplifiedForm && (
             <Col span={8}>
               <Form.Item name="status" label="Status" rules={[{ required: true }]}>
-                <Select>
+                <Select showSearch optionFilterProp="label" placeholder="Search status">
                   {allStatuses.map((s) => (
-                    <Option key={s.slug} value={s.slug}>
+                    <Option key={s.slug} value={s.slug} label={s.title}>
                       {s.title}
                     </Option>
                   ))}
@@ -195,9 +195,14 @@ export default function TicketFormModal({
           )}
           <Col span={showSimplifiedForm ? 12 : 8}>
             <Form.Item name="type_id" label="Type">
-              <Select placeholder="Select type" allowClear>
+              <Select
+                placeholder="Select type"
+                allowClear
+                showSearch
+                optionFilterProp="label"
+              >
                 {ticketTypes.map((t) => (
-                  <Option key={t.id} value={t.id}>
+                  <Option key={t.id} value={t.id} label={t.title}>
                     <Space>
                       <span
                         style={{
@@ -222,9 +227,14 @@ export default function TicketFormModal({
               label="Priority"
               rules={[{ required: true, message: 'Please select priority!' }]}
             >
-              <Select placeholder="Select priority" allowClear>
+              <Select
+                placeholder="Select priority"
+                allowClear
+                showSearch
+                optionFilterProp="label"
+              >
                 {ticketPriorities.map((p) => (
-                  <Option key={p.id} value={p.id}>
+                  <Option key={p.id} value={p.id} label={p.title}>
                     <Space>
                       <span
                         style={{
@@ -246,9 +256,14 @@ export default function TicketFormModal({
             <>
               <Col span={12}>
                 <Form.Item name="company_id" label="Company">
-                  <Select placeholder="Select company" allowClear>
+                  <Select
+                    placeholder="Select company"
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                  >
                     {companies.map((c) => (
-                      <Option key={c.id} value={c.id}>
+                      <Option key={c.id} value={c.id} label={c.name}>
                         {c.name}
                       </Option>
                     ))}
@@ -263,7 +278,9 @@ export default function TicketFormModal({
                     value={selectedTagIds}
                     onChange={onSelectedTagIdsChange}
                     optionLabelProp="label"
+                    optionFilterProp="label"
                     allowClear
+                    showSearch
                   >
                     {allTags.map((t) => (
                       <Option key={t.id} value={t.id} label={t.name}>
@@ -283,6 +300,9 @@ export default function TicketFormModal({
 
             <Form.Item name="visibility" label="Visibility" rules={[{ required: true }]}>
               <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder="Search visibility"
                 onChange={(value) => {
                   if (value !== 'specific_users') {
                     onSelectedAssigneesChange([])
@@ -291,10 +311,15 @@ export default function TicketFormModal({
                   }
                 }}
               >
-                <Option value="public">Public</Option>
-                <Option value="team">Team</Option>
-                <Option value="specific_users">Specific Users</Option>
-
+                <Option value="public" label="Public">
+                  Public
+                </Option>
+                <Option value="team" label="Team">
+                  Team
+                </Option>
+                <Option value="specific_users" label="Specific Users">
+                  Specific Users
+                </Option>
               </Select>
             </Form.Item>
 
@@ -311,9 +336,13 @@ export default function TicketFormModal({
                     label="Team"
                     rules={[{ required: getFieldValue('visibility') === 'team', message: 'Please select team!' }]}
                   >
-                    <Select placeholder="Select Team">
+                    <Select
+                      placeholder="Select Team"
+                      showSearch
+                      optionFilterProp="label"
+                    >
                       {selectableTeams.map((team) => (
-                        <Option key={team.id} value={team.id}>
+                        <Option key={team.id} value={team.id} label={team.name}>
                           {team.name}
                         </Option>
                       ))}
@@ -351,6 +380,8 @@ export default function TicketFormModal({
                       value={selectedAssignees}
                       onChange={onSelectedAssigneesChange}
                       optionLabelProp="label"
+                      optionFilterProp="label"
+                      showSearch
                     >
                       {users
                         .filter((u) => (u.role ?? '').toLowerCase() !== 'customer')

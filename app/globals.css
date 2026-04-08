@@ -114,6 +114,13 @@ body {
   background: rgba(255, 255, 255, 0.1) !important;
 }
 
+.admin-sidebar-deskteam .ant-menu-dark .ant-menu-submenu-title,
+.admin-sidebar-deskteam .ant-menu-dark .ant-menu-submenu-title .anticon {
+  color: #fff !important;
+}
+.admin-sidebar-deskteam .ant-menu-dark .ant-menu-submenu-title:hover {
+  color: #fff !important;
+}
 
 .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected {
   background: #f0f2f5 !important;

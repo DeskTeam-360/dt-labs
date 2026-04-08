@@ -12,9 +12,10 @@ import {
   Input,
   message,
   Popconfirm,
+  Tooltip,
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type Key } from 'react'
 import AdminSidebar from './AdminSidebar'
 import AdminMainColumn from './AdminMainColumn'
 import type { ColumnsType } from 'antd/es/table'
@@ -94,6 +95,9 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
   const [modalVisible, setModalVisible] = useState(false)
   const [editingTag, setEditingTag] = useState<TagRecord | null>(null)
   const [form] = Form.useForm()
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
+  const [bulkAction, setBulkAction] = useState<'delete' | null>(null)
 
   const fetchTags = async () => {
     setLoading(true)
@@ -132,9 +136,31 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
     try {
       await apiFetch(`/api/tags/${id}`, { method: 'DELETE' })
       message.success('Tag deleted')
+      setSelectedRowKeys((keys) => keys.filter((k) => String(k) !== id))
       fetchTags()
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to delete tag')
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = selectedRowKeys.map(String).filter(Boolean)
+    if (ids.length === 0) return
+    setBulkAction('delete')
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => apiFetch(`/api/tags/${id}`, { method: 'DELETE' }))
+      )
+      const failed = results.filter((r) => r.status === 'rejected').length
+      const ok = results.length - failed
+      if (ok > 0) message.success(`Deleted ${ok} tag(s)`)
+      if (failed > 0) message.error(`${failed} delete(s) failed`)
+      setSelectedRowKeys([])
+      fetchTags()
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Bulk delete failed')
+    } finally {
+      setBulkAction(null)
     }
   }
 
@@ -181,16 +207,37 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
+      width: 140,
+      render: (name: string) => (
+        <span style={{ display: 'block', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+          {name}
+        </span>
+      ),
+      onCell: () => ({
+        style: {
+          whiteSpace: 'normal',
+          wordBreak: 'break-word',
+          verticalAlign: 'top',
+        },
+      }),
     },
     {
       title: 'Slug',
       dataIndex: 'slug',
       key: 'slug',
+      width: 200,
       render: (slug: string) => (
-        <Typography.Text code copyable>
+        <Typography.Text code copyable style={{ wordBreak: 'break-all' }}>
           {slug}
         </Typography.Text>
       ),
+      onCell: () => ({
+        style: {
+          whiteSpace: 'normal',
+          wordBreak: 'break-word',
+          verticalAlign: 'top',
+        },
+      }),
     },
     {
       title: 'Color',
@@ -215,22 +262,23 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
     {
       title: 'Actions',
       key: 'actions',
-      width: 120,
+      width: 100,
       render: (_, record) => (
         <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            Edit
-          </Button>
+          <Tooltip title="Edit">
+            <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+          </Tooltip>
           <Popconfirm
             title="Delete this tag?"
             description="It will be removed from all tickets."
             onConfirm={() => handleDelete(record.id)}
             okText="Delete"
             okButtonProps={{ danger: true }}
+            cancelText="Cancel"
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              Delete
-            </Button>
+            <Tooltip title="Delete">
+              <Button type="primary" danger icon={<DeleteOutlined />} />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
@@ -241,23 +289,103 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
-        <Content style={{ margin: '24px' }}>
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Title level={4} style={{ margin: 0 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 24,
+                flexWrap: 'wrap',
+                gap: 16,
+              }}
+            >
+              <Title level={2} style={{ margin: 0 }}>
                 Tags
               </Title>
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
                 Add Tag
               </Button>
             </div>
-            <Table
-              rowKey="id"
-              loading={loading}
-              columns={columns}
-              dataSource={tags}
-              pagination={false}
-            />
+
+            {selectedRowKeys.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: '12px 16px',
+                  background: '#e6f4ff',
+                  border: '1px solid #91caff',
+                  borderRadius: 8,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <Typography.Text strong>{selectedRowKeys.length} selected</Typography.Text>
+                <Space wrap>
+                  <Popconfirm
+                    title="Delete selected tags?"
+                    description="They will be removed from all tickets."
+                    okText="Delete"
+                    okButtonProps={{ danger: true }}
+                    cancelText="Cancel"
+                    onConfirm={handleBulkDelete}
+                    disabled={bulkAction !== null}
+                  >
+                    <span>
+                      <Button
+                        danger
+                        icon={<DeleteOutlined />}
+                        loading={bulkAction === 'delete'}
+                        disabled={bulkAction !== null && bulkAction !== 'delete'}
+                      >
+                        Bulk delete
+                      </Button>
+                    </span>
+                  </Popconfirm>
+                  <Button
+                    type="link"
+                    onClick={() => setSelectedRowKeys([])}
+                    disabled={bulkAction !== null}
+                  >
+                    Clear selection
+                  </Button>
+                </Space>
+              </div>
+            )}
+
+            <div
+              style={{
+                width: '100%',
+                maxWidth: '100%',
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
+              <Table<TagRecord>
+                rowKey="id"
+                loading={loading}
+                columns={columns}
+                dataSource={tags}
+                rowSelection={{
+                  selectedRowKeys,
+                  onChange: (keys) => setSelectedRowKeys(keys),
+                }}
+                tableLayout="fixed"
+                style={{ width: '100%' }}
+                pagination={{
+                  current: pagination.current,
+                  pageSize: pagination.pageSize,
+                  showSizeChanger: true,
+                  pageSizeOptions: ['10', '15', '20', '50'],
+                  showTotal: (total) => `Total ${total} tags`,
+                  onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
+                  responsive: true,
+                }}
+              />
+            </div>
           </Card>
 
           <Modal

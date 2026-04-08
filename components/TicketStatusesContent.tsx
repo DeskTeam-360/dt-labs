@@ -14,9 +14,16 @@ import {
   Switch,
   message,
   Popconfirm,
+  Tooltip,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  CheckCircleOutlined,
+  StopOutlined,
+} from '@ant-design/icons'
+import { useState, useEffect, type Key } from 'react'
 import AdminSidebar from './AdminSidebar'
 import AdminMainColumn from './AdminMainColumn'
 import type { ColumnsType } from 'antd/es/table'
@@ -100,6 +107,11 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
   const [modalVisible, setModalVisible] = useState(false)
   const [editingStatus, setEditingStatus] = useState<TicketStatusRecord | null>(null)
   const [form] = Form.useForm()
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
+  const [bulkAction, setBulkAction] = useState<
+    'delete' | 'kanban_show' | 'kanban_hide' | null
+  >(null)
 
   const fetchStatuses = async () => {
     setLoading(true)
@@ -145,9 +157,59 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
     try {
       await apiFetch(`/api/ticket-statuses/${id}`, { method: 'DELETE' })
       message.success('Status deleted')
+      setSelectedRowKeys((keys) => keys.filter((k) => Number(k) !== id))
       fetchStatuses()
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to delete status')
+    }
+  }
+
+  const handleBulkKanban = async (show_in_kanban: boolean) => {
+    const ids = selectedRowKeys.map((k) => Number(k)).filter((n) => !Number.isNaN(n))
+    if (ids.length === 0) return
+    setBulkAction(show_in_kanban ? 'kanban_show' : 'kanban_hide')
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          apiFetch(`/api/ticket-statuses/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ show_in_kanban }),
+          })
+        )
+      )
+      const failed = results.filter((r) => r.status === 'rejected').length
+      const ok = results.length - failed
+      const label = show_in_kanban ? 'shown in Kanban' : 'hidden from Kanban'
+      if (ok > 0) message.success(`Updated ${ok} status(es) — ${label}`)
+      if (failed > 0) message.error(`${failed} update(s) failed`)
+      setSelectedRowKeys([])
+      fetchStatuses()
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Bulk update failed')
+    } finally {
+      setBulkAction(null)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = selectedRowKeys.map((k) => Number(k)).filter((n) => !Number.isNaN(n))
+    if (ids.length === 0) return
+    setBulkAction('delete')
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => apiFetch(`/api/ticket-statuses/${id}`, { method: 'DELETE' }))
+      )
+      const failed = results.filter((r) => r.status === 'rejected').length
+      const ok = results.length - failed
+      if (ok > 0) message.success(`Deleted ${ok} status(es)`)
+      if (failed > 0) message.error(`${failed} delete(s) failed`)
+      setSelectedRowKeys([])
+      fetchStatuses()
+    } catch (error: unknown) {
+      message.error((error as Error).message || 'Bulk delete failed')
+    } finally {
+      setBulkAction(null)
     }
   }
 
@@ -219,8 +281,19 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
-      ellipsis: true,
-      render: (v: string) => v || '—',
+      width: 280,
+      render: (v: string) => (
+        <span style={{ display: 'block', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+          {v || '—'}
+        </span>
+      ),
+      onCell: () => ({
+        style: {
+          whiteSpace: 'normal',
+          wordBreak: 'break-word',
+          verticalAlign: 'top',
+        },
+      }),
     },
     {
       title: 'Color',
@@ -254,19 +327,20 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
       key: 'actions',
       render: (_, record) => (
         <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            Edit
-          </Button>
+          <Tooltip title="Edit">
+            <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+          </Tooltip>
           <Popconfirm
             title="Delete this status?"
             description="Tickets using this status will keep the value; consider reassigning them first."
             onConfirm={() => handleDelete(record.id)}
             okText="Delete"
             okButtonProps={{ danger: true }}
+            cancelText="Cancel"
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              Delete
-            </Button>
+            <Tooltip title="Delete">
+              <Button type="primary" danger icon={<DeleteOutlined />} />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
@@ -277,23 +351,119 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
-        <Content style={{ margin: '24px' }}>
+        <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
           <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Title level={4} style={{ margin: 0 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 24,
+                flexWrap: 'wrap',
+                gap: 16,
+              }}
+            >
+              <Title level={2} style={{ margin: 0 }}>
                 Ticket Statuses
               </Title>
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
                 Add Status
               </Button>
             </div>
-            <Table
-              rowKey="id"
-              loading={loading}
-              columns={columns}
-              dataSource={statuses}
-              pagination={false}
-            />
+
+            {selectedRowKeys.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: '12px 16px',
+                  background: '#e6f4ff',
+                  border: '1px solid #91caff',
+                  borderRadius: 8,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <Typography.Text strong>{selectedRowKeys.length} selected</Typography.Text>
+                <Space wrap>
+                  <Button
+                    icon={<CheckCircleOutlined />}
+                    loading={bulkAction === 'kanban_show'}
+                    disabled={bulkAction !== null && bulkAction !== 'kanban_show'}
+                    onClick={() => handleBulkKanban(true)}
+                  >
+                    Show in Kanban
+                  </Button>
+                  <Button
+                    icon={<StopOutlined />}
+                    loading={bulkAction === 'kanban_hide'}
+                    disabled={bulkAction !== null && bulkAction !== 'kanban_hide'}
+                    onClick={() => handleBulkKanban(false)}
+                  >
+                    Hide from Kanban
+                  </Button>
+                  <Popconfirm
+                    title="Delete selected statuses?"
+                    description="Tickets using these statuses will keep their values; consider reassigning them first."
+                    okText="Delete"
+                    okButtonProps={{ danger: true }}
+                    cancelText="Cancel"
+                    onConfirm={handleBulkDelete}
+                    disabled={bulkAction !== null}
+                  >
+                    <span>
+                      <Button
+                        danger
+                        icon={<DeleteOutlined />}
+                        loading={bulkAction === 'delete'}
+                        disabled={bulkAction !== null && bulkAction !== 'delete'}
+                      >
+                        Bulk delete
+                      </Button>
+                    </span>
+                  </Popconfirm>
+                  <Button
+                    type="link"
+                    onClick={() => setSelectedRowKeys([])}
+                    disabled={bulkAction !== null}
+                  >
+                    Clear selection
+                  </Button>
+                </Space>
+              </div>
+            )}
+
+            <div
+              style={{
+                width: '100%',
+                maxWidth: '100%',
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
+              <Table<TicketStatusRecord>
+                rowKey="id"
+                loading={loading}
+                columns={columns}
+                dataSource={statuses}
+                rowSelection={{
+                  selectedRowKeys,
+                  onChange: (keys) => setSelectedRowKeys(keys),
+                }}
+                tableLayout="fixed"
+                style={{ width: '100%' }}
+                pagination={{
+                  current: pagination.current,
+                  pageSize: pagination.pageSize,
+                  showSizeChanger: true,
+                  pageSizeOptions: ['10', '15', '20', '50'],
+                  showTotal: (total) => `Total ${total} statuses`,
+                  onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
+                  responsive: true,
+                }}
+              />
+            </div>
           </Card>
 
           <Modal
