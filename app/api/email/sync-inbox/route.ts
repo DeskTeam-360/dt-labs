@@ -1157,7 +1157,7 @@ export async function POST(request: NextRequest) {
               title,
               description: body || null,
               createdBy: creatorUserId ?? null,
-              status: 'to_do',
+              status: 'open',
               visibility: 'public',
               companyId: ticketCompanyId,
               createdVia: 'email',

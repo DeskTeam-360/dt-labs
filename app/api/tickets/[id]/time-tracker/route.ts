@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { db, ticketTimeTracker, users } from '@/lib/db'
-import { eq, and, desc, isNull } from 'drizzle-orm'
+import { eq, and, desc, isNull, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { isAdmin, isAdminOrManager } from '@/lib/auth-utils'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
@@ -29,7 +29,10 @@ function mapTrackerRow(
   }
 }
 
-/** GET /api/tickets/[id]/time-tracker - List sessions. ?active=1 = current user's active session only */
+/**
+ * GET /api/tickets/[id]/time-tracker — list sessions. ?active=1 = current user's active timer only.
+ * Optional ?start=&end= (ISO): keep sessions whose interval overlaps that window (same rule as customer-time report).
+ */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -48,6 +51,11 @@ export async function GET(
   const url = new URL(request.url)
   const activeOnly = url.searchParams.get('active') === '1'
 
+  const startP = url.searchParams.get('start')?.trim()
+  const endP = url.searchParams.get('end')?.trim()
+  const startFilter = startP ? new Date(startP) : null
+  const endFilter = endP ? new Date(endP) : null
+
   const whereClause = activeOnly
     ? and(
         eq(ticketTimeTracker.ticketId, ticketId),
@@ -55,7 +63,17 @@ export async function GET(
         isNull(ticketTimeTracker.stopTime),
         eq(ticketTimeTracker.trackerType, 'timer')
       )
-    : eq(ticketTimeTracker.ticketId, ticketId)
+    : (() => {
+        const parts = [eq(ticketTimeTracker.ticketId, ticketId)]
+        // Overlap report window: start_time <= end AND coalesce(stop_time, now()) >= start
+        if (endFilter && !Number.isNaN(endFilter.getTime())) {
+          parts.push(lte(ticketTimeTracker.startTime, endFilter))
+        }
+        if (startFilter && !Number.isNaN(startFilter.getTime())) {
+          parts.push(sql`coalesce(${ticketTimeTracker.stopTime}, now()) >= ${startFilter.toISOString()}`)
+        }
+        return parts.length === 1 ? parts[0] : and(...parts)
+      })()
 
   const rows = await db
     .select({

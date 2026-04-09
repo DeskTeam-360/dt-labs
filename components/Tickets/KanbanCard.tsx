@@ -8,6 +8,7 @@ import { CSS } from '@dnd-kit/utilities'
 import dayjs from 'dayjs'
 import type { TicketRecord, StatusColumn } from './types'
 import { DEFAULT_ALL_STATUS_COLUMNS } from './types'
+import { isClosedLikeTicketStatus } from '@/lib/ticket-status-workflow'
 import { getVisibilityColor, darkenColor } from './types'
 import DateDisplay from '../DateDisplay'
 
@@ -276,7 +277,7 @@ export default function KanbanCard({
                   fontWeight: 700,
                   fontSize: 11,
                   color:
-                    dayjs(ticket.due_date).isBefore(dayjs()) && ticket.status !== 'completed' && ticket.status !== 'cancel'
+                    dayjs(ticket.due_date).isBefore(dayjs()) && !isClosedLikeTicketStatus(ticket.status)
                       ? '#ff4d4f'
                       : 'var(--kanban-card-muted)',
                 }}

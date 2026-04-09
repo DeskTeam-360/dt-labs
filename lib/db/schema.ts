@@ -170,6 +170,10 @@ export const ticketStatuses = pgTable('ticket_statuses', {
   customerTitle: varchar('customer_title', { length: 255 }),
   color: varchar('color', { length: 20 }).notNull(),
   showInKanban: boolean('show_in_kanban').default(true),
+  /** When false, API and UI must not allow deleting this row (seeded / system statuses). */
+  isDeletable: boolean('is_deletable').notNull().default(true),
+  /** When false, hidden from status pickers and default kanban; existing tickets keep slug. */
+  isActive: boolean('is_active').notNull().default(true),
   sortOrder: integer('sort_order').default(0),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
@@ -183,7 +187,7 @@ export const tickets = pgTable('tickets', {
   shortNote: text('short_note'),
   createdBy: uuid('created_by'),
   dueDate: ts('due_date'),
-  status: varchar('status', { length: 50 }).notNull().default('pending'),
+  status: varchar('status', { length: 50 }).notNull().default('open'),
   visibility: varchar('visibility', { length: 50 }).notNull().default('private'),
   teamId: uuid('team_id'),
   gmailThreadId: varchar('gmail_thread_id', { length: 255 }),
@@ -610,6 +614,14 @@ export const globalAnnouncement = pgTable('global_announcement', {
   isEnabled: boolean('is_enabled').notNull().default(false),
   startsAt: ts('starts_at'),
   endsAt: ts('ends_at'),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  updatedBy: uuid('updated_by'),
+})
+
+/** Singleton row (id = 1): saved filter conditions for Customer time report (global for all managers/admins). */
+export const customerTimeReportDefaults = pgTable('customer_time_report_defaults', {
+  id: integer('id').primaryKey(),
+  filters: jsonb('filters').notNull(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
   updatedBy: uuid('updated_by'),
 })

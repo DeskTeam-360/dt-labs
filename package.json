@@ -9,7 +9,9 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
+    "db:push": "node scripts/drizzle-db-push-first.cjs",
+    "db:push:both": "node scripts/drizzle-db-push-both.cjs",
+    "db:push:second": "node scripts/drizzle-db-push-second.cjs",
     "db:studio": "drizzle-kit studio",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:seed:js": "node prisma/seed.js"

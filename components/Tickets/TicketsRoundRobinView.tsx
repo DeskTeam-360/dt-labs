@@ -21,17 +21,17 @@ interface TicketsRoundRobinViewProps {
   onDelete?: (id: number) => void
 }
 
-const STATUS_ORDER = ['to_do', 'in_progress', 'completed', 'cancel', 'archived']
-
 function getStatusColor(status: string, columns: StatusColumn[]): string {
   const col = columns.find((c) => c.id === status)
   return col?.color ?? '#d9d9d9'
 }
 
-function sortTicketsByProgress(a: TicketRecord, b: TicketRecord): number {
-  const ai = STATUS_ORDER.indexOf(a.status)
-  const bi = STATUS_ORDER.indexOf(b.status)
-  if (ai !== bi) return ai - bi
+function sortTicketsByProgress(a: TicketRecord, b: TicketRecord, statusOrder: string[]): number {
+  const ai = statusOrder.indexOf(a.status)
+  const bi = statusOrder.indexOf(b.status)
+  const aIdx = ai === -1 ? 9999 : ai
+  const bIdx = bi === -1 ? 9999 : bi
+  if (aIdx !== bIdx) return aIdx - bIdx
   return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
 }
 
@@ -50,9 +50,9 @@ export default function TicketsRoundRobinView({
     byCompany.get(key)!.push(t)
   }
 
-  // Sort tickets per company by progress (to_do -> in_progress -> completed)
+  const statusOrder = statusColumns.map((c) => c.id)
   for (const arr of byCompany.values()) {
-    arr.sort(sortTicketsByProgress)
+    arr.sort((a, b) => sortTicketsByProgress(a, b, statusOrder))
   }
 
   const companyIds = Array.from(byCompany.keys())

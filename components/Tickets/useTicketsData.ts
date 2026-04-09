@@ -191,7 +191,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   const [statusColumns, setStatusColumns] = useState<StatusColumn[]>([])
   const [lookupReady, setLookupReady] = useState(false)
   const [allStatusColumns, setAllStatusColumns] = useState<StatusColumn[]>(DEFAULT_ALL_STATUS_COLUMNS)
-  const [allStatuses, setAllStatuses] = useState<{ slug: string; title: string }[]>(DEFAULT_ALL_STATUSES)
+  const [allStatuses, setAllStatuses] = useState<Array<{ slug: string; title: string; is_active?: boolean }>>(
+    DEFAULT_ALL_STATUSES
+  )
   const [filterStatus, setFilterStatus] = useState<string[]>(initialState.filterStatus)
   const [filterTypeIds, setFilterTypeIds] = useState<number[]>(initialState.filterTypeIds)
   const [filterCompanyIds, setFilterCompanyIds] = useState<string[]>(initialState.filterCompanyIds)
@@ -408,7 +410,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         ticketPriorities: Array<{ id: number; title: string; slug: string; color: string }>
         companies: Array<{ id: string; name: string; color?: string }>
         tags: Array<{ id: string; name: string; slug: string; color?: string }>
-        statuses: Array<TicketStatusRecord & { show_in_kanban?: boolean | null }>
+        statuses: Array<TicketStatusRecord & { show_in_kanban?: boolean | null; is_active?: boolean }>
       }>('/api/tickets/lookup')
 
       setTeams(data.teams || [])
@@ -432,10 +434,20 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         const statusTitle = (s: { slug: string; title: string; customer_title?: string; color: string }) =>
           isCustomer && s.customer_title ? s.customer_title : s.title
         const inKanban = (s: { show_in_kanban?: unknown }) => isTicketStatusInKanban(s.show_in_kanban)
-        const kanbanSlugs = list.filter(inKanban).map((s) => s.slug)
-        setStatusColumns(list.filter(inKanban).map((s) => ({ id: s.slug, title: statusTitle(s), color: s.color })))
+        const isActive = (s: { is_active?: boolean }) => s.is_active !== false
+        const activeList = list.filter(isActive)
+        const kanbanSlugs = activeList.filter(inKanban).map((s) => s.slug)
+        setStatusColumns(
+          activeList.filter(inKanban).map((s) => ({ id: s.slug, title: statusTitle(s), color: s.color }))
+        )
         setAllStatusColumns(list.map((s) => ({ id: s.slug, title: statusTitle(s), color: s.color })))
-        setAllStatuses(list.map((s) => ({ slug: s.slug, title: statusTitle(s) })))
+        setAllStatuses(
+          list.map((s) => ({
+            slug: s.slug,
+            title: statusTitle(s),
+            is_active: s.is_active !== false,
+          }))
+        )
         const validSlugs = new Set(list.map((s) => s.slug))
         if (fromUrl) {
           const current = initialRef.current?.state.filterStatus ?? []
@@ -803,7 +815,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setDeletedTicketAttachmentIds([])
     form.resetFields()
     const baseValues: Record<string, unknown> = {
-      status: allStatuses[0]?.slug ?? 'to_do',
+      status: allStatuses.find((s) => s.is_active !== false)?.slug ?? allStatuses[0]?.slug ?? 'open',
       visibility: 'public',
     }
     if (isCustomer && userCompanyId) {
@@ -933,7 +945,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     try {
       const effectiveValues = { ...values }
       if (isCustomer && !editingTicket) {
-        effectiveValues.status = allStatuses[0]?.slug ?? 'to_do'
+        effectiveValues.status =
+          allStatuses.find((s) => s.is_active !== false)?.slug ?? allStatuses[0]?.slug ?? 'open'
         effectiveValues.visibility = 'public'
         effectiveValues.company_id = userCompanyId ?? null
       }

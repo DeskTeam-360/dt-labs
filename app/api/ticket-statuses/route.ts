@@ -4,6 +4,7 @@ import { ticketStatuses } from '@/lib/db'
 import { asc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
+import { ensureTicketStatusIsDeletableColumn } from '@/lib/ensure-ticket-status-is-deletable'
 
 /** GET /api/ticket-statuses - List all ticket statuses */
 export async function GET() {
@@ -11,6 +12,8 @@ export async function GET() {
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  await ensureTicketStatusIsDeletableColumn()
 
   const rows = await db
     .select()
@@ -25,6 +28,8 @@ export async function GET() {
     description: r.description ?? undefined,
     color: r.color,
     show_in_kanban: isTicketStatusInKanban(r.showInKanban),
+    is_deletable: r.isDeletable,
+    is_active: r.isActive,
     sort_order: r.sortOrder ?? 0,
     created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
     updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
@@ -41,11 +46,14 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { title, slug, customer_title, description, color, show_in_kanban, sort_order } = body
+  const { title, slug, customer_title, description, color, show_in_kanban, sort_order, is_deletable, is_active } =
+    body
 
   if (!title || !slug) {
     return NextResponse.json({ error: 'title and slug required' }, { status: 400 })
   }
+
+  await ensureTicketStatusIsDeletableColumn()
 
   const [inserted] = await db
     .insert(ticketStatuses)
@@ -56,6 +64,8 @@ export async function POST(request: Request) {
       description: description?.trim() || '',
       color: color || '#8c8c8c',
       showInKanban: !!show_in_kanban,
+      isDeletable: is_deletable !== false,
+      isActive: is_active !== false,
       sortOrder: Number(sort_order) ?? 0,
     })
     .returning()
@@ -72,6 +82,8 @@ export async function POST(request: Request) {
     description: inserted.description ?? undefined,
     color: inserted.color,
     show_in_kanban: isTicketStatusInKanban(inserted.showInKanban),
+    is_deletable: inserted.isDeletable,
+    is_active: inserted.isActive,
     sort_order: inserted.sortOrder ?? 0,
     created_at: inserted.createdAt ? new Date(inserted.createdAt).toISOString() : '',
     updated_at: inserted.updatedAt ? new Date(inserted.updatedAt).toISOString() : '',

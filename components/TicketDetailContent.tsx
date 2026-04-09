@@ -227,7 +227,9 @@ export default function TicketDetailContent({
     const [timeTrackerSessions, setTimeTrackerSessions] = useState<any[]>([])
     const [totalTimeSeconds, setTotalTimeSeconds] = useState<number>(0)
     const [currentTime, setCurrentTime] = useState<number>(0)
-    const [statusesFromDb, setStatusesFromDb] = useState<{ slug: string; title: string; color: string }[]>([])
+    const [statusesFromDb, setStatusesFromDb] = useState<
+        { slug: string; title: string; color: string; is_active?: boolean }[]
+    >([])
     const [assigneesChanging, setAssigneesChanging] = useState(false)
     const [teamChanging, setTeamChanging] = useState(false)
     const [visibilityChanging, setVisibilityChanging] = useState(false)
@@ -267,13 +269,19 @@ export default function TicketDetailContent({
         { value: 'public', label: 'Public' },
     ]
 
-    // Default status labels/colors when DB has no ticket_statuses
+    // Default status labels/colors when DB has no ticket_statuses (matches seeded slugs)
     const DEFAULT_STATUS_MAP: Record<string, { title: string; color: string }> = {
-        to_do: { title: 'To Do', color: 'default' },
-        in_progress: { title: 'In Progress', color: 'processing' },
-        completed: { title: 'Completed', color: 'success' },
-        cancel: { title: 'Cancel', color: 'error' },
-        archived: { title: 'Archived', color: 'default' },
+        open: { title: 'Open', color: 'warning' },
+        received: { title: 'Received', color: 'default' },
+        question: { title: 'Question', color: 'processing' },
+        working_team: { title: 'Working Team', color: 'processing' },
+        am_review: { title: 'AM Review', color: 'processing' },
+        client_review: { title: 'Client Review', color: 'success' },
+        feedback_received: { title: 'Feedback Received', color: 'default' },
+        revision: { title: 'Revision', color: 'processing' },
+        pending: { title: 'Pending', color: 'default' },
+        resolved: { title: 'Resolved', color: 'success' },
+        closed: { title: 'Closed', color: 'default' },
     }
     const allStatusesForSelect = statusesFromDb.length > 0
         ? statusesFromDb
@@ -282,7 +290,9 @@ export default function TicketDetailContent({
     useEffect(() => {
         const fetchStatuses = async () => {
             try {
-                const data = await apiFetch<{ statuses: Array<{ slug: string; title: string; color: string }> }>('/api/tickets/lookup')
+                const data = await apiFetch<{
+                    statuses: Array<{ slug: string; title: string; color: string; is_active?: boolean }>
+                }>('/api/tickets/lookup')
                 if (data?.statuses?.length) {
                     setStatusesFromDb(data.statuses)
                 }

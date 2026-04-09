@@ -408,7 +408,7 @@ export async function POST(request: Request) {
       title: title || 'Untitled',
       description: description || null,
       shortNote: short_note ?? null,
-      status: status || 'to_do',
+      status: status || 'open',
       visibility: visibility || 'private',
       teamId: team_id || null,
       typeId: type_id ?? null,

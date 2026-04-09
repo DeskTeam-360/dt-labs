@@ -25,6 +25,7 @@ import { useRouter } from 'next/navigation'
 import DateDisplay from '../DateDisplay'
 import type { TicketRecord, StatusColumn } from './types'
 import { darkenColor } from './types'
+import { isClosedLikeTicketStatus } from '@/lib/ticket-status-workflow'
 
 type PriorityOption = { id: number; title: string; slug: string; color: string; sortOrder?: number }
 
@@ -345,9 +346,7 @@ export default function TicketsListView({
                   fontWeight: 700,
                   fontSize: 11,
                   color:
-                    new Date(record.due_date) < new Date() &&
-                    record.status !== 'completed' &&
-                    record.status !== 'cancel'
+                    new Date(record.due_date) < new Date() && !isClosedLikeTicketStatus(record.status)
                       ? '#ff4d4f'
                       : '#8c8c8c',
                 }}

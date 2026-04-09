@@ -27,7 +27,7 @@ export interface TicketRecord {
   short_note: string | null
   created_by: string
   due_date: string | null
-  status: 'to_do' | 'in_progress' | 'completed' | 'cancel' | 'archived'
+  status: string
   visibility: 'private' | 'team' | 'specific_users' | 'public'
   team_id: string | null
   type_id: number | null
@@ -74,6 +74,7 @@ export interface TicketStatusRecord {
   customer_title?: string
   color: string
   show_in_kanban: boolean
+  is_active?: boolean
   sort_order: number
 }
 
@@ -84,25 +85,37 @@ export interface StatusColumn {
 }
 
 export const DEFAULT_KANBAN_COLUMNS: StatusColumn[] = [
-  { id: 'to_do', title: 'To Do', color: '#faad14' },
-  { id: 'in_progress', title: 'In Progress', color: '#1890ff' },
-  { id: 'completed', title: 'Completed', color: '#52c41a' },
+  { id: 'open', title: 'Open', color: '#F1C232' },
+  { id: 'working_team', title: 'Working Team', color: '#D9EAD3' },
+  { id: 'client_review', title: 'Client Review', color: '#52c41a' },
 ]
 
 export const DEFAULT_ALL_STATUSES = [
-  { slug: 'to_do', title: 'To Do' },
-  { slug: 'in_progress', title: 'In Progress' },
-  { slug: 'completed', title: 'Completed' },
-  { slug: 'cancel', title: 'Cancel' },
-  { slug: 'archived', title: 'Archived' },
+  { slug: 'open', title: 'Open' },
+  { slug: 'received', title: 'Received' },
+  { slug: 'question', title: 'Question' },
+  { slug: 'working_team', title: 'Working Team' },
+  { slug: 'am_review', title: 'AM Review' },
+  { slug: 'client_review', title: 'Client Review' },
+  { slug: 'feedback_received', title: 'Feedback Received' },
+  { slug: 'revision', title: 'Revision' },
+  { slug: 'pending', title: 'Pending' },
+  { slug: 'resolved', title: 'Resolved' },
+  { slug: 'closed', title: 'Closed' },
 ]
 
 export const DEFAULT_ALL_STATUS_COLUMNS: StatusColumn[] = [
-  { id: 'to_do', title: 'To Do', color: '#faad14' },
-  { id: 'in_progress', title: 'In Progress', color: '#1890ff' },
-  { id: 'completed', title: 'Completed', color: '#52c41a' },
-  { id: 'cancel', title: 'Cancel', color: '#8c8c8c' },
-  { id: 'archived', title: 'Archived', color: '#595959' },
+  { id: 'open', title: 'Open', color: '#F1C232' },
+  { id: 'received', title: 'Received', color: '#C9DAF8' },
+  { id: 'question', title: 'Question', color: '#6D9EEB' },
+  { id: 'working_team', title: 'Working Team', color: '#D9EAD3' },
+  { id: 'am_review', title: 'AM Review', color: '#6D9EEB' },
+  { id: 'client_review', title: 'Client Review', color: '#52c41a' },
+  { id: 'feedback_received', title: 'Feedback Received', color: '#C9DAF8' },
+  { id: 'revision', title: 'Revision', color: '#1890ff' },
+  { id: 'pending', title: 'Pending', color: '#8c8c8c' },
+  { id: 'resolved', title: 'Resolved', color: '#52c41a' },
+  { id: 'closed', title: 'Closed', color: '#595959' },
 ]
 
 /** Darken a hex color by mixing with black (0-100, e.g. 30 = 30% darker) */

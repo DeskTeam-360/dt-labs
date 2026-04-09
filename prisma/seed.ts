@@ -11,60 +11,143 @@ import 'dotenv/config'
 
 import { db } from '../lib/db'
 import { users, ticketTypes, ticketPriorities, ticketStatuses } from '../lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import * as bcrypt from 'bcryptjs'
 
+/**
+ * Replaces all ticket_statuses rows. Colors follow the settings palette (#F1C232, #D9EAD3, …).
+ * All rows are is_deletable = false so they cannot be removed from the API/UI.
+ */
 async function seedTicketStatuses() {
-  const existing = await db.select().from(ticketStatuses).limit(1)
-  if (existing.length > 0) return
+  await db.execute(sql`TRUNCATE TABLE ticket_statuses RESTART IDENTITY`)
 
-  await db
-    .insert(ticketStatuses)
-    .values([
-      {
-        slug: 'to_do',
-        title: 'To Do',
-        description: '',
-        color: '#faad14',
-        showInKanban: true,
-        sortOrder: 1,
-      },
-      {
-        slug: 'in_progress',
-        title: 'In Progress',
-        description: '',
-        color: '#1890ff',
-        showInKanban: true,
-        sortOrder: 2,
-      },
-      {
-        slug: 'completed',
-        title: 'Completed',
-        description: '',
-        color: '#52c41a',
-        showInKanban: true,
-        sortOrder: 3,
-      },
-      {
-        slug: 'cancel',
-        title: 'Cancel',
-        description: '',
-        color: '#ff4d4f',
-        showInKanban: false,
-        sortOrder: 4,
-      },
-      {
-        slug: 'archived',
-        title: 'Archived',
-        description: '',
-        color: '#8c8c8c',
-        showInKanban: false,
-        sortOrder: 5,
-      },
-    ])
-    .onConflictDoNothing({ target: ticketStatuses.slug })
+  await db.insert(ticketStatuses).values([
+    {
+      slug: 'open',
+      title: 'Open',
+      customerTitle: 'Ticket received',
+      description: 'Ticket has been received and is in the queue.',
+      color: '#F1C232',
+      showInKanban: true,
+      sortOrder: 1,
+      isDeletable: false,
+      isActive: true,
+    },
+    {
+      slug: 'received',
+      title: 'Received',
+      customerTitle: "We've seen your request",
+      description: 'Our team has acknowledged your request.',
+      color: '#C9DAF8',
+      showInKanban: true,
+      sortOrder: 2,
+      isDeletable: false,
+      isActive: true,
+    },
+    {
+      slug: 'question',
+      title: 'Question',
+      customerTitle: 'Waiting for your reply',
+      description: "We're waiting for information from you.",
+      color: '#6D9EEB',
+      showInKanban: true,
+      sortOrder: 3,
+      isDeletable: false,
+      isActive: true,
+    },
+    {
+      slug: 'working_team',
+      title: 'Working Team',
+      customerTitle: "We're working on it",
+      description: 'We are actively working on this ticket.',
+      color: '#D9EAD3',
+      showInKanban: true,
+      sortOrder: 4,
+      isDeletable: false,
+      isActive: true,
+    },
+    {
+      slug: 'am_review',
+      title: 'AM Review',
+      customerTitle: "We're reviewing internally",
+      description: 'Under internal review before the next customer update.',
+      color: '#6D9EEB',
+      showInKanban: true,
+      sortOrder: 5,
+      isDeletable: false,
+      isActive: true,
+    },
+    {
+      slug: 'client_review',
+      title: 'Client Review',
+      customerTitle: 'Ready for your review',
+      description: 'Please review our work and share feedback.',
+      color: '#52c41a',
+      showInKanban: true,
+      sortOrder: 6,
+      isDeletable: false,
+      isActive: true,
+    },
+    {
+      slug: 'feedback_received',
+      title: 'Feedback Received',
+      customerTitle: "We've received your feedback",
+      description: 'We have received your feedback.',
+      color: '#C9DAF8',
+      showInKanban: true,
+      sortOrder: 7,
+      isDeletable: false,
+      isActive: true,
+    },
+    {
+      slug: 'revision',
+      title: 'Revision',
+      customerTitle: 'Working on your revision',
+      description: 'Implementing changes based on your feedback.',
+      color: '#1890ff',
+      showInKanban: true,
+      sortOrder: 8,
+      isDeletable: false,
+      isActive: true,
+    },
+    {
+      slug: 'pending',
+      title: 'Pending',
+      customerTitle: 'Temporarily paused',
+      description: 'Work on this ticket is temporarily paused.',
+      color: '#8c8c8c',
+      showInKanban: false,
+      sortOrder: 9,
+      isDeletable: false,
+      isActive: true,
+    },
+    {
+      slug: 'resolved',
+      title: 'Resolved',
+      customerTitle: 'All done!',
+      description: 'The work is complete from our side.',
+      color: '#52c41a',
+      showInKanban: false,
+      sortOrder: 10,
+      isDeletable: false,
+      isActive: true,
+    },
+    {
+      slug: 'closed',
+      title: 'Closed',
+      customerTitle: 'All done!',
+      description: 'This ticket is closed.',
+      color: '#595959',
+      showInKanban: false,
+      sortOrder: 11,
+      isDeletable: false,
+      isActive: true,
+    },
+  ])
 
-  console.log('Created ticket_statuses: to_do, in_progress, completed, cancel, archived')
+  console.log(
+    'Replaced ticket_statuses: open → closed (11 rows, is_deletable=false, colors from palette)'
+  )
 }
 
 async function seedTicketTypes() {

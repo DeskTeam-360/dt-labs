@@ -1,9 +1,11 @@
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { ticketStatuses, tickets } from '@/lib/db'
-import { eq, count, sql } from 'drizzle-orm'
+import { eq, count } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
+import { ensureTicketStatusIsDeletableColumn } from '@/lib/ensure-ticket-status-is-deletable'
+import { isLockedTicketStatusSlug } from '@/lib/ticket-status-locked-slugs'
 
 /** PATCH /api/ticket-statuses/[id] - Update ticket status */
 export async function PATCH(
@@ -22,7 +24,24 @@ export async function PATCH(
   }
 
   const body = await request.json()
-  const { title, slug, customer_title, description, color, show_in_kanban, sort_order } = body
+  const {
+    title,
+    slug,
+    customer_title,
+    description,
+    color,
+    show_in_kanban,
+    sort_order,
+    is_deletable,
+    is_active,
+  } = body
+
+  await ensureTicketStatusIsDeletableColumn()
+
+  const [current] = await db.select().from(ticketStatuses).where(eq(ticketStatuses.id, statusId)).limit(1)
+  if (!current) {
+    return NextResponse.json({ error: 'Status not found' }, { status: 404 })
+  }
 
   const values: Record<string, unknown> = {}
   if (title !== undefined) values.title = String(title).trim()
@@ -32,6 +51,12 @@ export async function PATCH(
   if (color !== undefined) values.color = color || '#8c8c8c'
   if (show_in_kanban !== undefined) values.showInKanban = !!show_in_kanban
   if (sort_order !== undefined) values.sortOrder = Number(sort_order) ?? 0
+  if (is_deletable !== undefined && !isLockedTicketStatusSlug(current.slug)) {
+    values.isDeletable = !!is_deletable
+  }
+  if (is_active !== undefined) {
+    values.isActive = !!is_active
+  }
 
   if (Object.keys(values).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -55,6 +80,8 @@ export async function PATCH(
     description: updated.description ?? undefined,
     color: updated.color,
     show_in_kanban: isTicketStatusInKanban(updated.showInKanban),
+    is_deletable: updated.isDeletable,
+    is_active: updated.isActive,
     sort_order: updated.sortOrder ?? 0,
     created_at: updated.createdAt ? new Date(updated.createdAt).toISOString() : '',
     updated_at: updated.updatedAt ? new Date(updated.updatedAt).toISOString() : '',
@@ -78,6 +105,8 @@ export async function DELETE(
   }
 
   try {
+    await ensureTicketStatusIsDeletableColumn()
+
     // First, get the status to check its slug
     const status = await db.query.ticketStatuses.findFirst({
       where: eq(ticketStatuses.id, statusId),
@@ -85,6 +114,10 @@ export async function DELETE(
 
     if (!status) {
       return NextResponse.json({ error: 'Status not found' }, { status: 404 })
+    }
+
+    if (isLockedTicketStatusSlug(status.slug) || !status.isDeletable) {
+      return NextResponse.json({ error: 'This status cannot be deleted.' }, { status: 403 })
     }
 
     // Check if any tickets use this status

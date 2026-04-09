@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Space,
   Row,
@@ -84,6 +84,8 @@ interface StatusOption {
   slug: string
   title: string
   color: string
+  /** false = inactive (hidden from this select except current ticket status) */
+  is_active?: boolean
 }
 
 interface TicketAttachment { id: string; file_url: string; file_name: string; file_path?: string }
@@ -270,6 +272,16 @@ export default function TabGeneral({
   useEffect(() => {
     setShortNoteInput(shortNote ?? '')
   }, [shortNote])
+
+  const statusSelectOptions = useMemo(() => {
+    const cur = ticketData?.status as string | undefined
+    const active = statusOptions.filter((s) => s.is_active !== false)
+    if (cur && !active.some((s) => s.slug === cur)) {
+      const row = statusOptions.find((s) => s.slug === cur)
+      return row ? [...active, row] : active
+    }
+    return active
+  }, [statusOptions, ticketData?.status])
 
   const creatorId = ticketData.creator?.id ?? ticketData.created_by ?? null
   const creatorEmail = ticketData.creator?.email ?? null
@@ -577,7 +589,7 @@ export default function TabGeneral({
                 value={ticketData.status ?? undefined}
                 onChange={(value) => value && onStatusChange(value)}
                 loading={statusChanging}
-                options={statusOptions.map((s) => ({
+                options={statusSelectOptions.map((s) => ({
                   value: s.slug,
                   label: (
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -72,6 +72,7 @@ interface StatusOption {
   slug: string
   title: string
   color?: string
+  is_active?: boolean
 }
 
 interface TypeOption {
@@ -109,6 +110,16 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [form] = Form.useForm()
   const [syncingEmail, setSyncingEmail] = useState(false)
+
+  const statusOptionsForModal = useMemo(() => {
+    const active = statuses.filter((s) => s.is_active !== false)
+    const cur = editingTicket?.status
+    if (cur && !active.some((s) => s.slug === cur)) {
+      const row = statuses.find((s) => s.slug === cur)
+      return row ? [...active, row] : active
+    }
+    return active
+  }, [statuses, editingTicket?.status])
 
   const ticketDetailUrl = (id: number) => (basePath ? `${basePath}/tickets/${id}` : `/tickets/${id}`)
 
@@ -178,7 +189,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
   const fetchLookup = async () => {
     try {
       const data = await apiFetch<{
-        statuses: Array<{ slug: string; title: string; color?: string }>
+        statuses: Array<{ slug: string; title: string; color?: string; is_active?: boolean }>
         ticketTypes: TypeOption[]
         ticketPriorities: TypeOption[]
         tags: Array<{ id: string; name: string }>
@@ -244,7 +255,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     setSelectedTagIds([])
     form.resetFields()
     form.setFieldsValue({
-      status: statuses[0]?.slug ?? 'to_do',
+      status: statuses[0]?.slug ?? 'open',
       visibility: 'public',
       company_id: companyData.id,
     })
@@ -284,7 +295,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       const payload = {
         title: values.title?.trim() || 'Untitled',
         description: values.description || null,
-        status: values.status || 'to_do',
+        status: values.status || 'open',
         type_id: values.type_id ?? null,
         priority_id: values.priority_id ?? null,
         company_id: companyData.id,
@@ -377,7 +388,13 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
       width: 120,
       render: (status: string) => {
         const s = statuses.find((x) => x.slug === status)
-        const color = s?.color ? undefined : status === 'completed' ? 'green' : status === 'in_progress' ? 'blue' : 'default'
+        const color = s?.color
+          ? undefined
+          : status === 'resolved' || status === 'closed' || status === 'completed'
+            ? 'green'
+            : status === 'working_team' || status === 'in_progress'
+              ? 'blue'
+              : 'default'
         return (
           <Tag color={color} style={s?.color ? { backgroundColor: s.color, borderColor: s.color, color: '#fff' } : undefined}>
             {getStatusLabel(status)}
@@ -573,7 +590,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
           </Form.Item>
           <Form.Item name="status" label="Status" rules={[{ required: true }]}>
             <Select>
-              {statuses.map((s) => (
+              {statusOptionsForModal.map((s) => (
                 <Option key={s.slug} value={s.slug}>
                   {s.title}
                 </Option>

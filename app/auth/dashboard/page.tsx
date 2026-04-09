@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { db, users, teams, tickets } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { inArray } from 'drizzle-orm'
 import DashboardContent from '@/components/DashboardContent'
 import CustomerDashboardContent from '@/components/CustomerDashboardContent'
 
@@ -40,7 +40,10 @@ export default async function AuthDashboardPage() {
     const [usersResult, teamsResult, completedResult, totalResult] = await Promise.all([
       db.select().from(users),
       db.select().from(teams),
-      db.select().from(tickets).where(eq(tickets.status, 'completed')),
+      db
+        .select()
+        .from(tickets)
+        .where(inArray(tickets.status, ['resolved', 'closed', 'completed'])),
       db.select().from(tickets),
     ])
     usersCount = usersResult.length

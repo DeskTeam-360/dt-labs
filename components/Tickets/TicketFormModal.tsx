@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import {
   Modal,
   Form,
@@ -33,7 +33,7 @@ interface TicketFormModalProps {
   ticketPriorities: Array<{ id: number; title: string; slug: string; color: string }>
   companies: Array<{ id: string; name: string }>
   allTags: Array<{ id: string; name: string }>
-  allStatuses: Array<{ slug: string; title: string }>
+  allStatuses: Array<{ slug: string; title: string; is_active?: boolean }>
   selectedAssignees: string[]
   onSelectedAssigneesChange: (v: string[]) => void
   selectedTagIds: string[]
@@ -96,6 +96,16 @@ export default function TicketFormModal({
   }
   const fileInputId = fileInputIdRef.current
   const selectableTeams = userTeamIds.length > 0 ? teams.filter((t) => userTeamIds.includes(t.id)) : []
+
+  const statusOptionsForForm = useMemo(() => {
+    const active = allStatuses.filter((s) => s.is_active !== false)
+    const cur = editingTicket?.status
+    if (cur && !active.some((s) => s.slug === cur)) {
+      const row = allStatuses.find((s) => s.slug === cur)
+      return row ? [...active, row] : active
+    }
+    return active
+  }, [allStatuses, editingTicket?.status])
 
   return (
     <Modal
@@ -186,7 +196,7 @@ export default function TicketFormModal({
             <Col span={8}>
               <Form.Item name="status" label="Status" rules={[{ required: true }]}>
                 <Select>
-                  {allStatuses.map((s) => (
+                  {statusOptionsForForm.map((s) => (
                     <Option key={s.slug} value={s.slug}>
                       {s.title}
                     </Option>

@@ -19,6 +19,7 @@ import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import AdminSidebar from './AdminSidebar'
 import AdminMainColumn from './AdminMainColumn'
+import { isLockedTicketStatusSlug } from '@/lib/ticket-status-locked-slugs'
 import type { ColumnsType } from 'antd/es/table'
 
 const { Content } = Layout
@@ -36,6 +37,10 @@ interface TicketStatusRecord {
   description?: string
   color: string
   show_in_kanban: boolean
+  /** When false, row is protected (seeded); delete is disabled in UI and API. */
+  is_deletable?: boolean
+  /** When false, inactive — hidden from ticket status pickers / default kanban. */
+  is_active?: boolean
   sort_order: number
   created_at: string
   updated_at: string
@@ -122,6 +127,8 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
     form.resetFields()
     form.setFieldsValue({
       show_in_kanban: true,
+      is_deletable: true,
+      is_active: true,
       sort_order: (statuses.length > 0 ? Math.max(...statuses.map((s) => s.sort_order)) : 0) + 1,
     })
     setModalVisible(true)
@@ -136,6 +143,8 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
       description: record.description ?? '',
       color: record.color,
       show_in_kanban: record.show_in_kanban,
+      is_deletable: record.is_deletable === true,
+      is_active: record.is_active !== false,
       sort_order: record.sort_order,
     })
     setModalVisible(true)
@@ -169,6 +178,8 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
         show_in_kanban: editingStatus
           ? Boolean(values.show_in_kanban)
           : !!(values.show_in_kanban ?? true),
+        is_deletable: values.is_deletable !== false,
+        is_active: values.is_active !== false,
         sort_order: Number(values.sort_order) ?? 0,
       }
 
@@ -250,26 +261,50 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
       render: (v: boolean) => (v ? 'Yes' : 'No'),
     },
     {
+      title: 'Active',
+      dataIndex: 'is_active',
+      key: 'is_active',
+      width: 90,
+      render: (_: unknown, record: TicketStatusRecord) => (record.is_active !== false ? 'Yes' : 'No'),
+    },
+    {
+      title: 'Deletable',
+      key: 'is_deletable',
+      width: 90,
+      render: (_: unknown, record: TicketStatusRecord) =>
+        record.is_deletable === true && !isLockedTicketStatusSlug(record.slug) ? 'Yes' : 'No',
+    },
+    {
       title: 'Actions',
       key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            Edit
-          </Button>
-          <Popconfirm
-            title="Delete this status?"
-            description="Tickets using this status will keep the value; consider reassigning them first."
-            onConfirm={() => handleDelete(record.id)}
-            okText="Delete"
-            okButtonProps={{ danger: true }}
-          >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              Delete
+      render: (_, record) => {
+        const canDelete =
+          record.is_deletable === true && !isLockedTicketStatusSlug(record.slug)
+        return (
+          <Space>
+            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+              Edit
             </Button>
-          </Popconfirm>
-        </Space>
-      ),
+            {canDelete ? (
+              <Popconfirm
+                title="Delete this status?"
+                description="Tickets using this status will keep the value; consider reassigning them first."
+                onConfirm={() => handleDelete(record.id)}
+                okText="Delete"
+                okButtonProps={{ danger: true }}
+              >
+                <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+                  Delete
+                </Button>
+              </Popconfirm>
+            ) : (
+              <Button type="link" size="small" danger icon={<DeleteOutlined />} disabled>
+                Delete
+              </Button>
+            )}
+          </Space>
+        )
+      },
     },
   ]
 
@@ -334,6 +369,26 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
               </Form.Item>
               <Form.Item name="show_in_kanban" label="Show in Kanban" valuePropName="checked">
                 <Switch />
+              </Form.Item>
+              <Form.Item
+                name="is_active"
+                label="Active"
+                valuePropName="checked"
+                tooltip="Inactive statuses are hidden from ticket status dropdowns and default kanban columns. Existing tickets keep the status."
+              >
+                <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+              </Form.Item>
+              <Form.Item
+                name="is_deletable"
+                label="Allow delete"
+                valuePropName="checked"
+                tooltip="If off, this status cannot be removed from settings (same as system statuses)."
+              >
+                <Switch
+                  disabled={!!editingStatus && isLockedTicketStatusSlug(editingStatus.slug)}
+                  checkedChildren="Yes"
+                  unCheckedChildren="No"
+                />
               </Form.Item>
               <Form.Item name="sort_order" label="Sort order" rules={[{ required: true }]}>
                 <InputNumber min={0} style={{ width: '100%' }} />
