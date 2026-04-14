@@ -1,10 +1,11 @@
 import { auth } from '@/auth'
 import { db, ticketTimeTracker, tickets } from '@/lib/db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
-import { eq, and, desc, gte, lte, isNull, isNotNull } from 'drizzle-orm'
+import { eq, and, desc, gte, lte, isNull, isNotNull, sql, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+import type { UserTimeTrackerTicketSummary } from '@/lib/user-time-tracker-summary'
 
-/** GET /api/users/time-tracker?user_id=xxx&filter=week|month|all&start=&end=&stopped_only=1&active_only=1&limit=15 */
+/** GET /api/users/time-tracker?user_id=xxx&filter=week|month|all&start=&end=&stopped_only=1&active_only=1&limit=15&include_ticket_summary=1 */
 export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user) {
@@ -19,7 +20,8 @@ export async function GET(request: Request) {
   const stoppedOnly = url.searchParams.get('stopped_only') === '1'
   const activeOnly = url.searchParams.get('active_only') === '1'
   const limitParam = url.searchParams.get('limit')
-  const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 100, 100) : 100
+  const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 100, 1), 500) : 100
+  const includeTicketSummary = url.searchParams.get('include_ticket_summary') === '1'
 
   if (!userId) {
     return NextResponse.json({ error: 'user_id required' }, { status: 400 })
@@ -45,7 +47,8 @@ export async function GET(request: Request) {
   const rows = await db
     .select({
       tracker: ticketTimeTracker,
-      ticket: tickets,
+      joinedTicketId: tickets.id,
+      joinedTicketTitle: tickets.title,
     })
     .from(ticketTimeTracker)
     .leftJoin(tickets, eq(ticketTimeTracker.ticketId, tickets.id))
@@ -67,14 +70,61 @@ export async function GET(request: Request) {
       durationAdjustment: r.tracker.durationAdjustment,
     }),
     created_at: r.tracker.createdAt ? new Date(r.tracker.createdAt).toISOString() : null,
-    ticket: r.ticket
-      ? {
-          id: r.ticket.id,
-          title: r.ticket.title,
-          description: r.ticket.description,
-        }
-      : null,
+    ticket:
+      r.joinedTicketId != null
+        ? {
+            id: r.joinedTicketId,
+            title: r.joinedTicketTitle,
+          }
+        : null,
   }))
 
-  return NextResponse.json(result)
+  if (!includeTicketSummary) {
+    return NextResponse.json(result)
+  }
+
+  const whereClause = and(...conditions)
+  const aggRows = await db
+    .select({
+      ticketId: ticketTimeTracker.ticketId,
+      reported_seconds_total: sql<number>`sum(
+        CASE
+          WHEN ${ticketTimeTracker.durationAdjustment} IS NOT NULL
+          THEN GREATEST(0, ${ticketTimeTracker.durationAdjustment})
+          ELSE GREATEST(0, COALESCE(${ticketTimeTracker.durationSeconds}, 0))
+        END
+      )`.mapWith(Number),
+    })
+    .from(ticketTimeTracker)
+    .where(whereClause)
+    .groupBy(ticketTimeTracker.ticketId)
+
+  let topTickets: UserTimeTrackerTicketSummary['top_tickets'] = []
+  if (aggRows.length > 0) {
+    const sorted = [...aggRows].sort(
+      (a, b) => b.reported_seconds_total - a.reported_seconds_total || a.ticketId - b.ticketId
+    )
+    const topFive = sorted.slice(0, 5)
+    const ids = topFive.map((r) => r.ticketId)
+    const titleRows =
+      ids.length > 0
+        ? await db
+            .select({ id: tickets.id, title: tickets.title })
+            .from(tickets)
+            .where(inArray(tickets.id, ids))
+        : []
+    const idToTitle = new Map(titleRows.map((r) => [r.id, r.title]))
+    topTickets = topFive.map((row) => ({
+      ticket_id: row.ticketId,
+      title: idToTitle.get(row.ticketId) ?? null,
+      reported_seconds_total: Math.round(Number(row.reported_seconds_total) || 0),
+    }))
+  }
+
+  const ticket_summary: UserTimeTrackerTicketSummary = {
+    distinct_ticket_count: aggRows.length,
+    top_tickets: topTickets,
+  }
+
+  return NextResponse.json({ sessions: result, ticket_summary })
 }

@@ -16,7 +16,6 @@ import {
   BankOutlined,
   TeamOutlined,
   NotificationOutlined,
-  BarChartOutlined,
 } from '@ant-design/icons'
 import { useState } from 'react'
 import AdminSidebar from './AdminSidebar'
@@ -34,7 +33,6 @@ import {
   canAccessTeams,
   canManageGlobalAnnouncement,
   canManageDashboardAnnouncements,
-  canAccessCustomerTimeReport,
 } from '@/lib/auth-utils'
 
 const { Content } = Layout
@@ -255,21 +253,6 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
-              </Row>
-            </Section>
-          )}
-
-          {canAccessCustomerTimeReport(role) && (
-            <Section heading="Reports">
-              <Row gutter={[16, 16]}>
-                <Col xs={24} sm={12} md={8}>
-                  <HubTile
-                    title="Customer time report"
-                    description="Per-company tickets, reported duration, urgent and completed counts"
-                    href="/settings/customer-time-report"
-                    icon={<BarChartOutlined />}
-                  />
-                </Col>
               </Row>
             </Section>
           )}

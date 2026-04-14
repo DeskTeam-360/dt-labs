@@ -5,7 +5,7 @@
 export const LOCKED_TICKET_STATUS_SLUGS = [
   'open',
   'pending',
-  'resolved',
+  // 'resolved',
   'closed',
 ] as const
 

@@ -33,6 +33,8 @@ import CommentWysiwyg from '../TicketDetail/CommentWysiwyg'
 import { DatePicker } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import type { ColumnsType } from 'antd/es/table'
+import { ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
+import { resolveDefaultNewTicketStatusSlug } from '@/lib/ticket-default-status'
 
 const { Text } = Typography
 const { Option } = Select
@@ -255,7 +257,7 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
     setSelectedTagIds([])
     form.resetFields()
     form.setFieldsValue({
-      status: statuses[0]?.slug ?? 'open',
+      status: resolveDefaultNewTicketStatusSlug(statuses),
       visibility: 'public',
       company_id: companyData.id,
     })
@@ -499,7 +501,10 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
                 value={filterStatus}
                 onChange={(v) => setFilterStatus(v ?? [])}
                 style={{ minWidth: 180 }}
-                options={statuses.map((s) => ({ value: s.slug, label: s.title }))}
+                options={statuses.map((s) => ({
+                  value: s.slug,
+                  label: ticketStatusDisplayLabel(s),
+                }))}
                 maxTagCount="responsive"
               />
               <Select

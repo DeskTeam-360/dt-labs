@@ -1,5 +1,4 @@
 import dayjs from 'dayjs'
-import { DEFAULT_KANBAN_COLUMNS } from '@/components/Tickets/types'
 import type { TicketSortField, TicketSortOrder } from '@/components/Tickets/types'
 
 /** URL param keys - used for shareable filter links and saved presets */
@@ -101,12 +100,12 @@ export function parseFiltersFromUrl(
         ? status
         : isCustomer
           ? []
-          : DEFAULT_KANBAN_COLUMNS.map((c) => c.id),
+          : [],
     filterTypeIds: typeIds,
     filterPriorityIds: priorityIds,
     filterCompanyIds: companyIds,
     filterTagIds: tagIds,
-    filterVisibility: inJunkFolder ? [] : visibility.length > 0 ? visibility : ['public'],
+    filterVisibility: inJunkFolder ? [] : visibility,
     filterTeamIds: teamIds,
     filterDateRange,
     filterSearch: searchParams.get(URL_PARAMS.search)?.trim() ?? '',

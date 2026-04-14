@@ -7,6 +7,7 @@ import {
   Typography,
   Form,
   Select,
+  Input,
   DatePicker,
   Switch,
   Button,
@@ -18,6 +19,7 @@ import {
   Divider,
   Flex,
   Drawer,
+  Popconfirm,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs, { Dayjs } from 'dayjs'
@@ -34,8 +36,19 @@ import {
 import AdminSidebar from './AdminSidebar'
 import AdminMainColumn from './AdminMainColumn'
 import { SpaNavLink } from './SpaNavLink'
-import { BarChartOutlined, TeamOutlined, SaveOutlined } from '@ant-design/icons'
-import type { CustomerTimeReportGlobalFilters } from '@/lib/customer-time-report-defaults'
+import { BarChartOutlined, TeamOutlined, SaveOutlined, DeleteOutlined } from '@ant-design/icons'
+import {
+  CUSTOMER_TIME_REPORT_DATE_PRESET_OPTIONS,
+  CUSTOMER_TIME_REPORT_PRESET_TITLE_DEFAULT,
+  CUSTOMER_TIME_REPORT_PRESET_TITLE_MAX,
+  normalizeDatePreset,
+  resolveDatePresetToRange,
+  type CustomerTimeReportDatePreset,
+  type CustomerTimeReportDatePresetKey,
+  type CustomerTimeReportGlobalFilters,
+  type CustomerTimeReportPresetDTO,
+} from '@/lib/customer-time-report-defaults'
+import { ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -60,26 +73,76 @@ function truncateLabel(s: string, max = 42): string {
   return s.length <= max ? s : `${s.slice(0, max - 1)}…`
 }
 
+function presetsSortedNewestFirst(presets: CustomerTimeReportPresetDTO[]): CustomerTimeReportPresetDTO[] {
+  return [...presets].sort((a, b) => {
+    const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0
+    const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0
+    return tb - ta
+  })
+}
+
+/** Map saved company IDs to canonical IDs from `/api/companies` (case-insensitive UUID match). */
+function canonicalCompanyIdsFromSaved(f: CustomerTimeReportGlobalFilters, companies: CompanyOpt[]): string[] {
+  const byLower = new Map<string, string>()
+  for (const c of companies) {
+    byLower.set(c.id.toLowerCase(), c.id)
+  }
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of f.company_ids) {
+    const id = String(raw).trim()
+    if (!id) continue
+    const canon = byLower.get(id.toLowerCase()) ?? id
+    if (!byLower.has(canon.toLowerCase())) continue
+    if (seen.has(canon)) continue
+    seen.add(canon)
+    out.push(canon)
+  }
+  return out
+}
+
 function savedFiltersToFormValues(
   f: CustomerTimeReportGlobalFilters,
-  validCompanyIds: Set<string>
+  companies: CompanyOpt[],
+  statuses: StatusOpt[]
 ): {
   company_ids: string[]
   range: [Dayjs, Dayjs] | null
+  date_preset?: CustomerTimeReportDatePreset
   status_slugs: string[] | undefined
   urgent_only: boolean
 } {
-  const company_ids = f.company_ids.filter((id) => validCompanyIds.has(id))
+  const company_ids = canonicalCompanyIdsFromSaved(f, companies)
+  const preset = f.date_preset ?? null
   let range: [Dayjs, Dayjs] | null = null
-  if (f.start && f.end) {
+  if (preset) {
+    const r = resolveDatePresetToRange(preset, dayjs())
+    if (r) range = [r.start, r.end]
+  } else if (f.start && f.end) {
     const a = dayjs(f.start)
     const b = dayjs(f.end)
     if (a.isValid() && b.isValid()) range = [a, b]
   }
+  let status_slugs: string[] | undefined
+  if (f.status_slugs?.length) {
+    const byLower = new Map(statuses.map((s) => [s.slug.toLowerCase(), s.slug]))
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const raw of f.status_slugs) {
+      const slug = String(raw).trim()
+      if (!slug) continue
+      const canon = byLower.get(slug.toLowerCase()) ?? slug
+      if (seen.has(canon)) continue
+      seen.add(canon)
+      out.push(canon)
+    }
+    status_slugs = out.length ? out : undefined
+  }
   return {
     company_ids,
     range,
-    status_slugs: f.status_slugs?.length ? f.status_slugs : undefined,
+    date_preset: preset ? preset : undefined,
+    status_slugs,
     urgent_only: f.urgent_only,
   }
 }
@@ -161,8 +224,10 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
   const [form] = Form.useForm<{
     company_ids: string[]
     range: [Dayjs, Dayjs] | null
+    date_preset?: CustomerTimeReportDatePresetKey
     status_slugs: string[] | undefined
     urgent_only: boolean
+    preset_title?: string
   }>()
   const [companies, setCompanies] = useState<CompanyOpt[]>([])
   const [statuses, setStatuses] = useState<StatusOpt[]>([])
@@ -175,12 +240,23 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
   const [workersSessions, setWorkersSessions] = useState<TimeTrackerSessionRow[]>([])
   const [workersLoading, setWorkersLoading] = useState(false)
 
-  const [savedGlobal, setSavedGlobal] = useState<{
-    filters: CustomerTimeReportGlobalFilters | null
-    updated_at: string | null
-  } | null>(null)
-  const [savingGlobalDefault, setSavingGlobalDefault] = useState(false)
+  const [presets, setPresets] = useState<CustomerTimeReportPresetDTO[]>([])
+  const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null)
+  const [savingPreset, setSavingPreset] = useState(false)
+  const [deletingPreset, setDeletingPreset] = useState(false)
   const globalDefaultsAppliedRef = useRef(false)
+
+  const loadPresetsFromApi = useCallback(async (): Promise<CustomerTimeReportPresetDTO[]> => {
+    const dRes = await fetch('/api/reports/customer-time/defaults', { credentials: 'include' })
+    if (!dRes.ok) {
+      setPresets([])
+      return []
+    }
+    const dJson = (await dRes.json()) as { presets?: CustomerTimeReportPresetDTO[] }
+    const list = Array.isArray(dJson.presets) ? dJson.presets : []
+    setPresets(list)
+    return list
+  }, [])
 
   useEffect(() => {
     if (!workersOpen || !workersTicket) return
@@ -221,10 +297,9 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
     const load = async () => {
       setLoadingMeta(true)
       try {
-        const [cRes, sRes, dRes] = await Promise.all([
+        const [cRes, sRes] = await Promise.all([
           fetch('/api/companies', { credentials: 'include' }),
           fetch('/api/ticket-statuses', { credentials: 'include' }),
-          fetch('/api/reports/customer-time/defaults', { credentials: 'include' }),
         ])
         if (!cRes.ok) throw new Error('Failed to load companies')
         if (!sRes.ok) throw new Error('Failed to load statuses')
@@ -242,18 +317,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
             title: r.title,
           }))
         )
-        if (dRes.ok) {
-          const dJson = (await dRes.json()) as {
-            filters?: CustomerTimeReportGlobalFilters
-            updated_at?: string | null
-          }
-          setSavedGlobal({
-            filters: dJson.filters ?? null,
-            updated_at: dJson.updated_at ?? null,
-          })
-        } else {
-          setSavedGlobal(null)
-        }
+        await loadPresetsFromApi()
       } catch (e) {
         message.error((e as Error).message)
       } finally {
@@ -261,27 +325,32 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       }
     }
     load()
-  }, [])
+  }, [loadPresetsFromApi])
 
   useEffect(() => {
-    if (globalDefaultsAppliedRef.current || !savedGlobal?.filters || companies.length === 0) return
-    const validIds = new Set(companies.map((c) => c.id))
-    const fields = savedFiltersToFormValues(savedGlobal.filters, validIds)
+    if (globalDefaultsAppliedRef.current || presets.length === 0 || companies.length === 0) return
+    const latest = presetsSortedNewestFirst(presets)[0]
+    if (!latest?.filters?.company_ids?.length) return
+    const fields = savedFiltersToFormValues(latest.filters, companies, statuses)
     if (fields.company_ids.length > 0) {
       form.setFieldsValue({
         company_ids: fields.company_ids,
         range: fields.range ?? undefined,
+        date_preset: fields.date_preset,
         status_slugs: fields.status_slugs,
         urgent_only: fields.urgent_only,
+        preset_title: latest.title,
       } as Parameters<typeof form.setFieldsValue>[0])
+      setSelectedPresetId(latest.id)
       globalDefaultsAppliedRef.current = true
     }
-  }, [savedGlobal, companies, form])
+  }, [presets, companies, statuses, form])
 
   const buildQuery = useCallback(
     (values: {
       company_ids?: string[]
       range?: [Dayjs, Dayjs] | null
+      date_preset?: CustomerTimeReportDatePreset
       status_slugs?: string[]
       urgent_only?: boolean
     }) => {
@@ -289,7 +358,12 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       const ids = (values.company_ids ?? []).map((id) => id.trim()).filter(Boolean)
       if (ids.length === 0) return null
       params.set('company_id', [...new Set(ids)].join(','))
-      const range = values.range
+      const preset = normalizeDatePreset(values.date_preset)
+      let range = values.range
+      if (preset) {
+        const r = resolveDatePresetToRange(preset, dayjs())
+        if (r) range = [r.start, r.end]
+      }
       if (range?.[0]) params.set('start', range[0].startOf('day').toISOString())
       if (range?.[1]) params.set('end', range[1].endOf('day').toISOString())
       const st = values.status_slugs
@@ -300,74 +374,192 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
     []
   )
 
-  const applySavedGlobalToForm = useCallback(() => {
-    if (!savedGlobal?.filters) {
-      message.info('No global default saved yet')
-      return
-    }
-    const validIds = new Set(companies.map((c) => c.id))
-    const fields = savedFiltersToFormValues(savedGlobal.filters, validIds)
-    if (fields.company_ids.length === 0) {
-      message.warning('Saved default has no companies you can access; pick companies and save again')
-      return
-    }
-    form.setFieldsValue({
-      company_ids: fields.company_ids,
-      range: fields.range ?? undefined,
-      status_slugs: fields.status_slugs,
-      urgent_only: fields.urgent_only,
-    } as Parameters<typeof form.setFieldsValue>[0])
-    message.success('Applied global default filters')
-  }, [savedGlobal, companies, form])
+  const applyPresetToForm = useCallback(
+    (preset: CustomerTimeReportPresetDTO) => {
+      const fields = savedFiltersToFormValues(preset.filters, companies, statuses)
+      if (fields.company_ids.length === 0) {
+        message.warning('Preset has no companies you can access; edit companies and save again')
+        return
+      }
+      form.setFieldsValue({
+        company_ids: fields.company_ids,
+        range: fields.range ?? undefined,
+        date_preset: fields.date_preset,
+        status_slugs: fields.status_slugs,
+        urgent_only: fields.urgent_only,
+        preset_title: preset.title,
+      } as Parameters<typeof form.setFieldsValue>[0])
+      message.success(`Loaded: ${preset.title}`)
+    },
+    [companies, statuses, form]
+  )
 
-  const saveGlobalDefault = useCallback(async () => {
+  const buildFiltersFromForm = useCallback(() => {
     const v = form.getFieldsValue() as {
       company_ids?: string[]
       range?: [Dayjs, Dayjs] | null
+      date_preset?: CustomerTimeReportDatePreset
       status_slugs?: string[]
       urgent_only?: boolean
+      preset_title?: string
     }
     const ids = [...new Set((v.company_ids ?? []).map((id) => String(id).trim()).filter(Boolean))]
-    if (ids.length === 0) {
-      message.warning('Select at least one company before saving')
-      return
-    }
+    if (ids.length === 0) return null
+    const datePreset = normalizeDatePreset(v.date_preset)
     const filters: CustomerTimeReportGlobalFilters = {
       company_ids: ids,
-      start: v.range?.[0]?.startOf('day').toISOString() ?? null,
-      end: v.range?.[1]?.endOf('day').toISOString() ?? null,
+      date_preset: datePreset,
+      start: datePreset
+        ? null
+        : v.range?.[0]?.startOf('day').toISOString() ?? null,
+      end: datePreset ? null : v.range?.[1]?.endOf('day').toISOString() ?? null,
       status_slugs: v.status_slugs?.length ? v.status_slugs : null,
       urgent_only: Boolean(v.urgent_only),
     }
-    setSavingGlobalDefault(true)
+    return filters
+  }, [form])
+
+  const saveNewPreset = useCallback(async () => {
+    const v = form.getFieldsValue() as { preset_title?: string }
+    const filters = buildFiltersFromForm()
+    if (!filters) {
+      message.warning('Select at least one company before saving')
+      return
+    }
+    setSavingPreset(true)
     try {
       const res = await fetch('/api/reports/customer-time/defaults', {
-        method: 'PATCH',
+        method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filters }),
+        body: JSON.stringify({
+          filters,
+          title: (v.preset_title ?? '').trim() || CUSTOMER_TIME_REPORT_PRESET_TITLE_DEFAULT,
+        }),
       })
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { error?: string }
         throw new Error(err.error || res.statusText)
       }
-      const data = (await res.json()) as {
-        filters: CustomerTimeReportGlobalFilters
-        updated_at: string | null
-      }
-      setSavedGlobal({ filters: data.filters, updated_at: data.updated_at })
-      message.success('Global default filters saved')
+      const data = (await res.json()) as CustomerTimeReportPresetDTO
+      await loadPresetsFromApi()
+      setSelectedPresetId(data.id)
+      form.setFieldValue(
+        'preset_title',
+        (data.title ?? '').trim() || CUSTOMER_TIME_REPORT_PRESET_TITLE_DEFAULT
+      )
+      message.success('New preset saved')
     } catch (e) {
       message.error((e as Error).message)
     } finally {
-      setSavingGlobalDefault(false)
+      setSavingPreset(false)
     }
-  }, [form])
+  }, [form, buildFiltersFromForm, loadPresetsFromApi])
+
+  const updateSelectedPreset = useCallback(async () => {
+    if (selectedPresetId == null) {
+      message.warning('Choose a preset in Saved filters to update, or use Save as new preset')
+      return
+    }
+    const v = form.getFieldsValue() as { preset_title?: string }
+    const filters = buildFiltersFromForm()
+    if (!filters) {
+      message.warning('Select at least one company before saving')
+      return
+    }
+    setSavingPreset(true)
+    try {
+      const res = await fetch(`/api/reports/customer-time/defaults/${selectedPresetId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filters,
+          title: (v.preset_title ?? '').trim() || CUSTOMER_TIME_REPORT_PRESET_TITLE_DEFAULT,
+        }),
+      })
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(err.error || res.statusText)
+      }
+      await loadPresetsFromApi()
+      message.success('Preset updated')
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setSavingPreset(false)
+    }
+  }, [selectedPresetId, form, buildFiltersFromForm, loadPresetsFromApi])
+
+  const deleteSelectedPreset = useCallback(async () => {
+    if (selectedPresetId == null) return
+    setDeletingPreset(true)
+    try {
+      const res = await fetch(`/api/reports/customer-time/defaults/${selectedPresetId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(err.error || res.statusText)
+      }
+      setSelectedPresetId(null)
+      const list = await loadPresetsFromApi()
+      if (list.length === 0) {
+        globalDefaultsAppliedRef.current = false
+      }
+      message.success('Preset deleted')
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setDeletingPreset(false)
+    }
+  }, [selectedPresetId, loadPresetsFromApi])
+
+  const hasSavedPresets = presets.length > 0
+  const selectedPreset = useMemo(
+    () => presets.find((p) => p.id === selectedPresetId) ?? null,
+    [presets, selectedPresetId]
+  )
+
+  const companySelectOptions = useMemo(() => {
+    const opts = companies.map((c) => ({ value: c.id, label: c.name }))
+    const lowerSeen = new Set(opts.map((o) => o.value.toLowerCase()))
+    for (const p of presets) {
+      for (const raw of p.filters.company_ids ?? []) {
+        const id = String(raw).trim()
+        if (!id || lowerSeen.has(id.toLowerCase())) continue
+        lowerSeen.add(id.toLowerCase())
+        opts.push({
+          value: id,
+          label: `Company (${id.slice(0, 8)}…)`,
+        })
+      }
+    }
+    return opts
+  }, [companies, presets])
+
+  const statusSelectOptions = useMemo(() => {
+    const opts = statuses.map((s) => ({ value: s.slug, label: ticketStatusDisplayLabel(s) }))
+    const lowerSeen = new Set(opts.map((o) => o.value.toLowerCase()))
+    for (const p of presets) {
+      for (const raw of p.filters.status_slugs ?? []) {
+        const slug = String(raw).trim()
+        if (!slug) continue
+        const lo = slug.toLowerCase()
+        if (lowerSeen.has(lo)) continue
+        lowerSeen.add(lo)
+        opts.push({ value: slug, label: slug })
+      }
+    }
+    return opts
+  }, [statuses, presets])
 
   const fetchReport = async () => {
     let values: {
       company_ids: string[]
       range?: [Dayjs, Dayjs] | null
+      date_preset?: CustomerTimeReportDatePreset
       status_slugs?: string[]
       urgent_only?: boolean
     }
@@ -596,19 +788,60 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
               <BarChartOutlined style={{ fontSize: 28, color: 'var(--ant-color-primary, #1677ff)' }} />
               <div>
                 <Title level={2} className="settings-section-heading" style={{ margin: 0, fontSize: '1.5rem' }}>
-                  Customer report
+                  C Report
                 </Title>
                 <Text type="secondary" style={{ fontSize: 13 }}>
                   Select one or more companies. Tickets with no completed time in the period still appear (0 reported,
                   “Not tracked”). Date range: include if the ticket was created in range or any time session overlaps the
-                  range (including running timers). Reported seconds use completed sessions that overlap the range. Save
-                  global default stores the current filters in the database for all admins and managers on this page.
+                  range (including running timers). Reported seconds use completed sessions that overlap the range. You can
+                  save many named presets for everyone with access; Saved filters loads one into the fields below. Rolling
+                  date presets (this month, last week, …) are saved by name and recomputed when you load the report. Save as
+                  new adds a row; Update overwrites the preset selected in the dropdown.
                 </Text>
               </div>
             </Flex>
             <Divider style={{ margin: '12px 0 20px' }} />
 
             <Form form={form} layout="vertical" initialValues={{ urgent_only: false }} onFinish={fetchReport}>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} lg={12} xl={10}>
+                  <Form.Item
+                    name="preset_title"
+                    label={<Text strong>Preset name</Text>}
+                    tooltip="Name shown in the Saved filters list. Each new save can use a different name."
+                  >
+                    <Input
+                      placeholder={CUSTOMER_TIME_REPORT_PRESET_TITLE_DEFAULT}
+                      maxLength={CUSTOMER_TIME_REPORT_PRESET_TITLE_MAX}
+                      showCount
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} lg={12} xl={10}>
+                  <Form.Item label={<Text strong>Saved filters</Text>}>
+                    <Select<number>
+                      placeholder={
+                        hasSavedPresets
+                          ? 'Load a saved preset into the fields below'
+                          : 'No presets yet — set filters and click Save as new preset'
+                      }
+                      disabled={!hasSavedPresets}
+                      allowClear
+                      style={{ width: '100%', maxWidth: 440 }}
+                      size="large"
+                      value={selectedPresetId ?? undefined}
+                      options={presets.map((p) => ({ value: p.id, label: p.title }))}
+                      onChange={(id) => {
+                        setSelectedPresetId(id ?? null)
+                        if (id == null) return
+                        const p = presets.find((x) => x.id === id)
+                        if (p) applyPresetToForm(p)
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
               <Row gutter={[16, 16]}>
                 <Col xs={24} lg={8}>
                   <Form.Item
@@ -631,24 +864,50 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                       placeholder="Select one or more companies"
                       size="large"
                       maxTagCount="responsive"
-                      options={companies.map((c) => ({ value: c.id, label: c.name }))}
+                      options={companySelectOptions}
                       loading={loadingMeta}
                     />
                   </Form.Item>
                 </Col>
                 <Col xs={24} lg={10}>
                   <Form.Item
+                    name="date_preset"
+                    label={<Text strong>Rolling dates</Text>}
+                    tooltip="Stored as this week / this month etc. and recalculated when you run the report. Weeks are ISO (Monday–Sunday). Pick custom dates below to clear this."
+                  >
+                    <Select<CustomerTimeReportDatePresetKey>
+                      allowClear
+                      placeholder="Custom — use calendar below"
+                      size="large"
+                      style={{ width: '100%' }}
+                      options={CUSTOMER_TIME_REPORT_DATE_PRESET_OPTIONS}
+                      onChange={(v) => {
+                        if (v) {
+                          const r = resolveDatePresetToRange(v, dayjs())
+                          if (r) {
+                            form.setFieldsValue({ range: [r.start, r.end] })
+                          }
+                        }
+                      }}
+                    />
+                  </Form.Item>
+                  <Form.Item
                     name="range"
                     label={
                       <Flex gap={16} align="center" wrap="wrap">
                         <Text strong>Date range</Text>
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                          Session start (optional)
+                          Optional — or use rolling dates above
                         </Text>
                       </Flex>
                     }
                   >
-                    <RangePicker style={{ width: '100%' }} size="large" format="dddd, MMM DD, YYYY" />
+                    <RangePicker
+                      style={{ width: '100%' }}
+                      size="large"
+                      format="dddd, MMM DD, YYYY"
+                      onChange={() => form.setFieldValue('date_preset', undefined)}
+                    />
                   </Form.Item>
                 </Col>
                 <Col xs={24} lg={6}>
@@ -658,7 +917,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                       allowClear
                       placeholder="All statuses"
                       size="large"
-                      options={statuses.map((s) => ({ value: s.slug, label: s.title }))}
+                      options={statusSelectOptions}
                     />
                   </Form.Item>
                 </Col>
@@ -676,25 +935,53 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                   type="default"
                   size="large"
                   icon={<SaveOutlined />}
-                  loading={savingGlobalDefault}
-                  onClick={() => void saveGlobalDefault()}
+                  loading={savingPreset}
+                  onClick={() => void saveNewPreset()}
                 >
-                  Save global default
+                  Save as new preset
                 </Button>
-                <Button type="link" size="large" onClick={applySavedGlobalToForm}>
-                  Apply saved default
+                <Button
+                  type="default"
+                  size="large"
+                  loading={savingPreset}
+                  disabled={selectedPresetId == null}
+                  onClick={() => void updateSelectedPreset()}
+                >
+                  Update preset
                 </Button>
+                <Popconfirm
+                  title="Delete this preset?"
+                  description="Other presets are unchanged."
+                  okText="Delete"
+                  okButtonProps={{ danger: true, loading: deletingPreset }}
+                  disabled={selectedPresetId == null}
+                  onConfirm={() => void deleteSelectedPreset()}
+                >
+                  <Button
+                    danger
+                    size="large"
+                    icon={<DeleteOutlined />}
+                    disabled={selectedPresetId == null}
+                    loading={deletingPreset}
+                  >
+                    Delete preset
+                  </Button>
+                </Popconfirm>
               </Flex>
-              {savedGlobal?.filters?.company_ids?.length ? (
+              {selectedPreset ? (
                 <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 10 }}>
-                  Global default last saved:{' '}
-                  {savedGlobal.updated_at
-                    ? dayjs(savedGlobal.updated_at).format('YYYY-MM-DD HH:mm')
+                  Selected: «{selectedPreset.title}» — last saved{' '}
+                  {selectedPreset.updated_at
+                    ? dayjs(selectedPreset.updated_at).format('YYYY-MM-DD HH:mm')
                     : '—'}
+                </Text>
+              ) : hasSavedPresets ? (
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 10 }}>
+                  {presets.length} saved preset{presets.length === 1 ? '' : 's'}. Choose one above to update or delete.
                 </Text>
               ) : (
                 <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 10 }}>
-                  No global default with companies saved yet (optional).
+                  No saved presets yet (optional).
                 </Text>
               )}
             </Form>

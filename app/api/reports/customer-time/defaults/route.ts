@@ -1,19 +1,19 @@
 import { auth } from '@/auth'
 import { isAdminOrManager } from '@/lib/auth-utils'
 import {
-  CUSTOMER_TIME_REPORT_DEFAULTS_ROW_ID,
   normalizeGlobalFilters,
+  normalizePresetTitle,
   type CustomerTimeReportGlobalFilters,
 } from '@/lib/customer-time-report-defaults'
 import { db, customerTimeReportDefaults } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { desc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role
 }
 
-/** GET — load global saved filters (same access as the report). */
+/** GET — list all saved presets (newest first). */
 export async function GET() {
   const session = await auth()
   if (!session?.user) {
@@ -24,42 +24,34 @@ export async function GET() {
   }
 
   try {
-    const [row] = await db
+    const rows = await db
       .select()
       .from(customerTimeReportDefaults)
-      .where(eq(customerTimeReportDefaults.id, CUSTOMER_TIME_REPORT_DEFAULTS_ROW_ID))
-      .limit(1)
+      .orderBy(desc(customerTimeReportDefaults.updatedAt))
 
-    if (!row) {
-      return NextResponse.json(
-        {
-          error:
-            'Default filters row missing. Run migration drizzle/migrations/018_customer_time_report_defaults.sql.',
-        },
-        { status: 503 }
-      )
-    }
-
-    const filters = normalizeGlobalFilters(row.filters)
-    return NextResponse.json({
-      filters,
+    const presets = rows.map((row) => ({
+      id: row.id,
+      title: normalizePresetTitle(row.title),
+      filters: normalizeGlobalFilters(row.filters),
       updated_at: row.updatedAt ? row.updatedAt.toISOString() : null,
       updated_by: row.updatedBy,
-    })
+    }))
+
+    return NextResponse.json({ presets })
   } catch (e) {
     console.error('[customer-time defaults GET]', e)
     return NextResponse.json(
       {
         error:
-          'Database error. Run migration drizzle/migrations/018_customer_time_report_defaults.sql if the table is missing.',
+          'Database error. Run migrations under drizzle/migrations for customer_time_report_defaults if the table is missing.',
       },
       { status: 500 }
     )
   }
 }
 
-/** PATCH — save global default filters (replaces entire JSON). */
-export async function PATCH(request: Request) {
+/** POST — create a new preset (does not replace existing rows). */
+export async function POST(request: Request) {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -75,12 +67,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
+  const bodyObj = body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>) : null
+  const title = normalizePresetTitle(bodyObj?.title)
+
   const parsed = normalizeGlobalFilters(
-    body && typeof body === 'object' && !Array.isArray(body)
-      ? (body as Record<string, unknown>).filters !== undefined
-        ? (body as { filters: unknown }).filters
-        : body
-      : body
+    bodyObj ? (bodyObj.filters !== undefined ? bodyObj.filters : body) : body
   )
 
   if (parsed.company_ids.length === 0) {
@@ -91,6 +82,7 @@ export async function PATCH(request: Request) {
     company_ids: parsed.company_ids,
     start: parsed.start,
     end: parsed.end,
+    date_preset: parsed.date_preset,
     status_slugs: parsed.status_slugs?.length ? parsed.status_slugs : null,
     urgent_only: parsed.urgent_only,
   }
@@ -98,37 +90,33 @@ export async function PATCH(request: Request) {
   const userId = (session.user as { id?: string }).id
 
   try {
-    const [updated] = await db
-      .update(customerTimeReportDefaults)
-      .set({
+    const [inserted] = await db
+      .insert(customerTimeReportDefaults)
+      .values({
+        title,
         filters,
         updatedAt: new Date(),
         updatedBy: userId ?? null,
       })
-      .where(eq(customerTimeReportDefaults.id, CUSTOMER_TIME_REPORT_DEFAULTS_ROW_ID))
       .returning()
 
-    if (!updated) {
-      return NextResponse.json(
-        {
-          error:
-            'Default filters row missing. Run migration drizzle/migrations/018_customer_time_report_defaults.sql.',
-        },
-        { status: 503 }
-      )
+    if (!inserted) {
+      return NextResponse.json({ error: 'Insert failed' }, { status: 500 })
     }
 
     return NextResponse.json({
+      id: inserted.id,
+      title: normalizePresetTitle(inserted.title),
       filters,
-      updated_at: updated.updatedAt ? updated.updatedAt.toISOString() : null,
-      updated_by: updated.updatedBy,
+      updated_at: inserted.updatedAt ? inserted.updatedAt.toISOString() : null,
+      updated_by: inserted.updatedBy,
     })
   } catch (e) {
-    console.error('[customer-time defaults PATCH]', e)
+    console.error('[customer-time defaults POST]', e)
     return NextResponse.json(
       {
         error:
-          'Database error. Run migration drizzle/migrations/018_customer_time_report_defaults.sql if the table is missing.',
+          'Database error. If saves still replace one row, run drizzle/migrations/023_customer_time_report_defaults_multi_preset.sql.',
       },
       { status: 500 }
     )

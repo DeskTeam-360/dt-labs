@@ -191,20 +191,25 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
       title: 'Order',
       dataIndex: 'sort_order',
       key: 'sort_order',
-      width: 80,
+      width: 104,
+      align: 'center',
       sorter: (a, b) => a.sort_order - b.sort_order,
     },
     {
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
+      width: 200,
+      ellipsis: true,
     },
     {
       title: 'Slug',
       dataIndex: 'slug',
       key: 'slug',
+      width: 160,
+      ellipsis: true,
       render: (slug: string) => (
-        <Typography.Text code copyable>
+        <Typography.Text code copyable ellipsis={{ tooltip: slug }}>
           {slug}
         </Typography.Text>
       ),
@@ -224,26 +229,30 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
       title: 'Color',
       dataIndex: 'color',
       key: 'color',
-      width: 120,
+      width: 112,
       render: (color: string) => (
-        <Space>
+        <Space size={6} style={{ maxWidth: '100%' }}>
           <div
             style={{
-              width: 24,
-              height: 24,
+              width: 22,
+              height: 22,
+              flexShrink: 0,
               borderRadius: 4,
               backgroundColor: color,
               border: '1px solid #d9d9d9',
             }}
           />
-          <Typography.Text type="secondary">{color}</Typography.Text>
+          <Typography.Text type="secondary" ellipsis={{ tooltip: color }} style={{ maxWidth: 72 }}>
+            {color}
+          </Typography.Text>
         </Space>
       ),
     },
     {
       title: 'Actions',
       key: 'actions',
-      width: 120,
+      width: 216,
+      fixed: 'right' as const,
       render: (_, record) => (
         <Space>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
@@ -285,6 +294,8 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
               columns={columns}
               dataSource={types}
               pagination={false}
+              tableLayout="fixed"
+              scroll={{ x: 960 }}
             />
           </Card>
 

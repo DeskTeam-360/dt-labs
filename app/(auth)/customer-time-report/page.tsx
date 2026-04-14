@@ -10,7 +10,7 @@ export default async function CustomerTimeReportPage() {
   }
   const role = (session.user as { role?: string }).role
   if (!isAdminOrManager(role)) {
-    redirect('/settings')
+    redirect('/dashboard')
   }
   return <CustomerTimeReportContent user={session.user} />
 }

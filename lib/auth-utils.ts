@@ -83,6 +83,13 @@ export function canAccessCustomerTimeReport(role: string | undefined): boolean {
   return isAdminOrManager(role)
 }
 
+/** My Teams: work time & activity for teams the user belongs to (not customers) */
+export function canAccessMyTeams(role: string | undefined): boolean {
+  const r = (role ?? '').toLowerCase()
+  if (!role) return false
+  return r !== 'customer'
+}
+
 /** Users: Admin only */
 export function canAccessUsers(role: string | undefined): boolean {
   return isAdmin(role)
@@ -108,8 +115,7 @@ export function canAccessSettingsHub(role: string | undefined): boolean {
     canAccessAutomationRules(role) ||
     canAccessUsers(role) ||
     canAccessCompanies(role) ||
-    canAccessTeams(role) ||
-    canAccessCustomerTimeReport(role)
+    canAccessTeams(role)
   )
 }
 

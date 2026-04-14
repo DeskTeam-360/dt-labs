@@ -44,9 +44,9 @@ CREATE POLICY "Authenticated can delete todo statuses"
   TO authenticated
   USING (true);
 
--- Seed default statuses (show_in_kanban: to_do, in_progress, completed; not shown: cancel, archived)
+-- Seed default statuses (first slug `open` matches app default for new tickets; then in_progress, completed; not shown: cancel, archived)
 INSERT INTO todo_statuses (slug, title, color, show_in_kanban, sort_order) VALUES
-  ('to_do', 'To Do', '#faad14', true, 1),
+  ('open', 'Open', '#faad14', true, 1),
   ('in_progress', 'In Progress', '#1890ff', true, 2),
   ('completed', 'Completed', '#52c41a', true, 3),
   ('cancel', 'Cancel', '#ff4d4f', false, 4),

@@ -22,3 +22,17 @@ export function isTicketStatusInKanban(showInKanban: unknown): boolean {
 
   return Boolean(showInKanban)
 }
+
+/** Non-empty label for selects and lists (avoids blank Ant Design options when DB title is missing). */
+export function ticketStatusDisplayLabel(
+  row: { slug: string; title?: string | null; customer_title?: string | null },
+  options?: { preferCustomerTitle?: boolean }
+): string {
+  const slug = String(row.slug ?? '').trim()
+  const title = String(row.title ?? '').trim()
+  const customerTitle = String(row.customer_title ?? '').trim()
+  if (options?.preferCustomerTitle && customerTitle) return customerTitle
+  if (title) return title
+  if (customerTitle) return customerTitle
+  return slug || '—'
+}

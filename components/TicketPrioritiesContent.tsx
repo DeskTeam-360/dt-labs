@@ -191,7 +191,7 @@ export default function TicketPrioritiesContent({ user: currentUser }: TicketPri
       title: 'Order',
       dataIndex: 'sort_order',
       key: 'sort_order',
-      width: 80,
+      width: 100,
       sorter: (a, b) => a.sort_order - b.sort_order,
     },
     {
@@ -243,7 +243,6 @@ export default function TicketPrioritiesContent({ user: currentUser }: TicketPri
     {
       title: 'Actions',
       key: 'actions',
-      width: 140,
       render: (_, record) => (
         <Space>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
