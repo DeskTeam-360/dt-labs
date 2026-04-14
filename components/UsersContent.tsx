@@ -11,6 +11,8 @@ import {
   SearchOutlined,
   CheckCircleOutlined,
   StopOutlined,
+  LockOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect, useMemo, type Key } from 'react'
 import { useRouter } from 'next/navigation'
@@ -85,6 +87,12 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
   const [bulkAction, setBulkAction] = useState<'active' | 'inactive' | 'delete' | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [resetEmailUserId, setResetEmailUserId] = useState<string | null>(null)
+  const [resetEmailAlert, setResetEmailAlert] = useState<{
+    type: 'success' | 'error'
+    message: string
+    description: string
+  } | null>(null)
   const selectedRole = Form.useWatch('role', form)
 
   const bulkDeletableCount = useMemo(
@@ -208,6 +216,49 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     } catch (error: any) {
       message.error(error.message || 'Failed to delete user')
     }
+  }
+
+  const sendResetCustomerPasswordEmail = async (record: UserRecord) => {
+    if (record.role !== 'customer') {
+      message.warning('Reset password from this action is only for customer users')
+      return
+    }
+    setResetEmailUserId(record.id)
+    try {
+      await apiFetch(`/api/users/${record.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ send_reset_email: true }),
+      })
+      message.success(`Reset password email sent to ${record.email}`)
+      setResetEmailAlert({
+        type: 'success',
+        message: 'Reset password email sent',
+        description: `Customer ${record.full_name || record.email} has received a reset password email at ${record.email}.`,
+      })
+    } catch (error: any) {
+      message.error(error.message || 'Failed to send reset email')
+      setResetEmailAlert({
+        type: 'error',
+        message: 'Failed to send reset email',
+        description:
+          error?.message ||
+          `Failed to send reset password email to ${record.full_name || record.email}. Please check email integration.`,
+      })
+    } finally {
+      setResetEmailUserId(null)
+    }
+  }
+
+  const confirmSendResetCustomerPasswordEmail = (record: UserRecord) => {
+    Modal.confirm({
+      title: 'Send reset password email?',
+      icon: <ExclamationCircleOutlined />,
+      content: `A reset password email will be sent to ${record.email}. The customer will receive a temporary password for login.`,
+      okText: 'Send Email',
+      cancelText: 'Cancel',
+      onOk: () => sendResetCustomerPasswordEmail(record),
+    })
   }
 
   const handleBulkStatus = async (status: 'active' | 'inactive') => {
@@ -497,6 +548,15 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               onClick={() => handleEdit(record)}
             />
           </Tooltip>
+          {isAdmin && record.role === 'customer' && (
+            <Tooltip title="Send reset password email">
+              <Button
+                icon={<LockOutlined />}
+                loading={resetEmailUserId === record.id}
+                onClick={() => confirmSendResetCustomerPasswordEmail(record)}
+              />
+            </Tooltip>
+          )}
           <Popconfirm
             title="Delete User"
             description="Are you sure you want to delete this user?"
@@ -572,6 +632,17 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
           )}
 
           <Card>
+            {resetEmailAlert && (
+              <Alert
+                type={resetEmailAlert.type}
+                showIcon
+                closable
+                style={{ marginBottom: 16 }}
+                message={resetEmailAlert.message}
+                description={resetEmailAlert.description}
+                onClose={() => setResetEmailAlert(null)}
+              />
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
               <Title level={4} style={{ margin: 0 }}>
                 Directory

@@ -1,7 +1,8 @@
 import { auth } from '@/auth'
-import { db, companies, tickets } from '@/lib/db'
-import { desc, isNotNull, max } from 'drizzle-orm'
+import { db, companies, tickets, companyUsers, users } from '@/lib/db'
+import { and, desc, eq, inArray, isNotNull, max } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
 
 /** GET /api/companies - List companies */
 export async function GET(request: Request) {
@@ -24,6 +25,24 @@ export async function GET(request: Request) {
       .where(isNotNull(tickets.companyId))
       .groupBy(tickets.companyId),
   ])
+  const companyIds = rows.map((r) => r.id)
+  const leaderByCompany = new Map<string, string>()
+  if (companyIds.length > 0) {
+    const leaders = await db
+      .select({ companyId: companyUsers.companyId, userId: companyUsers.userId })
+      .from(companyUsers)
+      .where(
+        and(
+          inArray(companyUsers.companyId, companyIds),
+          eq(companyUsers.companyRole, 'company_admin')
+        )
+      )
+    for (const row of leaders) {
+      if (!leaderByCompany.has(row.companyId)) {
+        leaderByCompany.set(row.companyId, row.userId)
+      }
+    }
+  }
 
   const lastTicketByCompany = new Map<string, string | null>()
   for (const row of ticketActivity) {
@@ -46,6 +65,7 @@ export async function GET(request: Request) {
     id: r.id,
     name: r.name,
     email: r.email,
+    created_by: leaderByCompany.get(r.id) ?? null,
     color: r.color,
     is_active: r.isActive ?? true,
     created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
@@ -64,10 +84,25 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { name, email, is_active, color } = body
+  const { name, email, is_active, color, leader_user_id } = body
 
   if (!name) {
     return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+  }
+  if (!leader_user_id || typeof leader_user_id !== 'string') {
+    return NextResponse.json({ error: 'Company leader is required' }, { status: 400 })
+  }
+
+  const [leader] = await db
+    .select({ id: users.id, role: users.role })
+    .from(users)
+    .where(eq(users.id, leader_user_id))
+    .limit(1)
+  if (!leader) {
+    return NextResponse.json({ error: 'Company leader not found' }, { status: 404 })
+  }
+  if ((leader.role || '').toLowerCase() !== 'customer') {
+    return NextResponse.json({ error: 'Company leader must be a customer user' }, { status: 400 })
   }
 
   const [row] = await db
@@ -84,12 +119,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create company' }, { status: 500 })
   }
 
+  await db
+    .update(users)
+    .set({ companyId: row.id, updatedAt: new Date() })
+    .where(eq(users.id, leader_user_id))
+  await upsertCompanyUserMembership({
+    companyId: row.id,
+    userId: leader_user_id,
+    companyRole: 'company_admin',
+  })
+
   return NextResponse.json(
     {
       data: {
         id: row.id,
         name: row.name,
         email: row.email,
+        created_by: leader_user_id,
         color: row.color,
         is_active: row.isActive ?? true,
         created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',

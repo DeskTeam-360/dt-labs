@@ -15,20 +15,180 @@ import {
   ticketComments,
   ticketAttachments,
   teamMembers,
+  messageTemplates,
+  emailIntegrations,
 } from '@/lib/db'
 import { loadAutomationTicketContext, runAutomationRules } from '@/lib/automation-engine'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { isAdmin } from '@/lib/auth-utils'
 import { getPublicUrl } from '@/lib/storage-idrive'
+import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 import { eq, inArray, desc, asc, and, or, ilike, gte, lte } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { notifyTicketUsers } from '@/lib/firebase/ticket-notifications-server'
 import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
 import { coerceTicketType, DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
+import { google } from 'googleapis'
 
 const DEFAULT_LIMIT = 500
 const MAX_LIMIT = 1000
+const REQUESTER_NEW_TICKET_TEMPLATE_KEY = 'requester_notification_new_ticket_created' as const
+
+function encodeSubjectHeader(subject: string): string {
+  if (/^[\x01-\x7F]*$/.test(subject)) return subject
+  return '=?UTF-8?B?' + Buffer.from(subject, 'utf8').toString('base64') + '?='
+}
+
+async function sendRequesterTicketCreatedEmail(params: {
+  creatorUserId: string
+  creatorRole: string | null | undefined
+  companyId: string | null
+  ticketId: number
+  ticketTitle: string
+}) {
+  const { creatorUserId, creatorRole, companyId, ticketId, ticketTitle } = params
+  const [creatorUser] = await db.select().from(users).where(eq(users.id, creatorUserId)).limit(1)
+  const creatorRoleLower = (creatorRole || '').toLowerCase()
+
+  const recipientEntries: Array<{
+    email: string
+    user: typeof users.$inferSelect | null
+  }> = []
+  const seenEmails = new Set<string>()
+  const pushRecipient = (emailRaw: string | null | undefined, user: typeof users.$inferSelect | null) => {
+    const email = String(emailRaw || '').trim().toLowerCase()
+    if (!email || seenEmails.has(email)) return
+    seenEmails.add(email)
+    recipientEntries.push({ email, user })
+  }
+
+  if (creatorRoleLower === 'customer') {
+    pushRecipient(creatorUser?.email, creatorUser ?? null)
+  } else if (companyId) {
+    // Agent-created ticket on a company: notify only one company leader (company_admin).
+    const [leaderRow] = await db
+      .select({ user: users, joinedAt: companyUsers.createdAt })
+      .from(companyUsers)
+      .leftJoin(users, eq(companyUsers.userId, users.id))
+      .where(and(eq(companyUsers.companyId, companyId), eq(companyUsers.companyRole, 'company_admin')))
+      .orderBy(asc(companyUsers.createdAt))
+      .limit(1)
+    pushRecipient(leaderRow?.user?.email, leaderRow?.user ?? null)
+  } else {
+    pushRecipient(creatorUser?.email, creatorUser ?? null)
+  }
+
+  if (recipientEntries.length === 0) return
+
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+  if (!clientId || !clientSecret) return
+
+  const [integration] = await db
+    .select({
+      id: emailIntegrations.id,
+      emailAddress: emailIntegrations.emailAddress,
+      accessToken: emailIntegrations.accessToken,
+      refreshToken: emailIntegrations.refreshToken,
+      expiresAt: emailIntegrations.expiresAt,
+    })
+    .from(emailIntegrations)
+    .where(and(eq(emailIntegrations.provider, 'google'), eq(emailIntegrations.isActive, true)))
+    .limit(1)
+
+  if (!integration?.accessToken) return
+
+  const oauth2Client = new google.auth.OAuth2(
+    clientId,
+    clientSecret,
+    `${baseUrl}/api/email/google/callback`
+  )
+
+  let accessToken = integration.accessToken
+  const expiresAt = integration.expiresAt ? new Date(integration.expiresAt) : null
+  const needsRefresh = !expiresAt || expiresAt <= new Date()
+  if (needsRefresh && integration.refreshToken) {
+    oauth2Client.setCredentials({ refresh_token: integration.refreshToken })
+    const { credentials } = await oauth2Client.refreshAccessToken()
+    accessToken = credentials.access_token ?? integration.accessToken
+    if (credentials.access_token && credentials.expiry_date) {
+      await db
+        .update(emailIntegrations)
+        .set({
+          accessToken: credentials.access_token,
+          expiresAt: new Date(credentials.expiry_date),
+          updatedAt: new Date(),
+        })
+        .where(eq(emailIntegrations.id, integration.id))
+    }
+  } else {
+    oauth2Client.setCredentials({ access_token: accessToken })
+  }
+
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
+  const fromEmail = integration.emailAddress || 'noreply@example.com'
+  const safeBase = baseUrl.replace(/\/$/, '')
+  const ticketUrl = `${safeBase}/tickets/${ticketId}`
+
+  const [tpl] = await db
+    .select({ content: messageTemplates.content })
+    .from(messageTemplates)
+    .where(
+      and(
+        eq(messageTemplates.key, REQUESTER_NEW_TICKET_TEMPLATE_KEY),
+        eq(messageTemplates.status, 'active')
+      )
+    )
+    .limit(1)
+
+  const senderMap = userRowToMergeMap(creatorUser ?? null)
+  const rawTpl = tpl?.content?.trim() ?? ''
+  const subject = `Ticket #${ticketId} has been created`
+  const subjectMime = encodeSubjectHeader(subject)
+
+  for (const recipient of recipientEntries) {
+    const recipientMap = userRowToMergeMap(recipient.user)
+    const mergedTpl = rawTpl
+      ? mergeMessageTemplateHtml(rawTpl, {
+          origin: safeBase,
+          ticketId: String(ticketId),
+          recipient: recipientMap,
+          sender: senderMap,
+          useDomMerge: false,
+        })
+      : ''
+
+    const fallbackHtml =
+      `<p>Hello ${recipientMap.full_name !== '—' ? recipientMap.full_name : ''},</p>` +
+      `<p>Your ticket has been created successfully.</p>` +
+      `<p><strong>Ticket #${ticketId}</strong>: ${ticketTitle}</p>` +
+      `<p>You can view your ticket here: <a href="${ticketUrl}">${ticketUrl}</a></p>`
+
+    const bodyHtml = mergedTpl || fallbackHtml
+    const rawEmail = [
+      `From: ${fromEmail}`,
+      `To: ${recipient.email}`,
+      `Subject: ${subjectMime}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      '',
+      bodyHtml,
+    ].join('\r\n')
+
+    const raw = Buffer.from(rawEmail)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw },
+    })
+  }
+}
 
 /** GET /api/tickets - List tickets with related data (server-side filtering). Customer: only tickets of their company */
 export async function GET(request: Request) {
@@ -505,6 +665,18 @@ export async function POST(request: Request) {
     companyId: newTicket.companyId ?? null,
     typeId: newTicket.typeId ?? null,
   })
+
+  try {
+    await sendRequesterTicketCreatedEmail({
+      creatorUserId: userId,
+      creatorRole: role,
+      companyId: resolvedCompanyId,
+      ticketId: newTicket.id,
+      ticketTitle: newTicket.title || 'Untitled',
+    })
+  } catch (mailErr) {
+    console.error('[POST ticket] requester notification email failed:', mailErr)
+  }
 
   return NextResponse.json({
     id: newTicket.id,

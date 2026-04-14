@@ -30,11 +30,19 @@ interface CompanyRecord {
   id: string
   name: string
   email?: string | null
+  created_by?: string | null
   is_active: boolean
   color: string
   created_at: string
   updated_at: string
   last_ticket_updated_at?: string | null
+}
+
+interface LeaderOption {
+  id: string
+  full_name: string | null
+  email: string
+  role: string
 }
 
 function ColorPickerWithInput({
@@ -81,6 +89,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
   const [editingCompany, setEditingCompany] = useState<CompanyRecord | null>(null)
   const [searchText, setSearchText] = useState('')
   const [filterStatus, setFilterStatus] = useState<boolean | undefined>(undefined)
+  const [leaderOptions, setLeaderOptions] = useState<LeaderOption[]>([])
   const [form] = Form.useForm()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
 
@@ -110,8 +119,20 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
     }
   }
 
+  const fetchLeaderOptions = async () => {
+    try {
+      const rows = await apiFetch<LeaderOption[]>('/api/users')
+      setLeaderOptions(
+        (rows || []).filter((u) => (u.role || '').toLowerCase() === 'customer' && !!u.email)
+      )
+    } catch {
+      setLeaderOptions([])
+    }
+  }
+
   useEffect(() => {
     fetchCompanies()
+    fetchLeaderOptions()
   }, [])
 
   const handleCreate = () => {
@@ -121,6 +142,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       is_active: true,
       color: '#000000',
       email: undefined,
+      leader_user_id: undefined,
     })
     setModalVisible(true)
   }
@@ -132,6 +154,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       email: record.email || '',
       is_active: record.is_active,
       color: record.color || '#000000',
+      leader_user_id: record.created_by || undefined,
     })
     setModalVisible(true)
   }
@@ -146,7 +169,13 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
     }
   }
 
-  const handleSubmit = async (values: { name: string; email?: string; is_active: boolean; color?: string }) => {
+  const handleSubmit = async (values: {
+    name: string
+    email?: string
+    is_active: boolean
+    color?: string
+    leader_user_id?: string
+  }) => {
     try {
       if (editingCompany) {
         await apiFetch(`/api/companies/${editingCompany.id}`, {
@@ -157,6 +186,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
             email: values.email?.trim() || null,
             is_active: values.is_active,
             color: values.color || '#000000',
+            leader_user_id: values.leader_user_id,
           }),
         })
         message.success('Company updated successfully')
@@ -172,6 +202,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
             email: values.email?.trim() || null,
             is_active: values.is_active,
             color: values.color || '#000000',
+            leader_user_id: values.leader_user_id,
           }),
         })
         message.success('Company created successfully')
@@ -392,6 +423,27 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 rules={[{ type: 'email', message: 'Invalid email!', required: true }]}
               >
                 <Input type="email" placeholder="support@company.com" />
+              </Form.Item>
+
+              <Form.Item
+                name="leader_user_id"
+                label="Company Leader"
+                rules={[{ required: true, message: 'Please select a company leader!' }]}
+                extra={
+                  editingCompany
+                    ? 'Change leader by selecting another customer user. Selected user becomes company leader (company_admin).'
+                    : 'Required for new company. The selected customer becomes company leader (company_admin).'
+                }
+              >
+                <Select
+                  showSearch
+                  placeholder="Select customer user as leader"
+                  optionFilterProp="label"
+                  options={leaderOptions.map((u) => ({
+                    value: u.id,
+                    label: `${u.full_name || u.email} (${u.email})`,
+                  }))}
+                />
               </Form.Item>
 
               <Form.Item
