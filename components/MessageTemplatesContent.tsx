@@ -115,7 +115,11 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
       key: 'status',
       width: 100,
       render: (_: unknown, r) => (
-        <Switch checked={r.status === 'active'} onChange={(c) => void toggleStatus(r, c)} />
+        <Switch
+          checked={r.status === 'active'}
+          disabled={r.status !== 'active'}
+          onChange={(c) => void toggleStatus(r, c)}
+        />
       ),
     },
     {
@@ -124,17 +128,28 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
       width: 200,
       render: (_: unknown, r) => {
         const editHref = `/settings/message-templates/${r.id}/edit`
+        const isInactive = r.status !== 'active'
         return (
           <Space wrap size="small">
-            <Button size="small" icon={<EyeOutlined />} onClick={() => setPreviewRow(r)}>
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              disabled={isInactive}
+              onClick={() => setPreviewRow(r)}
+            >
               Preview
             </Button>
             <Button
               type="primary"
               size="small"
               icon={<EditOutlined />}
+              disabled={isInactive}
               href={editHref}
               onClick={(e) => {
+                if (isInactive) {
+                  e.preventDefault()
+                  return
+                }
                 if (shouldOpenHrefInNewTab(e)) return
                 if (e.button !== 0) return
                 e.preventDefault()

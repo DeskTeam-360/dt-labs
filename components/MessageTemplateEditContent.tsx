@@ -59,6 +59,10 @@ export default function MessageTemplateEditContent({
   }, [load])
 
   const save = async () => {
+    if (row?.status !== 'active') {
+      message.warning('Inactive templates are locked for now.')
+      return
+    }
     setSaving(true)
     try {
       const updated = await apiFetch<MessageTemplateRow>(`/api/message-templates/${templateId}`, {
@@ -117,6 +121,12 @@ export default function MessageTemplateEditContent({
 
                   <MessageTemplatePlaceholdersPanel />
 
+                  {row.status !== 'active' && (
+                    <Text type="warning" style={{ display: 'block' }}>
+                      This template is inactive. Preview and edit are temporarily disabled.
+                    </Text>
+                  )}
+
                   <div style={{ marginTop: 20, paddingBottom: 20 }}>
                     <Text strong style={{ display: 'block', marginBottom: 8 }}>
                       Body (rich text)
@@ -132,10 +142,20 @@ export default function MessageTemplateEditContent({
                   </div>
 
                   <Space wrap>
-                    <Button icon={<EyeOutlined />} onClick={() => setPreviewOpen(true)}>
+                    <Button
+                      icon={<EyeOutlined />}
+                      disabled={row.status !== 'active'}
+                      onClick={() => setPreviewOpen(true)}
+                    >
                       Preview
                     </Button>
-                    <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => void save()}>
+                    <Button
+                      type="primary"
+                      icon={<SaveOutlined />}
+                      loading={saving}
+                      disabled={row.status !== 'active'}
+                      onClick={() => void save()}
+                    >
                       Save and return to list
                     </Button>
                     <Button onClick={() => router.push('/settings/message-templates')}>Cancel</Button>
