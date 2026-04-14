@@ -6,6 +6,7 @@ import { Layout, Button, Select, DatePicker, Input, Space, Typography, Badge, To
 const { Sider } = Layout
 import { FilterOutlined, LeftOutlined, RightOutlined, BookOutlined } from '@ant-design/icons'
 import type { StatusColumn } from './types'
+import { ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
 import type { Dayjs } from 'dayjs'
 
 const { Text } = Typography
@@ -146,7 +147,10 @@ export default function FilterSidebar({
                 style={{ width: '100%' }}
                 value={filterStatus}
                 onChange={(v) => onFilterStatusChange(v ?? [])}
-                options={allStatuses.map((s) => ({ value: s.slug, label: s.title }))}
+                options={allStatuses.map((s) => ({
+                  value: s.slug,
+                  label: ticketStatusDisplayLabel(s),
+                }))}
                 maxTagCount="responsive"
               />
             </div>
@@ -259,7 +263,7 @@ export default function FilterSidebar({
                     optionFilterProp="label"
                     style={{ width: '100%' }}
                     value={filterTagIds}
-                    onChange={onFilterTagIdsChange}
+                    onChange={(v) => onFilterTagIdsChange(v ?? [])}
                     optionLabelProp="label"
                     maxTagCount="responsive"
                   >

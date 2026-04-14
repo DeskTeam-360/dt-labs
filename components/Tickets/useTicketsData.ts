@@ -55,7 +55,8 @@ function saveFiltersToStorage(stored: StoredFilter) {
 import { uploadTicketFileDraft, deleteFile } from '@/utils/storage'
 import type { TicketRecord, Team, UserRecord } from './types'
 import type { NewTicketAttachment } from './types'
-import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
+import { isTicketStatusInKanban, ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
+import { resolveDefaultNewTicketStatusSlug } from '@/lib/ticket-default-status'
 import {
   DEFAULT_KANBAN_COLUMNS,
   DEFAULT_ALL_STATUSES,
@@ -80,37 +81,73 @@ function getInitialFilterStateFromStored(stored: StoredFilter | null, isCustomer
     ? []
     : DEFAULT_KANBAN_COLUMNS.map((c) => c.id)
   return {
-    filterStatus: stored?.filterStatus && stored.filterStatus.length ? stored.filterStatus : defaultStatus,
-    filterTypeIds:
-      (stored?.filterTypeIds && stored.filterTypeIds.length) || (stored?.filterTypeId != null)
-        ? (stored?.filterTypeIds && stored.filterTypeIds.length
-            ? stored.filterTypeIds
-            : stored?.filterTypeId != null
-              ? [stored.filterTypeId]
-              : [])
-        : [],
-    filterCompanyIds:
-      (stored?.filterCompanyIds && stored.filterCompanyIds.length) || (stored?.filterCompanyId != null)
-        ? (stored?.filterCompanyIds && stored.filterCompanyIds.length
-            ? stored.filterCompanyIds
-            : stored?.filterCompanyId
-              ? [stored.filterCompanyId]
-              : [])
-        : [],
-    filterTagIds: (stored?.filterTagIds && stored.filterTagIds.length) ? stored.filterTagIds : [],
-    filterPriorityIds:
-      stored?.filterPriorityIds && stored.filterPriorityIds.length
-        ? stored.filterPriorityIds.filter((n) => typeof n === 'number' && !isNaN(n))
-        : [],
-    filterVisibility: (stored?.filterVisibility && stored.filterVisibility.length) ? stored.filterVisibility : ['public'],
-    filterTeamIds:
-      (stored?.filterTeamIds && stored.filterTeamIds.length) || (stored?.filterTeamId != null)
-        ? (stored?.filterTeamIds && stored.filterTeamIds.length
-            ? stored.filterTeamIds
-            : stored?.filterTeamId
-              ? [stored.filterTeamId]
-              : [])
-        : [],
+    filterStatus: (() => {
+      if (stored && Array.isArray(stored.filterStatus)) {
+        if (stored.filterStatus.length > 0) return stored.filterStatus
+        return []
+      }
+      if (stored?.filterStatus && stored.filterStatus.length) return stored.filterStatus
+      return defaultStatus
+    })(),
+    filterTypeIds: (() => {
+      if (stored && 'filterTypeIds' in stored && Array.isArray(stored.filterTypeIds)) {
+        return (stored.filterTypeIds as number[]).filter((n) => typeof n === 'number' && !isNaN(n))
+      }
+      if (stored?.filterTypeIds && stored.filterTypeIds.length) {
+        return stored.filterTypeIds.filter((n) => typeof n === 'number' && !isNaN(n))
+      }
+      if (stored?.filterTypeId != null && typeof stored.filterTypeId === 'number' && !isNaN(stored.filterTypeId)) {
+        return [stored.filterTypeId]
+      }
+      return []
+    })(),
+    filterCompanyIds: (() => {
+      if (stored && 'filterCompanyIds' in stored && Array.isArray(stored.filterCompanyIds)) {
+        return (stored.filterCompanyIds as string[]).map(String).filter(Boolean)
+      }
+      if (stored?.filterCompanyIds && stored.filterCompanyIds.length) {
+        return stored.filterCompanyIds.map(String).filter(Boolean)
+      }
+      if (stored?.filterCompanyId) return [String(stored.filterCompanyId)]
+      return []
+    })(),
+    filterTagIds: (() => {
+      if (stored && 'filterTagIds' in stored && Array.isArray(stored.filterTagIds)) {
+        return (stored.filterTagIds as string[]).map(String).filter(Boolean)
+      }
+      if (stored?.filterTagIds && stored.filterTagIds.length) {
+        return stored.filterTagIds.map(String).filter(Boolean)
+      }
+      return []
+    })(),
+    filterPriorityIds: (() => {
+      if (stored && 'filterPriorityIds' in stored && Array.isArray(stored.filterPriorityIds)) {
+        return (stored.filterPriorityIds as number[]).filter((n) => typeof n === 'number' && !isNaN(n))
+      }
+      if (stored?.filterPriorityIds && stored.filterPriorityIds.length) {
+        return stored.filterPriorityIds.filter((n) => typeof n === 'number' && !isNaN(n))
+      }
+      return []
+    })(),
+    filterVisibility: (() => {
+      if (stored && 'filterVisibility' in stored && Array.isArray(stored.filterVisibility)) {
+        return stored.filterVisibility.map(String).filter(Boolean)
+      }
+      if (stored?.filterVisibility && stored.filterVisibility.length) {
+        return stored.filterVisibility.map(String).filter(Boolean)
+      }
+      return []
+    })(),
+    filterTeamIds: (() => {
+      if (stored && 'filterTeamIds' in stored && Array.isArray(stored.filterTeamIds)) {
+        return (stored.filterTeamIds as string[]).map(String).filter(Boolean)
+      }
+      if (stored?.filterTeamIds && stored.filterTeamIds.length) {
+        return stored.filterTeamIds.map(String).filter(Boolean)
+      }
+      if (stored?.filterTeamId) return [String(stored.filterTeamId)]
+      return []
+    })(),
     filterDateRange: ((): [dayjs.Dayjs | null, dayjs.Dayjs | null] | null => {
       const dr = stored?.filterDateRange
       if (!dr || !dr[0] || !dr[1]) return null
@@ -223,7 +260,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
    * Status show_in_kanban=false hanya dapat kolom jika slug-nya dipilih di filter.
    */
   const columnsToShow = useMemo(() => {
-    if (filterStatus.length === 0 || allStatusColumns.length === 0) return []
+    if (allStatusColumns.length === 0) return []
+    if (filterStatus.length === 0) return allStatusColumns
     const allowed = new Set(filterStatus)
     return allStatusColumns.filter((c) => allowed.has(c.id))
   }, [filterStatus, allStatusColumns])
@@ -251,14 +289,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     }
     return [...filterStatus].sort().join(',') !== defaultKanbanStatusKey
   }, [filterStatus, defaultKanbanStatusKey, statusColumns.length, isCustomer, lookupReady, allStatuses])
-
-  /** Multi-select Status dikosongkan → staff: slug show_in_kanban. Customer: biarkan fetchLookup / URL isi semua status. */
-  useEffect(() => {
-    if (filterTicketType) return
-    if (isCustomer) return
-    if (!lookupReady || statusColumns.length === 0 || filterStatus.length > 0) return
-    setFilterStatus(statusColumns.map((c) => c.id))
-  }, [lookupReady, statusColumns, filterStatus.length, filterTicketType, isCustomer])
 
   const hasActiveFilters =
     statusFilterIsRestrictive ||
@@ -289,27 +319,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setFilterSearch('')
   }, [statusColumns, isCustomer, allStatuses])
 
-  /**
-   * Visibility multiselect kosong = "All visibility" (tidak kirim param ke API).
-   * Saat user clear visibility (non-customer): reset filter lain dan status = slug show_in_kanban saja.
-   */
-  const setFilterVisibility = useCallback(
-    (v: string[]) => {
-      const next = v ?? []
-      setFilterVisibilityState(next)
-      if (!isCustomer && next.length === 0) {
-        setFilterTypeIds([])
-        setFilterCompanyIds([])
-        setFilterTagIds([])
-        setFilterPriorityIds([])
-        setFilterTeamIds([])
-        setFilterDateRange(null)
-        setFilterSearch('')
-        setFilterStatus(statusColumns.map((c) => c.id))
-      }
-    },
-    [isCustomer, statusColumns]
-  )
+  /** Visibility multiselect kosong = "All visibility" (tidak kirim param ke API). */
+  const setFilterVisibility = useCallback((v: string[]) => {
+    setFilterVisibilityState(v ?? [])
+  }, [])
 
   const fetchTickets = useCallback(async () => {
     const params = new URLSearchParams()
@@ -432,7 +445,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       const list = data.statuses || []
       if (list.length > 0) {
         const statusTitle = (s: { slug: string; title: string; customer_title?: string; color: string }) =>
-          isCustomer && s.customer_title ? s.customer_title : s.title
+          ticketStatusDisplayLabel(s, { preferCustomerTitle: isCustomer })
         const inKanban = (s: { show_in_kanban?: unknown }) => isTicketStatusInKanban(s.show_in_kanban)
         const isActive = (s: { is_active?: boolean }) => s.is_active !== false
         const activeList = list.filter(isActive)
@@ -457,20 +470,18 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
             intersection.length > 0 ? intersection : isCustomer ? allSlugs : kanbanSlugs
           setFilterStatus(resolvedStatus)
           lastKanbanSlugsRef.current = kanbanSlugs
-          saveFiltersToStorage({ ...(stored || {}), filterStatus: resolvedStatus.length ? resolvedStatus : null } as StoredFilter)
+          saveFiltersToStorage({ ...(stored || {}), filterStatus: resolvedStatus } as StoredFilter)
         } else {
           if (isCustomer) {
             const allSlugs = list.map((s) => s.slug)
             const hasStoredStatusPreference =
-              stored &&
-              'filterStatus' in stored &&
-              Array.isArray(stored.filterStatus) &&
-              stored.filterStatus.length > 0
-            const fromStore =
-              hasStoredStatusPreference && stored?.filterStatus?.length
-                ? stored.filterStatus.filter((slug: string) => validSlugs.has(slug))
-                : []
-            setFilterStatus(fromStore.length > 0 ? fromStore : allSlugs)
+              stored && 'filterStatus' in stored && Array.isArray(stored.filterStatus)
+            const fromStore = hasStoredStatusPreference
+              ? (stored.filterStatus as string[]).filter((slug: string) => validSlugs.has(slug))
+              : null
+            setFilterStatus(
+              fromStore !== null ? (fromStore.length > 0 ? fromStore : []) : allSlugs
+            )
             lastKanbanSlugsRef.current = kanbanSlugs
           } else {
             // Gabungkan slug kanban baru (mis. user centang Show in Kanban untuk Cancel/Archived) ke filter API.
@@ -481,13 +492,12 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
                 next = pruned.length > 0 ? pruned : kanbanSlugs
               } else {
                 const hasStoredStatusPreference =
-                  stored &&
-                  'filterStatus' in stored &&
-                  Array.isArray(stored.filterStatus) &&
-                  stored.filterStatus.length > 0
-                if (hasStoredStatusPreference && stored?.filterStatus?.length) {
-                  const intersection = stored.filterStatus.filter((slug: string) => validSlugs.has(slug))
-                  next = intersection.length > 0 ? intersection : kanbanSlugs
+                  stored && 'filterStatus' in stored && Array.isArray(stored.filterStatus)
+                if (hasStoredStatusPreference) {
+                  const intersection = (stored.filterStatus as string[]).filter((slug: string) =>
+                    validSlugs.has(slug)
+                  )
+                  next = intersection.length > 0 ? intersection : []
                 } else {
                   next = kanbanSlugs
                 }
@@ -495,6 +505,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
               const prevKanban = lastKanbanSlugsRef.current
               lastKanbanSlugsRef.current = kanbanSlugs
               if (prevKanban === null) {
+                if (next.length === 0) return []
                 const extra = next.filter((s) => !kanbanSlugs.includes(s) && validSlugs.has(s))
                 return [...new Set([...kanbanSlugs, ...extra])]
               }
@@ -576,6 +587,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         const pruned = statuses.filter((s) => valid.has(s))
         if (pruned.length > 0) {
           statuses = pruned
+        } else if (statuses.length === 0) {
+          statuses = []
         } else if (isCustomer && allStatuses.length > 0) {
           statuses = allStatuses.map((s) => s.slug)
         } else {
@@ -633,13 +646,13 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   /** On every filter change: save to localStorage + update URL (so link can be shared) */
   useEffect(() => {
     saveFiltersToStorage({
-      filterStatus: filterStatus.length ? filterStatus : null,
-      filterTypeIds: filterTypeIds.length ? filterTypeIds : null,
-      filterPriorityIds: filterPriorityIds.length ? filterPriorityIds : null,
-      filterCompanyIds: filterCompanyIds.length ? filterCompanyIds : null,
-      filterTagIds: filterTagIds.length ? filterTagIds : null,
-      filterVisibility: filterVisibility.length ? filterVisibility : null,
-      filterTeamIds: filterTeamIds.length ? filterTeamIds : null,
+      filterStatus,
+      filterTypeIds,
+      filterPriorityIds,
+      filterCompanyIds,
+      filterTagIds,
+      filterVisibility,
+      filterTeamIds,
       filterDateRange:
         filterDateRange?.[0] && filterDateRange?.[1]
           ? [filterDateRange[0].toISOString(), filterDateRange[1].toISOString()]
@@ -815,7 +828,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setDeletedTicketAttachmentIds([])
     form.resetFields()
     const baseValues: Record<string, unknown> = {
-      status: allStatuses.find((s) => s.is_active !== false)?.slug ?? allStatuses[0]?.slug ?? 'open',
+      status: resolveDefaultNewTicketStatusSlug(allStatuses),
       visibility: 'public',
     }
     if (isCustomer && userCompanyId) {
@@ -945,8 +958,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     try {
       const effectiveValues = { ...values }
       if (isCustomer && !editingTicket) {
-        effectiveValues.status =
-          allStatuses.find((s) => s.is_active !== false)?.slug ?? allStatuses[0]?.slug ?? 'open'
+        effectiveValues.status = resolveDefaultNewTicketStatusSlug(allStatuses)
         effectiveValues.visibility = 'public'
         effectiveValues.company_id = userCompanyId ?? null
       }

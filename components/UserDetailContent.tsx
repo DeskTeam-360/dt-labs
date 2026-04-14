@@ -1,13 +1,18 @@
 'use client'
 
-import { Layout, Card, Descriptions, Avatar, Tag, Typography, Button, Space, Row, Col, Divider, Form, Input, Select, Switch, Modal, message, Upload, Tabs, Table, DatePicker, Radio, Statistic } from 'antd'
-import { ArrowLeftOutlined, UserOutlined, MailOutlined, PhoneOutlined, BankOutlined, IdcardOutlined, GlobalOutlined, TranslationOutlined, CalendarOutlined, ClockCircleOutlined, EditOutlined, SaveOutlined, CloseOutlined, UploadOutlined, HistoryOutlined, LockOutlined } from '@ant-design/icons'
+import { Layout, Card, Descriptions, Avatar, Tag, Typography, Button, Space, Row, Col, Divider, Form, Input, Select, Switch, Modal, message, Upload, Tabs, Table, DatePicker, Radio, Statistic, Drawer, Flex } from 'antd'
+import { ArrowLeftOutlined, UserOutlined, MailOutlined, PhoneOutlined, BankOutlined, IdcardOutlined, GlobalOutlined, TranslationOutlined, CalendarOutlined, ClockCircleOutlined, EditOutlined, SaveOutlined, CloseOutlined, UploadOutlined, HistoryOutlined, LockOutlined, NumberOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { uploadAvatar } from '@/utils/storage'
-import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
+import {
+  USER_DEPARTMENTS,
+  USER_POSITIONS,
+  getUserDepartmentAccentColor,
+  getUserPositionAccentColor,
+} from '@/lib/user-work-dropdowns'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...options, credentials: 'include' })
@@ -23,12 +28,26 @@ import { SpaNavLink } from '@/components/SpaNavLink'
 import { confirmUserCompanyMove } from '@/components/confirm-user-company-move'
 import DashboardHourlyActivityCard from './DashboardHourlyActivityCard'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
+import type { UserTimeTrackerTicketSummary } from '@/lib/user-time-tracker-summary'
 
 const { Content } = Layout
 const { Title, Text } = Typography
 const { Option } = Select
 const { TextArea } = Input
 const { RangePicker } = DatePicker
+
+function ColoredWorkTag({ text, accent }: { text: string; accent?: string }) {
+  return (
+    <Tag
+      style={{
+        margin: 0,
+        ...(accent ? { backgroundColor: accent, borderColor: accent, color: '#fff' } : {}),
+      }}
+    >
+      {text}
+    </Tag>
+  )
+}
 
 interface UserDetailContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string }
@@ -53,6 +72,9 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const selectedRole = Form.useWatch('role', form)
   const [timeTrackerData, setTimeTrackerData] = useState<any[]>([])
   const [timeTrackerLoading, setTimeTrackerLoading] = useState(false)
+  const [timeTrackerTicketSummary, setTimeTrackerTicketSummary] = useState<UserTimeTrackerTicketSummary | null>(null)
+  /** When set, drawer lists time entries for this ticket only (same period as the table). */
+  const [entryTimesDrawerTicketId, setEntryTimesDrawerTicketId] = useState<number | null>(null)
   const [filterPeriod, setFilterPeriod] = useState<string>('all')
   const [customDateRange, setCustomDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
   const [overviewData, setOverviewData] = useState({
@@ -119,7 +141,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     if (!userData?.id) return
     setTimeTrackerLoading(true)
     try {
-      let url = `/api/users/time-tracker?user_id=${userData.id}&filter=${filter || 'all'}`
+      let url = `/api/users/time-tracker?user_id=${userData.id}&filter=${filter || 'all'}&include_ticket_summary=1&limit=500`
       if (filter === 'week') {
         url += `&start=${dayjs().subtract(7, 'day').startOf('day').toISOString()}`
       } else if (filter === 'month') {
@@ -127,10 +149,18 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       } else if (filter === 'custom' && dateRange?.[0] && dateRange?.[1]) {
         url += `&start=${dateRange[0].startOf('day').toISOString()}&end=${dateRange[1].endOf('day').toISOString()}`
       }
-      const data = await apiFetch<any[]>(url)
-      setTimeTrackerData(data || [])
+      const raw = await apiFetch<{ sessions: any[]; ticket_summary: UserTimeTrackerTicketSummary } | any[]>(url)
+      if (Array.isArray(raw)) {
+        setTimeTrackerData(raw || [])
+        setTimeTrackerTicketSummary(null)
+      } else {
+        setTimeTrackerData(raw?.sessions || [])
+        setTimeTrackerTicketSummary(raw?.ticket_summary ?? null)
+      }
     } catch (error: any) {
       message.error(error.message || 'Failed to fetch time tracker data')
+      setTimeTrackerData([])
+      setTimeTrackerTicketSummary(null)
     } finally {
       setTimeTrackerLoading(false)
     }
@@ -214,6 +244,45 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       return `${secs}s`
     }
   }
+
+  const formatEntryDateTime = (iso: string | null | undefined) =>
+    iso
+      ? new Date(iso).toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })
+      : '—'
+
+  const timeTrackerEntriesByLogTime = useMemo(() => {
+    return [...timeTrackerData].sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+      return tb - ta
+    })
+  }, [timeTrackerData])
+
+  const drawerEntryTimesForTicket = useMemo(() => {
+    if (entryTimesDrawerTicketId == null) return []
+    return timeTrackerEntriesByLogTime.filter(
+      (r) => Number(r.ticket_id) === entryTimesDrawerTicketId
+    )
+  }, [timeTrackerEntriesByLogTime, entryTimesDrawerTicketId])
+
+  const entryTimesDrawerTicketLabel = useMemo(() => {
+    if (entryTimesDrawerTicketId == null) return ''
+    const fromTop = timeTrackerTicketSummary?.top_tickets?.find(
+      (x) => x.ticket_id === entryTimesDrawerTicketId
+    )
+    const title =
+      fromTop?.title ??
+      timeTrackerData.find((r) => Number(r.ticket_id) === entryTimesDrawerTicketId)?.ticket?.title ??
+      null
+    return title ? `#${entryTimesDrawerTicketId} — ${title}` : `#${entryTimesDrawerTicketId}`
+  }, [entryTimesDrawerTicketId, timeTrackerTicketSummary, timeTrackerData])
 
   const getRoleColor = (role: string) => {
     const colorMap: Record<string, string> = {
@@ -687,21 +756,51 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         {!isCustomer && selectedRole !== 'customer' && (
                           <>
                             <Form.Item name="department" label="Department">
-                              <Select placeholder="Select Department" allowClear>
-                                {USER_DEPARTMENTS.map((d) => (
-                                  <Option key={d} value={d}>
-                                    {d}
-                                  </Option>
-                                ))}
+                              <Select placeholder="Select Department" allowClear optionLabelProp="label">
+                                {USER_DEPARTMENTS.map((d) => {
+                                  const c = getUserDepartmentAccentColor(d) ?? '#d9d9d9'
+                                  return (
+                                    <Option key={d} value={d} label={d}>
+                                      <Space size={8}>
+                                        <span
+                                          style={{
+                                            display: 'inline-block',
+                                            width: 10,
+                                            height: 10,
+                                            borderRadius: 3,
+                                            backgroundColor: c,
+                                            flexShrink: 0,
+                                          }}
+                                        />
+                                        {d}
+                                      </Space>
+                                    </Option>
+                                  )
+                                })}
                               </Select>
                             </Form.Item>
                             <Form.Item name="position" label="Position">
-                              <Select placeholder="Select Position" allowClear>
-                                {USER_POSITIONS.map((p) => (
-                                  <Option key={p} value={p}>
-                                    {p}
-                                  </Option>
-                                ))}
+                              <Select placeholder="Select Position" allowClear optionLabelProp="label">
+                                {USER_POSITIONS.map((p) => {
+                                  const c = getUserPositionAccentColor(p) ?? '#d9d9d9'
+                                  return (
+                                    <Option key={p} value={p} label={p}>
+                                      <Space size={8}>
+                                        <span
+                                          style={{
+                                            display: 'inline-block',
+                                            width: 10,
+                                            height: 10,
+                                            borderRadius: 3,
+                                            backgroundColor: c,
+                                            flexShrink: 0,
+                                          }}
+                                        />
+                                        {p}
+                                      </Space>
+                                    </Option>
+                                  )
+                                })}
                               </Select>
                             </Form.Item>
                           </>
@@ -740,13 +839,27 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             <Descriptions.Item label="Department">
                               <Space>
                                 <BankOutlined />
-                                <Text>{userData.department || 'N/A'}</Text>
+                                {userData.department ? (
+                                  <ColoredWorkTag
+                                    text={userData.department}
+                                    accent={getUserDepartmentAccentColor(userData.department)}
+                                  />
+                                ) : (
+                                  <Text type="secondary">N/A</Text>
+                                )}
                               </Space>
                             </Descriptions.Item>
                             <Descriptions.Item label="Position">
                               <Space>
                                 <IdcardOutlined />
-                                <Text>{userData.position || 'N/A'}</Text>
+                                {userData.position ? (
+                                  <ColoredWorkTag
+                                    text={userData.position}
+                                    accent={getUserPositionAccentColor(userData.position)}
+                                  />
+                                ) : (
+                                  <Text type="secondary">N/A</Text>
+                                )}
                               </Space>
                             </Descriptions.Item>
                           </>
@@ -993,6 +1106,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
 
                       {/* Filter Section */}
                       <Card style={{ marginBottom: 24 }}>
+                        <Flex justify="space-between" align="center">
                         <Space orientation="vertical" style={{ width: '100%' }} size="middle">
                           <div>
                             <Text strong style={{ marginRight: 16 }}>Filter Period:</Text>
@@ -1019,27 +1133,169 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             </div>
                           )}
                         </Space>
+                        <div style={{ textAlign: 'right', width: '200px' }}>
+                            <Statistic
+                              title="Total tickets"
+                              value={timeTrackerTicketSummary?.distinct_ticket_count ?? "0"}
+                              prefix={<NumberOutlined />}
+                            />
+                          </div>
+                        </Flex>
+                      </Card>
+                      <Row gutter={[24, 24]}>
+                        <Col xs={24} sm={12}>
+                        <Card title="Most reported tickets" size="small" loading={timeTrackerLoading}>
+                        <Row gutter={[24, 16]}>
+                          
+                          <Col xs={24} sm={24}>
+                           
+                            {timeTrackerTicketSummary?.top_tickets?.length ? (
+                              <Space orientation="vertical" size={10} style={{ width: '100%' }}>
+                                {timeTrackerTicketSummary.top_tickets.map((t, idx) => (
+                                  <div
+                                    key={t.ticket_id}
+                                    style={{
+                                      display: 'flex',
+                                      gap: 10,
+                                      alignItems: 'flex-start',
+                                    }}
+                                  >
+                                    <Text type="secondary" style={{ minWidth: 22, flexShrink: 0 }}>
+                                      {idx + 1}.
+                                    </Text>
+                                    <Space orientation="vertical" size={2} style={{ flex: 1, minWidth: 0 }}>
+                                      <SpaNavLink href={`/tickets/${t.ticket_id}`} style={{ fontWeight: 600 }}>
+                                        #{t.ticket_id} {t.title || 'Untitled'}
+                                      </SpaNavLink>
+                                      <Text type="secondary" style={{ fontSize: 12 }}>
+                                        {formatDuration(t.reported_seconds_total)} reported
+                                      </Text>
+                                      <Button
+                                        type="link"
+                                        size="small"
+                                        disabled={timeTrackerLoading}
+                                        style={{ padding: 0, height: 'auto', alignSelf: 'flex-start' }}
+                                        onClick={() => setEntryTimesDrawerTicketId(t.ticket_id)}
+                                      >
+                                        Click for entry times
+                                      </Button>
+                                    </Space>
+                                  </div>
+                                ))}
+                              </Space>
+                            ) : (
+                              <Text type="secondary">
+                                {timeTrackerTicketSummary ? 'No ticket data in this period' : '—'}
+                              </Text>
+                            )}
+                          </Col>
+                        </Row>
                       </Card>
 
-                      {/* Table */}
-                      <Card>
+                      <Drawer
+                        title={
+                          entryTimesDrawerTicketId != null ? (
+                            <Space orientation="vertical" size={0}>
+                              <span>When entries were logged</span>
+                              <Text type="secondary" style={{ fontSize: 13, fontWeight: 'normal' }}>
+                                {entryTimesDrawerTicketLabel}
+                              </Text>
+                            </Space>
+                          ) : (
+                            'When entries were logged'
+                          )
+                        }
+                        placement="right"
+                        width={720}
+                        open={entryTimesDrawerTicketId != null}
+                        onClose={() => setEntryTimesDrawerTicketId(null)}
+                        destroyOnClose={false}
+                      >
+                        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+                          Sorted by when the entry was saved (newest first). Start and stop reflect the tracked work window.
+                        </Text>
+                        <Table<any>
+                          size="small"
+                          rowKey="id"
+                          loading={timeTrackerLoading}
+                          dataSource={drawerEntryTimesForTicket}
+                          pagination={{
+                            pageSize: 20,
+                            showSizeChanger: true,
+                            showTotal: (total) => `${total} entries for this ticket in this period`,
+                          }}
+                          scroll={{ x: 'max-content' }}
+                          columns={[
+                            {
+                              title: 'Entry saved at',
+                              key: 'created_at',
+                              width: 200,
+                              fixed: 'left' as const,
+                              render: (_: unknown, record: { created_at?: string | null }) => (
+                                <Space>
+                                  <CalendarOutlined />
+                                  <Text>{formatEntryDateTime(record.created_at)}</Text>
+                                </Space>
+                              ),
+                            },
+                            {
+                              title: 'Type',
+                              dataIndex: 'tracker_type',
+                              key: 'tracker_type',
+                              width: 96,
+                              render: (ty: string | undefined) => (
+                                <Tag color={ty === 'manual' ? 'default' : 'blue'}>
+                                  {ty === 'manual' ? 'Manual' : 'Timer'}
+                                </Tag>
+                              ),
+                            },
+                            {
+                              title: 'Start',
+                              dataIndex: 'start_time',
+                              key: 'start_time',
+                              width: 180,
+                              render: (date: string | null) => (
+                                <Text>{formatEntryDateTime(date)}</Text>
+                              ),
+                            },
+                            {
+                              title: 'Stop',
+                              dataIndex: 'stop_time',
+                              key: 'stop_time',
+                              width: 180,
+                              render: (date: string | null) =>
+                                date ? (
+                                  <Text>{formatEntryDateTime(date)}</Text>
+                                ) : (
+                                  <Tag color="processing">Active</Tag>
+                                ),
+                            },
+                            {
+                              title: 'Reported',
+                              key: 'reported',
+                              width: 100,
+                              render: (_: unknown, record: { reported_duration_seconds?: number | null }) => {
+                                const s = record.reported_duration_seconds
+                                if (s == null || Number.isNaN(s)) return '—'
+                                return formatDuration(Math.round(Number(s)))
+                              },
+                            },
+                          ]}
+                        />
+                      </Drawer>
+                        </Col>
+                        <Col xs={24} sm={12}> 
+                        <Card>
                         <Table
                         columns={[
                           {
                             title: 'Ticket',
                             key: 'ticket',
                             render: (_, record) => (
-                              <div>
-                                <div style={{ fontWeight: 500 }}>
-                                  {record.ticket?.title || 'N/A'}
-                                </div>
-                                {record.ticket?.description && (
-                                  <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-                                    {record.ticket.description.length > 50 
-                                      ? `${record.ticket.description.substring(0, 50)}...`
-                                      : record.ticket.description}
-                                  </div>
-                                )}
+                              <div style={{ fontWeight: 500 }}>
+                                <SpaNavLink href={`/tickets/${record.ticket?.id}`} style={{ fontWeight: 600 }}>
+                                  #{record.ticket?.id || 'N/A'} - {record.ticket?.title || 'N/A'}
+                                </SpaNavLink>
                               </div>
                             ),
                           },
@@ -1151,6 +1407,11 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         }}
                       />
                     </Card>
+                        </Col>
+                      </Row>
+                     
+
+                      
                     </div>
                   ),
                 },

@@ -17,13 +17,21 @@ import {
     WarningOutlined,
     DeleteOutlined,
   ReadOutlined,
+  BarChartOutlined,
+  TeamOutlined,
 } from '@ant-design/icons'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { signOutAction } from '@/app/actions/auth'
 import { SpaNavLink, shouldOpenHrefInNewTab } from '@/components/SpaNavLink'
-import { canAccessTickets, canAccessSettingsHub, isSettingsHrefPathname } from '@/lib/auth-utils'
+import {
+  canAccessTickets,
+  canAccessSettingsHub,
+  canAccessCustomerTimeReport,
+  canAccessMyTeams,
+  isSettingsHrefPathname,
+} from '@/lib/auth-utils'
 
 const { Sider } = Layout
 const { Text } = Typography
@@ -58,7 +66,7 @@ function selectedKeysForPathname(pathname: string | null, ticketsSearch: string)
   }
   if (pathname === '/reference' || pathname.startsWith('/reference/')) return ['/reference']
   if (isSettingsHrefPathname(pathname)) return ['/settings']
-  const topLevel = ['/dashboard', '/my-company']
+  const topLevel = ['/dashboard', '/my-company', '/my-teams', '/customer-time-report']
   const top = topLevel.find((k) => pathname === k || (k !== '/dashboard' && pathname.startsWith(`${k}/`)))
   if (top) return [top]
   const ticketsDetail = pathname.startsWith('/tickets/')
@@ -140,6 +148,24 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
             icon: <ReadOutlined />,
             label: linkLabel('/reference', 'Reference'),
           },
+          ...(canAccessMyTeams(role)
+            ? [
+                {
+                  key: '/my-teams',
+                  icon: <TeamOutlined />,
+                  label: linkLabel('/my-teams', 'My Teams'),
+                },
+              ]
+            : []),
+          ...(canAccessCustomerTimeReport(role)
+            ? [
+                {
+                  key: '/customer-time-report',
+                  icon: <BarChartOutlined />,
+                  label: linkLabel('/customer-time-report', 'C Report'),
+                },
+              ]
+            : []),
         ]
       : []),
     ...(canAccessSettingsHub(role)

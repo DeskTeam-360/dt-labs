@@ -14,6 +14,7 @@ import {
   Switch,
   message,
   Popconfirm,
+  Tag,
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
@@ -258,21 +259,25 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
       dataIndex: 'show_in_kanban',
       key: 'show_in_kanban',
       width: 120,
-      render: (v: boolean) => (v ? 'Yes' : 'No'),
+      render: (v: boolean) => (
+        <Tag color={v ? 'success' : 'error'} style={{ margin: 0 }}>
+          {v ? 'Yes' : 'No'}
+        </Tag>
+      ),
     },
     {
       title: 'Active',
       dataIndex: 'is_active',
       key: 'is_active',
       width: 90,
-      render: (_: unknown, record: TicketStatusRecord) => (record.is_active !== false ? 'Yes' : 'No'),
-    },
-    {
-      title: 'Deletable',
-      key: 'is_deletable',
-      width: 90,
-      render: (_: unknown, record: TicketStatusRecord) =>
-        record.is_deletable === true && !isLockedTicketStatusSlug(record.slug) ? 'Yes' : 'No',
+      render: (_: unknown, record: TicketStatusRecord) => {
+        const active = record.is_active !== false
+        return (
+          <Tag color={active ? 'success' : 'error'} style={{ margin: 0 }}>
+            {active ? 'Yes' : 'No'}
+          </Tag>
+        )
+      },
     },
     {
       title: 'Actions',

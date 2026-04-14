@@ -618,9 +618,11 @@ export const globalAnnouncement = pgTable('global_announcement', {
   updatedBy: uuid('updated_by'),
 })
 
-/** Singleton row (id = 1): saved filter conditions for Customer time report (global for all managers/admins). */
+/** Named filter presets for Customer time report (global for managers/admins); multiple rows after migration 023. */
 export const customerTimeReportDefaults = pgTable('customer_time_report_defaults', {
-  id: integer('id').primaryKey(),
+  id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+  /** Label shown in the Saved filters control and when saving. */
+  title: varchar('title', { length: 200 }).notNull().default('Saved filter'),
   filters: jsonb('filters').notNull(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
   updatedBy: uuid('updated_by'),
