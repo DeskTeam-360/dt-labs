@@ -48,7 +48,9 @@ export async function GET() {
         })
         .from(ticketStatuses)
         .orderBy(asc(ticketStatuses.sortOrder)),
-      db.select({ teamId: teamMembers.teamId }).from(teamMembers).where(eq(teamMembers.userId, userId)),
+      role === 'customer'
+        ? Promise.resolve([] as Array<{ teamId: string }>)
+        : db.select({ teamId: teamMembers.teamId }).from(teamMembers).where(eq(teamMembers.userId, userId)),
       role === 'customer'
         ? Promise.all([
             db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1),

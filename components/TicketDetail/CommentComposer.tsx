@@ -51,6 +51,17 @@ export default function CommentComposer({
   companyCustomers = [],
   ticketCcEmails = [],
 }: CommentComposerProps) {
+  const isBlankEditorValue = (value: string): boolean => {
+    const textOnly = String(value || '')
+      .replace(/<p><br><\/p>/gi, '')
+      .replace(/<br\s*\/?>/gi, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .trim()
+    return textOnly.length === 0
+  }
+
   /** Customer / non-agent UI: selalu reply. Agent with note+reply: honor null = pilih dulu. */
   const mode = showNoteOption ? commentVisibility ?? null : 'reply'
 
@@ -63,43 +74,58 @@ export default function CommentComposer({
     return emails
   })
   const [bccEmails, setBccEmails] = useState<string[]>([])
+  const isReplyMode = (showNoteOption && mode === 'reply') || !showNoteOption
 
   /** One fetch per ticket per "reply session"; reset after successful send or ticket change. */
   const agentReplyTemplateConsumedRef = useRef(false)
+  const agentReplyTemplateHtmlRef = useRef('')
+  const agentReplyTemplateLoadingRef = useRef(false)
+
+  const applyTemplateIfPossible = (html: string) => {
+    if (!html.trim()) return
+    if (agentReplyTemplateConsumedRef.current) return
+    if (!isReplyMode) return
+    setDraft((prev) => {
+      if (!isBlankEditorValue(prev)) return prev
+      agentReplyTemplateConsumedRef.current = true
+      return html
+    })
+  }
+
+  const fetchAgentReplyTemplate = async () => {
+    if (agentReplyTemplateLoadingRef.current) return
+    agentReplyTemplateLoadingRef.current = true
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}/agent-reply-template`, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      if (!res.ok) return
+      const data = (await res.json()) as { html?: string }
+      const html = typeof data.html === 'string' ? data.html.trim() : ''
+      agentReplyTemplateHtmlRef.current = html
+      applyTemplateIfPossible(html)
+    } catch {
+      // optional prefill, ignore network/auth errors
+    } finally {
+      agentReplyTemplateLoadingRef.current = false
+    }
+  }
 
   useEffect(() => {
     agentReplyTemplateConsumedRef.current = false
+    agentReplyTemplateHtmlRef.current = ''
+    void fetchAgentReplyTemplate()
   }, [ticketId])
 
   useEffect(() => {
-    if (!showNoteOption || mode !== 'reply') return
-    if (agentReplyTemplateConsumedRef.current) return
-
-    let cancelled = false
-    void (async () => {
-      try {
-        const res = await fetch(`/api/tickets/${ticketId}/agent-reply-template`, {
-          credentials: 'include',
-          cache: 'no-store',
-        })
-        if (!res.ok || cancelled) return
-        const data = (await res.json()) as { html?: string }
-        const html = typeof data.html === 'string' ? data.html.trim() : ''
-        if (cancelled || !html) return
-        setDraft((prev) => {
-          if (prev.trim()) return prev
-          agentReplyTemplateConsumedRef.current = true
-          return html
-        })
-      } catch {
-        // parent / network handles failures silently for optional prefill
-      }
-    })()
-
-    return () => {
-      cancelled = true
+    if (!isReplyMode) return
+    if (agentReplyTemplateHtmlRef.current) {
+      applyTemplateIfPossible(agentReplyTemplateHtmlRef.current)
+      return
     }
-  }, [ticketId, showNoteOption, mode])
+    void fetchAgentReplyTemplate()
+  }, [isReplyMode, ticketId])
 
   const baseCcOptions = companyCustomers
     .filter((u) => u.email?.trim())

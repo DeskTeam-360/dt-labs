@@ -16,7 +16,7 @@ function requestOrigin(request: Request): string {
 
 function isAgentRole(role: string | undefined): boolean {
   const r = (role || '').toLowerCase()
-  return r === 'admin' || r === 'staff' || r === 'manager'
+  return !!r && r !== 'customer'
 }
 
 /** GET — merged HTML for Agent Reply template (`template_agent_reply`) for this ticket. */

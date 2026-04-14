@@ -12,12 +12,14 @@ import {
   companies,
   users,
   companyUsers,
+  messageTemplates,
 } from '@/lib/db'
 import { uploadBuffer } from '@/lib/storage-idrive'
 import { loadAutomationTicketContext, runAutomationRules, runTicketCommentAutomation } from '@/lib/automation-engine'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
+import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 import { eq, and, ilike, not, isNull, desc, gte, or, sql } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { NextRequest, NextResponse } from 'next/server'
@@ -117,6 +119,79 @@ function normalizeForMatch(email: string): string {
     return lower.slice(0, plus) + lower.slice(at)
   }
   return lower
+}
+
+const USER_ACTIVATION_TEMPLATE_KEY = 'requester_notification_user_activation' as const
+
+function encodeSubjectHeader(subject: string): string {
+  if (/^[\x01-\x7F]*$/.test(subject)) return subject
+  return '=?UTF-8?B?' + Buffer.from(subject, 'utf8').toString('base64') + '?='
+}
+
+async function sendUserActivationEmail(params: {
+  gmail: any
+  fromEmail: string
+  toEmail: string
+  baseUrl: string
+  ticketId: number
+  temporaryPassword: string
+  recipientMap: Record<string, string>
+  senderMap: Record<string, string>
+}): Promise<void> {
+  const { gmail, fromEmail, toEmail, baseUrl, ticketId, temporaryPassword, recipientMap, senderMap } = params
+  const safeBase = baseUrl.replace(/\/$/, '')
+  const loginUrl = `${safeBase}/login`
+  const changePasswordUrl = `${safeBase}/change-password`
+
+  const [tpl] = await db
+    .select({ content: messageTemplates.content })
+    .from(messageTemplates)
+    .where(and(eq(messageTemplates.key, USER_ACTIVATION_TEMPLATE_KEY), eq(messageTemplates.status, 'active')))
+    .limit(1)
+
+  const rawTpl = tpl?.content?.trim() ?? ''
+  const mergedTpl = rawTpl
+    ? mergeMessageTemplateHtml(rawTpl, {
+        origin: safeBase,
+        ticketId: String(ticketId),
+        recipient: recipientMap,
+        sender: senderMap,
+        useDomMerge: false,
+      })
+    : ''
+
+  const fallbackHtml =
+    `<p>Hello,</p>` +
+    `<p>Your ticket has been received. We created a portal account for you.</p>` +
+    `<p>You can login at <a href="${loginUrl}">${loginUrl}</a> and then update your password at <a href="${changePasswordUrl}">${changePasswordUrl}</a>.</p>`
+
+  const securityBlock =
+    `<p><strong>Temporary password:</strong> <code>${temporaryPassword}</code></p>` +
+    `<p>Please change your password after your first login.</p>`
+
+  const bodyHtml = (mergedTpl || fallbackHtml) + securityBlock
+  const subject = `Activate your portal account (Ticket #${ticketId})`
+  const subjectMime = encodeSubjectHeader(subject)
+  const rawEmail = [
+    `From: ${fromEmail}`,
+    `To: ${toEmail}`,
+    `Subject: ${subjectMime}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=UTF-8',
+    '',
+    bodyHtml,
+  ].join('\r\n')
+
+  const raw = Buffer.from(rawEmail)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw },
+  })
 }
 
 function decodeBodyDataBase64(b64: string | undefined): Buffer | null {
@@ -812,6 +887,8 @@ export async function POST(request: NextRequest) {
 
         let creatorUserId: string | null = null
         let ticketCompanyId: string | null = company?.id ?? null
+        let createdUserTempPassword: string | null = null
+        let shouldSendActivationForNewUser = false
 
         const [existingUser] = await db
           .select({ id: users.id, companyId: users.companyId })
@@ -829,66 +906,40 @@ export async function POST(request: NextRequest) {
           }
         } else {
           const displayName = parseNameFromHeader(from) || senderEmail.split('@')[0] || 'User'
-          const newCompanyName = company?.name || companyNameFromEmail(senderEmail)
-
-          // Prevent double company: check again before insert (by email or domain)
-          if (!company?.id) {
-            const [existingByDomain] = await db
-              .select({ id: companies.id, name: companies.name, email: companies.email, domainList: companies.domainList })
-              .from(companies)
-              .where(sql`${senderDomain} = ANY(COALESCE(${companies.domainList}, ARRAY[]::text[]))`)
-              .limit(1)
-            if (existingByDomain) {
-              company = existingByDomain
+          const password = randomPassword()
+          const passwordHash = await bcrypt.hash(password, 10)
+          // Use select-then-insert/update to avoid ON CONFLICT (works when users.email UNIQUE constraint is missing)
+          const [byEmail] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.email, truncateVarchar(senderEmail, 255)))
+            .limit(1)
+          if (byEmail) {
+            const updateData: { fullName: string; updatedAt: Date; companyId?: string } = {
+              fullName: truncateVarchar(displayName, 255),
+              updatedAt: new Date(),
             }
-          }
-          if (!company?.id) {
-            const [newCompany] = await db
-              .insert(companies)
+            if (company?.id) updateData.companyId = company.id
+            await db.update(users).set(updateData).where(eq(users.id, byEmail.id))
+            creatorUserId = byEmail.id
+          } else {
+            const [inserted] = await db
+              .insert(users)
               .values({
-                name: truncateVarchar(newCompanyName, 255),
                 email: truncateVarchar(senderEmail, 255),
-                domainList: senderDomain ? [senderDomain] : [],
+                fullName: truncateVarchar(displayName, 255),
+                companyId: company?.id ?? null,
+                role: 'customer',
+                passwordHash,
               })
-              .returning({ id: companies.id, name: companies.name, email: companies.email })
-            if (newCompany) {
-              company = { id: newCompany.id, name: newCompany.name ?? newCompanyName, email: newCompany.email ?? senderEmail, domainList: senderDomain ? [senderDomain] : [] }
+              .returning({ id: users.id })
+            if (inserted) {
+              creatorUserId = inserted.id
+              createdUserTempPassword = password
+              shouldSendActivationForNewUser = true
             }
           }
-
-          if (company?.id) {
-            const password = randomPassword()
-            const passwordHash = await bcrypt.hash(password, 10)
-            // Use select-then-insert/update to avoid ON CONFLICT (works when users.email UNIQUE constraint is missing)
-            const [byEmail] = await db
-              .select({ id: users.id })
-              .from(users)
-              .where(eq(users.email, truncateVarchar(senderEmail, 255)))
-              .limit(1)
-            if (byEmail) {
-              await db
-                .update(users)
-                .set({
-                  fullName: truncateVarchar(displayName, 255),
-                  companyId: company.id,
-                  updatedAt: new Date(),
-                })
-                .where(eq(users.id, byEmail.id))
-              creatorUserId = byEmail.id
-            } else {
-              const [inserted] = await db
-                .insert(users)
-                .values({
-                  email: truncateVarchar(senderEmail, 255),
-                  fullName: truncateVarchar(displayName, 255),
-                  companyId: company.id,
-                  role: 'customer',
-                  passwordHash,
-                })
-                .returning({ id: users.id })
-              if (inserted) creatorUserId = inserted.id
-            }
-          }
+          ticketCompanyId = company?.id ?? null
         }
 
         let existingTicketId: number | null = null
@@ -916,14 +967,6 @@ export async function POST(request: NextRequest) {
               .limit(1)
             if (dupByMsg?.ticketId) existingTicketId = dupByMsg.ticketId
           }
-        }
-
-        if (!ticketCompanyId) {
-          if (isDebug) {
-            debugLog.push({ email: senderEmail, subject: subject || '', reason: 'SKIP: no company match for sender domain/email' })
-            console.log('[Sync] SKIP no_company:', senderEmail, 'domain:', senderDomain)
-          }
-          continue
         }
 
         if (!existingTicketId && ticketCompanyId) {
@@ -1264,6 +1307,26 @@ export async function POST(request: NextRequest) {
               attachment_count: processedNew.files.length,
             },
           })
+
+          // Unknown sender (no company match) gets an activation email with temporary password.
+          if (!ticketCompanyId && shouldSendActivationForNewUser && creatorUserId && createdUserTempPassword) {
+            try {
+              const [recipientRow] = await db.select().from(users).where(eq(users.id, creatorUserId)).limit(1)
+              const [senderRow] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+              await sendUserActivationEmail({
+                gmail,
+                fromEmail: integration.emailAddress || 'noreply@example.com',
+                toEmail: senderEmail,
+                baseUrl,
+                ticketId: newTicket.id,
+                temporaryPassword: createdUserTempPassword,
+                recipientMap: userRowToMergeMap(recipientRow ?? null),
+                senderMap: userRowToMergeMap(senderRow ?? null),
+              })
+            } catch (mailErr) {
+              console.error('[Sync] activation email failed:', senderEmail, (mailErr as Error)?.message)
+            }
+          }
 
           createdCount++
           if (isDebug) {
