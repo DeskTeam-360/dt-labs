@@ -253,14 +253,15 @@ export async function POST(request: NextRequest) {
     }
 
     const ticketUrl = `${baseUrl}/tickets/${ticketIdNum}`
-    const portalFooter = `<p style="margin-top:24px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#666;">To view ticket details, please visit our portal: <a href="${ticketUrl}">${ticketUrl}</a></p>`
+    // const portalFooter = `<p style="margin-top:24px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#666;">To view ticket details, please visit our portal: <a href="${ticketUrl}">${ticketUrl}</a></p>`
     const innerHtml =
       hasText
         ? (bodyText.trim().includes('<')
             ? bodyText.trim()
             : bodyText.trim().replace(/\n/g, '<br>'))
         : '<p>&nbsp;</p>'
-    const bodyHtml = innerHtml + portalFooter
+    const bodyHtml = innerHtml 
+    // + portalFooter
 
     const headers: string[] = [
       'From: ' + fromEmail,

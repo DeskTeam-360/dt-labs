@@ -73,6 +73,9 @@ export async function POST(
   const effectiveVisibility = isCustomer ? 'reply' : visibility
   const effectiveAuthorType = isCustomer ? 'customer' : author_type
   const effectiveTaggedIds = isCustomer ? [] : (Array.isArray(tagged_user_ids) ? tagged_user_ids : [])
+  /** Portal customers must not set CC/BCC (UI disabled); ignore forged payloads. */
+  const effectiveCcEmails = isCustomer ? [] : Array.isArray(cc_emails) ? cc_emails : []
+  const effectiveBccEmails = isCustomer ? [] : Array.isArray(bcc_emails) ? bcc_emails : []
 
   const [row] = await db
     .insert(ticketComments)
@@ -83,8 +86,10 @@ export async function POST(
       visibility: effectiveVisibility,
       authorType: effectiveAuthorType,
       taggedUserIds: effectiveTaggedIds.length > 0 ? effectiveTaggedIds : null,
-      ccEmails: Array.isArray(cc_emails) && cc_emails.length > 0 ? cc_emails.filter((e: string) => e?.trim()) : null,
-      bccEmails: Array.isArray(bcc_emails) && bcc_emails.length > 0 ? bcc_emails.filter((e: string) => e?.trim()) : null,
+      ccEmails:
+        effectiveCcEmails.length > 0 ? effectiveCcEmails.filter((e: string) => e?.trim()) : null,
+      bccEmails:
+        effectiveBccEmails.length > 0 ? effectiveBccEmails.filter((e: string) => e?.trim()) : null,
     })
     .returning()
 
@@ -109,7 +114,7 @@ export async function POST(
   })
 
   const allCcEmails = [
-    ...(Array.isArray(cc_emails) ? cc_emails.filter((e: string) => e?.trim()?.includes('@')) : []),
+    ...effectiveCcEmails.filter((e: string) => e?.trim()?.includes('@')),
   ].map((e: string) => e.trim().toLowerCase()).filter(Boolean)
 
   let ticketCompanyId: string | null = null

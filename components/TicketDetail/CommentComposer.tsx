@@ -37,6 +37,8 @@ interface CommentComposerProps {
   companyCustomers?: Array<{ id: string; full_name: string | null; email: string }>
   /** Emails ever CC'd on this ticket - pre-fill CC for auto-CC on replies */
   ticketCcEmails?: string[]
+  /** Portal customer: hide CC/BCC (no outbound copy). */
+  showReplyCcBcc?: boolean
 }
 
 export default function CommentComposer({
@@ -50,6 +52,7 @@ export default function CommentComposer({
   nonCustomerUsers = [],
   companyCustomers = [],
   ticketCcEmails = [],
+  showReplyCcBcc = true,
 }: CommentComposerProps) {
   const isBlankEditorValue = (value: string): boolean => {
     const textOnly = String(value || '')
@@ -70,6 +73,7 @@ export default function CommentComposer({
   const [uploading, setUploading] = useState(false)
   const [taggedUserIds, setTaggedUserIds] = useState<string[]>([])
   const [ccEmails, setCcEmails] = useState<string[]>(() => {
+    if (!showReplyCcBcc) return []
     const emails = (ticketCcEmails ?? []).map((e) => String(e).trim().toLowerCase()).filter((e) => e && e.includes('@'))
     return emails
   })
@@ -170,8 +174,7 @@ export default function CommentComposer({
       if (showNoteOption && mode === 'note' && taggedUserIds.length > 0) {
         extra.taggedUserIds = taggedUserIds
       }
-      const isReplyMode = (showNoteOption && mode === 'reply') || !showNoteOption
-      if (isReplyMode) {
+      if (showReplyCcBcc && isReplyMode) {
         const cc = ccEmails.filter((e) => e?.trim() && e.includes('@'))
         const bcc = bccEmails.filter((e) => e?.trim() && e.includes('@'))
         if (cc.length > 0) extra.ccEmails = cc
@@ -266,7 +269,7 @@ export default function CommentComposer({
           />
         </Flex>
       )}
-      {((showNoteOption && mode === 'reply') || !showNoteOption) && (
+      {showReplyCcBcc && ((showNoteOption && mode === 'reply') || !showNoteOption) && (
         <Flex vertical gap={6}>
           <Flex align="center" gap={8}>
             <span style={{ fontSize: 12, color: '#666', minWidth: 36 }}>CC</span>

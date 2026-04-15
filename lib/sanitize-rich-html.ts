@@ -9,8 +9,10 @@ import type { Config } from 'dompurify'
  */
 const RICH_HTML_CONFIG: Config = {
   USE_PROFILES: { html: true },
-  /** data-list: Quill v2 lists; start: merged sibling <ol> continuation */
-  ADD_ATTR: ['target', 'data-list', 'start'],
+  /** data-list: Quill v2 lists; start: merged sibling <ol> continuation; class: Quill size (ql-size-*) */
+  ADD_ATTR: ['target', 'data-list', 'start', 'class'],
+  /** hr: Quill custom divider blot in comments */
+  ADD_TAGS: ['hr'],
   FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'base', 'link', 'meta', 'form'],
 }
 
