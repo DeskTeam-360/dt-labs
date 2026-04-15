@@ -363,8 +363,7 @@ export default function TabGeneralCustomer({
             loading={addCommentLoading}
             commentVisibility="reply"
             showNoteOption={false}
-            companyCustomers={companyCustomers}
-            ticketCcEmails={ticketCcEmails}
+            showReplyCcBcc={false}
           />
         </Flex>
       </Col>

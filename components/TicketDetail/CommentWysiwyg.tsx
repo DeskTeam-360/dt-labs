@@ -5,24 +5,42 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Input } from 'antd'
 import { useTheme } from '@/components/ThemeProvider'
 import { uploadTicketImage } from '@/utils/storage'
+import { registerCommentWysiwygQuill } from '@/lib/comment-wysiwyg-quill-register'
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false })
 
 import 'react-quill-new/dist/quill.snow.css'
 
+/** Full editor from ReactQuill / toolbar `this.quill` (not the read-only unprivileged proxy). */
+type QuillFullEditor = {
+  getSelection: (focus?: boolean) => { index: number; length?: number } | null
+  getLength: () => number
+  insertEmbed: (index: number, type: string, value: string | boolean, source?: string) => void
+  setSelection: (index: number, length?: number, source?: string) => void
+  focus: () => void
+}
+
 type QuillEditor = {
   getSelection: (focus: boolean) => { index: number } | null
   getLength: () => number
-  insertEmbed: (index: number, type: string, url: string, source: string) => void
-  setSelection: (index: number) => void
+  insertEmbed: (index: number, type: string, value: string | boolean, source?: string) => void
+  setSelection: (index: number, length?: number, source?: string) => void
 }
 
 const QUILL_FORMATS = [
   'header',
-  'bold', 'italic', 'underline', 'strike',
+  'size',
+  'color',
+  'background',
+  'bold',
+  'italic',
+  'underline',
+  'strike',
   'list',
   'link',
   'image',
+  /** Custom blot from `registerCommentWysiwygQuill()` — must be whitelisted or embed is stripped */
+  'divider',
 ]
 
 interface CommentWysiwygProps {
@@ -61,15 +79,25 @@ export default function CommentWysiwyg({
     toolbar: {
       container: [
         [{ header: [1, 2, 3, false] }],
+        [{ size: ['small', false, 'large', 'huge'] }],
+        [{ color: [] }, { background: [] }],
         ['bold', 'italic', 'underline', 'strike'],
         [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }],
         ['link', 'image'],
+        ['divider'],
         ['clean'],
       ],
       handlers: {
-        image: function imageHandler(this: unknown) {
-          const quill = quillRef.current?.getEditor?.()
-          if (!quill) return
+        /** Toolbar calls `handler.call(toolbarModule, value)` — use `this.quill` (reliable; ref spread can miss). */
+        divider: function dividerHandler(this: { quill: QuillFullEditor }) {
+          const quill = this.quill
+          const range = quill.getSelection(true)
+          const index = range?.index ?? Math.max(0, quill.getLength() - 1)
+          quill.insertEmbed(index, 'divider', true, 'user')
+          quill.setSelection(index + 1, 0, 'user')
+        },
+        image: function imageHandler(this: { quill: QuillFullEditor }) {
+          const quill = this.quill
           const input = document.createElement('input')
           input.setAttribute('type', 'file')
           input.setAttribute('accept', 'image/*')
@@ -82,9 +110,9 @@ export default function CommentWysiwyg({
               return
             }
             const range = quill.getSelection(true)
-            const index = range?.index ?? quill.getLength()
-            quill.insertEmbed(index, 'image', url, 'user')
-            quill.setSelection(index + 1)
+            const idx = range?.index ?? Math.max(0, quill.getLength() - 1)
+            quill.insertEmbed(idx, 'image', url, 'user')
+            quill.setSelection(idx + 1, 0, 'user')
           }
           input.click()
         },
@@ -93,6 +121,7 @@ export default function CommentWysiwyg({
   }), [])
 
   useEffect(() => {
+    registerCommentWysiwygQuill()
     setMounted(true)
   }, [])
 
@@ -161,8 +190,47 @@ export default function CommentWysiwyg({
   return (
     <>
     <style>{`
+      .comment-wysiwyg-wrapper {
+        position: relative;
+        overflow: visible;
+      }
       .comment-wysiwyg-wrapper .ql-editor {
         min-height: ${editorMinPx}px;
+      }
+      /* Toolbar: size / color pickers need room; dropdowns above sibling controls */
+      .comment-wysiwyg-wrapper .ql-toolbar.ql-snow {
+        flex-wrap: wrap;
+        row-gap: 4px;
+      }
+      .comment-wysiwyg-wrapper .ql-snow .ql-picker.ql-size {
+        width: 92px;
+      }
+      .comment-wysiwyg-wrapper .ql-snow .ql-picker.ql-header {
+        width: 108px;
+      }
+      /* Snow theme ships .ql-size-* on spans; reinforce in composer if theme order loads late */
+      .comment-wysiwyg-wrapper .ql-editor .ql-size-small {
+        font-size: 0.75em;
+      }
+      .comment-wysiwyg-wrapper .ql-editor .ql-size-large {
+        font-size: 1.5em;
+      }
+      .comment-wysiwyg-wrapper .ql-editor .ql-size-huge {
+        font-size: 2.5em;
+      }
+      .comment-wysiwyg-wrapper .ql-editor hr {
+        border: none;
+        border-top: 1px solid rgba(0, 0, 0, 0.12);
+        margin: 0.75em 0;
+        height: 0;
+        padding: 0;
+      }
+      .comment-wysiwyg-wrapper .ql-toolbar button.ql-divider {
+        width: 28px;
+      }
+      .comment-wysiwyg-wrapper .ql-toolbar button.ql-divider svg {
+        width: 18px;
+        height: 18px;
       }
     `}</style>
 

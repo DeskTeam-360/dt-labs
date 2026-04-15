@@ -349,6 +349,53 @@ html.dark .ql-editor.comment-html {
   color: var(--foreground);
 }
 
+/* Quill: font size classes (toolbar + saved HTML in threads / descriptions) */
+.ql-editor .ql-size-small,
+.comment-html .ql-size-small {
+  font-size: 0.75em;
+}
+.ql-editor .ql-size-large,
+.comment-html .ql-size-large {
+  font-size: 1.5em;
+}
+.ql-editor .ql-size-huge,
+.comment-html .ql-size-huge {
+  font-size: 2.5em;
+}
+
+/* Quill divider (<hr>) in editor + rendered comments */
+.ql-editor hr,
+.comment-html hr {
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  margin: 0.75em 0;
+  height: 0;
+  padding: 0;
+}
+html.dark .ql-editor hr,
+html.dark .comment-html hr {
+  border-top-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Color / highlight swatches in toolbar — dark UI: subtle grid so swatches don’t blend into the bar */
+html.dark .ql-snow .ql-color .ql-picker-options,
+html.dark .ql-snow .ql-background .ql-picker-options {
+  padding: 4px;
+}
+html.dark .ql-snow .ql-color .ql-picker-item,
+html.dark .ql-snow .ql-background .ql-picker-item {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+html.dark .ql-snow .ql-color .ql-picker-item:hover,
+html.dark .ql-snow .ql-background .ql-picker-item:hover {
+  box-shadow: inset 0 0 0 1px var(--ticket-nav-filter-link, #69b1ff);
+}
+
+/* Composer: color/size dropdowns above sibling rows (attachments, buttons) */
+.comment-wysiwyg-wrapper .ql-toolbar .ql-picker-options {
+  z-index: 60;
+}
+
 /* Ticket thread: Ant Design `type="secondary"` inside bubbles must stay readable on tinted backgrounds */
 .ticket-thread-bubble .ant-typography-secondary {
   color: var(--ticket-thread-meta) !important;
