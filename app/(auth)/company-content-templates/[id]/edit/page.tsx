@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { db, companyContentTemplates } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import ContentTemplateForm from '@/components/ContentTemplateForm'
+import { companyContentTemplates,db } from '@/lib/db'
 
 export default async function EditContentTemplatePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()

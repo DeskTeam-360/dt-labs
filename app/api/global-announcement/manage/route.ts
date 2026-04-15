@@ -1,13 +1,14 @@
+import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { isAdmin } from '@/lib/auth-utils'
 import { db, globalAnnouncement } from '@/lib/db'
 import {
-  GLOBAL_ANNOUNCEMENT_ROW_ID,
   getGlobalAnnouncementRow,
+  GLOBAL_ANNOUNCEMENT_ROW_ID,
   resolveActiveAnnouncementMessage,
 } from '@/lib/global-announcement'
-import { eq } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role

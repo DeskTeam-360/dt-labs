@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import ContentTemplateForm from '@/components/ContentTemplateForm'
 
 export default async function CreateContentTemplatePage() {

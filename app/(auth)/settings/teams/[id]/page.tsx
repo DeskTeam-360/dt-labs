@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { db, teams, users, teamMembers } from '@/lib/db'
-import { eq, asc } from 'drizzle-orm'
+import { asc,eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import TeamDetailContent from '@/components/content/TeamDetailContent'
+import { db, teamMembers,teams, users } from '@/lib/db'
 
 export default async function SettingsTeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()

@@ -1,6 +1,7 @@
-import { db, apiTokens } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
+import { and,eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { apiTokens,db } from '@/lib/db'
 
 export async function POST(request: Request) {
   try {

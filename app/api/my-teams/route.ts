@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { canAccessMyTeams } from '@/lib/auth-utils'
-import { db, teams, teamMembers } from '@/lib/db'
 import { eq, inArray, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { canAccessMyTeams } from '@/lib/auth-utils'
+import { db, teamMembers,teams } from '@/lib/db'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role

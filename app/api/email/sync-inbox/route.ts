@@ -1,29 +1,30 @@
+import bcrypt from 'bcryptjs'
+import { and, desc, eq, gte, ilike, isNull, not, or, sql } from 'drizzle-orm'
+import { google } from 'googleapis'
+import { NextRequest, NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
+import { loadAutomationTicketContext, runAutomationRules, runTicketCommentAutomation } from '@/lib/automation-engine'
+import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import {
+  commentAttachments,
+  companies,
+  companyUsers,
   db,
   emailIntegrations,
   emailMessages,
   emailSkipList,
-  tickets,
-  ticketComments,
-  ticketCcRecipients,
-  ticketAttachments,
-  commentAttachments,
-  companies,
-  users,
-  companyUsers,
   messageTemplates,
+  ticketAttachments,
+  ticketCcRecipients,
+  ticketComments,
+  tickets,
+  users,
 } from '@/lib/db'
-import { uploadBuffer } from '@/lib/storage-idrive'
-import { loadAutomationTicketContext, runAutomationRules, runTicketCommentAutomation } from '@/lib/automation-engine'
-import { logTicketActivity } from '@/lib/ticket-activity-log'
-import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
-import { eq, and, ilike, not, isNull, desc, gte, or, sql } from 'drizzle-orm'
-import bcrypt from 'bcryptjs'
-import { NextRequest, NextResponse } from 'next/server'
-import { google } from 'googleapis'
+import { uploadBuffer } from '@/lib/storage-idrive'
+import { logTicketActivity } from '@/lib/ticket-activity-log'
 
 /** Parse Gmail internalDate to ISO string for created_at */
 function getEmailDateIso(msg: { internalDate?: string }): string | null {
@@ -405,7 +406,7 @@ async function processIncomingEmailMedia(
     const directB64 = p.body?.data as string | undefined
     const mimeRaw = p.mimeType || 'application/octet-stream'
     const mime = mimeRaw.toLowerCase()
-    let filename = typeof p.filename === 'string' && p.filename.trim() ? p.filename.trim() : 'attachment'
+    const filename = typeof p.filename === 'string' && p.filename.trim() ? p.filename.trim() : 'attachment'
     const { disposition, contentId } = partDispositionAndCid(p)
 
     let buf: Buffer | null = null
@@ -945,7 +946,7 @@ export async function POST(request: NextRequest) {
           )
           .limit(2)
         // Prefer email match over domain match
-        let company = companyRows.find((r) => r.email?.toLowerCase() === senderEmail) ?? companyRows[0] ?? null
+        const company = companyRows.find((r) => r.email?.toLowerCase() === senderEmail) ?? companyRows[0] ?? null
 
         let creatorUserId: string | null = null
         let ticketCompanyId: string | null = company?.id ?? null

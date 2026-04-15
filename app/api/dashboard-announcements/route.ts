@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { db, dashboardAnnouncements } from '@/lib/db'
-import { announcementVisibleForViewer } from '@/lib/dashboard-announcement'
 import { asc, desc, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { announcementVisibleForViewer } from '@/lib/dashboard-announcement'
+import { dashboardAnnouncements,db } from '@/lib/db'
 
 /** GET — published announcements visible to current user (id + title only). */
 export async function GET() {

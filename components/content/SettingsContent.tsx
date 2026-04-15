@@ -1,39 +1,41 @@
 'use client'
 
-import type { CSSProperties, ReactNode } from 'react'
-import { Layout, Row, Col, Typography } from 'antd'
 import {
-  SettingOutlined,
   AppstoreOutlined,
-  FlagOutlined,
-  TagOutlined,
-  MailOutlined,
-  FileTextOutlined,
-  ThunderboltOutlined,
-  InfoCircleOutlined,
-  BellOutlined,
-  UserOutlined,
   BankOutlined,
-  TeamOutlined,
+  BellOutlined,
+  FileTextOutlined,
+  FlagOutlined,
+  InfoCircleOutlined,
+  MailOutlined,
   NotificationOutlined,
+  SettingOutlined,
+  TagOutlined,
+  TeamOutlined,
+  ThunderboltOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
+import { Col, Layout, Row, Typography } from 'antd'
+import type { CSSProperties, ReactNode } from 'react'
 import { useState } from 'react'
-import AdminSidebar from '../AdminSidebar'
-import AdminMainColumn from '../AdminMainColumn'
-import { SpaNavLink } from '../SpaNavLink'
+
 import {
-  canAccessTicketAttributes,
-  canAccessEmailIntegration,
-  canAccessSlackNotifications,
-  canAccessMessageTemplates,
-  canAccessKnowledgeBase,
   canAccessAutomationRules,
-  canAccessUsers,
   canAccessCompanies,
+  canAccessEmailIntegration,
+  canAccessKnowledgeBase,
+  canAccessMessageTemplates,
+  canAccessSlackNotifications,
   canAccessTeams,
-  canManageGlobalAnnouncement,
+  canAccessTicketAttributes,
+  canAccessUsers,
   canManageDashboardAnnouncements,
+  canManageGlobalAnnouncement,
 } from '@/lib/auth-utils'
+
+import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
+import { SpaNavLink } from '../SpaNavLink'
 
 const { Content } = Layout
 const { Title, Text } = Typography

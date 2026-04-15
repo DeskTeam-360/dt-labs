@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, users, companies, companyUsers } from '@/lib/db'
-import { eq, desc, inArray } from 'drizzle-orm'
+import { desc, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { companies, companyUsers,db, users } from '@/lib/db'
 
 /** GET /api/users - List users with company. When customer: only users in same company */
 export async function GET() {

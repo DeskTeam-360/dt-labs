@@ -1,4 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore'
+
 import { getFirebaseAdminFirestore } from '@/lib/firebase/admin'
 import { TICKET_DATA_SYNC_COLLECTION } from '@/lib/firebase/ticket-sync-constants'
 

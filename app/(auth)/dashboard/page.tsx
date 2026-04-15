@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { db, users, teams, tickets } from '@/lib/db'
 import { inArray } from 'drizzle-orm'
-import DashboardContent from '@/components/content/DashboardContent'
+
+import { auth } from '@/auth'
 import CustomerDashboardContent from '@/components/content/CustomerDashboardContent'
+import DashboardContent from '@/components/content/DashboardContent'
+import { db, teams, tickets,users } from '@/lib/db'
 
 export default async function DashboardPage() {
   const session = await auth()

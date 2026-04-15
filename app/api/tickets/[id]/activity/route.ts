@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, ticketActivityLog, users } from '@/lib/db'
 import { desc, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { db, ticketActivityLog, users } from '@/lib/db'
 
 /** GET /api/tickets/[id]/activity - Append-only activity log for this ticket */
 export async function GET(

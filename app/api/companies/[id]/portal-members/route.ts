@@ -1,9 +1,10 @@
-import { auth } from '@/auth'
-import { db, users, companyUsers } from '@/lib/db'
-import { eq, inArray } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
+import { eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
-import { userBelongsToCompany, isCompanyPortalAdmin } from '@/lib/customer-company'
+
+import { auth } from '@/auth'
+import { isCompanyPortalAdmin,userBelongsToCompany } from '@/lib/customer-company'
+import { companyUsers,db, users } from '@/lib/db'
 import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
 
 async function mergedCustomerRows(companyId: string) {

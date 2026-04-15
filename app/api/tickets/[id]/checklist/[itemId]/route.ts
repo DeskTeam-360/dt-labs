@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
-import { db, ticketChecklist } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { db, ticketChecklist } from '@/lib/db'
+import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 
 /** PATCH /api/tickets/[id]/checklist/[itemId] - Toggle or update checklist item */
 export async function PATCH(

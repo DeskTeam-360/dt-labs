@@ -1,6 +1,7 @@
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { getGlobalAnnouncementRow, resolveActiveAnnouncementMessage } from '@/lib/global-announcement'
-import { NextResponse } from 'next/server'
 
 /** GET — active banner for signed-in users (no sensitive config). */
 export async function GET() {

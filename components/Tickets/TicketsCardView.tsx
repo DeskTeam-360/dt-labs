@@ -1,9 +1,10 @@
 'use client'
 
+import { Col, Empty,Row } from 'antd'
 import { useMemo } from 'react'
-import { Row, Col, Empty } from 'antd'
+
 import CardViewCard from './CardViewCard'
-import type { TicketRecord, StatusColumn, TicketSortField, TicketSortOrder } from './types'
+import type { StatusColumn, TicketRecord, TicketSortField, TicketSortOrder } from './types'
 import { sortTickets } from './types'
 
 interface TicketsCardViewProps {

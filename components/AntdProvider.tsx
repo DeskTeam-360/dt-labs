@@ -1,8 +1,9 @@
 'use client'
 
 import { App, ConfigProvider, theme } from 'antd'
-import { SessionProvider } from 'next-auth/react'
 import type { Session } from 'next-auth'
+import { SessionProvider } from 'next-auth/react'
+
 import FirebaseSessionBridge from '@/components/FirebaseSessionBridge'
 import SessionAccessGuard from '@/components/SessionAccessGuard'
 import { ThemeProvider, useTheme } from '@/components/ThemeProvider'

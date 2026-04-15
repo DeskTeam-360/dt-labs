@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, users, companyUsers } from '@/lib/db'
 import { eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { companyUsers,db, users } from '@/lib/db'
 
 /** GET /api/companies/[id]/users - List users in company (for CC/BCC preselect) */
 export async function GET(

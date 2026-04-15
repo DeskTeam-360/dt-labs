@@ -1,12 +1,14 @@
 'use client'
 
-import { Layout, Card, Form, Input, Button, Typography, message, Avatar, Space, Upload, Select, Row, Col, Divider, Tag, Popconfirm } from 'antd'
-import { UserOutlined, MailOutlined, UploadOutlined, PhoneOutlined, KeyOutlined, CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
-import { uploadAvatar } from '@/utils/storage'
+import { CopyOutlined, DeleteOutlined, KeyOutlined, MailOutlined, PhoneOutlined, PlusOutlined,UploadOutlined, UserOutlined } from '@ant-design/icons'
+import { Avatar, Button, Card, Col, Divider, Form, Input, Layout, message, Popconfirm,Row, Select, Space, Tag, Typography, Upload } from 'antd'
+import { useEffect,useState } from 'react'
+
 import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
-import AdminSidebar from '../AdminSidebar'
+import { uploadAvatar } from '@/utils/storage'
+
 import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
 
 const { Content } = Layout
 const { Title, Text } = Typography

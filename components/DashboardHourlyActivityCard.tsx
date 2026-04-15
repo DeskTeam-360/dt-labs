@@ -1,13 +1,9 @@
 'use client'
 
-import { Card, DatePicker, Space, Typography } from 'antd'
 import { ClockCircleOutlined } from '@ant-design/icons'
-import { useEffect, useMemo, useState } from 'react'
+import { Card, DatePicker, Space, Typography } from 'antd'
 import dayjs from 'dayjs'
-import {
-  buildHourlyActivity,
-  type StoppedTimeSession,
-} from '@/lib/dashboard-hourly-activity'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Bar,
   CartesianGrid,
@@ -19,6 +15,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+
+import {
+  buildHourlyActivity,
+  type StoppedTimeSession,
+} from '@/lib/dashboard-hourly-activity'
 
 const { Text } = Typography
 

@@ -1,16 +1,17 @@
-import { auth } from '@/auth'
+import { and, asc,eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import ContentPlannerDetailContent from '@/components/content/ContentPlannerDetailContent'
 import {
-  db,
   companies,
+  companyAiSystemTemplate,
   companyContentPlanners,
   contentPlannerChannels,
-  contentPlannerTopicTypes,
   contentPlannerIntents,
-  companyAiSystemTemplate,
+  contentPlannerTopicTypes,
+  db,
 } from '@/lib/db'
-import { eq, and, asc } from 'drizzle-orm'
 
 function toSnake(obj: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}

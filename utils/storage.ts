@@ -6,9 +6,9 @@
  */
 
 import {
-  uploadBuffer,
   deleteObject,
   getPublicUrl as getIdrivePublicUrl,
+  uploadBuffer,
 } from '@/lib/storage-idrive'
 
 const BUCKET_NAME = process.env.IDRIVE_E2_BUCKET || 'dtlabs'

@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { redirect } from 'next/navigation'
-import { db, knowledgeBaseArticles } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import KnowledgeBaseArticleForm from '@/components/KnowledgeBaseArticleForm'
+import { db, knowledgeBaseArticles } from '@/lib/db'
 
 export default async function KnowledgeBaseEditPage({
   params,

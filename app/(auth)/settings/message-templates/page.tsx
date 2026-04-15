@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import MessageTemplatesContent from '@/components/content/MessageTemplatesContent'
 import { canAccessMessageTemplates } from '@/lib/auth-utils'
 

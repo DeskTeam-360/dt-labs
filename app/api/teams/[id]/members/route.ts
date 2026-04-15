@@ -1,9 +1,10 @@
+import { eq, inArray } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { canAccessTeams, canAdminTeams } from '@/lib/auth-utils'
 import { db } from '@/lib/db'
-import { teams, teamMembers, users } from '@/lib/db'
-import { eq, inArray } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
+import { teamMembers, teams, users } from '@/lib/db'
 
 const TEAM_INELIGIBLE_ROLES = ['customer', 'guest']
 

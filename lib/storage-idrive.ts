@@ -11,10 +11,10 @@
  */
 
 import {
-  S3Client,
-  PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
 } from '@aws-sdk/client-s3'
 
 const BUCKET = process.env.IDRIVE_E2_BUCKET || 'dtlabs'

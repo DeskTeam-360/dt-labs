@@ -1,13 +1,14 @@
+import { asc } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import {
+  companyAiSystemTemplate,
+  contentPlannerChannels,
   contentPlannerIntents,
   contentPlannerTopicTypes,
-  contentPlannerChannels,
-  companyAiSystemTemplate,
 } from '@/lib/db/schema'
-import { asc } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** GET /api/content-planner/lookup - Lookup data for content planner */
 export async function GET() {

@@ -1,8 +1,9 @@
+import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { companyWebsites } from '@/lib/db'
-import { eq } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** PATCH /api/company-websites/[id] */
 export async function PATCH(

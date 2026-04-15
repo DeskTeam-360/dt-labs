@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, teamMembers, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { db, teamMembers, users } from '@/lib/db'
 
 /** GET /api/tickets/[id]/team-members?team_id=xxx - Get team members for a team */
 export async function GET(

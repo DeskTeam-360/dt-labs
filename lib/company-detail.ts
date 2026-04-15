@@ -2,6 +2,8 @@
  * Server-side helper to fetch company with related data
  * Used by company detail page and API
  */
+import { eq, inArray } from 'drizzle-orm'
+
 import { db } from '@/lib/db'
 import {
   companies,
@@ -11,7 +13,6 @@ import {
   companyWebsites,
   users,
 } from '@/lib/db'
-import { eq, inArray } from 'drizzle-orm'
 
 export async function getCompanyDetail(id: string) {
   const [companyRow] = await db.select().from(companies).where(eq(companies.id, id)).limit(1)

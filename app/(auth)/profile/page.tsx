@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+
+import { auth } from '@/auth'
 import ProfileContent from '@/components/content/ProfileContent'
+import { db, users } from '@/lib/db'
 
 export default async function ProfilePage() {
   const session = await auth()

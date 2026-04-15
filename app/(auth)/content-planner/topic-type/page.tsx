@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import ContentPlannerTopicTypesContent from '@/components/content/ContentPlannerTopicTypesContent'
 
 export default async function ContentPlannerTopicTypePage() {

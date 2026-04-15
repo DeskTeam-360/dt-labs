@@ -1,8 +1,9 @@
+import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { ticketPriorities } from '@/lib/db'
-import { eq } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** PATCH /api/ticket-priorities/[id] */
 export async function PATCH(

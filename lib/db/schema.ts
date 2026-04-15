@@ -2,18 +2,18 @@
  * Drizzle schema — PostgreSQL tables used by the app.
  */
 import {
+  bigint,
+  boolean,
+  index,
+  integer,
+  jsonb,
   pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
   uuid,
   varchar,
-  text,
-  integer,
-  boolean,
-  timestamp,
-  jsonb,
-  bigint,
-  primaryKey,
-  unique,
-  index,
 } from 'drizzle-orm/pg-core'
 
 const ts = (name: string) => timestamp(name, { withTimezone: true })

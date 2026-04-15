@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import TicketReferenceContent from '@/components/content/TicketReferenceContent'
 import { canAccessTickets } from '@/lib/auth-utils'
 

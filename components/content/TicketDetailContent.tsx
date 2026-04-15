@@ -3,34 +3,35 @@
 import 'react-quill-new/dist/quill.snow.css'
 
 import {
-    Layout,
-    Card,
-    Tag,
-    Typography,
-    Button,
-    Row,
-    Col,
-    Divider,
-    Input,
-    Form,
-    message,
-    Modal,
-    Select,
-    DatePicker,
-    Tabs,
-    Flex,
-    notification,
-    Tooltip,
-} from 'antd'
-import {
     ArrowLeftOutlined,
-    WarningOutlined,
-    WarningTwoTone,
     DeleteOutlined,
     DeleteTwoTone,
+    WarningOutlined,
+    WarningTwoTone,
 } from '@ant-design/icons'
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import {
+    Button,
+    Card,
+    Col,
+    DatePicker,
+    Divider,
+    Flex,
+    Form,
+    Input,
+    Layout,
+    message,
+    Modal,
+    notification,
+    Row,
+    Select,
+    Tabs,
+    Tag,
+    Tooltip,
+    Typography,
+} from 'antd'
 import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef,useState } from 'react'
+
 import { uploadTicketFile } from '@/utils/storage'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
@@ -45,16 +46,18 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   }
   return res.json()
 }
-import AdminSidebar from '../AdminSidebar'
-import DateDisplay from '../DateDisplay'
-import { TabGeneral, TabTimeTracker, TabScreenshots, TabActivity } from '../TicketDetail'
-import TabGeneralCustomer from '../TicketDetail/TabGeneralCustomer'
-import CommentWysiwyg from '../TicketDetail/CommentWysiwyg'
-import TicketPresenceBar from '../TicketPresenceBar'
-import AdminMainColumn from '../AdminMainColumn'
 import dayjs from 'dayjs'
+
 import { isAdmin, isAdminOrManager } from '@/lib/auth-utils'
 import { useTicketDetailLiveSync } from '@/lib/firebase/useTicketDetailLiveSync'
+
+import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
+import DateDisplay from '../DateDisplay'
+import { TabActivity,TabGeneral, TabScreenshots, TabTimeTracker } from '../TicketDetail'
+import CommentWysiwyg from '../TicketDetail/CommentWysiwyg'
+import TabGeneralCustomer from '../TicketDetail/TabGeneralCustomer'
+import TicketPresenceBar from '../TicketPresenceBar'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -1260,62 +1263,46 @@ export default function TicketDetailContent({
                         <Divider />
 
                         {isCustomer ? (
-                            <Tabs
-                                defaultActiveKey="details"
-                                items={[
-                                    {
-                                        key: 'details',
-                                        label: 'Details',
-                                        children: (
-                                            <TabGeneralCustomer
-                                                ticketData={displayTicket}
-                                                ticketAttachments={descriptionAttachmentsFromDb}
-                                                statusOptions={allStatusesForSelect}
-                                                onStatusChange={handleStatusChange}
-                                                statusChanging={statusChanging}
-                                                typeOptions={ticketTypes}
-                                                priorityOptions={ticketPriorities}
-                                                onTypeChange={handleTypeChange}
-                                                onPriorityChange={handlePriorityChange}
-                                                typeChanging={typeChanging}
-                                                priorityChanging={priorityChanging}
-                                                totalTimeSeconds={totalTimeSeconds}
-                                                activeTimeTracker={activeTimeTracker}
-                                                currentTime={currentTime}
-                                                formatTime={formatTime}
-                                                comments={comments}
-                                                currentUserId={currentUser.id}
-                                                editingComment={editingComment}
-                                                editingCommentValue={editingCommentValue}
-                                                onEditComment={(id, value) => {
-                                                    setEditingComment(id)
-                                                    setEditingCommentValue(value)
-                                                }}
-                                                onEditingCommentValueChange={setEditingCommentValue}
-                                                onSaveEditComment={handleUpdateComment}
-                                                onCancelEditComment={() => {
-                                                    setEditingComment(null)
-                                                    setEditingCommentValue('')
-                                                }}
-                                                onDeleteComment={handleDeleteComment}
-                                                canDeleteComment={canDeleteComment}
-                                                onAddComment={handleAddComment}
-                                                addCommentLoading={loading}
-                                                commentsHasOlder={commentsHasOlder}
-                                                commentsOlderRemaining={commentsOlderRemaining}
-                                                onLoadMoreComments={handleLoadMoreComments}
-                                                loadMoreCommentsLoading={loadingMoreComments}
-                                                companyCustomers={companyCustomers}
-                                                ticketCcEmails={ticketCcEmailsState}
-                                            />
-                                        ),
-                                    },
-                                    {
-                                        key: 'activity',
-                                        label: 'Activity log',
-                                        children: <TabActivity ticketId={displayTicket.id} />,
-                                    },
-                                ]}
+                            <TabGeneralCustomer
+                                ticketData={displayTicket}
+                                ticketAttachments={descriptionAttachmentsFromDb}
+                                statusOptions={allStatusesForSelect}
+                                onStatusChange={handleStatusChange}
+                                statusChanging={statusChanging}
+                                typeOptions={ticketTypes}
+                                priorityOptions={ticketPriorities}
+                                onTypeChange={handleTypeChange}
+                                onPriorityChange={handlePriorityChange}
+                                typeChanging={typeChanging}
+                                priorityChanging={priorityChanging}
+                                totalTimeSeconds={totalTimeSeconds}
+                                activeTimeTracker={activeTimeTracker}
+                                currentTime={currentTime}
+                                formatTime={formatTime}
+                                comments={comments}
+                                currentUserId={currentUser.id}
+                                editingComment={editingComment}
+                                editingCommentValue={editingCommentValue}
+                                onEditComment={(id, value) => {
+                                    setEditingComment(id)
+                                    setEditingCommentValue(value)
+                                }}
+                                onEditingCommentValueChange={setEditingCommentValue}
+                                onSaveEditComment={handleUpdateComment}
+                                onCancelEditComment={() => {
+                                    setEditingComment(null)
+                                    setEditingCommentValue('')
+                                }}
+                                onDeleteComment={handleDeleteComment}
+                                canDeleteComment={canDeleteComment}
+                                onAddComment={handleAddComment}
+                                addCommentLoading={loading}
+                                commentsHasOlder={commentsHasOlder}
+                                commentsOlderRemaining={commentsOlderRemaining}
+                                onLoadMoreComments={handleLoadMoreComments}
+                                loadMoreCommentsLoading={loadingMoreComments}
+                                companyCustomers={companyCustomers}
+                                ticketCcEmails={ticketCcEmailsState}
                             />
                         ) : (
                         <Tabs

@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import AutomationRulesContent from '@/components/content/AutomationRulesContent'
 import { canAccessAutomationRules } from '@/lib/auth-utils'
 

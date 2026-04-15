@@ -1,9 +1,10 @@
-import { auth } from '@/auth'
-import { isAdmin } from '@/lib/auth-utils'
-import { db, dashboardAnnouncements } from '@/lib/db'
-import { normalizeTargetRolesInput } from '@/lib/knowledge-base-article-roles'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { isAdmin } from '@/lib/auth-utils'
+import { dashboardAnnouncements,db } from '@/lib/db'
+import { normalizeTargetRolesInput } from '@/lib/knowledge-base-article-roles'
 
 function sessionRole(session: { user?: { role?: string; id?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role

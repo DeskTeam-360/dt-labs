@@ -1,9 +1,10 @@
 'use client'
 
-import type { CSSProperties } from 'react'
-import { Button, Dropdown } from 'antd'
-import type { DropdownProps, MenuProps } from 'antd'
 import { BulbOutlined, CheckOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
+import type { DropdownProps, MenuProps } from 'antd'
+import { Button, Dropdown } from 'antd'
+import type { CSSProperties } from 'react'
+
 import { useTheme } from '@/components/ThemeProvider'
 
 type ThemeToggleProps = {

@@ -1,10 +1,11 @@
-import { auth } from '@/auth'
-import { redirect } from 'next/navigation'
-import { db, users, companies } from '@/lib/db'
 import { eq } from 'drizzle-orm'
-import UserDetailContent from '@/components/content/UserDetailContent'
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
+import UserDetailContent from '@/components/content/UserDetailContent'
 import { canAccessUsers, isAdminOrManager } from '@/lib/auth-utils'
+import { companies,db, users } from '@/lib/db'
 
 export async function generateMetadata({
   params,

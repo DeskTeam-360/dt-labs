@@ -1,9 +1,10 @@
-import { auth } from '@/auth'
-import { db, users } from '@/lib/db'
-import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
+import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
-import { userBelongsToCompany, isCompanyPortalAdmin } from '@/lib/customer-company'
+
+import { auth } from '@/auth'
+import { isCompanyPortalAdmin,userBelongsToCompany } from '@/lib/customer-company'
+import { db, users } from '@/lib/db'
 import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
 
 const COMPANY_ROLES = ['member', 'company_admin'] as const

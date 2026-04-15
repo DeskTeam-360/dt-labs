@@ -1,10 +1,11 @@
+import { asc } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { ticketStatuses } from '@/lib/db'
-import { asc } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
-import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
 import { ensureTicketStatusIsDeletableColumn } from '@/lib/ensure-ticket-status-is-deletable'
+import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
 
 /** GET /api/ticket-statuses - List all ticket statuses */
 export async function GET() {

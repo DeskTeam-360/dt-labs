@@ -1,5 +1,6 @@
-import { db, globalAnnouncement } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+
+import { db, globalAnnouncement } from '@/lib/db'
 
 /** Primary key of the single configuration row (must match migration seed). */
 export const GLOBAL_ANNOUNCEMENT_ROW_ID = 'a0000001-0000-4000-8000-000000000001'

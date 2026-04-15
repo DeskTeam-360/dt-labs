@@ -1,27 +1,29 @@
 'use client'
 
+import { DeleteOutlined,EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
-  Layout,
-  Table,
   Button,
-  Space,
-  Typography,
   Card,
-  Modal,
   Form,
   Input,
   InputNumber,
-  Switch,
+  Layout,
   message,
+  Modal,
   Popconfirm,
+  Space,
+  Switch,
+  Table,
   Tag,
+  Typography,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
-import AdminSidebar from '../AdminSidebar'
-import AdminMainColumn from '../AdminMainColumn'
-import { isLockedTicketStatusSlug } from '@/lib/ticket-status-locked-slugs'
 import type { ColumnsType } from 'antd/es/table'
+import { useEffect,useState } from 'react'
+
+import { isLockedTicketStatusSlug } from '@/lib/ticket-status-locked-slugs'
+
+import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
 
 const { Content } = Layout
 const { Title } = Typography

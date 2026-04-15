@@ -1,13 +1,14 @@
+import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
+import { db } from '@/lib/db'
+import { companyUsers, tickets,users } from '@/lib/db'
 import {
   fetchTicketCommentsWindow,
   TICKET_COMMENTS_PAGE_SIZE,
   type TicketCommentOlderCursor,
 } from '@/lib/ticket-detail'
-import { db } from '@/lib/db'
-import { users, companyUsers, tickets } from '@/lib/db'
-import { eq } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** GET /api/tickets/[id]/comments/older?before_created_at=&before_id= — next page of older comments */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {

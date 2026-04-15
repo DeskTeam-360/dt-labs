@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, apiTokens } from '@/lib/db'
-import { eq, desc } from 'drizzle-orm'
+import { desc,eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { apiTokens,db } from '@/lib/db'
 
 /** GET /api/auth/tokens - List API tokens for current user */
 export async function GET() {

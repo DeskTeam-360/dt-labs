@@ -1,13 +1,14 @@
+import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { isAdminOrManager } from '@/lib/auth-utils'
 import {
+  type CustomerTimeReportGlobalFilters,
   normalizeGlobalFilters,
   normalizePresetTitle,
-  type CustomerTimeReportGlobalFilters,
 } from '@/lib/customer-time-report-defaults'
-import { db, customerTimeReportDefaults } from '@/lib/db'
-import { eq } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
+import { customerTimeReportDefaults,db } from '@/lib/db'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role

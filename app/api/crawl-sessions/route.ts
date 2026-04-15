@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { db } from '@/lib/db'
-import { crawlSessions, companyWebsites, companies } from '@/lib/db'
 import { desc, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { db } from '@/lib/db'
+import { companies,companyWebsites, crawlSessions } from '@/lib/db'
 
 /** GET /api/crawl-sessions - List all crawl sessions with company_websites.companies */
 export async function GET() {

@@ -1,5 +1,6 @@
-import { db, companyUsers } from '@/lib/db'
 import { and, eq } from 'drizzle-orm'
+
+import { companyUsers,db } from '@/lib/db'
 
 /**
  * Insert or update a company_users row without ON CONFLICT — works when the table

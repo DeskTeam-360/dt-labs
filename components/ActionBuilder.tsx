@@ -1,9 +1,11 @@
 'use client'
 
+import { CloseOutlined,PlusOutlined } from '@ant-design/icons'
 import { Button, Dropdown, Form, Input, Select, Space } from 'antd'
-import { PlusOutlined, CloseOutlined } from '@ant-design/icons'
 import { useEffect, useState } from 'react'
+
 import type { AutomationActions } from '@/lib/automation-actions-types'
+
 import CommentWysiwyg from './TicketDetail/CommentWysiwyg'
 
 type ActionType =

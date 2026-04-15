@@ -1,7 +1,8 @@
+import { and,eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db, screenshots } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** PATCH /api/screenshots/link - Update screenshot ticket link (for web app with session) */
 export async function PATCH(request: Request) {

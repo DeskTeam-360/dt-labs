@@ -1,14 +1,15 @@
+import { asc,eq } from 'drizzle-orm'
+
 import { db } from '@/lib/db'
 import {
-  slackTicketNotificationRules,
-  tickets,
-  teams,
   companies,
-  users,
+  slackTicketNotificationRules,
+  teams,
   ticketPriorities,
+  tickets,
   ticketTypes,
+  users,
 } from '@/lib/db'
-import { eq, asc } from 'drizzle-orm'
 
 export type SlackTicketNotifyEvent = 'ticket_created' | 'status_changed' | 'client_reply'
 

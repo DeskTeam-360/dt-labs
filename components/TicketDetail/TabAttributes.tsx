@@ -1,7 +1,7 @@
 'use client'
 
-import { Space, Row, Col, Descriptions, Typography, Button, Input, Empty, Popconfirm } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { DeleteOutlined,EditOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Col, Descriptions, Empty, Input, Popconfirm,Row, Space, Typography } from 'antd'
 
 const { Text } = Typography
 

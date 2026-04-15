@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import GlobalAnnouncementSettingsContent from '@/components/content/GlobalAnnouncementSettingsContent'
 import { isAdmin } from '@/lib/auth-utils'
 

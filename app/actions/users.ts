@@ -1,9 +1,10 @@
 'use server'
 
+import bcrypt from 'bcryptjs'
+import { eq } from 'drizzle-orm'
+
 import { auth } from '@/auth'
 import { db, users } from '@/lib/db'
-import { eq } from 'drizzle-orm'
-import bcrypt from 'bcryptjs'
 
 export async function createUser(formData: {
   email: string

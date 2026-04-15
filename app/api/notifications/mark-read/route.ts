@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { getFirebaseAdminFirestore } from '@/lib/firebase/admin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { getFirebaseAdminFirestore } from '@/lib/firebase/admin'
 
 /** Mark one or more notification docs as read (Admin SDK). */
 export async function POST(request: Request) {

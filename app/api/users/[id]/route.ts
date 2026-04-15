@@ -1,10 +1,11 @@
-import { auth } from '@/auth'
-import { db, users, companies, emailIntegrations } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
-import { NextResponse } from 'next/server'
-import { google } from 'googleapis'
 import { randomBytes } from 'crypto'
+import { and,eq } from 'drizzle-orm'
+import { google } from 'googleapis'
+import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { companies, db, emailIntegrations,users } from '@/lib/db'
 
 function encodeSubjectHeader(subject: string): string {
   if (/^[\x01-\x7F]*$/.test(subject)) return subject

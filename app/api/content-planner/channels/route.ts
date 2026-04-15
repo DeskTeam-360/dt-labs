@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, contentPlannerChannels, companyAiSystemTemplate } from '@/lib/db'
-import { eq, asc } from 'drizzle-orm'
+import { asc,eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { companyAiSystemTemplate,contentPlannerChannels, db } from '@/lib/db'
 
 /** GET /api/content-planner/channels - List channels with template */
 export async function GET() {

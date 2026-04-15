@@ -1,11 +1,12 @@
+import { desc, eq, inArray } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import {
-  companyKnowledgeBases,
   companyContentTemplates,
+  companyKnowledgeBases,
 } from '@/lib/db'
-import { eq, desc, inArray } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** GET /api/companies/[id]/knowledge-bases */
 export async function GET(
@@ -26,7 +27,7 @@ export async function GET(
     .orderBy(desc(companyKnowledgeBases.updatedAt))
 
   const templateIds = [...new Set(rows.map((r) => r.contentTemplateId).filter(Boolean))] as string[]
-  let templateMap: Record<string, { id: string; title: string; fields: string[] | null }> = {}
+  const templateMap: Record<string, { id: string; title: string; fields: string[] | null }> = {}
 
   if (templateIds.length > 0) {
     const templates = await db

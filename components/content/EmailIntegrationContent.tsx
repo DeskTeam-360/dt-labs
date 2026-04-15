@@ -1,11 +1,12 @@
 'use client'
 
-import { Layout, Card, Button, Typography, Space, Tag, message, Collapse } from 'antd'
-import { MailOutlined, CheckCircleOutlined, DisconnectOutlined, SyncOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, DisconnectOutlined, MailOutlined, SyncOutlined } from '@ant-design/icons'
+import { Button, Card, Collapse,Layout, message, Space, Tag, Typography } from 'antd'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import AdminSidebar from '../AdminSidebar'
+
 import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
 
 const { Content } = Layout
 const { Title, Text } = Typography

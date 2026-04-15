@@ -2,27 +2,29 @@
  * Automation rules engine: evaluate conditions and apply actions when tickets are
  * created, updated, or when a new comment/reply/note is added.
  */
-import { db } from '@/lib/db'
+import { and, desc,eq } from 'drizzle-orm'
+
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
+import { db } from '@/lib/db'
 import {
   automationRules,
-  tickets,
-  ticketPriorities,
-  ticketTypes,
-  ticketStatuses,
-  ticketAssignees,
   teams,
-  ticketTags,
-  ticketComments,
+  ticketAssignees,
   ticketChecklist,
+  ticketComments,
+  ticketPriorities,
+  tickets,
+  ticketStatuses,
+  ticketTags,
+  ticketTypes,
 } from '@/lib/db'
-import { eq, and, desc } from 'drizzle-orm'
-import type { OurCondition, OurConditionGroup, OurConditionLeaf } from './condition-builder-utils'
+
 import type { AutomationActions } from './automation-actions-types'
-import { coerceTicketType, parseTicketType } from './ticket-classification'
 import { AUTOMATION_NOTE_USER_ID } from './automation-constants'
-import { diffTicketSnapshots, loadTicketActivitySnapshot, logTicketActivity } from './ticket-activity-log'
+import type { OurCondition, OurConditionGroup, OurConditionLeaf } from './condition-builder-utils'
 import { bumpTicketDataVersion } from './firebase/ticket-sync-server'
+import { diffTicketSnapshots, loadTicketActivitySnapshot, logTicketActivity } from './ticket-activity-log'
+import { coerceTicketType, parseTicketType } from './ticket-classification'
 
 function automationNoteHtmlHasText(html: string | undefined | null): boolean {
   if (!html?.trim()) return false

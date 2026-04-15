@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
+
 import * as schema from './schema'
 
 // Strip ?schema=public from DATABASE_URL (postgres.js doesn't support it)

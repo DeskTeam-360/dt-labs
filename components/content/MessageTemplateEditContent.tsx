@@ -1,14 +1,15 @@
 'use client'
 
-import { Layout, Button, Typography, Card, Space, message, Spin } from 'antd'
-import { ArrowLeftOutlined, SaveOutlined, EyeOutlined } from '@ant-design/icons'
-import { useState, useEffect, useCallback } from 'react'
+import { ArrowLeftOutlined, EyeOutlined,SaveOutlined } from '@ant-design/icons'
+import { Button, Card, Layout, message, Space, Spin,Typography } from 'antd'
 import { useRouter } from 'next/navigation'
-import AdminSidebar from '../AdminSidebar'
+import { useCallback,useEffect, useState } from 'react'
+
 import AdminMainColumn from '../AdminMainColumn'
-import CommentWysiwyg from '../TicketDetail/CommentWysiwyg'
+import AdminSidebar from '../AdminSidebar'
 import MessageTemplatePlaceholdersPanel from '../MessageTemplatePlaceholdersPanel'
 import MessageTemplatePreviewModal from '../MessageTemplatePreviewModal'
+import CommentWysiwyg from '../TicketDetail/CommentWysiwyg'
 import type { MessageTemplateRow } from './MessageTemplatesContent'
 
 const { Content } = Layout

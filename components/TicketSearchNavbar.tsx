@@ -1,26 +1,28 @@
 'use client'
 
-import { Input, Spin, Tooltip, Typography } from 'antd'
+import 'dayjs/locale/en'
+
 import { CloseOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icons'
+import { Input, Spin, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
-import 'dayjs/locale/en'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
+
 import { SpaNavLink } from '@/components/SpaNavLink'
+import ThemeToggle from '@/components/ThemeToggle'
+import TicketActivityActorAvatar from '@/components/TicketActivityActorAvatar'
+import TicketNotificationBell from '@/components/TicketNotificationBell'
+import {
+  formatTicketActivityNavbarLabel,
+  isTicketActivityNavbarPeekRow,
+} from '@/lib/ticket-activity-labels'
 import {
   loadSavedTicketFilterPresets,
   removeSavedTicketFilterPreset,
   SAVED_FILTERS_CHANGED_EVENT,
   type SavedTicketFilterPreset,
 } from '@/lib/ticket-saved-filters'
-import {
-  formatTicketActivityNavbarLabel,
-  isTicketActivityNavbarPeekRow,
-} from '@/lib/ticket-activity-labels'
-import TicketActivityActorAvatar from '@/components/TicketActivityActorAvatar'
-import TicketNotificationBell from '@/components/TicketNotificationBell'
-import ThemeToggle from '@/components/ThemeToggle'
 
 dayjs.extend(relativeTime)
 dayjs.locale('en')

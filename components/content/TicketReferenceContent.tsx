@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
-import { Layout, Card, Typography, Tabs, Spin, Empty } from 'antd'
 import { ReadOutlined } from '@ant-design/icons'
-import AdminSidebar from '../AdminSidebar'
+import { Card, Empty,Layout, Spin, Tabs, Typography } from 'antd'
+import { useEffect, useMemo,useState } from 'react'
+
 import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
 
 const { Content } = Layout
 const { Title, Text, Paragraph } = Typography

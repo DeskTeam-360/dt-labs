@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { db, messageTemplates } from '@/lib/db'
-import { canAccessMessageTemplates } from '@/lib/auth-utils'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { canAccessMessageTemplates } from '@/lib/auth-utils'
+import { db, messageTemplates } from '@/lib/db'
 
 function assertAdmin(session: { user?: { role?: string } } | null) {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

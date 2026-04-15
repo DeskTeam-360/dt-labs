@@ -1,18 +1,19 @@
 'use client'
 
-import { Layout, Card, Descriptions, Avatar, Tag, Typography, Button, Space, Row, Col, Divider, Form, Input, Select, Switch, Modal, message, Upload, Tabs, Table, DatePicker, Radio, Statistic, Drawer, Flex } from 'antd'
-import { ArrowLeftOutlined, UserOutlined, MailOutlined, PhoneOutlined, BankOutlined, IdcardOutlined, GlobalOutlined, TranslationOutlined, CalendarOutlined, ClockCircleOutlined, EditOutlined, SaveOutlined, CloseOutlined, UploadOutlined, HistoryOutlined, LockOutlined, NumberOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, BankOutlined, CalendarOutlined, ClockCircleOutlined, CloseOutlined, EditOutlined, GlobalOutlined, HistoryOutlined, IdcardOutlined, LockOutlined, MailOutlined, NumberOutlined,PhoneOutlined, SaveOutlined, TranslationOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons'
+import { Avatar, Button, Card, Col, DatePicker, Descriptions, Divider, Drawer, Flex,Form, Input, Layout, message, Modal, Radio, Row, Select, Space, Statistic, Switch, Table, Tabs, Tag, Typography, Upload } from 'antd'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { uploadAvatar } from '@/utils/storage'
+import { useCallback, useEffect, useMemo,useRef, useState } from 'react'
+
 import {
-  USER_DEPARTMENTS,
-  USER_POSITIONS,
   getUserDepartmentAccentColor,
   getUserPositionAccentColor,
+  USER_DEPARTMENTS,
+  USER_POSITIONS,
 } from '@/lib/user-work-dropdowns'
+import { uploadAvatar } from '@/utils/storage'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...options, credentials: 'include' })
@@ -22,13 +23,14 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   }
   return res.json()
 }
-import AdminSidebar from '../AdminSidebar'
-import AdminMainColumn from '../AdminMainColumn'
-import { SpaNavLink } from '@/components/SpaNavLink'
 import { confirmUserCompanyMove } from '@/components/confirm-user-company-move'
-import DashboardHourlyActivityCard from '../DashboardHourlyActivityCard'
+import { SpaNavLink } from '@/components/SpaNavLink'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 import type { UserTimeTrackerTicketSummary } from '@/lib/user-time-tracker-summary'
+
+import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
+import DashboardHourlyActivityCard from '../DashboardHourlyActivityCard'
 
 const { Content } = Layout
 const { Title, Text } = Typography

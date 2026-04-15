@@ -1,10 +1,11 @@
-import { auth } from '@/auth'
-import { db, ticketComments, commentAttachments } from '@/lib/db'
-import { logTicketActivity } from '@/lib/ticket-activity-log'
-import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
-import type { TicketActorRole } from '@/lib/ticket-activity-log'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { commentAttachments,db, ticketComments } from '@/lib/db'
+import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
+import type { TicketActorRole } from '@/lib/ticket-activity-log'
+import { logTicketActivity } from '@/lib/ticket-activity-log'
 
 /** PATCH /api/tickets/[id]/comments/[commentId] - Update comment */
 export async function PATCH(

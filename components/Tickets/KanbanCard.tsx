@@ -1,16 +1,18 @@
 'use client'
 
-import { Card, Button, Dropdown, Flex, Tag, Tooltip, Avatar, Modal, Typography } from 'antd'
-import { EditOutlined, DeleteOutlined, UserOutlined, MoreOutlined, FlagOutlined, FieldTimeOutlined, CommentOutlined } from '@ant-design/icons'
-import { useRouter } from 'next/navigation'
+import { CommentOutlined,DeleteOutlined, EditOutlined, FieldTimeOutlined, FlagOutlined, MoreOutlined, UserOutlined } from '@ant-design/icons'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { Avatar, Button, Card, Dropdown, Flex, Modal, Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
-import type { TicketRecord, StatusColumn } from './types'
-import { DEFAULT_ALL_STATUS_COLUMNS } from './types'
+import { useRouter } from 'next/navigation'
+
 import { isClosedLikeTicketStatus } from '@/lib/ticket-status-workflow'
-import { getVisibilityColor, darkenColor } from './types'
+
 import DateDisplay from '../DateDisplay'
+import type { StatusColumn,TicketRecord } from './types'
+import { DEFAULT_ALL_STATUS_COLUMNS } from './types'
+import { darkenColor,getVisibilityColor } from './types'
 
 const { Text } = Typography
 

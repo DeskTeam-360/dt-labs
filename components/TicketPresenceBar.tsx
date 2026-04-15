@@ -1,10 +1,9 @@
 'use client'
 
-import { Avatar, Tooltip, Typography } from 'antd'
 import { EyeOutlined, UserOutlined } from '@ant-design/icons'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Avatar, Tooltip, Typography } from 'antd'
+import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import {
-  Timestamp,
   collection,
   deleteDoc,
   doc,
@@ -12,8 +11,10 @@ import {
   onSnapshot,
   serverTimestamp,
   setDoc,
+  Timestamp,
 } from 'firebase/firestore'
-import { getAuth, onAuthStateChanged } from 'firebase/auth'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
 import { getFirebaseApp, isFirebaseClientConfigured } from '@/lib/firebase/client'
 
 const { Text } = Typography

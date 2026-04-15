@@ -1,29 +1,30 @@
+import { and, eq, inArray } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
+import { runAutomationRules } from '@/lib/automation-engine'
 import { db } from '@/lib/db'
 import {
-  tickets,
   ticketAssignees,
-  ticketTags,
   ticketAttachments,
+  ticketAttributs,
   ticketChecklist,
   ticketComments,
-  ticketAttributs,
   ticketPriorities,
+  tickets,
+  ticketTags,
   ticketTypes,
 } from '@/lib/db'
-import { runAutomationRules } from '@/lib/automation-engine'
+import { diffNewAssignees,notifyTicketUsers } from '@/lib/firebase/ticket-notifications-server'
+import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
+import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
+import type { TicketActorRole } from '@/lib/ticket-activity-log'
 import {
   diffTicketSnapshots,
   loadTicketActivitySnapshot,
   logTicketActivity,
 } from '@/lib/ticket-activity-log'
-import type { TicketActorRole } from '@/lib/ticket-activity-log'
-import { and, eq, inArray } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
-import { notifyTicketUsers, diffNewAssignees } from '@/lib/firebase/ticket-notifications-server'
-import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 import { coerceTicketType, parseTicketType } from '@/lib/ticket-classification'
-import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
 
 async function triggerTicketUpdatedAutomation(ticketId: number) {
   try {

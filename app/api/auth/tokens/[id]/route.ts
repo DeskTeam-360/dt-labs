@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, apiTokens } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
+import { and,eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { apiTokens,db } from '@/lib/db'
 
 /** DELETE /api/auth/tokens/[id] - Delete API token */
 export async function DELETE(

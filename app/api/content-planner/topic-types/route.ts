@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, contentPlannerTopicTypes } from '@/lib/db'
 import { asc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { contentPlannerTopicTypes,db } from '@/lib/db'
 
 /** GET /api/content-planner/topic-types */
 export async function GET() {

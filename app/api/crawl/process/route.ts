@@ -1,6 +1,7 @@
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { NextResponse } from 'next/server'
 
 // Vercel serverless function configuration
 export const maxDuration = 300 // 5 minutes

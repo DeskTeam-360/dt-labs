@@ -1,8 +1,9 @@
+import { and,eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db, screenshots } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
 import { deleteObject } from '@/lib/storage-idrive'
-import { NextResponse } from 'next/server'
 
 /** POST /api/screenshots/delete - Delete screenshot (for web app with session) */
 export async function POST(request: Request) {

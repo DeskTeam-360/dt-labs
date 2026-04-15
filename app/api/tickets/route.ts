@@ -1,35 +1,36 @@
+import { and, asc, desc, eq, gte, ilike, inArray, lte,or } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
+import { google } from 'googleapis'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
+import { isAdmin } from '@/lib/auth-utils'
+import { loadAutomationTicketContext, runAutomationRules } from '@/lib/automation-engine'
 import { db } from '@/lib/db'
 import {
-  tickets,
-  users,
-  teams,
-  ticketTypes,
-  ticketPriorities,
   companies,
   companyUsers,
-  ticketAssignees,
-  ticketChecklist,
-  ticketTags,
-  tags,
-  ticketComments,
-  ticketAttachments,
-  teamMembers,
-  messageTemplates,
   emailIntegrations,
+  messageTemplates,
+  tags,
+  teamMembers,
+  teams,
+  ticketAssignees,
+  ticketAttachments,
+  ticketChecklist,
+  ticketComments,
+  ticketPriorities,
+  tickets,
+  ticketTags,
+  ticketTypes,
+  users,
 } from '@/lib/db'
-import { loadAutomationTicketContext, runAutomationRules } from '@/lib/automation-engine'
-import { logTicketActivity } from '@/lib/ticket-activity-log'
-import { isAdmin } from '@/lib/auth-utils'
-import { getPublicUrl } from '@/lib/storage-idrive'
-import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
-import { eq, inArray, desc, asc, and, or, ilike, gte, lte } from 'drizzle-orm'
-import { sql } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 import { notifyTicketUsers } from '@/lib/firebase/ticket-notifications-server'
+import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
+import { getPublicUrl } from '@/lib/storage-idrive'
+import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { coerceTicketType, DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
-import { google } from 'googleapis'
 
 const DEFAULT_LIMIT = 500
 const MAX_LIMIT = 1000

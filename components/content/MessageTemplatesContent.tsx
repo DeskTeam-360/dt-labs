@@ -1,14 +1,15 @@
 'use client'
 
-import { Layout, Table, Button, Typography, Card, message, Switch, Space, Tag, Tabs } from 'antd'
 import { EditOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Button, Card, Layout, message, Space, Switch, Table, Tabs,Tag, Typography } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import { useRouter } from 'next/navigation'
-import AdminSidebar from '../AdminSidebar'
+import { useCallback, useEffect, useMemo,useState } from 'react'
+
 import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
 import MessageTemplatePreviewModal from '../MessageTemplatePreviewModal'
 import { shouldOpenHrefInNewTab } from '../SpaNavLink'
-import type { ColumnsType } from 'antd/es/table'
 
 const { Content } = Layout
 const { Title, Text } = Typography

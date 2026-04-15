@@ -1,8 +1,8 @@
 'use client'
 
-import { Card, Form, Button, Space, Row, Col, Spin, Typography, Input } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import type { FormInstance } from 'antd'
+import { Button, Card, Col, Form, Input,Row, Space, Spin, Typography } from 'antd'
 
 const { TextArea } = Input
 const { Text } = Typography

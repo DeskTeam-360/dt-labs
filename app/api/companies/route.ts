@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, companies, tickets, companyUsers, users } from '@/lib/db'
 import { and, desc, eq, inArray, isNotNull, max } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { companies, companyUsers, db, tickets, users } from '@/lib/db'
 import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
 
 /** GET /api/companies - List companies */

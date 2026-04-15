@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const SCOPES = [

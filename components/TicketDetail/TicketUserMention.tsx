@@ -1,8 +1,9 @@
 'use client'
 
 import { Tooltip } from 'antd'
-import { SpaNavLink } from '@/components/SpaNavLink'
 import type { ReactNode } from 'react'
+
+import { SpaNavLink } from '@/components/SpaNavLink'
 
 type TicketUserMentionProps = {
   userId?: string | null

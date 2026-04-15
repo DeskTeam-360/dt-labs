@@ -1,22 +1,30 @@
+import bcrypt from 'bcryptjs'
+import { and, eq, ilike, inArray } from 'drizzle-orm'
+import { google } from 'googleapis'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
+import { runTicketCommentAutomation } from '@/lib/automation-engine'
 import {
-  db,
-  ticketComments,
   commentAttachments,
-  ticketCcRecipients,
-  tickets,
-  ticketAssignees,
-  users,
   companyUsers,
+  db,
+  emailIntegrations,
+  messageTemplates,
+  teamMembers,
+  ticketAssignees,
+  ticketCcRecipients,
+  ticketComments,
+  tickets,
+  users,
 } from '@/lib/db'
 import { notifyTicketUsers } from '@/lib/firebase/ticket-notifications-server'
 import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
-import { runTicketCommentAutomation } from '@/lib/automation-engine'
-import { logTicketActivity } from '@/lib/ticket-activity-log'
-import { eq, ilike, inArray } from 'drizzle-orm'
-import bcrypt from 'bcryptjs'
-import { NextResponse } from 'next/server'
+import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
+import { logTicketActivity } from '@/lib/ticket-activity-log'
+
+const AGENT_REQUESTER_REPLIES_TEMPLATE_KEY = 'agent_notification_requester_replies' as const
 
 function randomPassword(length = 24): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -35,6 +43,141 @@ function truncateVarchar(s: string | null | undefined, maxLen: number): string {
 
 function escapeIlike(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+}
+
+function encodeSubjectHeader(subject: string): string {
+  if (/^[\x01-\x7F]*$/.test(subject)) return subject
+  return '=?UTF-8?B?' + Buffer.from(subject, 'utf8').toString('base64') + '?='
+}
+
+async function sendAgentRequesterRepliesEmail(params: {
+  ticketId: number
+  actorUserId: string
+  ticketTitle: string
+  bodyPreview: string
+}) {
+  const { ticketId, actorUserId, ticketTitle, bodyPreview } = params
+
+  const [ticketRow] = await db
+    .select({ teamId: tickets.teamId })
+    .from(tickets)
+    .where(eq(tickets.id, ticketId))
+    .limit(1)
+  if (!ticketRow?.teamId) return
+
+  const memberRows = await db
+    .select({ user: users })
+    .from(teamMembers)
+    .leftJoin(users, eq(teamMembers.userId, users.id))
+    .where(eq(teamMembers.teamId, ticketRow.teamId))
+
+  const recipients = memberRows
+    .map((r) => r.user)
+    .filter((u): u is NonNullable<typeof memberRows[number]['user']> => Boolean(u?.email))
+    .filter((u) => u.id !== actorUserId)
+
+  if (recipients.length === 0) return
+
+  const [senderUser] = await db.select().from(users).where(eq(users.id, actorUserId)).limit(1)
+  const senderMap = userRowToMergeMap(senderUser ?? null)
+
+  const [tpl] = await db
+    .select({ content: messageTemplates.content, status: messageTemplates.status })
+    .from(messageTemplates)
+    .where(eq(messageTemplates.key, AGENT_REQUESTER_REPLIES_TEMPLATE_KEY))
+    .limit(1)
+  if (!tpl || tpl.status !== 'active') return
+
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const safeBase = baseUrl.replace(/\/$/, '')
+  const ticketUrl = `${safeBase}/tickets/${ticketId}`
+  const subject = `Requester replied on Ticket #${ticketId}`
+  const subjectMime = encodeSubjectHeader(subject)
+
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+  if (!clientId || !clientSecret) return
+
+  const [integration] = await db
+    .select({
+      id: emailIntegrations.id,
+      emailAddress: emailIntegrations.emailAddress,
+      accessToken: emailIntegrations.accessToken,
+      refreshToken: emailIntegrations.refreshToken,
+      expiresAt: emailIntegrations.expiresAt,
+    })
+    .from(emailIntegrations)
+    .where(and(eq(emailIntegrations.provider, 'google'), eq(emailIntegrations.isActive, true)))
+    .limit(1)
+  if (!integration?.accessToken) return
+
+  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, `${safeBase}/api/email/google/callback`)
+  let accessToken = integration.accessToken
+  const expiresAt = integration.expiresAt ? new Date(integration.expiresAt) : null
+  const needsRefresh = !expiresAt || expiresAt <= new Date()
+  if (needsRefresh && integration.refreshToken) {
+    oauth2Client.setCredentials({ refresh_token: integration.refreshToken })
+    const { credentials } = await oauth2Client.refreshAccessToken()
+    accessToken = credentials.access_token ?? integration.accessToken
+    if (credentials.access_token && credentials.expiry_date) {
+      await db
+        .update(emailIntegrations)
+        .set({
+          accessToken: credentials.access_token,
+          expiresAt: new Date(credentials.expiry_date),
+          updatedAt: new Date(),
+        })
+        .where(eq(emailIntegrations.id, integration.id))
+    }
+  } else {
+    oauth2Client.setCredentials({ access_token: accessToken })
+  }
+
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
+  const fromEmail = integration.emailAddress || 'noreply@example.com'
+  const rawTpl = tpl.content?.trim() ?? ''
+
+  for (const recipient of recipients) {
+    const recipientMap = userRowToMergeMap(recipient)
+    const mergedTpl = rawTpl
+      ? mergeMessageTemplateHtml(rawTpl, {
+          origin: safeBase,
+          ticketId: String(ticketId),
+          recipient: recipientMap,
+          sender: senderMap,
+          useDomMerge: false,
+        })
+      : ''
+
+    const fallbackHtml =
+      `<p>Hello ${recipientMap.full_name !== '—' ? recipientMap.full_name : ''},</p>` +
+      `<p>The requester has replied on <strong>Ticket #${ticketId}</strong>.</p>` +
+      `<p><strong>${ticketTitle}</strong></p>` +
+      `<p>${bodyPreview || '(attachment)'}</p>` +
+      `<p>Open ticket: <a href="${ticketUrl}">${ticketUrl}</a></p>`
+
+    const bodyHtml = mergedTpl || fallbackHtml
+    const rawEmail = [
+      `From: ${fromEmail}`,
+      `To: ${recipient.email}`,
+      `Subject: ${subjectMime}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      '',
+      bodyHtml,
+    ].join('\r\n')
+
+    const raw = Buffer.from(rawEmail)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw },
+    })
+  }
 }
 
 export async function POST(
@@ -315,6 +458,27 @@ export async function POST(
       }
     } catch (err) {
       console.error('[comments] slack notify:', err)
+    }
+
+    try {
+      const [ticketForMail] = await db
+        .select({ title: tickets.title })
+        .from(tickets)
+        .where(eq(tickets.id, ticketId))
+        .limit(1)
+      const mailPreview = (comment || '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 300)
+      await sendAgentRequesterRepliesEmail({
+        ticketId,
+        actorUserId: authUser.id,
+        ticketTitle: ticketForMail?.title || 'Ticket',
+        bodyPreview: mailPreview,
+      })
+    } catch (err) {
+      console.error('[comments] team email notify:', err)
     }
   }
 

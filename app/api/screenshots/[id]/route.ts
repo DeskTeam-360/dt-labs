@@ -1,7 +1,8 @@
-import { db, screenshots, apiTokens } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
-import { deleteObject } from '@/lib/storage-idrive'
+import { and,eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { apiTokens,db, screenshots } from '@/lib/db'
+import { deleteObject } from '@/lib/storage-idrive'
 
 function validateToken(request: Request) {
   const authHeader = request.headers.get('Authorization')
