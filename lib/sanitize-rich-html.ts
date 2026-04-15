@@ -2,10 +2,10 @@ import DOMPurify from 'isomorphic-dompurify'
 import type { Config } from 'dompurify'
 
 /**
- * HTML untuk ditampilkan di detail tiket (deskripsi + komentar, termasuk dari email).
- * - Menghapus script / tag dokumen yang merusak layout
- * - Pada tabel: hilangkan lebar paksa (style width & atribut width) supaya muat kontainer
- * - Sel td/th yang benar-benar kosong: sembunyikan agar tidak menambah ruang kosong besar
+ * Sanitize HTML shown on ticket detail (description + comments, including from email).
+ * - Strip script / document tags that break layout
+ * - On tables: remove forced widths (style width & width attribute) so content fits the container
+ * - Truly empty td/th cells: hide them so they do not add large blank gaps
  */
 const RICH_HTML_CONFIG: Config = {
   USE_PROFILES: { html: true },
@@ -105,22 +105,22 @@ function installTicketRichHtmlHooks(): void {
   })
 }
 
-/** <ol> tanpa li[data-list] (HTML semantik / export Quill): penomoran browser selalu mulai 1 per <ol>. */
+/** <ol> without li[data-list] (semantic HTML / Quill export): browsers restart numbering at 1 per <ol>. */
 function isSemanticOrderedList(el: Element): boolean {
   if (el.nodeName !== 'OL') return false
   return el.querySelector(':scope > li[data-list]') == null
 }
 
 /**
- * Satu checklist sering jadi beberapa <ol> beturut-turut yang dipisah <ul>.
- * Tanpa ini, tiap <ol> tampil 1. 1. 1. — kita set atribut `start` untuk melanjutkan angka.
+ * One checklist often becomes several consecutive <ol> blocks split by <ul>.
+ * Without this, each <ol> shows 1. 1. 1. — we set the `start` attribute to continue numbering.
  */
 function mergeSiblingOrderedListStarts(container: ParentNode): void {
   let nextIndex = 0
   let prev: Element | null = null
 
   for (const child of Array.from(container.children)) {
-    /* JSDOM / Node: hindari `instanceof Element` (global tidak selalu ada). */
+    /* JSDOM / Node: avoid `instanceof Element` (global may be missing). */
     const el = child as Element
     if (el.nodeName === 'OL') {
       if (!isSemanticOrderedList(el)) {

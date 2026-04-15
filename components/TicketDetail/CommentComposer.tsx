@@ -27,7 +27,7 @@ interface CommentComposerProps {
     extra?: CommentExtra
   ) => Promise<void>
   loading?: boolean
-  /** When `showNoteOption`, `null` = belum pilih mode (hanya tombol Add note / Reply). */
+  /** When `showNoteOption`, `null` = pick mode first (Add note / Reply buttons only). */
   commentVisibility?: 'note' | 'reply' | null
   onCommentVisibilityChange?: (v: 'note' | 'reply') => void
   showNoteOption?: boolean
@@ -65,7 +65,7 @@ export default function CommentComposer({
     return textOnly.length === 0
   }
 
-  /** Customer / non-agent UI: selalu reply. Agent with note+reply: honor null = pilih dulu. */
+  /** Customer / non-agent UI: always reply. Agent with note+reply: honor null = choose mode first. */
   const mode = showNoteOption ? commentVisibility ?? null : 'reply'
 
   const [draft, setDraft] = useState('')

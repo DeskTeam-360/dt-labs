@@ -218,9 +218,9 @@ export async function startCrawlProcess(
 
       const contentType = response.headers.get('content-type') || ''
       const httpStatus = response.status
-      const finalUrl = response.url // URL final setelah redirect (jika ada)
-      
-      // Detect redirect: jika final URL berbeda dengan current URL, berarti ada redirect
+      const finalUrl = response.url // Final URL after redirect (if any)
+
+      // Detect redirect: if final URL differs from the requested URL, a redirect occurred
       const isRedirect = finalUrl !== currentUrl
       const redirectInfo = isRedirect ? `Redirected from ${currentUrl} to ${finalUrl}` : null
 
@@ -258,9 +258,8 @@ export async function startCrawlProcess(
         continue
       }
 
-      // Handle non-HTML responses (hanya jika bukan redirect)
-      // Jika redirect, kita tetap process meskipun mungkin bukan HTML
-      // Non-HTML content bukan failed, tapi uncrawlable (seperti images, PDFs, dll)
+      // Handle non-HTML responses (only when not a redirect)
+      // Non-HTML is not a failure, but uncrawlable (e.g. images, PDFs, etc.)
       if (!contentType.includes('text/html') && !isRedirect) {
         uncrawledCount++
         await database.insert(crawlPages).values({
@@ -274,7 +273,7 @@ export async function startCrawlProcess(
           crawledAt: new Date(),
         })
 
-        // Update session - uncrawl-page tidak dihitung sebagai failed atau crawled
+        // Update session — uncrawl-page is neither failed nor successfully crawled HTML
         await database
           .update(crawlSessions)
           .set({

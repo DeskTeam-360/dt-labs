@@ -1,6 +1,6 @@
-// Background service worker untuk Chrome extension
+// Background service worker for the Chrome extension
 
-// Listen untuk messages dari popup
+// Listen for messages from the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'captureScreenshot') {
     captureScreenshot()
@@ -26,7 +26,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Fungsi untuk mengambil screenshot
+// Capture a screenshot of the active tab
 async function captureScreenshot() {
   try {
     // Get current active tab
@@ -49,7 +49,7 @@ async function captureScreenshot() {
   }
 }
 
-// Fungsi untuk upload screenshot otomatis
+// Auto-capture and upload (scheduled)
 async function autoCaptureAndUpload() {
   try {
     console.log('Auto screenshot triggered');
@@ -92,7 +92,7 @@ async function autoCaptureAndUpload() {
           type: 'basic',
           iconUrl: 'icons/icon48.png',
           title: 'Auto Screenshot',
-          message: 'Screenshot berhasil diupload otomatis'
+          message: 'Screenshot uploaded automatically'
         });
       } catch (error) {
         // Notification permission might not be granted, ignore
@@ -133,7 +133,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// Listen untuk install
+// Install hook
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Screenshot & Upload extension installed');
 });

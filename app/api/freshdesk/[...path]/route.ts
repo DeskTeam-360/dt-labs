@@ -15,7 +15,10 @@ export async function GET(
 ) {
   if (!FRESHDESK_DOMAIN || !FRESHDESK_API_KEY) {
     return NextResponse.json(
-      { error: 'Freshdesk tidak dikonfigurasi. Set FRESHDESK_DOMAIN dan FRESHDESK_API_KEY di .env.local' },
+      {
+        error:
+          'Freshdesk is not configured. Set FRESHDESK_DOMAIN and FRESHDESK_API_KEY in .env.local',
+      },
       { status: 503 }
     )
   }

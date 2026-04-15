@@ -11,6 +11,14 @@ import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
 const { Text, Paragraph } = Typography
 
+function statusLabelForCustomer(slug: string | undefined | null, options: StatusOption[]): string {
+  if (!slug) return '—'
+  const s = options.find((o) => o.slug === slug)
+  if (!s) return slug
+  const ct = typeof s.customer_title === 'string' ? s.customer_title.trim() : ''
+  return ct || s.title
+}
+
 interface CommentAttachment {
   id: string
   file_url: string
@@ -36,6 +44,8 @@ interface Comment {
 interface StatusOption {
   slug: string
   title: string
+  /** Shown in customer portal instead of internal `title` when set */
+  customer_title?: string
   color: string
 }
 
@@ -179,7 +189,7 @@ export default function TabGeneralCustomer({
               style={{ padding: 0 }}
             >
               Load older comments
-              {commentsOlderRemaining > 0 ? ` (${commentsOlderRemaining} belum ditampilkan)` : ''}
+              {commentsOlderRemaining > 0 ? ` (${commentsOlderRemaining} not shown yet)` : ''}
             </Button>
           ) : null}
         </div>
@@ -372,7 +382,7 @@ export default function TabGeneralCustomer({
         <Descriptions column={1} bordered>
           <Descriptions.Item label="Status">
             <Tag color={statusOptions.find((s) => s.slug === ticketData.status)?.color ?? 'default'}>
-              {statusOptions.find((s) => s.slug === ticketData.status)?.title ?? ticketData.status}
+              {statusLabelForCustomer(ticketData.status, statusOptions)}
             </Tag>
           </Descriptions.Item>
           <Descriptions.Item label="Type">
@@ -456,12 +466,12 @@ export default function TabGeneralCustomer({
               <DateDisplay date={ticketData.updated_at} />
             </Space>
           </Descriptions.Item>
-          <Descriptions.Item label="Total Time Tracked">
+          {/* <Descriptions.Item label="Total Time Tracked">
             <Space>
               <ClockCircleOutlined />
               <Text strong>{formatTime(totalTimeSeconds + (activeTimeTracker ? currentTime : 0))}</Text>
             </Space>
-          </Descriptions.Item>
+          </Descriptions.Item> */}
         </Descriptions>
       </Col>
     </Row>

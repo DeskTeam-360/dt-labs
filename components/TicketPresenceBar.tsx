@@ -18,7 +18,7 @@ import { getFirebaseApp, isFirebaseClientConfigured } from '@/lib/firebase/clien
 
 const { Text } = Typography
 
-/** Dianggap masih “online” di halaman tiket jika heartbeat dalam jendela ini (ms). */
+/** Treat viewer as still “online” on the ticket page if heartbeat is within this window (ms). */
 const VIEWER_TTL_MS = 40_000
 const HEARTBEAT_MS = 12_000
 
@@ -45,7 +45,7 @@ export default function TicketPresenceBar({ ticketId, currentUser }: Props) {
 
   const ticketKey = String(ticketId)
 
-  /** Orang lain yang sedang membuka tiket ini (bukan Anda). */
+  /** Other people currently viewing this ticket (excluding you). */
   const otherViewers = useMemo(
     () => viewers.filter((v) => v.userId !== currentUser.id),
     [viewers, currentUser.id]

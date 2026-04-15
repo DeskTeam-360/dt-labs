@@ -87,7 +87,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
 
   const update = (key: keyof AutomationActions, val: unknown) => {
     const next = { ...actions }
-    /** Quill memanggil onChange saat mount dengan HTML “kosong”; jangan hapus baris Add Note. */
+    /** Quill fires onChange on mount with “empty” HTML; do not remove the Add Note row. */
     if (key === 'add_note') {
       if (val === undefined || val === null) {
         delete next.add_note

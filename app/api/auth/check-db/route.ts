@@ -23,11 +23,11 @@ export async function GET() {
     const client = postgres(connStr, { prepare: false, max: 1 })
     const db = drizzle(client)
 
-    // Test query: hitung users
+    // Test query: count users
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(users)
     const userCount = result[0]?.count ?? 0
 
-    // Cek users dengan password_hash
+    // Check users that have password_hash
     const withPassword = await db
       .select({ email: users.email })
       .from(users)
@@ -43,9 +43,9 @@ export async function GET() {
       userCount,
       usersWithPassword,
       message: userCount === 0
-        ? 'Tabel users kosong. Jalankan: npm run db:seed'
+        ? 'The users table is empty. Run: npm run db:seed'
         : usersWithPassword === 0
-          ? 'Semua user tidak punya password_hash. Jalankan seed atau update password_hash.'
+          ? 'No users have password_hash set. Run the seed or update password_hash.'
           : 'DB OK',
     })
   } catch (err: unknown) {

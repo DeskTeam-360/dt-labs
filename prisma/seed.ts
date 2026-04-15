@@ -1,11 +1,11 @@
 /**
  * Seed: ticket_statuses, ticket_types, ticket_priorities, users (Drizzle)
- * Jalankan: npm run db:seed
+ * Run: npm run db:seed
  *
  * Env:
- *   DATABASE_URL (wajib)
- *   SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_ADMIN_NAME — admin default jika SEED_USERS kosong
- *   SEED_USERS — beberapa user: 'email1:pass1:Nama1,email2:pass2:Nama2' (role: user)
+ *   DATABASE_URL (required)
+ *   SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_ADMIN_NAME — default admin when SEED_USERS is empty
+ *   SEED_USERS — extra users: 'email1:pass1:Name1,email2:pass2:Name2' (role: user)
  */
 import 'dotenv/config'
 

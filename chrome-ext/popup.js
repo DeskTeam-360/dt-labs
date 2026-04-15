@@ -106,18 +106,18 @@ async function handleSaveConfig() {
   const token = apiTokenInput.value.trim();
 
   if (!url) {
-    showStatus(configStatus, 'API URL harus diisi', 'error');
+    showStatus(configStatus, 'API URL is required', 'error');
     return;
   }
 
   // Validate URL format
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    showStatus(configStatus, 'URL harus dimulai dengan http:// atau https://', 'error');
+    showStatus(configStatus, 'URL must start with http:// or https://', 'error');
     return;
   }
 
   if (!token) {
-    showStatus(configStatus, 'API Token harus diisi. Dapatkan dari halaman Profile aplikasi.', 'error');
+    showStatus(configStatus, 'API Token is required. Get it from the app Profile page.', 'error');
     return;
   }
 
@@ -131,7 +131,7 @@ async function handleSaveConfig() {
     // Initialize API
     await initAPI(url, token);
 
-    showStatus(configStatus, 'Konfigurasi berhasil disimpan!', 'success');
+    showStatus(configStatus, 'Configuration saved successfully.', 'success');
     
     // Switch to main section
     setTimeout(() => {
@@ -149,8 +149,8 @@ async function handleSaveConfig() {
 async function handleCapture() {
   try {
     captureBtn.disabled = true;
-    captureBtn.textContent = 'Mengambil screenshot...';
-    showStatus(statusMessage, 'Mengambil screenshot...', 'info');
+    captureBtn.textContent = 'Capturing screenshot...';
+    showStatus(statusMessage, 'Capturing screenshot...', 'info');
 
     // Send message to background script
     chrome.runtime.sendMessage({ action: 'captureScreenshot' }, (response) => {
@@ -162,39 +162,39 @@ async function handleCapture() {
         currentScreenshot = response.dataUrl;
         screenshotPreview.src = response.dataUrl;
         previewContainer.style.display = 'block';
-        showStatus(statusMessage, 'Screenshot berhasil diambil!', 'success');
+        showStatus(statusMessage, 'Screenshot captured successfully.', 'success');
       } else {
         throw new Error(response.error || 'Failed to capture screenshot');
       }
 
       captureBtn.disabled = false;
-      captureBtn.textContent = '📷 Ambil Screenshot';
+      captureBtn.textContent = '📷 Capture screenshot';
     });
   } catch (error) {
     console.error('Error capturing screenshot:', error);
     showStatus(statusMessage, 'Error: ' + error.message, 'error');
     captureBtn.disabled = false;
-    captureBtn.textContent = '📷 Ambil Screenshot';
+    captureBtn.textContent = '📷 Capture screenshot';
   }
 }
 
 // Handle upload screenshot
 async function handleUpload() {
   if (!currentScreenshot) {
-    showStatus(statusMessage, 'Tidak ada screenshot untuk diupload', 'error');
+    showStatus(statusMessage, 'No screenshot to upload', 'error');
     return;
   }
 
   try {
     uploadBtn.disabled = true;
-    uploadBtn.textContent = 'Mengupload...';
-    showStatus(statusMessage, 'Mengupload screenshot...', 'info');
+    uploadBtn.textContent = 'Uploading...';
+    showStatus(statusMessage, 'Uploading screenshot...', 'info');
 
     // Upload using API client
     const result = await uploadScreenshot(currentScreenshot);
 
     if (result.success) {
-      showStatus(statusMessage, `Upload berhasil! URL disalin ke clipboard.`, 'success');
+      showStatus(statusMessage, `Upload successful. URL copied to clipboard.`, 'success');
       
       // Copy URL to clipboard
       try {
@@ -237,7 +237,7 @@ function handleRetake() {
 
 // Handle logout
 async function handleLogout() {
-  if (confirm('Yakin ingin logout? Konfigurasi akan dihapus.')) {
+  if (confirm('Log out? Your saved configuration will be removed from this device.')) {
     // Stop auto screenshot
     chrome.runtime.sendMessage({ action: 'stopAutoScreenshot' });
     
@@ -263,7 +263,7 @@ async function handleAutoScreenshotToggle() {
     
     // Validate interval
     if (interval < 1 || interval > 60) {
-      showStatus(statusMessage, 'Interval harus antara 1-60 menit', 'error');
+      showStatus(statusMessage, 'Interval must be between 1 and 60 minutes', 'error');
       autoScreenshotToggle.checked = false;
       autoScreenshotSettings.style.display = 'none';
       return;
@@ -289,7 +289,7 @@ async function handleAutoScreenshotToggle() {
       });
       
       updateAutoScreenshotStatus();
-      showStatus(statusMessage, `Auto screenshot aktif: setiap ${interval} menit`, 'success');
+      showStatus(statusMessage, `Auto screenshot on: every ${interval} minute(s)`, 'success');
     });
   } else {
     // Stop auto screenshot
@@ -302,7 +302,7 @@ async function handleAutoScreenshotToggle() {
       chrome.storage.sync.set({ autoScreenshotEnabled: false });
       autoScreenshotSettings.style.display = 'none';
       autoScreenshotStatus.textContent = '';
-      showStatus(statusMessage, 'Auto screenshot dinonaktifkan', 'info');
+      showStatus(statusMessage, 'Auto screenshot turned off', 'info');
     });
   }
 }
@@ -315,7 +315,7 @@ async function handleIntervalChange() {
   
   // Validate interval
   if (interval < 1 || interval > 60) {
-    showStatus(statusMessage, 'Interval harus antara 1-60 menit', 'error');
+    showStatus(statusMessage, 'Interval must be between 1 and 60 minutes', 'error');
     return;
   }
   
@@ -332,7 +332,7 @@ async function handleIntervalChange() {
     // Save settings
     chrome.storage.sync.set({ autoScreenshotInterval: interval });
     updateAutoScreenshotStatus();
-    showStatus(statusMessage, `Interval diupdate: setiap ${interval} menit`, 'success');
+    showStatus(statusMessage, `Interval updated: every ${interval} minute(s)`, 'success');
   });
 }
 
@@ -354,13 +354,13 @@ async function updateAutoScreenshotStatus() {
       
       autoScreenshotStatus.innerHTML = `
         <div style="color: #4CAF50;">
-          ✅ Aktif - Screenshot berikutnya dalam ${minutesUntil} menit
+          ✅ On — next screenshot in ${minutesUntil} minute(s)
         </div>
       `;
     } else {
       autoScreenshotStatus.innerHTML = `
         <div style="color: #666;">
-          ⏳ Menunggu screenshot pertama...
+          ⏳ Waiting for first screenshot...
         </div>
       `;
     }

@@ -1,53 +1,53 @@
-# Setup Token Authentication untuk Chrome Extension
+# Chrome extension: token authentication setup
 
-## Cara Menggunakan Token Authentication
+## How to use token authentication
 
-### 1. Login ke Aplikasi
-- Login ke aplikasi Next.js Anda di browser
-- Pastikan sudah login dengan akun yang valid
+### 1. Sign in to the app
+- Sign in to your Next.js app in the browser
+- Use a valid account
 
-### 2. Generate API Token
-1. Buka halaman **Profile** (menu di sidebar)
-2. Scroll ke bagian **"API Tokens for Chrome Extension"**
-3. Klik tombol **"Generate New Token"**
-4. **PENTING**: Copy token yang muncul (token hanya ditampilkan sekali!)
-5. Token akan expire setelah 30 hari
+### 2. Generate an API token
+1. Open **Profile** (sidebar menu)
+2. Scroll to **“API Tokens for Chrome Extension”**
+3. Click **“Generate New Token”**
+4. **Important:** Copy the token when it appears (it is only shown once)
+5. The token expires after 30 days
 
-### 3. Konfigurasi Extension
-1. Buka Chrome Extension popup
-2. Masukkan:
-   - **Next.js API URL**: URL aplikasi Anda (contoh: `http://localhost:3000` atau `https://your-app.vercel.app`)
-   - **API Token**: Token yang sudah di-copy dari halaman Profile
-3. Klik **"Simpan Konfigurasi"**
-4. Extension siap digunakan!
+### 3. Configure the extension
+1. Open the Chrome extension popup
+2. Enter:
+   - **Next.js API URL:** your app URL (e.g. `http://localhost:3000` or `https://your-app.vercel.app`)
+   - **API Token:** the token you copied from Profile
+3. Click **“Save configuration”**
+4. The extension is ready to use
 
-## Keuntungan Token Authentication
+## Why use token authentication
 
-✅ **Lebih Aman**: Tidak perlu service role key di extension  
-✅ **User-Specific**: Setiap user punya token sendiri  
-✅ **Trackable**: Bisa lihat siapa yang upload screenshot  
-✅ **Revocable**: Bisa hapus token kapan saja  
-✅ **Expirable**: Token otomatis expire setelah 30 hari  
+- **Safer:** No service role key in the extension  
+- **Per user:** Each user has their own token  
+- **Traceable:** You can see who uploaded screenshots  
+- **Revocable:** Tokens can be removed at any time  
+- **Expiring:** Tokens expire automatically after 30 days  
 
 ## Troubleshooting
 
-### "Token is required" error
-- Pastikan token sudah di-copy dengan benar
-- Pastikan tidak ada spasi di awal/akhir token
-- Generate token baru jika perlu
+### “Token is required” error
+- Make sure the token was copied correctly
+- Trim any leading or trailing spaces
+- Generate a new token if needed
 
-### "Invalid or expired token" error
-- Token mungkin sudah expired (30 hari)
-- Token mungkin sudah dihapus
-- Generate token baru di halaman Profile
+### “Invalid or expired token” error
+- The token may have expired (30 days)
+- The token may have been deleted
+- Generate a new token on the Profile page
 
-### "Unauthorized" error
-- Pastikan sudah login ke aplikasi
-- Pastikan token masih aktif (cek di halaman Profile)
+### “Unauthorized” error
+- Ensure you are signed in to the app
+- Confirm the token is still active (check on Profile)
 
-## Catatan
+## Notes
 
-- Token hanya ditampilkan sekali saat generate
-- Simpan token dengan aman (jangan share ke orang lain)
-- Hapus token jika tidak digunakan lagi
-- Token baru akan expire 30 hari setelah dibuat
+- The token is only shown once when generated
+- Store it securely (do not share it)
+- Delete tokens you no longer use
+- New tokens expire 30 days after creation

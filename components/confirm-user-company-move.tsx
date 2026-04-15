@@ -2,7 +2,7 @@
 
 import { Modal } from 'antd'
 
-/** Peringatan saat user customer sudah punya company lalu dialihkan ke company lain (bukan di /companies saja). */
+/** Confirm when a customer user already belongs to a company and will be moved to another. */
 export function confirmUserCompanyMove(options: {
   userLabel: string
   fromCompanyName: string
@@ -10,10 +10,10 @@ export function confirmUserCompanyMove(options: {
   onOk: () => void | Promise<void>
 }): void {
   Modal.confirm({
-    title: 'Pindah company?',
-    content: `${options.userLabel} saat ini terdaftar di company "${options.fromCompanyName}". Jika dilanjutkan, user akan dipindahkan ke "${options.toCompanyName}" dan tidak lagi tergabung di company sebelumnya.`,
-    okText: 'Ya, pindahkan',
-    cancelText: 'Batal',
+    title: 'Move to another company?',
+    content: `${options.userLabel} is currently assigned to "${options.fromCompanyName}". If you continue, they will be moved to "${options.toCompanyName}" and will no longer belong to the previous company.`,
+    okText: 'Yes, move user',
+    cancelText: 'Cancel',
     onOk: () => Promise.resolve(options.onOk()),
   })
 }

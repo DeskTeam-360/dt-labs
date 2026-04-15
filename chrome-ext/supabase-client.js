@@ -1,5 +1,5 @@
-// API client untuk Chrome extension
-// Menggunakan Next.js API endpoint untuk upload screenshot
+// API client for the Chrome extension
+// Uses the Next.js API endpoint to upload screenshots
 
 let apiUrl = "http://localhost:3000";
 

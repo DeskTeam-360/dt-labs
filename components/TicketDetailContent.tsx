@@ -228,7 +228,7 @@ export default function TicketDetailContent({
     const [totalTimeSeconds, setTotalTimeSeconds] = useState<number>(0)
     const [currentTime, setCurrentTime] = useState<number>(0)
     const [statusesFromDb, setStatusesFromDb] = useState<
-        { slug: string; title: string; color: string; is_active?: boolean }[]
+        { slug: string; title: string; customer_title?: string; color: string; is_active?: boolean }[]
     >([])
     const [assigneesChanging, setAssigneesChanging] = useState(false)
     const [teamChanging, setTeamChanging] = useState(false)
@@ -291,7 +291,13 @@ export default function TicketDetailContent({
         const fetchStatuses = async () => {
             try {
                 const data = await apiFetch<{
-                    statuses: Array<{ slug: string; title: string; color: string; is_active?: boolean }>
+                    statuses: Array<{
+                        slug: string
+                        title: string
+                        customer_title?: string
+                        color: string
+                        is_active?: boolean
+                    }>
                 }>('/api/tickets/lookup')
                 if (data?.statuses?.length) {
                     setStatusesFromDb(data.statuses)
@@ -401,7 +407,7 @@ export default function TicketDetailContent({
         }
     }
 
-    /** Dipanggil saat Firestore `ticket_data_sync/{id}` berubah: ambil ulang detail + komentar dari API. */
+    /** Called when Firestore `ticket_data_sync/{id}` changes: refetch ticket detail + comments from the API. */
     const mergeDetailFromServer = useCallback(async () => {
         const id = liveSyncTicketIdRef.current
         if (!id) return
@@ -449,7 +455,7 @@ export default function TicketDetailContent({
         }
     }, [variant])
 
-    // User membuka ticket ini → onSnapshot ke ticket_data_sync/{id}; versi naik → mergeDetailFromServer.
+    // User opened this ticket → onSnapshot on ticket_data_sync/{id}; version bump → mergeDetailFromServer.
     useTicketDetailLiveSync(displayTicket?.id, mergeDetailFromServer)
 
     const handleLoadMoreComments = async () => {
@@ -608,7 +614,7 @@ export default function TicketDetailContent({
             return
         }
         if (variant === 'admin' && (commentVisibility !== 'note' && commentVisibility !== 'reply')) {
-            message.warning('Pilih Add note atau Reply dulu')
+            message.warning('Choose Add note or Reply first')
             return
         }
         setLoading(true)
@@ -658,10 +664,10 @@ export default function TicketDetailContent({
                     })
                     if (!res.ok) {
                         const err = await res.json().catch(() => ({}))
-                        message.warning('Balasan dikirim, tapi email ke pelanggan gagal: ' + (err?.error || res.statusText))
+                        message.warning('Reply saved, but email to the customer failed: ' + (err?.error || res.statusText))
                     }
                 } catch {
-                    message.warning('Balasan dikirim, tapi email ke pelanggan gagal.')
+                    message.warning('Reply saved, but email to the customer failed.')
                 }
             }
         } catch (error: any) {

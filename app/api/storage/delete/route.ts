@@ -27,10 +27,10 @@ export async function POST(request: Request) {
       { status: 400 }
     )
   }
-  // Hanya izinkan hapus file draft (CompanyName/draft/... atau draft/draft/...)
+  // Only allow deleting draft paths (CompanyName/draft/... or draft/draft/...)
   if (!path.includes('/draft/')) {
     return NextResponse.json(
-      { error: 'Hanya path draft yang boleh dihapus', success: false },
+      { error: 'Only draft paths can be deleted', success: false },
       { status: 403 }
     )
   }

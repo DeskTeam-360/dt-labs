@@ -981,11 +981,11 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       case 'failed':
         return 'red'
       case 'broken-page':
-        return 'orange' // Orange untuk broken pages (HTTP error status codes)
+        return 'orange' // Orange for broken pages (HTTP error status codes)
       case 'pending':
         return 'orange'
       case 'uncrawl-page':
-        return 'geekblue' // Cyan/blue untuk menunjukkan ini bukan error tapi uncrawlable
+        return 'geekblue' // Cyan/blue: not an error, but uncrawlable (non-HTML, etc.)
       default:
         return 'default'
     }

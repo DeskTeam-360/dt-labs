@@ -53,7 +53,7 @@ export default function ContentPlannerIntentsContent({ user: currentUser }: Cont
       setIntents((data || []) as IntentRecord[])
     } catch (e: unknown) {
       const err = e as { message?: string }
-      message.error(err?.message ?? 'Gagal memuat intents')
+      message.error(err?.message ?? 'Failed to load intents')
     } finally {
       setLoading(false)
     }
@@ -82,11 +82,11 @@ export default function ContentPlannerIntentsContent({ user: currentUser }: Cont
     try {
       const res = await fetch(`/api/content-planner/intents/${id}`, { method: 'DELETE', credentials: 'include' })
       if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
-      message.success('Intent dihapus')
+      message.success('Intent deleted')
       fetchIntents()
     } catch (e: unknown) {
       const err = e as { message?: string }
-      message.error(err?.message ?? 'Gagal menghapus')
+      message.error(err?.message ?? 'Failed to delete')
     }
   }
 
@@ -105,7 +105,7 @@ export default function ContentPlannerIntentsContent({ user: currentUser }: Cont
           body: JSON.stringify(payload),
         })
         if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
-        message.success('Intent diperbarui')
+        message.success('Intent updated')
       } else {
         const res = await fetch('/api/content-planner/intents', {
           method: 'POST',
@@ -114,14 +114,14 @@ export default function ContentPlannerIntentsContent({ user: currentUser }: Cont
           body: JSON.stringify(payload),
         })
         if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
-        message.success('Intent ditambah')
+        message.success('Intent added')
       }
       setModalVisible(false)
       form.resetFields()
       fetchIntents()
     } catch (e: unknown) {
       const err = e as { message?: string }
-      message.error(err?.message ?? 'Gagal menyimpan')
+      message.error(err?.message ?? 'Failed to save')
     } finally {
       setSaving(false)
     }
@@ -146,13 +146,13 @@ export default function ContentPlannerIntentsContent({ user: currentUser }: Cont
             Edit
           </Button>
           <Popconfirm
-            title="Hapus intent ini?"
+            title="Delete this intent?"
             onConfirm={() => handleDelete(record.id)}
-            okText="Hapus"
+            okText="Delete"
             okButtonProps={{ danger: true }}
           >
             <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              Hapus
+              Delete
             </Button>
           </Popconfirm>
         </Space>
@@ -171,7 +171,7 @@ export default function ContentPlannerIntentsContent({ user: currentUser }: Cont
                 Content Planner – Intents
               </Title>
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                Tambah Intent
+                Add intent
               </Button>
             </div>
             <Table
@@ -182,14 +182,14 @@ export default function ContentPlannerIntentsContent({ user: currentUser }: Cont
               pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} item` }}
             />
             <Modal
-              title={editingIntent ? 'Edit Intent' : 'Tambah Intent'}
+              title={editingIntent ? 'Edit intent' : 'Add intent'}
               open={modalVisible}
               onCancel={() => { setModalVisible(false); form.resetFields() }}
               footer={null}
               destroyOnClose
             >
               <Form form={form} layout="vertical" onFinish={handleSubmit}>
-                <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Wajib diisi' }]}>
+                <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Required' }]}>
                   <Input placeholder="e.g. Educational" />
                 </Form.Item>
                 <Form.Item name="description" label="Description">
@@ -198,9 +198,9 @@ export default function ContentPlannerIntentsContent({ user: currentUser }: Cont
                 <Form.Item>
                   <Space>
                     <Button type="primary" htmlType="submit" loading={saving}>
-                      {editingIntent ? 'Update' : 'Buat'}
+                      {editingIntent ? 'Update' : 'Create'}
                     </Button>
-                    <Button onClick={() => setModalVisible(false)}>Batal</Button>
+                    <Button onClick={() => setModalVisible(false)}>Cancel</Button>
                   </Space>
                 </Form.Item>
               </Form>

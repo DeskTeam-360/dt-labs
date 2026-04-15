@@ -57,7 +57,7 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
       setChannels(data || [])
     } catch (e: unknown) {
       const err = e as { message?: string }
-      message.error(err?.message ?? 'Gagal memuat channels')
+      message.error(err?.message ?? 'Failed to load channels')
     } finally {
       setLoading(false)
     }
@@ -103,11 +103,11 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
         credentials: 'include',
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
-      message.success('Channel dihapus')
+      message.success('Channel deleted')
       fetchChannels()
     } catch (e: unknown) {
       const err = e as { message?: string }
-      message.error(err?.message ?? 'Gagal menghapus')
+      message.error(err?.message ?? 'Failed to delete')
     }
   }
 
@@ -128,7 +128,7 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
           body: JSON.stringify(payload),
         })
         if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
-        message.success('Channel diperbarui')
+        message.success('Channel updated')
       } else {
         const res = await fetch('/api/content-planner/channels', {
           method: 'POST',
@@ -137,14 +137,14 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
           body: JSON.stringify(payload),
         })
         if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
-        message.success('Channel ditambah')
+        message.success('Channel added')
       }
       setModalVisible(false)
       form.resetFields()
       fetchChannels()
     } catch (e: unknown) {
       const err = e as { message?: string }
-      message.error(err?.message ?? 'Gagal menyimpan')
+      message.error(err?.message ?? 'Failed to save')
     } finally {
       setSaving(false)
     }
@@ -180,14 +180,14 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
             Edit
           </Button>
           <Popconfirm
-            title="Hapus channel ini?"
-            description="Content planner yang memakai channel ini akan kehilangan referensi channel."
+            title="Delete this channel?"
+            description="Content planners that use this channel will lose their channel reference."
             onConfirm={() => handleDelete(record.id)}
-            okText="Hapus"
+            okText="Delete"
             okButtonProps={{ danger: true }}
           >
             <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              Hapus
+              Delete
             </Button>
           </Popconfirm>
         </Space>
@@ -206,7 +206,7 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
                 Content Planner Channels
               </Title>
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                Tambah Channel
+                Add channel
               </Button>
             </div>
             <Table
@@ -218,7 +218,7 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
             />
 
             <Modal
-              title={editingChannel ? 'Edit Channel' : 'Tambah Channel'}
+              title={editingChannel ? 'Edit channel' : 'Add channel'}
               open={modalVisible}
               onCancel={() => {
                 setModalVisible(false)
@@ -231,16 +231,16 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
                 <Form.Item
                   name="title"
                   label="Title"
-                  rules={[{ required: true, message: 'Wajib diisi' }]}
+                  rules={[{ required: true, message: 'Required' }]}
                 >
                   <Input placeholder="e.g. Google Business Profile" />
                 </Form.Item>
                 <Form.Item name="description" label="Description">
-                  <TextArea rows={2} placeholder="Keterangan (opsional)" />
+                  <TextArea rows={2} placeholder="Description (optional)" />
                 </Form.Item>
                 <Form.Item name="company_ai_system_template_id" label="Default AI Template">
                   <Select
-                    placeholder="Pilih template (opsional)"
+                    placeholder="Select template (optional)"
                     allowClear
                     options={aiTemplates.map((t) => ({ value: t.id, label: t.title }))}
                   />
@@ -248,9 +248,9 @@ export default function ContentPlannerChannelsContent({ user: currentUser }: Con
                 <Form.Item>
                   <Space>
                     <Button type="primary" htmlType="submit" loading={saving}>
-                      {editingChannel ? 'Update' : 'Buat'}
+                      {editingChannel ? 'Update' : 'Create'}
                     </Button>
-                    <Button onClick={() => setModalVisible(false)}>Batal</Button>
+                    <Button onClick={() => setModalVisible(false)}>Cancel</Button>
                   </Space>
                 </Form.Item>
               </Form>

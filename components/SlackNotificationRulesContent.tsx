@@ -89,12 +89,12 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
           'error' in data &&
           typeof (data as { error: unknown }).error === 'string'
             ? (data as { error: string }).error
-            : `Gagal memuat aturan (HTTP ${res.status})`
+            : `Failed to load rules (HTTP ${res.status})`
         throw new Error(errMsg)
       }
       setRules(Array.isArray(data) ? data : [])
     } catch (e) {
-      message.error(e instanceof Error ? e.message : 'Gagal memuat aturan')
+      message.error(e instanceof Error ? e.message : 'Failed to load rules')
     } finally {
       setLoading(false)
     }
@@ -346,16 +346,16 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
               Slack notifications
             </Title>
             <Text type="secondary">
-              Kirim pesan ke channel Slack (Incoming Webhook) saat ticket cocok dengan filter.
+              Post to a Slack channel (Incoming Webhook) when a ticket matches your filters and events.
             </Text>
           </div>
 
           <Card>
             <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-              Di Slack: <Text strong>App</Text> → pilih workspace → <Text strong>Incoming Webhooks</Text> → tambahkan ke
-              channel → salin URL yang dimulai dengan <Text code>https://hooks.slack.com/services/</Text>. Satu URL = satu
-              channel. Kosongkan semua filter tim/prioritas/perusahaan/tipe agar semua ticket yang memenuhi event ikut
-              terkirim.
+              In Slack: <Text strong>App</Text> → choose your workspace → <Text strong>Incoming Webhooks</Text> → add to a
+              channel → copy the URL that starts with <Text code>https://hooks.slack.com/services/</Text>. One URL = one
+              channel. Leave all team / priority / company / type filters empty so every ticket that matches the selected
+              events is included.
             </Paragraph>
             <div style={{ marginBottom: 16 }}>
               <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
@@ -402,7 +402,9 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
             }
             extra={
               editing ? (
-                <Text type="secondary">Biarkan kosong untuk mempertahankan URL yang tersimpan ({editing.webhook_url_masked}).</Text>
+                <Text type="secondary">
+                  Leave blank to keep the saved URL ({editing.webhook_url_masked}).
+                </Text>
               ) : null
             }
           >

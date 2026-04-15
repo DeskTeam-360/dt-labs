@@ -1,70 +1,69 @@
-# Cara Install Chrome Extension
+# Installing the Chrome extension
 
-## Langkah-langkah Instalasi
+## Steps
 
-1. **Buka Chrome Extensions Page**
-   - Buka browser Chrome
-   - Ketik di address bar: `chrome://extensions/`
-   - Atau klik menu (⋮) > More tools > Extensions
+1. **Open the Chrome extensions page**
+   - In Chrome, go to `chrome://extensions/`
+   - Or: menu (⋮) → **Extensions** → **Manage extensions**
 
-2. **Aktifkan Developer Mode**
-   - Toggle switch "Developer mode" di pojok kanan atas
-   - Pastikan switch berwarna biru/aktif
+2. **Enable Developer mode**
+   - Toggle **Developer mode** in the top-right (should be on / blue)
 
-3. **Load Extension**
-   - Klik tombol "Load unpacked"
-   - Pilih folder `chrome-ext` dari project ini
-   - Extension akan muncul di daftar extensions
+3. **Load the extension**
+   - Click **Load unpacked**
+   - Choose the `chrome-ext` folder from this repository
+   - The extension should appear in the list
 
-4. **Pin Extension (Opsional)**
-   - Klik icon puzzle (🧩) di toolbar Chrome
-   - Cari "Screenshot & Upload"
-   - Klik pin icon untuk pin extension ke toolbar
+4. **Pin the extension (optional)**
+   - Click the puzzle icon in the toolbar
+   - Find **Screenshot & Upload**
+   - Click the pin icon to keep it on the toolbar
 
-## Konfigurasi Pertama Kali
+## First-time configuration
 
-1. Klik icon extension di toolbar
-2. Masukkan informasi Supabase:
-   - **Supabase URL**: Dapatkan dari Supabase Dashboard > Settings > API > Project URL
-   - **Supabase Anon Key**: Dapatkan dari Supabase Dashboard > Settings > API > anon/public key
-   - **Access Token** (opsional): JWT token jika diperlukan autentikasi
-3. Klik "Simpan Konfigurasi"
-4. Extension siap digunakan!
+1. Click the extension icon
+2. Enter:
+   - **Next.js API URL** — base URL of the app (no `/api/screenshots` suffix), e.g. `http://localhost:3000`
+   - **API Token** — create one in the app under **Profile** → API tokens (see `README-TOKEN.md` if needed)
+3. Click **Save configuration**
+4. You can use **Capture** and **Gallery** from the popup
 
-## Cara Menggunakan
+## Usage
 
-1. Buka halaman web yang ingin di-screenshot
-2. Klik icon extension
-3. Klik "📷 Ambil Screenshot"
-4. Preview akan muncul
-5. Klik "Upload" untuk mengupload ke Supabase
-6. URL screenshot akan otomatis disalin ke clipboard
+1. Open the page to capture
+2. Click the extension icon
+3. Click **Capture screenshot**
+4. Review the preview
+5. Click **Upload** to send it to the API
+6. The URL is copied to the clipboard when upload succeeds
 
 ## Troubleshooting
 
-### Extension tidak muncul
-- Pastikan Developer mode aktif
-- Refresh halaman extensions
-- Cek console untuk error (klik "service worker" di card extension)
+### Extension does not appear
 
-### Screenshot gagal
-- Pastikan extension memiliki permission untuk tab aktif
-- Coba reload extension
+- Confirm Developer mode is on
+- Refresh `chrome://extensions/`
+- Open **service worker** on the extension card and check the console for errors
 
-### Upload gagal
-- Pastikan Supabase URL dan Key benar
-- Pastikan bucket `dtlabs` sudah dibuat di Supabase Storage
-- Cek policy storage di Supabase Dashboard
-- Cek console untuk error detail
+### Screenshot fails
 
-### Icon tidak muncul
-- Buat icon 16x16, 48x48, dan 128x128 pixels
-- Simpan sebagai PNG di folder `icons/`
-- Reload extension
+- Grant tab permissions when prompted
+- Try reloading the extension
 
-## Catatan
+### Upload fails
 
-- Extension ini menggunakan Manifest V3
-- Screenshot diambil dalam format PNG
-- File diupload ke folder `screenshots/` di bucket `dtlabs`
-- Konfigurasi disimpan di Chrome sync storage
+- Verify the API URL and token
+- Confirm `POST /api/screenshots` works (e.g. from the app docs or Network tab)
+- Check storage configuration on the server
+- Inspect the console for error messages
+
+### Icons missing
+
+- Generate icons with `create-icons.html` or add `16`, `48`, and `128` PNGs under `icons/`
+- Reload the extension
+
+## Notes
+
+- Manifest V3
+- PNG capture
+- Settings are stored in Chrome sync storage (`apiUrl`, `apiToken`, optional auto-screenshot options)

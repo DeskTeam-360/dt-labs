@@ -28,8 +28,8 @@ function dbErrorMessage(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e)
   if (/slack_ticket_notification_rules|42P01|relation .* does not exist/i.test(msg)) {
     return (
-      'Database: tabel slack_ticket_notification_rules belum ada. ' +
-      'Jalankan migrasi `supabase/migrations/slack_ticket_notification_rules.sql` (atau `supabase db push`) lalu coba lagi.'
+      'Database: table slack_ticket_notification_rules is missing. ' +
+      'Run migration `supabase/migrations/slack_ticket_notification_rules.sql` (or `supabase db push`) and try again.'
     )
   }
   return msg || 'Database error'

@@ -364,7 +364,7 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
                   },
                 ]}
               >
-                  {/** Jangan kirim onChange kosong — timpa kontrol Form.Item sehingga kondisi tidak tersimpan */}
+                  {/** Do not emit empty onChange — it would overwrite Form.Item so conditions are not saved */}
                   <ConditionBuilder />
                 </Form.Item>
 

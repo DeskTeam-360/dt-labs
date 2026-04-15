@@ -44,7 +44,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: TabUsersProps) {
   const router = useRouter()
   const companyId = companyData.id
-  const companyName = companyData.name ?? 'company ini'
+  const companyName = companyData.name ?? 'this company'
   const companyUsers = (companyData.company_users || []) as CompanyUserRow[]
 
   const [assignOpen, setAssignOpen] = useState(false)
@@ -60,7 +60,7 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
       setAllUsers(Array.isArray(data) ? data : [])
     } catch {
       setAllUsers([])
-      message.error('Gagal memuat daftar user')
+      message.error('Failed to load user list')
     } finally {
       setLoadingUsers(false)
     }
@@ -84,12 +84,12 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ company_id: companyId }),
         })
-        message.success('User ditambahkan ke company')
+        message.success('User added to company')
         setAssignOpen(false)
         setSelectedUserId(undefined)
         router.refresh()
       } catch (e: unknown) {
-        message.error(e instanceof Error ? e.message : 'Gagal menyimpan')
+        message.error(e instanceof Error ? e.message : 'Failed to save')
       } finally {
         setSaving(false)
       }
@@ -116,10 +116,10 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ company_id: null }),
       })
-      message.success('User dihapus dari company')
+      message.success('User removed from company')
       router.refresh()
     } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : 'Gagal menghapus')
+      message.error(e instanceof Error ? e.message : 'Failed to remove')
     } finally {
       setSaving(false)
     }
@@ -181,7 +181,7 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
                             message.success('Updated')
                             router.refresh()
                           } catch (e: unknown) {
-                            message.error(e instanceof Error ? e.message : 'Gagal menyimpan')
+                            message.error(e instanceof Error ? e.message : 'Failed to save')
                           }
                         }}
                       />
@@ -205,10 +205,10 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
                     <EditOutlined /> Edit
                   </SpaNavLink>
                   <Popconfirm
-                    title="Hapus user dari company ini?"
-                    description="Company pada user akan dikosongkan; user tidak dihapus dari sistem."
-                    okText="Ya"
-                    cancelText="Batal"
+                    title="Remove user from this company?"
+                    description="The user's company will be cleared; the user account is not deleted from the system."
+                    okText="Yes"
+                    cancelText="Cancel"
                     onConfirm={() => removeUserFromCompany(cu.user_id)}
                   >
                     <Button
@@ -219,7 +219,7 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
                       loading={saving}
                       disabled={saving}
                     >
-                      Hapus
+                      Remove
                     </Button>
                   </Popconfirm>
                 </Space>
@@ -238,11 +238,11 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
           setAssignOpen(false)
           setSelectedUserId(undefined)
         }}
-        okText="Simpan"
+        okText="Save"
         confirmLoading={saving}
         onOk={async () => {
           if (!selectedUserId) {
-            message.warning('Pilih user')
+            message.warning('Select a user')
             return
           }
           await assignUserToCompany(selectedUserId)
@@ -251,7 +251,7 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
         <Select
           showSearch
           allowClear
-          placeholder="Pilih user (role customer)"
+          placeholder="Select user (customer role)"
           style={{ width: '100%' }}
           loading={loadingUsers}
           optionFilterProp="label"
@@ -261,9 +261,9 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
             const inThis = u.company_id === companyId
             const extra =
               u.company_id && u.company_id !== companyId
-                ? ` — saat ini: ${u.company?.name ?? 'company lain'}`
+                ? ` — currently: ${u.company?.name ?? 'another company'}`
                 : inThis
-                  ? ' — sudah di company ini'
+                  ? ' — already on this company'
                   : ''
             return {
               value: u.id,
@@ -273,7 +273,7 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
           })}
         />
         <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
-          Jika user sudah terdaftar di company lain, akan muncul peringatan pemindahan.
+          If the user is already assigned to another company, you will be asked to confirm the move.
         </Text>
       </Modal>
     </>

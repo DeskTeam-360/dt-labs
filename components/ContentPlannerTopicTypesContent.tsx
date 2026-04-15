@@ -49,11 +49,11 @@ export default function ContentPlannerTopicTypesContent({ user: currentUser }: C
     try {
       const res = await fetch('/api/content-planner/topic-types', { credentials: 'include' })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Gagal memuat topic types')
+      if (!res.ok) throw new Error(json.error ?? 'Failed to load topic types')
       setTopicTypes((Array.isArray(json) ? json : json.data || []) as TopicTypeRecord[])
     } catch (e: unknown) {
       const err = e as { message?: string }
-      message.error(err?.message ?? 'Gagal memuat topic types')
+      message.error(err?.message ?? 'Failed to load topic types')
     } finally {
       setLoading(false)
     }
@@ -82,11 +82,11 @@ export default function ContentPlannerTopicTypesContent({ user: currentUser }: C
     try {
       const res = await fetch(`/api/content-planner/topic-types/${id}`, { method: 'DELETE', credentials: 'include' })
       if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
-      message.success('Topic type dihapus')
+      message.success('Topic type deleted')
       fetchTopicTypes()
     } catch (e: unknown) {
       const err = e as { message?: string }
-      message.error(err?.message ?? 'Gagal menghapus')
+      message.error(err?.message ?? 'Failed to delete')
     }
   }
 
@@ -105,7 +105,7 @@ export default function ContentPlannerTopicTypesContent({ user: currentUser }: C
           body: JSON.stringify(payload),
         })
         if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
-        message.success('Topic type diperbarui')
+        message.success('Topic type updated')
       } else {
         const res = await fetch('/api/content-planner/topic-types', {
           method: 'POST',
@@ -114,14 +114,14 @@ export default function ContentPlannerTopicTypesContent({ user: currentUser }: C
           body: JSON.stringify(payload),
         })
         if (!res.ok) throw new Error((await res.json().catch(() => ({})) as { error?: string })?.error ?? 'Failed')
-        message.success('Topic type ditambah')
+        message.success('Topic type added')
       }
       setModalVisible(false)
       form.resetFields()
       fetchTopicTypes()
     } catch (e: unknown) {
       const err = e as { message?: string }
-      message.error(err?.message ?? 'Gagal menyimpan')
+      message.error(err?.message ?? 'Failed to save')
     } finally {
       setSaving(false)
     }
@@ -146,13 +146,13 @@ export default function ContentPlannerTopicTypesContent({ user: currentUser }: C
             Edit
           </Button>
           <Popconfirm
-            title="Hapus topic type ini?"
+            title="Delete this topic type?"
             onConfirm={() => handleDelete(record.id)}
-            okText="Hapus"
+            okText="Delete"
             okButtonProps={{ danger: true }}
           >
             <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              Hapus
+              Delete
             </Button>
           </Popconfirm>
         </Space>
@@ -171,7 +171,7 @@ export default function ContentPlannerTopicTypesContent({ user: currentUser }: C
                 Content Planner – Topic Types
               </Title>
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                Tambah Topic Type
+                Add topic type
               </Button>
             </div>
             <Table
@@ -182,25 +182,25 @@ export default function ContentPlannerTopicTypesContent({ user: currentUser }: C
               pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} item` }}
             />
             <Modal
-              title={editingTopicType ? 'Edit Topic Type' : 'Tambah Topic Type'}
+              title={editingTopicType ? 'Edit topic type' : 'Add topic type'}
               open={modalVisible}
               onCancel={() => { setModalVisible(false); form.resetFields() }}
               footer={null}
               destroyOnClose
             >
               <Form form={form} layout="vertical" onFinish={handleSubmit}>
-                <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Wajib diisi' }]}>
+                <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Required' }]}>
                   <Input placeholder="e.g. How-to" />
                 </Form.Item>
                 <Form.Item name="description" label="Description">
-                  <TextArea rows={2} placeholder="Keterangan (opsional)" />
+                  <TextArea rows={2} placeholder="Description (optional)" />
                 </Form.Item>
                 <Form.Item>
                   <Space>
                     <Button type="primary" htmlType="submit" loading={saving}>
-                      {editingTopicType ? 'Update' : 'Buat'}
+                      {editingTopicType ? 'Update' : 'Create'}
                     </Button>
-                    <Button onClick={() => setModalVisible(false)}>Batal</Button>
+                    <Button onClick={() => setModalVisible(false)}>Cancel</Button>
                   </Space>
                 </Form.Item>
               </Form>

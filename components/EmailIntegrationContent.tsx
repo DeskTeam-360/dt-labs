@@ -185,7 +185,7 @@ export default function EmailIntegrationContent({
                   size="small"
                   items={[{
                     key: '1',
-                    label: `Debug: ${lastDebug.skippedDetails.length} email(s) skipped - klik untuk detail`,
+                    label: `Debug: ${lastDebug.skippedDetails.length} email(s) skipped — click for details`,
                     children: (
                       <div style={{ maxHeight: 200, overflow: 'auto', fontSize: 12 }}>
                         {lastDebug.skippedDetails.map((d, i) => (

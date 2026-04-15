@@ -15,7 +15,7 @@ type TicketUserMentionProps = {
  * Hover: email. Click: profile /settings/users/[id] (when userId present).
  */
 export default function TicketUserMention({ userId, email, children, className }: TicketUserMentionProps) {
-  const tip = email?.trim() ? email.trim() : 'Email tidak tersedia'
+  const tip = email?.trim() ? email.trim() : 'No email on file'
   const body =
     userId ? (
       <SpaNavLink

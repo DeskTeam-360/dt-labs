@@ -1,6 +1,6 @@
 /**
- * Auth helpers - migrasi dari Supabase Auth ke NextAuth
- * Gunakan auth() dari '@/auth' untuk mendapatkan session
+ * Auth helpers — migrated from Supabase Auth to NextAuth.
+ * Use `auth()` from `@/auth` to read the session.
  */
 
 import { auth } from '@/auth'

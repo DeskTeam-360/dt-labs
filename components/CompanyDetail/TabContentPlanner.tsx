@@ -222,7 +222,7 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
       const social = values.social_per_week ?? 0
       const blogs = values.blogs_per_week ?? 0
       if (gbp + social + blogs === 0) {
-        message.error('Minimal satu dari GBP, Social, atau Blogs harus > 0')
+        message.error('At least one of GBP, Social, or Blogs must be greater than 0')
         return
       }
       setGeneratorSaving(true)
@@ -238,15 +238,15 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        message.error(data?.error ?? 'Gagal generate planners')
+        message.error(data?.error ?? 'Failed to generate planners')
         return
       }
-      message.success(`${data.created ?? 0} content planner dibuat`)
+      message.success(`${data.created ?? 0} content planner(s) created`)
       setGeneratorModalVisible(false)
       fetchPlanners()
     } catch (e: unknown) {
       if (String((e as { message?: string })?.message || '').includes('validateFields')) return
-      message.error((e as { message?: string })?.message ?? 'Gagal')
+      message.error((e as { message?: string })?.message ?? 'Failed')
     } finally {
       setGeneratorSaving(false)
     }
@@ -475,7 +475,7 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
     if (!res.ok) {
       const err = (data as { error?: string })?.error ?? 'Failed to create channel'
       console.error('Failed to create channel:', displayTitle, err)
-      message.warning(`Channel "${displayTitle}" tidak bisa dibuat: ${err}`)
+      message.warning(`Channel "${displayTitle}" could not be created: ${err}`)
     }
     return null
   }
@@ -545,9 +545,11 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
       }
       const newChannelsCount = Object.keys(channelCache).length - initialCacheKeys
       if (newChannelsCount > 0) {
-        message.success(`${created} content planner(s) diimpor. ${newChannelsCount} channel baru otomatis ditambahkan.`)
+        message.success(
+          `${created} content planner(s) imported. ${newChannelsCount} new channel(s) were added automatically.`
+        )
       } else {
-        message.success(`${created} content planner(s) diimpor`)
+        message.success(`${created} content planner(s) imported`)
       }
       setImportSheetVisible(false)
       fetchPlanners()
@@ -941,10 +943,10 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
       >
         <Space orientation="vertical" style={{ width: '100%' }} size="middle">
           <Text type="secondary">
-            Paste link dari Google Sheets (docs.google.com/spreadsheets/d/...) atau OpenSheet URL. ID spreadsheet akan dipakai untuk fetch via opensheet.elk.sh.
+            Paste a Google Sheets link (docs.google.com/spreadsheets/d/...) or an OpenSheet URL. The spreadsheet ID is used to fetch data via opensheet.elk.sh.
           </Text>
           <Input
-            placeholder="https://docs.google.com/spreadsheets/d/.../edit?gid=... atau https://opensheet.elk.sh/..."
+            placeholder="https://docs.google.com/spreadsheets/d/.../edit?gid=... or https://opensheet.elk.sh/..."
             value={sheetUrl}
             onChange={(e) => setSheetUrl(e.target.value)}
             addonAfter={
@@ -954,7 +956,9 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
             }
           />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>Tab / sheet ke (1 = pertama):</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Tab / sheet index (1 = first):
+            </Text>
             <InputNumber
               min={1}
               value={sheetNumber}
@@ -1093,7 +1097,7 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
         width={560}
       >
         <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-          Set default AI System Template per channel. Saat Generate content, template ini akan dipakai otomatis jika channel planner memakai channel ini.
+          Set a default AI system template per channel. When you generate content, this template is used automatically if the planner row uses that channel.
         </Text>
         <Space orientation="vertical" style={{ width: '100%' }} size="middle">
           {channels.map((ch) => (
@@ -1111,7 +1115,7 @@ export default function TabContentPlanner({ companyData, basePath }: TabContentP
             </div>
           ))}
           {channels.length === 0 && (
-            <Text type="secondary">Belum ada channel. Buat channel lewat Import from Sheet atau Add Content.</Text>
+            <Text type="secondary">No channels yet. Create channels via Import from Sheet or Add Content.</Text>
           )}
         </Space>
       </Modal>
