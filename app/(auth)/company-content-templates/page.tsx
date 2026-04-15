@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import CompanyContentTemplatesContent from '@/components/content/CompanyContentTemplatesContent'
 
 export default async function CompanyContentTemplatesPage() {

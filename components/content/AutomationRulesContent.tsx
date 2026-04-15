@@ -1,31 +1,33 @@
 'use client'
 
+import { DeleteOutlined, EditOutlined, PlusOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import {
-  Layout,
-  Table,
   Button,
-  Space,
-  Typography,
   Card,
-  Modal,
   Form,
   Input,
   InputNumber,
-  Select,
-  Switch,
+  Layout,
   message,
+  Modal,
   Popconfirm,
+  Select,
+  Space,
+  Switch,
+  Table,
   Tag,
+  Typography,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, ThunderboltOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
-import AdminSidebar from '../AdminSidebar'
-import AdminMainColumn from '../AdminMainColumn'
-import ConditionBuilder from '../ConditionBuilder'
-import ActionBuilder from '../ActionBuilder'
 import type { ColumnsType } from 'antd/es/table'
-import type { OurConditionGroup } from '@/lib/condition-builder-utils'
+import { useEffect,useState } from 'react'
+
 import type { AutomationActions } from '@/lib/automation-actions-types'
+import type { OurConditionGroup } from '@/lib/condition-builder-utils'
+
+import ActionBuilder from '../ActionBuilder'
+import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
+import ConditionBuilder from '../ConditionBuilder'
 
 const { Content } = Layout
 const { Title } = Typography

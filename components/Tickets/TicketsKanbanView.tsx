@@ -1,7 +1,7 @@
 'use client'
 
-import { Card, Typography } from 'antd'
 import {
+  closestCorners,
   DndContext,
   DragEndEvent,
   DragOverlay,
@@ -9,10 +9,11 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  closestCorners,
 } from '@dnd-kit/core'
+import { Card, Typography } from 'antd'
+
 import KanbanColumn from './KanbanColumn'
-import type { TicketRecord, StatusColumn, TicketSortField, TicketSortOrder } from './types'
+import type { StatusColumn, TicketRecord, TicketSortField, TicketSortOrder } from './types'
 
 const { Text } = Typography
 

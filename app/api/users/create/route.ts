@@ -1,8 +1,9 @@
+import bcrypt from 'bcryptjs'
+import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db, users } from '@/lib/db'
-import { eq } from 'drizzle-orm'
-import bcrypt from 'bcryptjs'
-import { NextResponse } from 'next/server'
 
 /** POST /api/users/create - Create user (replaces Supabase Auth) */
 export async function POST(request: Request) {

@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Card, Empty, Badge, Typography } from 'antd'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { Badge, Card, Empty, Typography } from 'antd'
+import { useMemo } from 'react'
+
 import KanbanCard from './KanbanCard'
-import type { TicketRecord, StatusColumn, TicketSortField, TicketSortOrder } from './types'
+import type { StatusColumn, TicketRecord, TicketSortField, TicketSortOrder } from './types'
 import { sortTickets } from './types'
 
 const { Text } = Typography

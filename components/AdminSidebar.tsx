@@ -1,35 +1,36 @@
 'use client'
 
-import Image from 'next/image'
-import { Layout, Menu, Avatar, Dropdown, Typography } from 'antd'
-import type { MenuProps } from 'antd'
 import {
+  BarChartOutlined,
+    CheckSquareOutlined,
     DashboardOutlined,
-    UserOutlined,
-    LogoutOutlined,
-    LockOutlined,
+    DeleteOutlined,
     HomeOutlined,
     InfoCircleOutlined,
-    SettingOutlined,
+    LockOutlined,
+    LogoutOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
-    CheckSquareOutlined,
-    WarningOutlined,
-    DeleteOutlined,
   ReadOutlined,
-  BarChartOutlined,
+    SettingOutlined,
   TeamOutlined,
+    UserOutlined,
+    WarningOutlined,
 } from '@ant-design/icons'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { useState, useEffect, useMemo } from 'react'
+import type { MenuProps } from 'antd'
+import { Avatar, Dropdown, Layout, Menu, Typography } from 'antd'
+import Image from 'next/image'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { useEffect, useMemo,useState } from 'react'
+
 import { signOutAction } from '@/app/actions/auth'
-import { SpaNavLink, shouldOpenHrefInNewTab } from '@/components/SpaNavLink'
+import { shouldOpenHrefInNewTab,SpaNavLink } from '@/components/SpaNavLink'
 import {
-  canAccessTickets,
-  canAccessSettingsHub,
   canAccessCustomerTimeReport,
   canAccessMyTeams,
+  canAccessSettingsHub,
+  canAccessTickets,
   isSettingsHrefPathname,
 } from '@/lib/auth-utils'
 

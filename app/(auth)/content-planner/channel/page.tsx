@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import ContentPlannerChannelsContent from '@/components/content/ContentPlannerChannelsContent'
 
 export default async function ContentPlannerChannelPage() {

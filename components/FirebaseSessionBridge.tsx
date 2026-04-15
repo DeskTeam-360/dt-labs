@@ -1,8 +1,9 @@
 'use client'
 
+import { getAuth, signInWithCustomToken, signOut as firebaseSignOut } from 'firebase/auth'
 import { useSession } from 'next-auth/react'
 import { useEffect, useRef } from 'react'
-import { getAuth, signInWithCustomToken, signOut as firebaseSignOut } from 'firebase/auth'
+
 import { getFirebaseApp, isFirebaseClientConfigured } from '@/lib/firebase/client'
 
 /**

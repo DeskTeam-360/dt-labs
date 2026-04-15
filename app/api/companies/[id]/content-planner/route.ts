@@ -1,12 +1,13 @@
+import { and, desc, eq, inArray } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import {
-  db,
   companyContentPlanners,
   contentPlannerChannels,
   contentPlannerTopicTypes,
+  db,
 } from '@/lib/db'
-import { eq, and, desc, inArray } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** GET /api/companies/[id]/content-planner - List planners with channel and topic_type */
 export async function GET(

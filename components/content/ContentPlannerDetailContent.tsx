@@ -1,28 +1,29 @@
 'use client'
 
+import { ArrowLeftOutlined, PictureOutlined,PlayCircleOutlined, SaveOutlined } from '@ant-design/icons'
 import {
-  Layout,
-  Card,
   Button,
+  Card,
+  Col,
+  DatePicker,
   Form,
   Input,
-  Select,
-  Switch,
-  DatePicker,
-  Row,
-  Col,
-  Typography,
-  Space,
-  Popconfirm,
+  Layout,
   message,
+  Popconfirm,
+  Row,
+  Select,
+  Space,
+  Switch,
+  Typography,
 } from 'antd'
-import { ArrowLeftOutlined, PlayCircleOutlined, SaveOutlined, PictureOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import AdminSidebar from '../AdminSidebar'
-import AdminMainColumn from '../AdminMainColumn'
-import CustomerNavbar from '../CustomerNavbar'
 import dayjs from 'dayjs'
+import { useRouter } from 'next/navigation'
+import { useEffect,useState } from 'react'
+
+import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
+import CustomerNavbar from '../CustomerNavbar'
 
 const { Text } = Typography
 const { TextArea } = Input

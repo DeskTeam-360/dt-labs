@@ -1,23 +1,24 @@
 'use client'
 
-import { useRef, useMemo } from 'react'
+import { DeleteOutlined,PaperClipOutlined } from '@ant-design/icons'
 import {
-  Modal,
+  Button,
+  Col,
+  DatePicker,
+  Flex,
   Form,
   Input,
-  Select,
-  DatePicker,
-  Button,
-  Space,
-  Col,
+  Modal,
   Row,
-  Flex,
+  Select,
+  Space,
 } from 'antd'
 import type { FormInstance } from 'antd/es/form'
-import { PaperClipOutlined, DeleteOutlined } from '@ant-design/icons'
+import { useMemo,useRef } from 'react'
+
 import CommentWysiwyg from '../TicketDetail/CommentWysiwyg'
-import type { TicketRecord, Team, UserRecord } from './types'
-import type { TicketAttachment, NewTicketAttachment } from './types'
+import type { Team, TicketRecord, UserRecord } from './types'
+import type { NewTicketAttachment,TicketAttachment } from './types'
 
 const { Option } = Select
 

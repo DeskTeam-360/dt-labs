@@ -1,10 +1,11 @@
-import { auth } from '@/auth'
+import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
-import { getTicketDetail } from '@/lib/ticket-detail'
+
+import { auth } from '@/auth'
 import TicketDetailContentClient from '@/components/TicketDetailContentClient'
 import { db } from '@/lib/db'
-import { users, companyUsers } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { companyUsers,users } from '@/lib/db'
+import { getTicketDetail } from '@/lib/ticket-detail'
 
 export default async function TicketDetailPage({
   params,

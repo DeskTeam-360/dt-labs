@@ -1,5 +1,5 @@
-import { initializeApp, getApps, type FirebaseApp } from 'firebase/app'
-import { getFirestore, type Firestore } from 'firebase/firestore'
+import { type FirebaseApp,getApps, initializeApp } from 'firebase/app'
+import { type Firestore,getFirestore } from 'firebase/firestore'
 
 export type ClientFirebaseConfig = {
   apiKey: string

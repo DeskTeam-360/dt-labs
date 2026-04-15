@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { getPublicUrl } from '@/lib/storage-idrive'
-import { db, ticketAttachments } from '@/lib/db'
-import { eq, asc } from 'drizzle-orm'
+import { asc,eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { db, ticketAttachments } from '@/lib/db'
+import { getPublicUrl } from '@/lib/storage-idrive'
 
 /** GET /api/tickets/[id]/attachments */
 export async function GET(

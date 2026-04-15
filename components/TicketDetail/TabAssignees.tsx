@@ -1,7 +1,7 @@
 'use client'
 
-import { Card, Space, Typography, Avatar, Empty, Tag } from 'antd'
 import { UserOutlined } from '@ant-design/icons'
+import { Avatar, Card, Empty, Space, Tag,Typography } from 'antd'
 
 const { Text } = Typography
 

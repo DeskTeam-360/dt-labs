@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, contentPlannerChannels } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { contentPlannerChannels,db } from '@/lib/db'
 
 /** PUT /api/content-planner/channels/[id] - Full update */
 export async function PUT(

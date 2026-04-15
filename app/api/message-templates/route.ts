@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { db, messageTemplates } from '@/lib/db'
-import { canAccessMessageTemplates } from '@/lib/auth-utils'
 import { asc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { canAccessMessageTemplates } from '@/lib/auth-utils'
+import { db, messageTemplates } from '@/lib/db'
 
 function rowToJson(r: (typeof messageTemplates.$inferSelect)[]) {
   return r.map((row) => ({

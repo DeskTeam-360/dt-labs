@@ -1,9 +1,10 @@
+import { and,eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { canAccessTeams, canAdminTeams } from '@/lib/auth-utils'
 import { db } from '@/lib/db'
-import { teams, teamMembers } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
+import { teamMembers,teams } from '@/lib/db'
 
 function sessionRole(session: { user?: { role?: string; id?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role

@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import KnowledgeBaseContent from '@/components/content/KnowledgeBaseContent'
 
 export default async function KnowledgeBasePage() {

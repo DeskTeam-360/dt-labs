@@ -1,11 +1,12 @@
 /**
  * GET /api/auth/check-db — verify DATABASE_URL / DB connectivity (login page only shows errors).
  */
+import { isNotNull,sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/postgres-js'
 import { NextResponse } from 'next/server'
 import postgres from 'postgres'
-import { drizzle } from 'drizzle-orm/postgres-js'
+
 import { users } from '@/lib/db/schema'
-import { sql, isNotNull } from 'drizzle-orm'
 
 function getConnectionString() {
   const url = process.env.DATABASE_URL || ''

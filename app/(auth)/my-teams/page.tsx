@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import MyTeamsContent from '@/components/content/MyTeamsContent'
 import { canAccessMyTeams } from '@/lib/auth-utils'
 

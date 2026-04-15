@@ -1,7 +1,8 @@
+import { and,eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db, messageTemplates, tickets, users } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 
 export const dynamic = 'force-dynamic'

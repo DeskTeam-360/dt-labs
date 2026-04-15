@@ -2,9 +2,10 @@
  * Delete file from iDrive e2 storage.
  * POST body: { path: string } - path = object key (e.g. CompanyName/123/attachments/xxx.pdf)
  */
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { deleteObject } from '@/lib/storage-idrive'
-import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
   const session = await auth()

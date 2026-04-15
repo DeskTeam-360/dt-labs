@@ -1,6 +1,7 @@
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { getFirebaseAdminFirestore } from '@/lib/firebase/admin'
-import { NextResponse } from 'next/server'
 
 const BATCH_MAX = 450
 

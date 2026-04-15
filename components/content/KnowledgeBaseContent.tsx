@@ -1,21 +1,23 @@
 'use client'
 
+import { DeleteOutlined,EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
-  Layout,
-  Table,
   Button,
-  Typography,
+  Layout,
   message,
   Popconfirm,
+  Table,
   Tag,
+  Typography,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import AdminSidebar from '../AdminSidebar'
-import AdminMainColumn from '../AdminMainColumn'
 import type { ColumnsType } from 'antd/es/table'
+import { useRouter } from 'next/navigation'
+import { useEffect,useState } from 'react'
+
 import { labelForKnowledgeBaseRoles } from '@/lib/knowledge-base-article-roles'
+
+import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
 
 const { Content } = Layout
 const { Title } = Typography

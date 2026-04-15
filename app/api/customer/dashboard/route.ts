@@ -1,20 +1,21 @@
+import { and,asc, eq, inArray } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import {
-  users,
-  tickets,
-  ticketAssignees,
-  ticketTypes,
-  ticketPriorities,
-  ticketStatuses,
-  ticketTimeTracker,
   companies,
   companyUsers,
-  ticketTags,
   tags,
+  ticketAssignees,
+  ticketPriorities,
+  tickets,
+  ticketStatuses,
+  ticketTags,
+  ticketTimeTracker,
+  ticketTypes,
+  users,
 } from '@/lib/db'
-import { eq, inArray, asc, and } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 import { DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
 
 /** GET /api/customer/dashboard - Stats for customer dashboard. Add ?debug=1 to see why Urgent ETA might be missing. */
@@ -94,7 +95,7 @@ export async function GET(request: Request) {
   }))
 
   const myTicketIds = myTickets.map((t) => t.id)
-  let timeByType: Array<{ type_title: string; seconds: number; color: string }> = []
+  const timeByType: Array<{ type_title: string; seconds: number; color: string }> = []
   let totalTimeSeconds = 0
   if (myTicketIds.length > 0) {
     const trackerRows = await db.select({ ticketId: ticketTimeTracker.ticketId, durationSeconds: ticketTimeTracker.durationSeconds }).from(ticketTimeTracker).where(inArray(ticketTimeTracker.ticketId, myTicketIds))

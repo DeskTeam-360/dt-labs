@@ -1,9 +1,10 @@
-import { auth } from '@/auth'
-import { db } from '@/lib/db'
-import { companyWebsites, crawlSessions } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { db } from '@/lib/db'
+import { companyWebsites, crawlSessions } from '@/lib/db/schema'
 
 // Vercel serverless function configuration
 export const maxDuration = 300 // 5 minutes (max for Pro plan, 10s for Hobby)

@@ -1,18 +1,19 @@
+import { asc, eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import {
-  teams,
-  users,
-  ticketTypes,
-  ticketPriorities,
   companies,
   companyUsers,
   tags,
-  ticketStatuses,
   teamMembers,
+  teams,
+  ticketPriorities,
+  ticketStatuses,
+  ticketTypes,
+  users,
 } from '@/lib/db'
-import { asc, eq } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 import { ensureTicketStatusIsDeletableColumn } from '@/lib/ensure-ticket-status-is-deletable'
 
 /** GET /api/tickets/lookup - Lookup data for ticket form */

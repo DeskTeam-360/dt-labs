@@ -2,25 +2,26 @@
  * Server-side helper to fetch full ticket detail for detail page
  * Replaces Supabase queries
  */
+import { and, asc, desc, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm'
+
 import { db } from '@/lib/db'
 import {
-  tickets,
-  users,
-  teams,
-  ticketTypes,
-  ticketPriorities,
+  commentAttachments,
   companies,
+  screenshots,
+  tags,
+  teams,
   ticketAssignees,
+  ticketAttributs,
+  ticketCcRecipients,
   ticketChecklist,
   ticketComments,
-  ticketCcRecipients,
-  commentAttachments,
-  ticketAttributs,
-  screenshots,
+  ticketPriorities,
+  tickets,
   ticketTags,
-  tags,
+  ticketTypes,
+  users,
 } from '@/lib/db'
-import { eq, asc, inArray, and, desc, or, lt, ne, isNull, sql } from 'drizzle-orm'
 import { getPublicUrl } from '@/lib/storage-idrive'
 import { coerceTicketType } from '@/lib/ticket-classification'
 

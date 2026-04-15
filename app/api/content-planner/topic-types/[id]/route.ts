@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, contentPlannerTopicTypes } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { contentPlannerTopicTypes,db } from '@/lib/db'
 
 /** PUT /api/content-planner/topic-types/[id] */
 export async function PUT(

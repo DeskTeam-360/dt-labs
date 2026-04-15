@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import CustomerTimeReportContent from '@/components/content/CustomerTimeReportContent'
 import { isAdminOrManager } from '@/lib/auth-utils'
 

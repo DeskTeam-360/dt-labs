@@ -1,6 +1,7 @@
 'use client'
 
-import { Alert, Space, Typography, Tag, message } from 'antd'
+import { Alert, message,Space, Tag, Typography } from 'antd'
+
 import {
   MESSAGE_TEMPLATE_RECIPIENT_PLACEHOLDERS,
   MESSAGE_TEMPLATE_SENDER_PLACEHOLDERS,

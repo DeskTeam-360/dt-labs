@@ -1,13 +1,15 @@
 'use client'
 
-import { Flex, Row, Col, Space, Descriptions, Tag, Typography, Avatar, Empty, Popconfirm, Button, Select } from 'antd'
-import { UserOutlined, ThunderboltOutlined, ClockCircleOutlined, PaperClipOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { ClockCircleOutlined, DeleteOutlined,EditOutlined, PaperClipOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons'
+import { Avatar, Button, Col, Descriptions, Empty, Flex, Modal, Popconfirm, Row, Select,Space, Tag, Typography } from 'antd'
+
+import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
+
 import DateDisplay from '../DateDisplay'
-import CommentWysiwyg from './CommentWysiwyg'
 import CommentComposer from './CommentComposer'
 import CommentTaggedCcLines from './CommentTaggedCcLines'
+import CommentWysiwyg from './CommentWysiwyg'
 import TicketUserMention from './TicketUserMention'
-import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
 const { Text, Paragraph } = Typography
 
@@ -141,6 +143,25 @@ export default function TabGeneralCustomer({
     statusOptions.find((s) => (s.title || '').trim().toLowerCase() === 'closed')?.slug ??
     null
   const canCloseTicket = Boolean(onStatusChange && closedStatusSlug && ticketData.status !== closedStatusSlug)
+  const showCloseTicketConfirm = () => {
+    Modal.confirm({
+      title: 'Close this ticket?',
+      centered: true,
+      width: 680,
+      okText: 'Yes, close ticket',
+      // cancelText: 'Cancel',
+      content: (
+        <div>
+          When you close this ticket, you can still view it and leave another comment to reopen it.
+          <br />
+          While the ticket is in closed status, our team treats it as completed and cleared.
+          <br />
+          Thank you. We will be waiting for your next request.
+        </div>
+      ),
+      onOk: () => closedStatusSlug && onStatusChange?.(closedStatusSlug),
+    })
+  }
 
   return (
     <Row gutter={[24, 24]}>
@@ -475,16 +496,7 @@ export default function TabGeneralCustomer({
                 <ClockCircleOutlined />
                 <DateDisplay date={ticketData.updated_at} />
               </Space>
-              {canCloseTicket ? (
-                <Button
-                  type="primary"
-                  danger
-                  loading={statusChanging}
-                  onClick={() => closedStatusSlug && onStatusChange?.(closedStatusSlug)}
-                >
-                  Close this ticket
-                </Button>
-              ) : null}
+              
             </Flex>
           </Descriptions.Item>
           {/* <Descriptions.Item label="Total Time Tracked">
@@ -494,7 +506,14 @@ export default function TabGeneralCustomer({
             </Space>
           </Descriptions.Item> */}
         </Descriptions>
+        <br />
+        {canCloseTicket ? (
+          <Button type="primary" danger block loading={statusChanging} onClick={showCloseTicketConfirm}>
+            Close this ticket
+          </Button>
+        ) : null}
       </Col>
+      
     </Row>
   )
 }

@@ -1,7 +1,8 @@
+import { desc,eq } from 'drizzle-orm'
+
 import { auth } from '@/auth'
-import { db, screenshots, tickets } from '@/lib/db'
-import { eq, desc } from 'drizzle-orm'
 import ScreenshotsContent from '@/components/content/ScreenshotsContent'
+import { db, screenshots, tickets } from '@/lib/db'
 
 export default async function ScreenshotsPage() {
   const session = await auth()

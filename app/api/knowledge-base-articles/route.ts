@@ -1,8 +1,9 @@
+import { asc, eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { knowledgeBaseArticles } from '@/lib/db'
-import { asc, eq } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 import { articleVisibleForRole, normalizeTargetRolesInput } from '@/lib/knowledge-base-article-roles'
 
 /** GET /api/knowledge-base-articles - List articles. ?published=true for customer (only published) */

@@ -1,6 +1,7 @@
+import { eq } from 'drizzle-orm'
+
 import { db } from '@/lib/db'
 import { companyWebsites, crawlPages, crawlSessions } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
 
 // Normalize URL to avoid duplicate crawling (normalize trailing slash)
 // For root URLs (e.g., https://example.com/ and https://example.com), always use with trailing slash

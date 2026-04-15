@@ -1,11 +1,12 @@
+import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import {
   aiTokenUsage,
   companyKnowledgeBases,
 } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 const OPENAI_EMBEDDING_MODEL =
   process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small'

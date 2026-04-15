@@ -1,24 +1,25 @@
 'use client'
 
+import { ArrowLeftOutlined, CopyOutlined,SaveOutlined } from '@ant-design/icons'
 import {
-  Layout,
+  Button,
   Card,
+  Col,
+  Divider,
   Form,
   Input,
-  Button,
-  Space,
-  Typography,
+  Layout,
   message,
-  Tag,
-  Divider,
   Row,
-  Col,
+  Space,
+  Tag,
+  Typography,
 } from 'antd'
-import { ArrowLeftOutlined, SaveOutlined, CopyOutlined } from '@ant-design/icons'
-import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import AdminSidebar from './AdminSidebar'
+import { useEffect, useRef,useState } from 'react'
+
 import AdminMainColumn from './AdminMainColumn'
+import AdminSidebar from './AdminSidebar'
 
 const { Content } = Layout
 const { Title, Text } = Typography

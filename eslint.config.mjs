@@ -1,43 +1,38 @@
-import { FlatCompat } from '@eslint/eslintrc'
+import nextCoreWebVitals from 'eslint-config-next/core-web-vitals'
+import nextTypescript from 'eslint-config-next/typescript'
+import reactPlugin from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
 import simpleImportSort from 'eslint-plugin-simple-import-sort'
-import unusedImports from 'eslint-plugin-unused-imports'
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-})
 
 /** @type {import('eslint').Linter.Config[]} */
 const eslintConfig = [
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  ...nextCoreWebVitals,
+  ...nextTypescript,
   {
     plugins: {
+      react: reactPlugin,
+      'react-hooks': reactHooks,
       'simple-import-sort': simpleImportSort,
-      'unused-imports': unusedImports,
     },
     rules: {
-      // 🔥 Sort import
-      'simple-import-sort/imports': 'error',
-      'simple-import-sort/exports': 'error',
-
-      // 🔥 REMOVE unused import (auto fix)
-      'unused-imports/no-unused-imports': 'error',
-
-      // 🔥 HANDLE unused variable
-      '@typescript-eslint/no-unused-vars': 'off', // matikan default
-      'unused-imports/no-unused-vars': [
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
         'warn',
         {
-          vars: 'all',
-          varsIgnorePattern: '^_',
-          args: 'after-used',
           argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
         },
       ],
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-require-imports': 'warn',
+      'react/no-unescaped-entities': 'warn',
+      'react/jsx-key': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
+      'react-hooks/purity': 'warn',
+      'simple-import-sort/imports': 'error',
+      'simple-import-sort/exports': 'error',
     },
   },
 ]

@@ -1,11 +1,12 @@
 'use client'
 
-import { Layout, Card, Typography, Form, Input, Button, Space, message, Divider } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
+import { Button, Card, Divider,Form, Input, Layout, message, Space, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import AdminSidebar from '../AdminSidebar'
+
 import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
 import TabInfo from '../CompanyDetail/TabInfo'
 import CustomerPortalTeamSection from '../CustomerPortalTeamSection'
 

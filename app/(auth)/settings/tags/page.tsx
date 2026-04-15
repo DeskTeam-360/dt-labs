@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import TagsContent from '@/components/content/TagsContent'
 
 export default async function TagsPage() {

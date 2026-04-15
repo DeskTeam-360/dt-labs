@@ -1,14 +1,15 @@
-import { auth } from '@/auth'
+import { and, asc, desc,eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
 import {
-  db,
   companies,
+  companyContentPlanners,
   companyKnowledgeBases,
   contentPlannerChannels,
   contentPlannerIntents,
-  companyContentPlanners,
+  db,
 } from '@/lib/db'
-import { eq, and, asc, desc } from 'drizzle-orm'
 
 const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini'
 

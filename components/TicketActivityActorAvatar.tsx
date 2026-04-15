@@ -1,8 +1,8 @@
 'use client'
 
-import type { CSSProperties } from 'react'
-import { Avatar } from 'antd'
 import { CloudOutlined, RobotOutlined, UserOutlined } from '@ant-design/icons'
+import { Avatar } from 'antd'
+import type { CSSProperties } from 'react'
 
 type Props = {
   size?: number

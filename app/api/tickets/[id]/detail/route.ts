@@ -1,9 +1,10 @@
-import { auth } from '@/auth'
-import { getTicketDetail } from '@/lib/ticket-detail'
-import { db } from '@/lib/db'
-import { users, companyUsers } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { db } from '@/lib/db'
+import { companyUsers,users } from '@/lib/db'
+import { getTicketDetail } from '@/lib/ticket-detail'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+
 import { auth } from '@/auth'
 import { canAccessSlackNotifications } from '@/lib/auth-utils'
 

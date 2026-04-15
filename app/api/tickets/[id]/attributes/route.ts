@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
-import { db, ticketAttributs } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { db, ticketAttributs } from '@/lib/db'
+import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 
 /** POST /api/tickets/[id]/attributes - Add attribute */
 export async function POST(

@@ -1,9 +1,10 @@
-import { auth } from '@/auth'
-import { db } from '@/lib/db'
-import { automationRules } from '@/lib/db'
-import { canAccessAutomationRules } from '@/lib/auth-utils'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { canAccessAutomationRules } from '@/lib/auth-utils'
+import { db } from '@/lib/db'
+import { automationRules } from '@/lib/db'
 
 /** PATCH /api/automation-rules/[id] - Update rule */
 export async function PATCH(

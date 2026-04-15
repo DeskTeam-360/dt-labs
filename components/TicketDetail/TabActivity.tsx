@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import 'dayjs/locale/en'
+
 import { Space, Table, Typography } from 'antd'
 import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime'
 import localizedFormat from 'dayjs/plugin/localizedFormat'
-import 'dayjs/locale/en'
+import relativeTime from 'dayjs/plugin/relativeTime'
+import { useEffect, useState } from 'react'
+
 import TicketActivityActorAvatar from '@/components/TicketActivityActorAvatar'
 import { formatTicketActivityAction } from '@/lib/ticket-activity-labels'
 import { summarizeTicketActivityMetadata } from '@/lib/ticket-activity-metadata'

@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { db, ticketTimeTracker, tickets } from '@/lib/db'
-import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
-import { eq, and, desc, gte, lte, isNull, isNotNull, sql, inArray } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray,isNotNull, isNull, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { db, tickets,ticketTimeTracker } from '@/lib/db'
+import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 import type { UserTimeTrackerTicketSummary } from '@/lib/user-time-tracker-summary'
 
 /** GET /api/users/time-tracker?user_id=xxx&filter=week|month|all&start=&end=&stopped_only=1&active_only=1&limit=15&include_ticket_summary=1 */

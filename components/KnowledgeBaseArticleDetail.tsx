@@ -1,11 +1,12 @@
 'use client'
 
-import { Layout, Card, Typography, Button, Spin } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import AdminSidebar from './AdminSidebar'
+import { Button, Card, Layout, Spin,Typography } from 'antd'
+import { useParams,useRouter } from 'next/navigation'
+import { useEffect,useState } from 'react'
+
 import AdminMainColumn from './AdminMainColumn'
+import AdminSidebar from './AdminSidebar'
 
 const { Content } = Layout
 const { Title, Text } = Typography

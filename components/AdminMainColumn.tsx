@@ -2,8 +2,9 @@
 
 import { Layout } from 'antd'
 import type { CSSProperties, ReactNode } from 'react'
-import TicketSearchNavbar from '@/components/TicketSearchNavbar'
+
 import GlobalAnnouncementBar from '@/components/GlobalAnnouncementBar'
+import TicketSearchNavbar from '@/components/TicketSearchNavbar'
 
 export type AdminMainColumnUser = {
   id: string

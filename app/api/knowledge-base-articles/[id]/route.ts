@@ -1,9 +1,10 @@
-import { auth } from '@/auth'
-import { db } from '@/lib/db'
-import { knowledgeBaseArticles } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
 import { canAccessKnowledgeBase } from '@/lib/auth-utils'
+import { db } from '@/lib/db'
+import { knowledgeBaseArticles } from '@/lib/db'
 import { articleVisibleForRole, normalizeTargetRolesInput } from '@/lib/knowledge-base-article-roles'
 
 /** GET /api/knowledge-base-articles/[id] - Get single article */

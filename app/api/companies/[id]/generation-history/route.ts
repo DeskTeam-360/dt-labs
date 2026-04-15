@@ -1,8 +1,9 @@
+import { desc,eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { companyContentGenerationHistory } from '@/lib/db'
-import { eq, desc } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** GET /api/companies/[id]/generation-history */
 export async function GET(

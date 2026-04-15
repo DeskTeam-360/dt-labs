@@ -1,10 +1,11 @@
+import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm'
+import { google } from 'googleapis'
+import { NextRequest, NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { emailIntegrations, emailMessages, tickets } from '@/lib/db/schema'
 import { getObjectBuffer } from '@/lib/storage-idrive'
-import { eq, and, desc, isNotNull, isNull } from 'drizzle-orm'
-import { NextRequest, NextResponse } from 'next/server'
-import { google } from 'googleapis'
 
 const MIME_BY_EXT: Record<string, string> = {
   pdf: 'application/pdf',
@@ -233,7 +234,7 @@ export async function POST(request: NextRequest) {
       .orderBy(desc(emailMessages.syncedAt))
       .limit(1)
 
-    let threadId = ticketRow?.gmailThreadId || lastIncoming?.threadId || null
+    const threadId = ticketRow?.gmailThreadId || lastIncoming?.threadId || null
     let inReplyTo = lastIncoming?.rfcMessageId || null
 
     if (threadId && !inReplyTo) {

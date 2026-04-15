@@ -1,8 +1,9 @@
+import { asc } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { companyContentTemplates } from '@/lib/db'
-import { asc } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** GET /api/company-content-templates */
 export async function GET() {

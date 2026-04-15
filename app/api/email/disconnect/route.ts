@@ -1,7 +1,8 @@
+import { and,eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db, emailIntegrations } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** POST /api/email/disconnect - Disconnect Google email integration */
 export async function POST() {

@@ -1,8 +1,9 @@
+import { and,eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { companyDatas } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** POST /api/companies/[id]/company-datas - upsert company data fields */
 export async function POST(

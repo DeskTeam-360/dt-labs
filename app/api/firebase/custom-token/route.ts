@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { getFirebaseAdminApp } from '@/lib/firebase/admin'
 import { getAuth } from 'firebase-admin/auth'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { getFirebaseAdminApp } from '@/lib/firebase/admin'
 
 /** Returns a Firebase custom token so the client can sign in with uid = NextAuth user id (Firestore rules). */
 export async function GET() {

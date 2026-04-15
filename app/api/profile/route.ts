@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { db, users } from '@/lib/db'
 
 /** PATCH /api/profile - Update current user profile */
 export async function PATCH(request: Request) {

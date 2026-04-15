@@ -1,5 +1,6 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import TicketTypesContent from '@/components/content/TicketTypesContent'
 
 export default async function TicketTypesPage() {

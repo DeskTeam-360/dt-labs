@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, users, companies, companyDatas, companyDataTemplates, companyWebsites } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
+import { companies, companyDatas, companyDataTemplates, companyWebsites,db, users } from '@/lib/db'
 
 export async function getCustomerCompanyData() {
   const session = await auth()

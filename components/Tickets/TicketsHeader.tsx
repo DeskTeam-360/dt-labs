@@ -1,7 +1,8 @@
 'use client'
 
-import { Button, Flex, Typography, Segmented, Select, Input } from 'antd'
-import { PlusOutlined, AppstoreOutlined, UnorderedListOutlined, IdcardOutlined, TeamOutlined, SortAscendingOutlined, SearchOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, IdcardOutlined, PlusOutlined, SearchOutlined,SortAscendingOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { Button, Flex, Input,Segmented, Select, Typography } from 'antd'
+
 import type { TicketSortField, TicketSortOrder } from './types'
 
 type ViewMode = 'kanban' | 'list' | 'card' | 'roundrobin'

@@ -1,11 +1,12 @@
+import { and, desc,eq, inArray, lte, sql } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { canAccessMyTeams } from '@/lib/auth-utils'
+import { db, teamMembers, tickets, ticketTimeTracker, ticketTypes, users } from '@/lib/db'
 import { accumulateSession, roundHourly, type SessionLike } from '@/lib/my-teams-activity-aggregate'
 import { parseMyTeamsActivityDateParam, utcDayBounds, utcTodayYesterday } from '@/lib/my-teams-date'
-import { db, teamMembers, ticketTimeTracker, tickets, ticketTypes, users } from '@/lib/db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
-import { eq, and, inArray, sql, lte, desc } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role

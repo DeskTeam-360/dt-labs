@@ -1,5 +1,5 @@
-import { allMessageTemplatePlaceholderKeys } from '@/lib/message-template-placeholders'
 import type { users } from '@/lib/db/schema'
+import { allMessageTemplatePlaceholderKeys } from '@/lib/message-template-placeholders'
 
 export type MessageTemplateMergeUserMaps = {
   recipient: Record<string, string>

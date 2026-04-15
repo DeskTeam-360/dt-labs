@@ -9,10 +9,11 @@
  */
 import 'dotenv/config'
 
-import { db } from '../lib/db'
-import { users, ticketTypes, ticketPriorities, ticketStatuses } from '../lib/db/schema'
-import { eq, sql } from 'drizzle-orm'
 import * as bcrypt from 'bcryptjs'
+import { eq, sql } from 'drizzle-orm'
+
+import { db } from '../lib/db'
+import { ticketPriorities, ticketStatuses,ticketTypes, users } from '../lib/db/schema'
 
 /**
  * Replaces all ticket_statuses rows. Colors follow the settings palette (#F1C232, #D9EAD3, …).

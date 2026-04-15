@@ -1,9 +1,10 @@
-import { auth } from '@/auth'
-import { db, ticketActivityLog, tickets, users, companyUsers } from '@/lib/db'
-import { isAdmin } from '@/lib/auth-utils'
-import { TICKET_ACTIVITY_ACTIONS, type TicketActivityAction } from '@/lib/ticket-activity-actions'
-import { and, desc, eq, inArray, or, sql, count, ilike, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, inArray, or, type SQL,sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { isAdmin } from '@/lib/auth-utils'
+import { companyUsers,db, ticketActivityLog, tickets, users } from '@/lib/db'
+import { TICKET_ACTIVITY_ACTIONS, type TicketActivityAction } from '@/lib/ticket-activity-actions'
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 100

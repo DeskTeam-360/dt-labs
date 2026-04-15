@@ -1,9 +1,10 @@
-import { auth } from '@/auth'
-import { isAdminOrManager } from '@/lib/auth-utils'
-import { db, ticketTimeTracker, tickets, companies, ticketPriorities } from '@/lib/db'
-import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 import { and, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { isAdminOrManager } from '@/lib/auth-utils'
+import { companies, db, ticketPriorities,tickets, ticketTimeTracker } from '@/lib/db'
+import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role

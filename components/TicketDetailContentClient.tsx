@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+
 import type { TicketDetailContentProps } from './content/TicketDetailContent'
 
 /** `ssr: false` must live in a Client Component (Next.js 16). Avoids NP extension hydration noise on inputs. */

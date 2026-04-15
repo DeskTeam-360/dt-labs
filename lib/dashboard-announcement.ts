@@ -1,5 +1,5 @@
-import { articleVisibleForRole } from '@/lib/knowledge-base-article-roles'
 import type { dashboardAnnouncements } from '@/lib/db'
+import { articleVisibleForRole } from '@/lib/knowledge-base-article-roles'
 
 export type DashboardAnnouncementRow = typeof dashboardAnnouncements.$inferSelect
 

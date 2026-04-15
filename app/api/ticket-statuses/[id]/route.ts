@@ -1,10 +1,11 @@
+import { count,eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { ticketStatuses, tickets } from '@/lib/db'
-import { eq, count } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
-import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
+import { tickets,ticketStatuses } from '@/lib/db'
 import { ensureTicketStatusIsDeletableColumn } from '@/lib/ensure-ticket-status-is-deletable'
+import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
 import { isLockedTicketStatusSlug } from '@/lib/ticket-status-locked-slugs'
 
 /** PATCH /api/ticket-statuses/[id] - Update ticket status */

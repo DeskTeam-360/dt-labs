@@ -1,12 +1,14 @@
 'use client'
 
-import { Descriptions, Space, Typography, Button, Modal, Select, message, Popconfirm, Switch, Tag } from 'antd'
-import { PlusOutlined, DeleteOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons'
-import { useCallback, useEffect, useState } from 'react'
+import { DeleteOutlined, EditOutlined,EyeOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Descriptions, message, Modal, Popconfirm, Select, Space, Switch, Tag,Typography } from 'antd'
 import { useRouter } from 'next/navigation'
-import DateDisplay from '../DateDisplay'
+import { useCallback, useEffect, useState } from 'react'
+
 import { confirmUserCompanyMove } from '@/components/confirm-user-company-move'
 import { SpaNavLink } from '@/components/SpaNavLink'
+
+import DateDisplay from '../DateDisplay'
 
 const { Text } = Typography
 

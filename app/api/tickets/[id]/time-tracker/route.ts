@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
-import { db, ticketTimeTracker, users } from '@/lib/db'
-import { eq, and, desc, isNull, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
 import { isAdmin, isAdminOrManager } from '@/lib/auth-utils'
+import { db, ticketTimeTracker, users } from '@/lib/db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 
 function mapTrackerRow(

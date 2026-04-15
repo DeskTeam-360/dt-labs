@@ -1,8 +1,9 @@
-import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
 import CustomerCompanySettingsContent from '@/components/content/CustomerCompanySettingsContent'
-import { getCustomerCompanyId, isCompanyPortalAdmin } from '@/lib/customer-company'
 import { getCompanyDetail } from '@/lib/company-detail'
+import { getCustomerCompanyId, isCompanyPortalAdmin } from '@/lib/customer-company'
 
 export default async function MyCompanyPage() {
   const session = await auth()

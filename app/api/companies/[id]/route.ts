@@ -1,9 +1,10 @@
-import { auth } from '@/auth'
-import { db, companies, users, companyUsers } from '@/lib/db'
 import { and, eq, ne } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
 import { getCompanyDetail } from '@/lib/company-detail'
 import { customerOwnsCompany } from '@/lib/customer-company'
+import { companies, companyUsers,db, users } from '@/lib/db'
 import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
 
 /** GET /api/companies/[id] - Get company with related data */

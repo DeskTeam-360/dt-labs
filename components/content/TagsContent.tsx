@@ -1,23 +1,24 @@
 'use client'
 
+import { DeleteOutlined,EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
-  Layout,
-  Table,
   Button,
-  Space,
-  Typography,
   Card,
-  Modal,
   Form,
   Input,
+  Layout,
   message,
+  Modal,
   Popconfirm,
+  Space,
+  Table,
+  Typography,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
-import AdminSidebar from '../AdminSidebar'
-import AdminMainColumn from '../AdminMainColumn'
 import type { ColumnsType } from 'antd/es/table'
+import { useEffect,useState } from 'react'
+
+import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
 
 const { Content } = Layout
 const { Title } = Typography

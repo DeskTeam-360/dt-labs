@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { db, contentPlannerIntents } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { contentPlannerIntents,db } from '@/lib/db'
 
 /** PUT /api/content-planner/intents/[id] */
 export async function PUT(

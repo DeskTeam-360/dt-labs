@@ -1,5 +1,6 @@
-import { db, users, companyUsers } from '@/lib/db'
 import { and, eq } from 'drizzle-orm'
+
+import { companyUsers,db, users } from '@/lib/db'
 
 /** Company UUID for a portal customer (`users.company_id` or `company_users`). */
 export async function getCustomerCompanyId(userId: string): Promise<string | null> {

@@ -1,14 +1,16 @@
 'use client'
 
-import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Table, Tabs, Progress, message, Select } from 'antd'
-import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, ReloadOutlined, GlobalOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import AdminSidebar from '../AdminSidebar'
-import AdminMainColumn from '../AdminMainColumn'
-import DateDisplay from '../DateDisplay'
-import { getCrawlPages } from '@/app/actions/crawl'
+import { ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, GlobalOutlined,ReloadOutlined } from '@ant-design/icons'
+import { Button, Card, Descriptions, Layout, message, Progress, Select,Space, Table, Tabs, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { useRouter } from 'next/navigation'
+import { useEffect,useState } from 'react'
+
+import { getCrawlPages } from '@/app/actions/crawl'
+
+import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
+import DateDisplay from '../DateDisplay'
 
 const { Content } = Layout
 const { Title, Text } = Typography

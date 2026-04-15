@@ -1,7 +1,8 @@
-import { auth } from '@/auth'
-import { NextResponse } from 'next/server'
-import { db, companyDataTemplates } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { companyDataTemplates,db } from '@/lib/db'
 
 // GET - Get data template by ID
 export async function GET(

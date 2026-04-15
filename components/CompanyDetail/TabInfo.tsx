@@ -1,7 +1,8 @@
 'use client'
 
-import { Row, Col, Descriptions, Tag, Typography, Space } from 'antd'
-import { CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { Col, Descriptions, Row, Space,Tag, Typography } from 'antd'
+
 import DateDisplay from '../DateDisplay'
 
 const { Text } = Typography

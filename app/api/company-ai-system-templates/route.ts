@@ -1,8 +1,9 @@
+import { desc } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { companyAiSystemTemplate } from '@/lib/db/schema'
-import { desc } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** GET /api/company-ai-system-templates - returns full list for management */
 export async function GET() {

@@ -1,5 +1,6 @@
-import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+
+import { db, users } from '@/lib/db'
 
 /** Active login + JWT refresh: user must exist, not soft-deleted, status active. */
 export function userRowAllowsSession(row: { status: string | null; deletedAt: Date | null } | undefined): boolean {

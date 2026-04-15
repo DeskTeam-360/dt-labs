@@ -1,8 +1,9 @@
+import { asc } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { ticketTypes } from '@/lib/db'
-import { asc } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** GET /api/ticket-types - List all ticket types */
 export async function GET() {

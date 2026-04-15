@@ -1,24 +1,25 @@
 'use client'
 
-import { Layout, Card, Descriptions, Tag, Typography, Button, Space, Row, Col, Divider, Tabs, Form, Input, message, Spin, Select, Table, Popconfirm, Switch, Modal, Progress, Flex } from 'antd'
-import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, TeamOutlined, DatabaseOutlined, SaveOutlined, FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, GlobalOutlined, PlayCircleOutlined, EyeOutlined, ReadOutlined, CloudUploadOutlined, HistoryOutlined, CheckSquareOutlined } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
+import { ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, CheckSquareOutlined,ClockCircleOutlined, CloseCircleOutlined, CloudUploadOutlined, DatabaseOutlined, DeleteOutlined, EditOutlined, EyeOutlined, FileTextOutlined, GlobalOutlined, HistoryOutlined, PlayCircleOutlined, PlusOutlined, ReadOutlined, SaveOutlined, TeamOutlined } from '@ant-design/icons'
+import { Button, Card, Col, Descriptions, Divider, Flex,Form, Input, Layout, message, Modal, Popconfirm, Progress, Row, Select, Space, Spin, Switch, Table, Tabs, Tag, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
-import AdminSidebar from '../AdminSidebar'
+import { useEffect,useState } from 'react'
+
 import AdminMainColumn from '../AdminMainColumn'
-import CustomerNavbar from '../CustomerNavbar'
-import DateDisplay from '../DateDisplay'
+import AdminSidebar from '../AdminSidebar'
 import {
-  TabInfo,
-  TabUsers,
+  TabContentPlanner,
+  TabCrawling,
   TabDataForm,
   TabGenerate,
+  TabInfo,
   TabKnowledgeBase,
-  TabWebsites,
-  TabCrawling,
   TabTickets,
-  TabContentPlanner,
+  TabUsers,
+  TabWebsites,
 } from '../CompanyDetail'
+import CustomerNavbar from '../CustomerNavbar'
+import DateDisplay from '../DateDisplay'
 
 /** Temporary: company KB API errors on load — set true to restore tab + fetches */
 const COMPANY_DETAIL_KNOWLEDGE_BASE_ENABLED = false

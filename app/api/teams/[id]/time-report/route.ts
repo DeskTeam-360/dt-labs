@@ -1,10 +1,11 @@
+import { and, desc,eq, gte, inArray, lte } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { canAccessTeams } from '@/lib/auth-utils'
 import { db } from '@/lib/db'
-import { teamMembers, ticketTimeTracker, tickets, users } from '@/lib/db'
+import { teamMembers, tickets, ticketTimeTracker, users } from '@/lib/db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
-import { eq, and, inArray, gte, lte, desc } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role

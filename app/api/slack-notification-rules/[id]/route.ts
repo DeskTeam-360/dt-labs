@@ -1,9 +1,10 @@
-import { auth } from '@/auth'
-import { db, slackTicketNotificationRules } from '@/lib/db'
-import { isSlackIncomingWebhookUrl, maskWebhookUrlForDisplay } from '@/lib/slack-ticket-notify'
-import { isAdmin } from '@/lib/auth-utils'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import { isAdmin } from '@/lib/auth-utils'
+import { db, slackTicketNotificationRules } from '@/lib/db'
+import { isSlackIncomingWebhookUrl, maskWebhookUrlForDisplay } from '@/lib/slack-ticket-notify'
 
 function normalizeFilter(body: Record<string, unknown>) {
   const f = (body.filter && typeof body.filter === 'object' ? body.filter : {}) as Record<string, unknown>

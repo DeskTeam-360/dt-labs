@@ -1,5 +1,5 @@
-import DOMPurify from 'isomorphic-dompurify'
 import type { Config } from 'dompurify'
+import DOMPurify from 'isomorphic-dompurify'
 
 /**
  * Sanitize HTML shown on ticket detail (description + comments, including from email).

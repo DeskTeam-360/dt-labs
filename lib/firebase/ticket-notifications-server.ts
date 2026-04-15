@@ -1,5 +1,6 @@
-import { FieldValue } from 'firebase-admin/firestore'
 import { inArray } from 'drizzle-orm'
+import { FieldValue } from 'firebase-admin/firestore'
+
 import { db, users } from '@/lib/db'
 import { getFirebaseAdminFirestore } from '@/lib/firebase/admin'
 

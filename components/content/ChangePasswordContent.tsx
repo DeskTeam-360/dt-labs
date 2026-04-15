@@ -1,10 +1,11 @@
 'use client'
 
-import { Layout, Card, Form, Input, Button, Typography, message } from 'antd'
 import { LockOutlined } from '@ant-design/icons'
+import { Button, Card, Form, Input, Layout, message,Typography } from 'antd'
 import { useState } from 'react'
-import AdminSidebar from '../AdminSidebar'
+
 import AdminMainColumn from '../AdminMainColumn'
+import AdminSidebar from '../AdminSidebar'
 
 const { Content } = Layout
 const { Title, Text } = Typography

@@ -1,8 +1,9 @@
+import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { companyAiSystemTemplate } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
-import { NextResponse } from 'next/server'
 
 /** PUT /api/company-ai-system-templates/[id] - update template */
 export async function PUT(
