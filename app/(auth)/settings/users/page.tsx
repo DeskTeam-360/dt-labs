@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import UsersContent from '@/components/UsersContent'
+import UsersContent from '@/components/content/UsersContent'
 import { canAccessUsers } from '@/lib/auth-utils'
 
 export default async function SettingsUsersPage() {

@@ -1,5 +1,5 @@
 /**
- * Drizzle schema - migrasi dari Supabase ke PostgreSQL
+ * Drizzle schema — PostgreSQL tables used by the app.
  */
 import {
   pgTable,

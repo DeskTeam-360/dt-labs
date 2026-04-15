@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import TeamsContent from '@/components/TeamsContent'
+import TeamsContent from '@/components/content/TeamsContent'
 
 export default async function SettingsTeamsPage() {
   const session = await auth()

@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import ContentPlannerTopicTypesContent from '@/components/ContentPlannerTopicTypesContent'
+import ContentPlannerTopicTypesContent from '@/components/content/ContentPlannerTopicTypesContent'
 
 export default async function ContentPlannerTopicTypePage() {
   const session = await auth()

@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import ContentPlannerChannelsContent from '@/components/ContentPlannerChannelsContent'
+import ContentPlannerChannelsContent from '@/components/content/ContentPlannerChannelsContent'
 
 export default async function ContentPlannerChannelPage() {
   const session = await auth()

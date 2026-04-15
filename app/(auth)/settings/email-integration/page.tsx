@@ -2,7 +2,7 @@ import { auth } from '@/auth'
 import { db, emailIntegrations } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
-import EmailIntegrationContent from '@/components/EmailIntegrationContent'
+import EmailIntegrationContent from '@/components/content/EmailIntegrationContent'
 
 export default async function EmailIntegrationPage() {
   const session = await auth()

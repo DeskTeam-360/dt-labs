@@ -1,8 +1,8 @@
 import { auth } from '@/auth'
 import { db, users, teams, tickets } from '@/lib/db'
 import { inArray } from 'drizzle-orm'
-import DashboardContent from '@/components/DashboardContent'
-import CustomerDashboardContent from '@/components/CustomerDashboardContent'
+import DashboardContent from '@/components/content/DashboardContent'
+import CustomerDashboardContent from '@/components/content/CustomerDashboardContent'
 
 function toSessionUser(user: { id: string; email?: string | null; name?: string | null; image?: string | null }) {
   return {

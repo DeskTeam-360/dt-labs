@@ -20,6 +20,7 @@ interface TicketsKanbanViewProps {
   tickets: TicketRecord[]
   columnsToShow: StatusColumn[]
   activeId: number | null
+  isCustomer?: boolean
   onDragStart: (event: DragStartEvent) => void
   onDragEnd: (event: DragEndEvent) => void | Promise<void>
   onEdit: (ticket: TicketRecord) => void
@@ -38,6 +39,7 @@ export default function TicketsKanbanView({
   tickets,
   columnsToShow,
   activeId,
+  isCustomer = false,
   onDragStart,
   onDragEnd,
   onEdit,
@@ -61,6 +63,45 @@ export default function TicketsKanbanView({
 
   const activeTicket = activeId ? tickets.find((t) => t.id === activeId) : null
 
+  const board = (
+    <div
+      className="tickets-kanban-board"
+      style={{
+        paddingLeft: 24,
+        paddingRight: 24,
+        paddingBottom: 16,
+        display: 'flex',
+        flexWrap: 'nowrap',
+        overflowX: 'auto',
+        overflowY: 'hidden',
+        background: 'var(--kanban-board-bg)',
+      }}
+    >
+      {columnsToShow.map((column) => (
+        <KanbanColumn
+          key={column.id}
+          column={column}
+          tickets={tickets}
+          dragDisabled={isCustomer}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          allPriorities={allPriorities}
+          allStatusColumns={allStatusColumns}
+          onFilterByStatus={onFilterByStatus}
+          onFilterByPriority={onFilterByPriority}
+          onFilterByTag={onFilterByTag}
+          onFilterByCompany={onFilterByCompany}
+        />
+      ))}
+    </div>
+  )
+
+  if (isCustomer) {
+    return board
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -68,38 +109,7 @@ export default function TicketsKanbanView({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
     >
-      <div
-        className="tickets-kanban-board"
-        style={{
-          paddingLeft: 24,
-          paddingRight: 24,
-          paddingBottom: 16,
-          display: 'flex',
-          flexWrap: 'nowrap',
-          overflowX: 'auto',
-          overflowY: 'hidden',
-          background: 'var(--kanban-board-bg)',
-        }}
-      >
-        {columnsToShow.map((column) => (
-          <KanbanColumn
-            key={column.id}
-            column={column}
-            tickets={tickets}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            allPriorities={allPriorities}
-            allStatusColumns={allStatusColumns}
-            onFilterByStatus={onFilterByStatus}
-            onFilterByPriority={onFilterByPriority}
-            onFilterByTag={onFilterByTag}
-            onFilterByCompany={onFilterByCompany}
-          />
-        ))}
-      </div>
-
+      {board}
       <DragOverlay>
         {activeTicket ? (
           <Card

@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import TagsContent from '@/components/TagsContent'
+import TagsContent from '@/components/content/TagsContent'
 
 export default async function TagsPage() {
   const session = await auth()

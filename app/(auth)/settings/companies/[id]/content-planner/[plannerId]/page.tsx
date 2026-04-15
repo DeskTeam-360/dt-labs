@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import ContentPlannerDetailContent from '@/components/ContentPlannerDetailContent'
+import ContentPlannerDetailContent from '@/components/content/ContentPlannerDetailContent'
 import {
   db,
   companies,

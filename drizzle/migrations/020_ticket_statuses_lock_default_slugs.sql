@@ -1,4 +1,4 @@
--- Set is_deletable = false for canonical workflow statuses (same slugs as prisma/seed.ts).
+-- Set is_deletable = false for canonical workflow statuses (same slugs as scripts/seed.ts).
 -- Run after 019 (or drizzle push) so column exists.
 UPDATE "ticket_statuses"
 SET "is_deletable" = false

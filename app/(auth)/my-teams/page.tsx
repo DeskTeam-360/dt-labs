@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import MyTeamsContent from '@/components/MyTeamsContent'
+import MyTeamsContent from '@/components/content/MyTeamsContent'
 import { canAccessMyTeams } from '@/lib/auth-utils'
 
 export default async function MyTeamsPage() {

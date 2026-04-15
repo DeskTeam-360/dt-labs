@@ -13,6 +13,7 @@ const { Text } = Typography
 interface KanbanColumnProps {
   column: StatusColumn
   tickets: TicketRecord[]
+  dragDisabled?: boolean
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
   sortBy?: TicketSortField
@@ -28,6 +29,7 @@ interface KanbanColumnProps {
 export default function KanbanColumn({
   column,
   tickets,
+  dragDisabled = false,
   onEdit,
   onDelete,
   sortBy = 'updated_at',
@@ -117,6 +119,7 @@ export default function KanbanColumn({
                 <KanbanCard
                   key={ticket.id}
                   ticket={ticket}
+                  dragDisabled={dragDisabled}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   allStatusColumns={allStatusColumns}

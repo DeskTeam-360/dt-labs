@@ -60,6 +60,8 @@ interface TabGeneralCustomerProps {
   ticketData: any
   ticketAttachments?: TicketAttachment[]
   statusOptions: StatusOption[]
+  onStatusChange?: (newStatus: string) => void | Promise<void>
+  statusChanging?: boolean
   typeOptions: { id: number; title: string; slug: string; color: string }[]
   onTypeChange?: (typeId: number | null) => void | Promise<void>
   typeChanging?: boolean
@@ -99,6 +101,8 @@ export default function TabGeneralCustomer({
   ticketData,
   ticketAttachments = [],
   statusOptions,
+  onStatusChange,
+  statusChanging = false,
   typeOptions,
   onTypeChange,
   typeChanging = false,
@@ -132,6 +136,11 @@ export default function TabGeneralCustomer({
   const creatorEmail = ticketData.creator?.email ?? null
   const creatorLabel =
     ticketData.company?.name || ticketData.creator?.full_name || ticketData.creator?.email || 'Unknown'
+  const closedStatusSlug =
+    statusOptions.find((s) => s.slug === 'closed')?.slug ??
+    statusOptions.find((s) => (s.title || '').trim().toLowerCase() === 'closed')?.slug ??
+    null
+  const canCloseTicket = Boolean(onStatusChange && closedStatusSlug && ticketData.status !== closedStatusSlug)
 
   return (
     <Row gutter={[24, 24]}>
@@ -461,10 +470,22 @@ export default function TabGeneralCustomer({
             </Space>
           </Descriptions.Item>
           <Descriptions.Item label="Updated At">
-            <Space>
-              <ClockCircleOutlined />
-              <DateDisplay date={ticketData.updated_at} />
-            </Space>
+            <Flex vertical gap={10} align="flex-start">
+              <Space>
+                <ClockCircleOutlined />
+                <DateDisplay date={ticketData.updated_at} />
+              </Space>
+              {canCloseTicket ? (
+                <Button
+                  type="primary"
+                  danger
+                  loading={statusChanging}
+                  onClick={() => closedStatusSlug && onStatusChange?.(closedStatusSlug)}
+                >
+                  Close this ticket
+                </Button>
+              ) : null}
+            </Flex>
           </Descriptions.Item>
           {/* <Descriptions.Item label="Total Time Tracked">
             <Space>

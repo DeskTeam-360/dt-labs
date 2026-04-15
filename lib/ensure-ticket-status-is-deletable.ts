@@ -7,7 +7,7 @@ let ensurePromise: Promise<void> | null = null
 
 /**
  * Ensures `ticket_statuses.is_deletable` exists, then locks default workflow rows
- * (same slugs as prisma/seed.ts). Idempotent; safe if 020 migration was already applied.
+ * (same slugs as scripts/seed.ts). Idempotent; safe if 020 migration was already applied.
  */
 export function ensureTicketStatusIsDeletableColumn(): Promise<void> {
   if (!ensurePromise) {

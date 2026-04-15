@@ -16,6 +16,7 @@ const { Text } = Typography
 
 interface KanbanCardProps {
   ticket: TicketRecord
+  dragDisabled?: boolean
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
   onFilterByStatus?: (statusSlug: string) => void
@@ -27,6 +28,7 @@ interface KanbanCardProps {
 
 export default function KanbanCard({
   ticket,
+  dragDisabled = false,
   onEdit,
   onDelete,
   onFilterByStatus,
@@ -47,7 +49,7 @@ export default function KanbanCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: ticket.id })
+  } = useSortable({ id: ticket.id, disabled: dragDisabled })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -56,13 +58,13 @@ export default function KanbanCard({
   }
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
+    <div ref={setNodeRef} style={style} {...(!dragDisabled ? attributes : {})}>
       <Card
         className="kanban-ticket-card"
         size="small"
         style={{
           margin: 6,
-          cursor: 'grab',
+          cursor: dragDisabled ? 'default' : 'grab',
           borderRadius: 12,
           boxShadow: 'var(--kanban-card-shadow)',
           maxWidth: 300,
@@ -71,7 +73,7 @@ export default function KanbanCard({
           border: '1px solid var(--kanban-card-border)',
         }}
         styles={{ body: { padding: 14, background: 'transparent' } }}
-        {...listeners}
+        {...(!dragDisabled ? listeners : {})}
       >
         {/* Tags + menu row — stop drag sensor when interacting with filter chips */}
         <Flex justify="space-between" align="flex-start" style={{ marginBottom: 10 }}>

@@ -1,5 +1,5 @@
 import { auth } from '@/auth'
-import TicketActivityHistoryContent from '@/components/TicketActivityHistoryContent'
+import TicketActivityHistoryContent from '@/components/content/TicketActivityHistoryContent'
 
 export default async function TicketActivityPage() {
   const session = await auth()

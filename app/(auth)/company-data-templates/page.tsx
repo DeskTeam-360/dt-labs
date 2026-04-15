@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import CompanyDataTemplatesContent from '@/components/CompanyDataTemplatesContent'
+import CompanyDataTemplatesContent from '@/components/content/CompanyDataTemplatesContent'
 
 export default async function CompanyDataTemplatesPage() {
   const session = await auth()

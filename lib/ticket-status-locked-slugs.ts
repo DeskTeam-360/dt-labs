@@ -1,5 +1,5 @@
 /**
- * Canonical workflow statuses (same slugs as prisma/seed.ts). Must never be deletable
+ * Canonical workflow statuses (same slugs as scripts/seed.ts). Must never be deletable
  * from API/UI even if `is_deletable` in DB is wrong.
  */
 export const LOCKED_TICKET_STATUS_SLUGS = [

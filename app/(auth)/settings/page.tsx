@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import SettingsContent from '@/components/SettingsContent'
+import SettingsContent from '@/components/content/SettingsContent'
 import { canAccessSettingsHub } from '@/lib/auth-utils'
 
 export default async function SettingsPage() {

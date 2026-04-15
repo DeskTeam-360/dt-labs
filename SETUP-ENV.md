@@ -6,92 +6,62 @@
 
 Buat file `.env.local` di root project (sama level dengan `package.json`).
 
-### 2. Dapatkan Credentials dari Supabase
+### 2. Database (PostgreSQL)
 
-1. Buka **Supabase Dashboard**: https://app.supabase.com
-2. Pilih **project Anda**
-3. Pergi ke **Settings > API**
-4. Salin nilai-nilai berikut:
-
-### 3. Isi File `.env.local`
-
-Copy template berikut dan isi dengan nilai dari Supabase:
+Aplikasi memakai **PostgreSQL** lewat `DATABASE_URL` (Drizzle + driver `postgres`). Tidak ada client Supabase di runtime.
 
 ```env
-# Supabase Project URL
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+# Wajib untuk koneksi DB (format connection string PostgreSQL)
+DATABASE_URL=postgresql://user:password@host:5432/dbname
 
-# Supabase Anon/Public Key
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_publishable_key_here
+# Optional: site URL (OAuth callback, link email, dll.)
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+```
 
-# Supabase Service Role Key (PENTING untuk upload screenshot!)
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+Skrip SQL manual: lihat `drizzle/migrations/`.
 
-# Optional: Site URL
+### 3. Template `.env.local` (fitur opsional)
+
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/mydb
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 # --- OpenAI API (untuk embeddings / RAG / AI features) ---
 # Dapatkan di https://platform.openai.com/api-keys
 OPENAI_API_KEY=sk-your_openai_api_key_here
-# Optional: model untuk embeddings (default: text-embedding-3-small)
 # OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-# Optional: model untuk generate konten dari knowledge base / RAG (default: gpt-4o-mini)
 # OPENAI_CHAT_MODEL=gpt-4o-mini
 
 # --- Freshdesk API (untuk testing integrasi) ---
-# Domain helpdesk (tanpa .freshdesk.com). Contoh: mycompany -> https://mycompany.freshdesk.com
 # FRESHDESK_DOMAIN=mycompany
-# API key dari Profile Settings di Freshdesk portal
 # FRESHDESK_API_KEY=your_freshdesk_api_key_here
 
 # --- Google OAuth (untuk Email Integration / Shared Inbox) ---
-# Dapatkan di Google Cloud Console: APIs & Services > Credentials
-# Buat OAuth 2.0 Client ID (Web application), tambahkan redirect URI: {NEXT_PUBLIC_SITE_URL}/api/email/google/callback
 # GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
 # GOOGLE_CLIENT_SECRET=your_google_client_secret
 ```
 
-### 4. Cara Mendapatkan Service Role Key
-
-1. Di Supabase Dashboard > Settings > API
-2. Scroll ke bagian **"Project API keys"**
-3. Cari **"service_role"** key (bukan "anon" atau "publishable")
-4. Klik **"Reveal"** untuk melihat key
-5. Copy key tersebut ke `.env.local`
-
-⚠️ **PENTING**: 
-- Service Role Key memiliki akses penuh ke database
-- JANGAN commit file `.env.local` ke git
-- JANGAN expose key ini ke client-side
-
-### 5. Restart Next.js Server
-
-Setelah menambahkan environment variables:
+### 4. Restart Next.js Server
 
 ```bash
-# Stop server (Ctrl+C)
-# Start lagi
+# Stop server (Ctrl+C), lalu:
 npm run dev
 ```
 
 ## Troubleshooting
 
-### Error: "Supabase admin credentials not configured"
-- Pastikan `SUPABASE_SERVICE_ROLE_KEY` sudah ditambahkan ke `.env.local`
-- Pastikan tidak ada typo di nama variable
-- Restart Next.js dev server setelah menambah env variable
+### Error koneksi database / `DATABASE_URL`
 
-### Error: "NEXT_PUBLIC_SUPABASE_URL is not defined"
-- Pastikan semua environment variables sudah diisi
-- Pastikan file `.env.local` ada di root project
-- Restart Next.js dev server
+- Pastikan `DATABASE_URL` benar dan database bisa dijangkau dari mesin Anda.
+- Setelah mengubah `.env.local`, restart `npm run dev`.
 
-## File yang Perlu Diisi
+## Variabel yang sering dipakai
 
-✅ `NEXT_PUBLIC_SUPABASE_URL` - Project URL  
-✅ `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` - Anon/Public key  
-✅ `SUPABASE_SERVICE_ROLE_KEY` - Service role key (untuk admin operations)  
-✅ `OPENAI_API_KEY` - OpenAI API key (untuk embeddings, RAG, knowledge base)  
+| Variabel | Keterangan |
+|----------|------------|
+| `DATABASE_URL` | Connection string PostgreSQL (wajib untuk fitur DB) |
+| `NEXT_PUBLIC_SITE_URL` | Base URL aplikasi (opsional, untuk OAuth/link) |
+| `OPENAI_API_KEY` | Fitur AI / embeddings / RAG (opsional) |
 
 ---
 

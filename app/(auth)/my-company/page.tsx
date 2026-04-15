@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import CustomerCompanySettingsContent from '@/components/CustomerCompanySettingsContent'
+import CustomerCompanySettingsContent from '@/components/content/CustomerCompanySettingsContent'
 import { getCustomerCompanyId, isCompanyPortalAdmin } from '@/lib/customer-company'
 import { getCompanyDetail } from '@/lib/company-detail'
 

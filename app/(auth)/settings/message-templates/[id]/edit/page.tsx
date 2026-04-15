@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import MessageTemplateEditContent from '@/components/MessageTemplateEditContent'
+import MessageTemplateEditContent from '@/components/content/MessageTemplateEditContent'
 import { canAccessMessageTemplates } from '@/lib/auth-utils'
 
 export default async function MessageTemplateEditPage({

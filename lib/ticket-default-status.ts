@@ -1,4 +1,4 @@
-/** Canonical first status for new tickets (matches prisma seed / DEFAULT_ALL_STATUSES). */
+/** Canonical first status for new tickets (matches db seed / DEFAULT_ALL_STATUSES). */
 export const DEFAULT_NEW_TICKET_STATUS_SLUG = 'open' as const
 
 /**

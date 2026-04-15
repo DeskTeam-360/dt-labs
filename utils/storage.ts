@@ -1,6 +1,5 @@
 /**
- * Storage - iDrive e2 (S3-compatible)
- * Migrasi dari Supabase Storage
+ * Storage — iDrive e2 (S3-compatible).
  *
  * Client: uses /api/upload
  * Server: uses lib/storage-idrive directly

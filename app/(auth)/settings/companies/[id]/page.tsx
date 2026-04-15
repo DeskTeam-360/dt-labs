@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import CompanyDetailContent from '@/components/CompanyDetailContent'
+import CompanyDetailContent from '@/components/content/CompanyDetailContent'
 import { getCompanyDetail } from '@/lib/company-detail'
 
 export default async function SettingsCompanyDetailPage({

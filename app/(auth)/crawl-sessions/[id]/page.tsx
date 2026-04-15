@@ -2,7 +2,7 @@ import { auth } from '@/auth'
 import { db, crawlSessions, companyWebsites, companies } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
-import CrawlSessionDetailContent from '@/components/CrawlSessionDetailContent'
+import CrawlSessionDetailContent from '@/components/content/CrawlSessionDetailContent'
 
 export default async function CrawlSessionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()

@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import CrawlSessionsContent from '@/components/CrawlSessionsContent'
+import CrawlSessionsContent from '@/components/content/CrawlSessionsContent'
 
 export default async function CrawlSessionsPage() {
   const session = await auth()
