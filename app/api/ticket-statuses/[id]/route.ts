@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { tickets,ticketStatuses } from '@/lib/db'
-import { ensureTicketStatusIsDeletableColumn } from '@/lib/ensure-ticket-status-is-deletable'
 import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
 import { isLockedTicketStatusSlug } from '@/lib/ticket-status-locked-slugs'
 
@@ -36,8 +35,6 @@ export async function PATCH(
     is_deletable,
     is_active,
   } = body
-
-  await ensureTicketStatusIsDeletableColumn()
 
   const [current] = await db.select().from(ticketStatuses).where(eq(ticketStatuses.id, statusId)).limit(1)
   if (!current) {
@@ -106,8 +103,6 @@ export async function DELETE(
   }
 
   try {
-    await ensureTicketStatusIsDeletableColumn()
-
     // First, get the status to check its slug
     const status = await db.query.ticketStatuses.findFirst({
       where: eq(ticketStatuses.id, statusId),
