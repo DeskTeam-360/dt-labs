@@ -211,6 +211,8 @@ export default function TicketDetailContent({
     const [descriptionValue, setDescriptionValue] = useState(() => (typeof ticketData?.description === 'string' ? ticketData.description : '') || '')
     const [editModalVisible, setEditModalVisible] = useState(false)
     const [teams, setTeams] = useState<any[]>([])
+    /** Teams the signed-in user belongs to (from /api/tickets/lookup). Team picker is limited to these. */
+    const [userTeamIds, setUserTeamIds] = useState<string[]>([])
     const [users, setUsers] = useState<any[]>([])
     const [companyCustomers, setCompanyCustomers] = useState<Array<{ id: string; full_name: string | null; email: string }>>([])
     const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
@@ -329,8 +331,17 @@ export default function TicketDetailContent({
     useEffect(() => {
         const fetchLookup = async () => {
             try {
-                const data = await apiFetch<{ teams: any[]; users: any[]; ticketTypes: any[]; ticketPriorities: any[]; companies: any[]; tags: any[] }>('/api/tickets/lookup')
+                const data = await apiFetch<{
+                    teams: any[]
+                    userTeamIds?: string[]
+                    users: any[]
+                    ticketTypes: any[]
+                    ticketPriorities: any[]
+                    companies: any[]
+                    tags: any[]
+                }>('/api/tickets/lookup')
                 setTeams(data?.teams || [])
+                setUserTeamIds(Array.isArray(data?.userTeamIds) ? data.userTeamIds : [])
                 setUsers(data?.users || [])
                 setTicketTypes(data?.ticketTypes || [])
                 setTicketPriorities(data?.ticketPriorities || [])
@@ -563,6 +574,18 @@ export default function TicketDetailContent({
         }
         return colorMap[visibility] || 'default'
     }
+
+    /** Team dropdown: only teams the current user is a member of, plus current ticket team if not in that set (read-only context). */
+    const teamOptionsForTicket = useMemo(() => {
+        const mine = new Set(userTeamIds)
+        const list = (teams || []).filter((t: { id: string }) => mine.has(t.id))
+        const cur = displayTicket?.team_id as string | undefined
+        if (cur && !list.some((t: { id: string }) => t.id === cur)) {
+            const extra = teams.find((t: { id: string }) => t.id === cur)
+            if (extra) return [...list, extra]
+        }
+        return list
+    }, [teams, userTeamIds, displayTicket?.team_id])
 
     const handleAddChecklistItem = async () => {
         if (!newChecklistTitle.trim()) {
@@ -1444,7 +1467,7 @@ export default function TicketDetailContent({
                                             selectedVisibility={optimisticVisibility ?? displayTicket.visibility ?? 'private'}
                                             onVisibilityChange={handleVisibilityChange}
                                             visibilityChanging={visibilityChanging}
-                                            teamOptions={teams}
+                                            teamOptions={teamOptionsForTicket}
                                             selectedTeamId={displayTicket.team_id ?? null}
                                             onTeamChange={handleTeamChange}
                                             teamChanging={teamChanging}
