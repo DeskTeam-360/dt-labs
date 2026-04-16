@@ -194,7 +194,6 @@ export async function GET(request: Request) {
     })).sort((a, b) => (orderMap[a.id] ?? 999) - (orderMap[b.id] ?? 999))
   }
 
-  // ETA: due_date terdekat, jika ada beberapa dengan tanggal sama → ambil yang prioritas tertinggi (urgent dulu)
   const ticketsWithDue = myTickets.filter((t) => t.dueDate != null)
   let lastDueDate: string | null = null
   let lastDueTicket: { id: number; title: string } | null = null

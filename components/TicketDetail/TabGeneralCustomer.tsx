@@ -242,13 +242,13 @@ export default function TabGeneralCustomer({
                       borderTop: `1px solid ${outline}`,
                       borderBottom: `1px solid ${outline}`,
                       borderLeft: `1px solid ${outline}`,
-                      borderRight: '3px solid #52c41a',
+                      borderRight: '5px solid #52c41a',
                     }
                   : {
                       borderTop: `1px solid ${outline}`,
                       borderBottom: `1px solid ${outline}`,
                       borderRight: `1px solid ${outline}`,
-                      borderLeft: `3px solid ${borderColor}`,
+                      borderLeft: `5px solid ${borderColor}`,
                     }
                 const authorLabel = isAutomation
                   ? 'Automation'
