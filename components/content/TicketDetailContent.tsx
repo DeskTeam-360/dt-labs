@@ -6,6 +6,8 @@ import {
     ArrowLeftOutlined,
     DeleteOutlined,
     DeleteTwoTone,
+    LeftOutlined,
+    RightOutlined,
     WarningOutlined,
     WarningTwoTone,
 } from '@ant-design/icons'
@@ -190,6 +192,7 @@ export default function TicketDetailContent({
 
     const [loading, setLoading] = useState(false)
     const [classifyLoading, setClassifyLoading] = useState<'support' | 'spam' | 'trash' | null>(null)
+    const [nextTicketNavLoading, setNextTicketNavLoading] = useState(false)
     const [newChecklistTitle, setNewChecklistTitle] = useState('')
     const [commentVisibility, setCommentVisibility] = useState<'note' | 'reply' | null>(null)
     useEffect(() => {
@@ -1112,6 +1115,88 @@ export default function TicketDetailContent({
         },
         [displayTicket?.id, router],
     )
+
+    type MyOpenTicketNavDirection = 'next' | 'prev'
+
+    const navigateMyOpenTicket = useCallback(
+        async (direction: MyOpenTicketNavDirection) => {
+            const tid = displayTicket?.id
+            if (tid == null) return
+            setNextTicketNavLoading(true)
+            try {
+                type TicketListRow = {
+                    id: number
+                    created_at: string
+                    updated_at: string
+                    status: string
+                    created_by: string
+                    ticket_type?: string
+                }
+                const list = await apiFetch<TicketListRow[]>('/api/tickets?limit=500')
+                const uid = currentUser.id
+                const openMine = list.filter(
+                    (t) =>
+                        t.created_by === uid &&
+                        String(t.status || '').toLowerCase() !== 'closed' &&
+                        (t.ticket_type ?? 'support') === 'support',
+                )
+                /** Same default as ticket list: newest activity first (`sortTickets` updated_at desc). */
+                const ordered = [...openMine].sort((a, b) => {
+                    const tu = new Date(a.updated_at || 0).getTime() - new Date(b.updated_at || 0).getTime()
+                    if (tu !== 0) return -tu
+                    return b.id - a.id
+                })
+                if (ordered.length === 0) {
+                    message.info('You have no open tickets.')
+                    return
+                }
+                const idx = ordered.findIndex((t) => t.id === tid)
+                let targetId: number | null = null
+
+                if (direction === 'next') {
+                    if (idx >= 0 && idx < ordered.length - 1) {
+                        targetId = ordered[idx + 1]!.id
+                    } else if (idx >= 0 && idx === ordered.length - 1) {
+                        message.info('You are already on the last ticket in the list (oldest activity in this view).')
+                        return
+                    } else {
+                        const candidate = ordered.find((t) => t.id !== tid) ?? ordered[0]
+                        targetId = candidate.id === tid ? null : candidate.id
+                        if (targetId == null) {
+                            message.info('No other open tickets.')
+                            return
+                        }
+                    }
+                } else {
+                    if (idx > 0) {
+                        targetId = ordered[idx - 1]!.id
+                    } else if (idx === 0) {
+                        message.info('You are already on the first ticket in the list (most recently updated).')
+                        return
+                    } else {
+                        for (let i = ordered.length - 1; i >= 0; i--) {
+                            if (ordered[i]!.id !== tid) {
+                                targetId = ordered[i]!.id
+                                break
+                            }
+                        }
+                        if (targetId == null) {
+                            message.info('No other open tickets.')
+                            return
+                        }
+                    }
+                }
+
+                router.push(`/tickets/${targetId}`)
+            } catch (e: unknown) {
+                message.error(e instanceof Error ? e.message : 'Failed to load tickets')
+            } finally {
+                setNextTicketNavLoading(false)
+            }
+        },
+        [currentUser.id, displayTicket?.id, router],
+    )
+
     const timeTrackerManualUserOptions = useMemo(
         () =>
             users
@@ -1192,6 +1277,25 @@ export default function TicketDetailContent({
                                             #{displayTicket.id} {displayTicket.title}
                                         </span>
                                     </Title>
+                                    {isCustomer && (
+                                        <Flex gap={8} wrap="wrap" align="center">
+                                            <Button
+                                                icon={<LeftOutlined />}
+                                                loading={nextTicketNavLoading}
+                                                onClick={() => void navigateMyOpenTicket('prev')}
+                                            >
+                                                Prev ticket
+                                            </Button>
+                                            <Button
+                                                icon={<RightOutlined />}
+                                                type="primary"
+                                                loading={nextTicketNavLoading}
+                                                onClick={() => void navigateMyOpenTicket('next')}
+                                            >
+                                                Next ticket
+                                            </Button>
+                                        </Flex>
+                                    )}
                                     {!isCustomer && (
                                         <div
                                             style={{

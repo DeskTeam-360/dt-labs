@@ -1,17 +1,19 @@
 'use client'
 
-import { KeyOutlined,PlusOutlined } from '@ant-design/icons'
+import { KeyOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   Button,
   Form,
   Input,
   message,
   Modal,
+  Popconfirm,
+  Space,
   Table,
   Tag,
   Typography,
 } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 const { Text, Title } = Typography
 
@@ -32,21 +34,43 @@ async function apiJson<T>(url: string, options?: RequestInit): Promise<T> {
   return data as T
 }
 
-export default function CustomerPortalTeamSection({ companyId }: { companyId: string }) {
+export default function CustomerPortalTeamSection({
+  companyId,
+  canManagePortal = false,
+  currentUserId,
+}: {
+  companyId: string
+  /** Add users / reset passwords — server also enforces on POST/PATCH. */
+  canManagePortal?: boolean
+  /** Used to hide self-service status / password actions on own row. */
+  currentUserId?: string
+}) {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
+  const [canManageFromApi, setCanManageFromApi] = useState<boolean | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [addLoading, setAddLoading] = useState(false)
   const [resetUserId, setResetUserId] = useState<string | null>(null)
   const [resetLoading, setResetLoading] = useState(false)
+  const [statusActionId, setStatusActionId] = useState<string | null>(null)
   const [form] = Form.useForm<{ email: string; password: string; full_name?: string }>()
   const [resetForm] = Form.useForm<{ password: string; confirm: string }>()
 
   const load = useCallback(async () => {
+    if (!companyId?.trim()) {
+      setMembers([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
-      const data = await apiJson<{ members: Member[] }>(`/api/companies/${companyId}/portal-members`)
+      const data = await apiJson<{ members: Member[]; currentUserIsCompanyAdmin?: boolean }>(
+        `/api/companies/${encodeURIComponent(companyId)}/portal-members`,
+      )
       setMembers(data.members || [])
+      if (typeof data.currentUserIsCompanyAdmin === 'boolean') {
+        setCanManageFromApi(data.currentUserIsCompanyAdmin)
+      }
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : 'Failed to load team')
       setMembers([])
@@ -59,40 +83,113 @@ export default function CustomerPortalTeamSection({ companyId }: { companyId: st
     load()
   }, [load])
 
-  const openReset = (userId: string) => {
+  const openReset = useCallback((userId: string) => {
     setResetUserId(userId)
     resetForm.resetFields()
-  }
+  }, [resetForm])
 
-  const columns = [
-    {
-      title: 'Name',
-      key: 'name',
-      render: (_: unknown, row: Member) => row.full_name || '—',
+  const setMemberStatus = useCallback(
+    async (userId: string, status: 'active' | 'inactive') => {
+      setStatusActionId(userId)
+      try {
+        await apiJson(`/api/companies/${encodeURIComponent(companyId)}/portal-members/${encodeURIComponent(userId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        })
+        message.success(status === 'inactive' ? 'Member deactivated' : 'Member reactivated')
+        await load()
+      } catch (e: unknown) {
+        message.error(e instanceof Error ? e.message : 'Failed to update status')
+      } finally {
+        setStatusActionId(null)
+      }
     },
-    {
-      title: 'Email',
-      dataIndex: 'email',
-      key: 'email',
-    },
-    {
-      title: 'Role',
-      key: 'role',
-      width: 120,
-      render: (_: unknown, row: Member) =>
-        row.company_role === 'company_admin' ? <Tag color="blue">Portal admin</Tag> : <Tag>Member</Tag>,
-    },
-    {
-      title: '',
-      key: 'actions',
-      width: 140,
-      render: (_: unknown, row: Member) => (
-        <Button type="primary" icon={<KeyOutlined />} onClick={() => openReset(row.id)}>
-          Reset password
-        </Button>
-      ),
-    },
-  ]
+    [companyId, load],
+  )
+
+  const canManage = canManageFromApi ?? canManagePortal
+
+  const columns = useMemo(() => {
+    const base = [
+      {
+        title: 'Name',
+        key: 'name',
+        render: (_: unknown, row: Member) => row.full_name || '—',
+      },
+      {
+        title: 'Email',
+        dataIndex: 'email',
+        key: 'email',
+      },
+      {
+        title: 'Status',
+        key: 'status',
+        width: 100,
+        render: (_: unknown, row: Member) => {
+          const active = (row.status || 'active').toLowerCase() === 'active'
+          return active ? <Tag color="success">Active</Tag> : <Tag>Inactive</Tag>
+        },
+      },
+      {
+        title: 'Role',
+        key: 'role',
+        width: 120,
+        render: (_: unknown, row: Member) =>
+          row.company_role === 'company_admin' ? <Tag color="blue">Portal admin</Tag> : <Tag>Member</Tag>,
+      },
+    ]
+    if (!canManage) return base
+    return [
+      ...base,
+      {
+        title: 'Actions',
+        key: 'actions',
+        width: 280,
+        render: (_: unknown, row: Member) => {
+          const isSelf = currentUserId != null && row.id === currentUserId
+          const isPortalAdminRow = row.company_role === 'company_admin'
+          const active = (row.status || 'active').toLowerCase() === 'active'
+          const canToggleStatus = !isSelf && !isPortalAdminRow
+          return (
+            <Space wrap size="small">
+              <Button type="primary" icon={<KeyOutlined />} onClick={() => openReset(row.id)}>
+                Reset password
+              </Button>
+              {canToggleStatus ? (
+                active ? (
+                  <Popconfirm
+                    title="Deactivate this member?"
+                    description="They will not be able to sign in until reactivated."
+                    okText="Deactivate"
+                    cancelText="Cancel"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => void setMemberStatus(row.id, 'inactive')}
+                  >
+                    <Button danger loading={statusActionId === row.id}>
+                      Deactivate
+                    </Button>
+                  </Popconfirm>
+                ) : (
+                  <Popconfirm
+                    title="Reactivate this member?"
+                    description="They will be able to sign in again."
+                    okText="Reactivate"
+                    cancelText="Cancel"
+                    onConfirm={() => void setMemberStatus(row.id, 'active')}
+                  >
+                    <Button type="default" loading={statusActionId === row.id}>
+                      Activate
+                    </Button>
+                  </Popconfirm>
+                )
+              ) : null}
+            </Space>
+          )
+        },
+      },
+    ]
+  }, [canManage, currentUserId, openReset, setMemberStatus, statusActionId])
 
   return (
     <>
@@ -110,12 +207,16 @@ export default function CustomerPortalTeamSection({ companyId }: { companyId: st
           <Title level={5} style={{ margin: 0 }}>
             Portal accounts
           </Title>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddOpen(true)}>
-            Add account
-          </Button>
+          {canManage ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddOpen(true)}>
+              Add account
+            </Button>
+          ) : null}
         </div>
         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-          Create logins for colleagues in your organization and reset their passwords when needed.
+          {canManage
+            ? 'Create logins, reset passwords, and deactivate or reactivate members (except other portal admins and yourself).'
+            : 'Everyone in your company can see who has portal access. Only a portal admin can add accounts, reset passwords, or change member status.'}
         </Text>
         <Table<Member>
           size="small"
@@ -140,7 +241,7 @@ export default function CustomerPortalTeamSection({ companyId }: { companyId: st
           try {
             const values = await form.validateFields()
             setAddLoading(true)
-            await apiJson(`/api/companies/${companyId}/portal-members`, {
+            await apiJson(`/api/companies/${encodeURIComponent(companyId)}/portal-members`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -203,7 +304,7 @@ export default function CustomerPortalTeamSection({ companyId }: { companyId: st
               return
             }
             setResetLoading(true)
-            await apiJson(`/api/companies/${companyId}/portal-members/${resetUserId}`, {
+            await apiJson(`/api/companies/${encodeURIComponent(companyId)}/portal-members/${encodeURIComponent(resetUserId)}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ password: v.password }),

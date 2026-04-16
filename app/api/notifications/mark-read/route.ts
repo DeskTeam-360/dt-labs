@@ -41,7 +41,6 @@ export async function POST(request: Request) {
     await batch.commit()
     return NextResponse.json({ ok: true })
   } catch (e) {
-    console.error('[POST /api/notifications/mark-read]', e)
     return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
   }
 }

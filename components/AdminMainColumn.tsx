@@ -42,7 +42,12 @@ export default function AdminMainColumn({
   return (
     <Layout style={layoutStyle} {...layoutProps}>
       <GlobalAnnouncementBar />
-      <TicketSearchNavbar savedFiltersUserId={!isCustomer ? user.id : undefined} />
+
+      
+      {typeof window !== 'undefined' && !window.location.pathname.startsWith('/settings') && (
+        <TicketSearchNavbar savedFiltersUserId={!isCustomer ? user.id : undefined} />
+      )}
+ 
       {children}
     </Layout>
   )

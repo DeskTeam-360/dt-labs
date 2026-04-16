@@ -22,10 +22,7 @@ export function isFirebaseAdminConfigured(): boolean {
   )
 }
 
-/**
- * App default Firebase Admin — hanya jika service account env terisi.
- * Dipakai di API routes / server actions: notifikasi, housekeeping data Firestore.
- */
+
 export function getFirebaseAdminApp(): App | null {
   if (!isFirebaseAdminConfigured()) return null
   if (getApps().length > 0) {
@@ -48,7 +45,6 @@ export function getFirebaseAdminFirestore(): Firestore | null {
   return app ? getFirestore(app) : null
 }
 
-/** Kirim FCM dari server (topic / token); null jika Admin tidak dikonfigurasi. */
 export function getFirebaseAdminMessaging(): Messaging | null {
   const app = getFirebaseAdminApp()
   return app ? getMessaging(app) : null

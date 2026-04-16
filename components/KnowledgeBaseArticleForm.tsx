@@ -36,6 +36,7 @@ interface KnowledgeBaseArticleFormProps {
 const CATEGORY_OPTIONS = [
   { label: 'General', value: 'general' },
   { label: 'Requests', value: 'requests' },
+  { label: 'Customer service', value: 'customer service' },
 ]
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {

@@ -573,10 +573,10 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
           {/* Knowledge Base */}
           <Col xs={24} lg={12}>
             <Card>
-              <span style={{ fontWeight: 600, fontSize: 16 }}>Knowledge base</span>
+              <span style={{ fontWeight: 600, fontSize: 16 }}>Frequently asked questions</span>
               <br />
               <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>How can we help you today?</Text>
-              <Space orientation="vertical" style={{ width: '100%' }}>
+              {/* <Space orientation="vertical" style={{ width: '100%' }}>
                 <Select
                   placeholder="Filter by category"
                   style={{ width: '100%' }}
@@ -588,7 +588,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                     { label: 'Requests', value: 'requests' },
                   ]}
                 />
-              </Space>
+              </Space> */}
               <div style={{ marginTop: 16 }}>
                 {filteredKbArticles.length > 0 ? (
                   filteredKbArticles.map((art) => (

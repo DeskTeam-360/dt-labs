@@ -5,7 +5,6 @@ import { getFirebaseAdminFirestore } from '@/lib/firebase/admin'
 
 const LIMIT = 40
 
-/** List ticket notifications for the signed-in user (Firestore via Admin — tidak pakai auth Firebase di browser). */
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) {
@@ -53,7 +52,6 @@ export async function GET() {
 
     return NextResponse.json({ items })
   } catch (e) {
-    console.error('[GET /api/notifications]', e)
     return NextResponse.json({ items: [], error: 'fetch_failed' })
   }
 }

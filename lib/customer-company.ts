@@ -38,12 +38,29 @@ export async function userBelongsToCompany(userId: string, companyId: string): P
   return !!cu
 }
 
-/** Can manage portal accounts for this company (add users, reset passwords). */
+/**
+ * Can manage portal accounts and company contact/branding for this company.
+ * - Explicit: `company_users.company_role === 'company_admin'` for this company.
+ * - Legacy fallback: if the company has no explicit portal admin yet, the customer whose
+ *   `users.company_id` is this company may manage (typical first account).
+ */
 export async function isCompanyPortalAdmin(userId: string, companyId: string): Promise<boolean> {
-  const [row] = await db
+  const [cu] = await db
     .select({ companyRole: companyUsers.companyRole })
     .from(companyUsers)
     .where(and(eq(companyUsers.userId, userId), eq(companyUsers.companyId, companyId)))
     .limit(1)
-  return row?.companyRole === 'company_admin'
+
+  if (cu?.companyRole === 'company_admin') return true
+
+  const [anyAdmin] = await db
+    .select({ userId: companyUsers.userId })
+    .from(companyUsers)
+    .where(and(eq(companyUsers.companyId, companyId), eq(companyUsers.companyRole, 'company_admin')))
+    .limit(1)
+
+  if (anyAdmin) return false
+
+  const [u] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
+  return u?.companyId === companyId
 }

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { getCompanyDetail } from '@/lib/company-detail'
-import { customerOwnsCompany } from '@/lib/customer-company'
+import { customerOwnsCompany, isCompanyPortalAdmin, userBelongsToCompany } from '@/lib/customer-company'
 import { companies, companyUsers,db, users } from '@/lib/db'
 import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
 
@@ -49,8 +49,12 @@ export async function PUT(
   const isCustomer = role === 'customer'
 
   if (isCustomer) {
-    const ok = await customerOwnsCompany(session.user.id!, id)
-    if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const belongs = await userBelongsToCompany(session.user.id!, id)
+    if (!belongs) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const canEdit = await isCompanyPortalAdmin(session.user.id!, id)
+    if (!canEdit) {
+      return NextResponse.json({ error: 'Only a portal admin can update company details' }, { status: 403 })
+    }
   }
 
   const updateData: Record<string, unknown> = {}

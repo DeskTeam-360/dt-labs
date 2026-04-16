@@ -111,24 +111,34 @@ export default function CustomerCompanySettingsContent({
               Company info
             </Title>
             <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
-              View your organization details. You can update name, email, and brand color below.
+              View your organization details.
+              {isCompanyPortalAdmin
+                ? ' As portal admin you can update name, email, and brand color below.'
+                : ' Only a portal admin can change company contact and branding; everyone in the company can see portal accounts.'}
             </Text>
 
             <TabInfo companyData={companyData as any} groupedDatas={groupedDatas} />
 
-            {isCompanyPortalAdmin ? <CustomerPortalTeamSection companyId={companyId} /> : null}
+            <CustomerPortalTeamSection
+              companyId={companyId}
+              canManagePortal={isCompanyPortalAdmin}
+              currentUserId={user.id}
+            />
 
             <Divider />
 
-            <Title level={4}>Update contact &amp; branding</Title>
+            <Title level={4}>Contact &amp; branding</Title>
             <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-              Changes apply to how your company appears in the portal.
+              {isCompanyPortalAdmin
+                ? 'Changes apply to how your company appears in the portal.'
+                : 'Ask a portal admin to update how your company appears in the portal.'}
             </Text>
             <Form
               form={form}
               layout="vertical"
               style={{ maxWidth: 480 }}
               onFinish={onFinish}
+              disabled={!isCompanyPortalAdmin}
               initialValues={{
                 name: companyData.name,
                 email: (companyData.email as string | null) || '',
@@ -144,11 +154,13 @@ export default function CustomerCompanySettingsContent({
               <Form.Item name="color" label="Brand color">
                 <ColorPickerInput />
               </Form.Item>
-              <Form.Item>
-                <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving}>
-                  Save changes
-                </Button>
-              </Form.Item>
+              {isCompanyPortalAdmin ? (
+                <Form.Item>
+                  <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving}>
+                    Save changes
+                  </Button>
+                </Form.Item>
+              ) : null}
             </Form>
           </Card>
         </Content>

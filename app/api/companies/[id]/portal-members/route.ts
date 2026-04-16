@@ -3,8 +3,8 @@ import { eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isCompanyPortalAdmin,userBelongsToCompany } from '@/lib/customer-company'
-import { companyUsers,db, users } from '@/lib/db'
+import { isCompanyPortalAdmin, userBelongsToCompany } from '@/lib/customer-company'
+import { companies, companyUsers, db, users } from '@/lib/db'
 import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
 
 async function mergedCustomerRows(companyId: string) {
@@ -47,6 +47,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   if (!isGlobalAdmin && !(await userBelongsToCompany(session.user.id, companyId))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const [companyRow] = await db.select({ id: companies.id }).from(companies).where(eq(companies.id, companyId)).limit(1)
+  if (!companyRow) {
+    return NextResponse.json({ error: 'Company not found' }, { status: 404 })
   }
 
   const members = await mergedCustomerRows(companyId)

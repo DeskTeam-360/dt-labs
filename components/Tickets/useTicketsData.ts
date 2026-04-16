@@ -257,10 +257,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   /** Server returns filtered data - no client-side filtering */
   const filteredTickets = tickets
 
-  /**
-   * Kolom Kanban: persis slug yang dipilih di filter (urutan sort DB).
-   * Status show_in_kanban=false hanya dapat kolom jika slug-nya dipilih di filter.
-   */
+  
   const columnsToShow = useMemo(() => {
     if (allStatusColumns.length === 0) return []
     if (filterStatus.length === 0) return allStatusColumns
@@ -268,15 +265,11 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     return allStatusColumns.filter((c) => allowed.has(c.id))
   }, [filterStatus, allStatusColumns])
 
-  /** Slug default = semua yang show_in_kanban (sama isi statusColumns.id). */
   const defaultKanbanStatusKey = useMemo(
     () => [...statusColumns.map((c) => c.id)].sort().join(','),
     [statusColumns]
   )
 
-  /**
-   * Filter status "aktif" jika bukan tepat kumpulan default kanban, atau ada tambahan non-kanban / kurang kolom kanban.
-   */
   const statusFilterIsRestrictive = useMemo(() => {
     if (statusColumns.length === 0) return false
     if (filterStatus.length === 0) return false

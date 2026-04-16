@@ -37,7 +37,6 @@ export async function POST() {
 
     return NextResponse.json({ ok: true, deleted })
   } catch (e) {
-    console.error('[POST /api/notifications/delete-read]', e)
     return NextResponse.json({ error: 'Failed to delete', deleted }, { status: 500 })
   }
 }

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isCompanyPortalAdmin,userBelongsToCompany } from '@/lib/customer-company'
+import { isCompanyPortalAdmin, userBelongsToCompany } from '@/lib/customer-company'
 import { db, users } from '@/lib/db'
 import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
 
@@ -73,6 +73,27 @@ export async function PATCH(
       .update(users)
       .set({ passwordHash: await bcrypt.hash(password, 10), updatedAt: new Date() })
       .where(eq(users.id, targetUserId))
+    didSomething = true
+  }
+
+  if (body && body.status !== undefined && body.status !== null) {
+    const st = String(body.status).toLowerCase().trim()
+    if (st !== 'active' && st !== 'inactive') {
+      return NextResponse.json({ error: 'status must be active or inactive' }, { status: 400 })
+    }
+    if (!isGlobalAdmin && !(await isCompanyPortalAdmin(session.user.id, companyId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    if (targetUserId === session.user.id) {
+      return NextResponse.json({ error: 'You cannot change your own account status here' }, { status: 400 })
+    }
+    if (!isGlobalAdmin && (await isCompanyPortalAdmin(targetUserId, companyId))) {
+      return NextResponse.json(
+        { error: 'Cannot change status for another portal administrator' },
+        { status: 403 },
+      )
+    }
+    await db.update(users).set({ status: st, updatedAt: new Date() }).where(eq(users.id, targetUserId))
     didSomething = true
   }
 

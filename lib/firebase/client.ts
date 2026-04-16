@@ -38,8 +38,6 @@ export function isFirebaseClientConfigured(): boolean {
       c.appId
   )
 }
-
-/** Singleton app; null jika env belum lengkap. */
 export function getFirebaseApp(): FirebaseApp | null {
   if (!isFirebaseClientConfigured()) return null
   const cfg = getClientFirebaseConfig() as ClientFirebaseConfig
@@ -51,7 +49,6 @@ export function getFirebaseApp(): FirebaseApp | null {
 
 let firestoreCache: Firestore | null | undefined
 
-/** Firestore browser; null jika belum dikonfigurasi. */
 export function getFirebaseFirestore(): Firestore | null {
   if (!isFirebaseClientConfigured()) return null
   if (firestoreCache !== undefined) return firestoreCache
@@ -60,10 +57,7 @@ export function getFirebaseFirestore(): Firestore | null {
   return firestoreCache
 }
 
-/**
- * FCM untuk web — hanya di client, dengan dynamic import agar tidak ikut ke SSR.
- * Perlu NEXT_PUBLIC_FIREBASE_VAPID_KEY untuk getToken().
- */
+
 export async function getFirebaseMessaging(): Promise<
   import('firebase/messaging').Messaging | null
 > {
