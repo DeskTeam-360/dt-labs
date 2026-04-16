@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { ticketStatuses } from '@/lib/db'
-import { ensureTicketStatusIsDeletableColumn } from '@/lib/ensure-ticket-status-is-deletable'
 import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
 
 /** GET /api/ticket-statuses - List all ticket statuses */
@@ -13,8 +12,6 @@ export async function GET() {
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-
-  await ensureTicketStatusIsDeletableColumn()
 
   const rows = await db
     .select()
@@ -53,8 +50,6 @@ export async function POST(request: Request) {
   if (!title || !slug) {
     return NextResponse.json({ error: 'title and slug required' }, { status: 400 })
   }
-
-  await ensureTicketStatusIsDeletableColumn()
 
   const [inserted] = await db
     .insert(ticketStatuses)

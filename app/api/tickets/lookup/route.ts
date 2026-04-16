@@ -14,8 +14,6 @@ import {
   ticketTypes,
   users,
 } from '@/lib/db'
-import { ensureTicketStatusIsDeletableColumn } from '@/lib/ensure-ticket-status-is-deletable'
-
 /** GET /api/tickets/lookup - Lookup data for ticket form */
 export async function GET() {
   try {
@@ -23,8 +21,6 @@ export async function GET() {
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    await ensureTicketStatusIsDeletableColumn()
 
     const userId = session.user.id!
     const role = (session.user as { role?: string }).role?.toLowerCase()
