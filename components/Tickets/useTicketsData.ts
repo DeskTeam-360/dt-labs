@@ -204,11 +204,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   }
   const initialState = initialRef.current.state
 
-  /** Snapshot kanban slugs terakhir dari lookup — untuk menambahkan status baru (Cancel/Archived dll) ke filter API tanpa timpa penyempitan manual. */
   const lastKanbanSlugsRef = useRef<string[] | null>(null)
-  /** Hindari loop `router.replace` saat state diset dari perubahan URL (preset / browser back). */
   const applyingFromUrlRef = useRef(false)
-  /** Hanya `search` halaman daftar tiket — deteksi navigasi query baru vs mount pertama. */
   const prevTicketsListSearchRef = useRef<string | null>(null)
 
   const [collapsed, setCollapsed] = useState(true)
@@ -314,7 +311,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setFilterSearch('')
   }, [statusColumns, isCustomer, allStatuses])
 
-  /** Visibility multiselect kosong = "All visibility" (tidak kirim param ke API). */
   const setFilterVisibility = useCallback((v: string[]) => {
     setFilterVisibilityState(v ?? [])
   }, [])
@@ -541,7 +537,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
   const searchParamsKey = searchParams.toString()
 
-  /** Saat query `/tickets` berubah (preset navbar, link, back): samakan state Filter sidebar & hook. */
   useEffect(() => {
     const isTicketsList = pathname === '/tickets' || pathname === '/tickets/'
     if (!isTicketsList) return
