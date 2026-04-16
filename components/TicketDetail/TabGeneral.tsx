@@ -287,8 +287,16 @@ export default function TabGeneral({
 
   const creatorId = ticketData.creator?.id ?? ticketData.created_by ?? null
   const creatorEmail = ticketData.creator?.email ?? null
+  /** Thread header: company + person when both exist (portal context). */
   const creatorLabel =
-    ticketData.company?.name || ticketData.creator?.full_name || ticketData.creator?.email || 'Unknown'
+    [ticketData.company?.name, ticketData.creator?.full_name || ticketData.creator?.email].filter(Boolean).join(' · ') ||
+    ticketData.creator?.full_name ||
+    ticketData.creator?.email ||
+    ticketData.company?.name ||
+    'Unknown'
+  /** Sidebar "Created By": person under company ticket only (company has its own row). */
+  const createdByPersonLabel =
+    ticketData.creator?.full_name || ticketData.creator?.email || '—'
 
   return (
     <Space orientation="vertical" style={{ width: '100%' }} size="middle">
@@ -666,14 +674,16 @@ export default function TabGeneral({
                 </Text>
               )}
             </Descriptions.Item>
-            <Descriptions.Item label="Created By">
-              <TicketUserMention userId={creatorId} email={creatorEmail}>
-                <Space style={{ cursor: creatorId ? 'pointer' : undefined }}>
-                  <UserOutlined />
-                  <Text>{creatorLabel}</Text>
-                </Space>
-              </TicketUserMention>
-            </Descriptions.Item>
+            {ticketData.company_id ? (
+              <Descriptions.Item label="Created By">
+                <TicketUserMention userId={creatorId} email={creatorEmail}>
+                  <Space style={{ cursor: creatorId ? 'pointer' : undefined }}>
+                    <UserOutlined />
+                    <Text>{creatorLabel}</Text> 
+                  </Space>
+                </TicketUserMention>
+              </Descriptions.Item>
+            ) : null}
             <Descriptions.Item label="CC Recipients">
               {ticketCcEmails?.length ? (
                 <Text style={{ fontSize: 12 }}>{ticketCcEmails.join(', ')}</Text>
