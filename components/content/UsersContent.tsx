@@ -213,11 +213,11 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const handleDelete = async (userId: string) => {
     try {
       await apiFetch(`/api/users/${userId}`, { method: 'DELETE' })
-      message.success('User deleted successfully')
+      message.success('User deactivated')
       setSelectedRowKeys((keys) => keys.filter((k) => String(k) !== userId))
       fetchUsers()
     } catch (error: any) {
-      message.error(error.message || 'Failed to delete user')
+      message.error(error.message || 'Failed to deactivate user')
     }
   }
 
@@ -294,7 +294,9 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const handleBulkDelete = async () => {
     const withoutSelf = selectedRowKeys.map(String).filter((id) => id !== currentUser.id)
     if (withoutSelf.length === 0) {
-      message.warning('Select at least one other user to delete. You cannot remove your own account from this list.')
+      message.warning(
+        'Select at least one other user to deactivate. You cannot deactivate your own account from this list.'
+      )
       return
     }
     setBulkAction('delete')
@@ -304,12 +306,12 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       )
       const failed = results.filter((r) => r.status === 'rejected').length
       const ok = results.length - failed
-      if (ok > 0) message.success(`Deleted ${ok} user(s)`)
-      if (failed > 0) message.error(`${failed} delete(s) failed`)
+      if (ok > 0) message.success(`Deactivated ${ok} user(s)`)
+      if (failed > 0) message.error(`${failed} deactivate request(s) failed`)
       setSelectedRowKeys([])
       fetchUsers()
     } catch (error: any) {
-      message.error(error.message || 'Bulk delete failed')
+      message.error(error.message || 'Bulk deactivate failed')
     } finally {
       setBulkAction(null)
     }
@@ -560,22 +562,20 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               />
             </Tooltip>
           )}
-          <Popconfirm
-            title="Delete User"
-            description="Are you sure you want to delete this user?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Tooltip title="Delete">
-              <Button
-                type="primary"
-                danger
-                icon={<DeleteOutlined />}
-
-              />
-            </Tooltip>
-          </Popconfirm>
+          {isAdmin ? (
+            <Popconfirm
+              title="Deactivate user"
+              description="The account will be disabled and cannot sign in until reactivated (status set back to active)."
+              onConfirm={() => handleDelete(record.id)}
+              okText="Deactivate"
+              okButtonProps={{ danger: true }}
+              cancelText="Cancel"
+            >
+              <Tooltip title="Deactivate user">
+                <Button type="primary" danger icon={<DeleteOutlined />} />
+              </Tooltip>
+            </Popconfirm>
+          ) : null}
         </Space>
       ),
     },
@@ -738,32 +738,34 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                   >
                     Set inactive
                   </Button>
-                  <Popconfirm
-                    title="Delete selected users?"
-                    description={
-                      bulkDeletableCount > 0
-                        ? `This will permanently delete ${bulkDeletableCount} user(s).`
-                        : 'You cannot delete your own account from this action. Select other users.'
-                    }
-                    okText="Delete"
-                    okButtonProps={{ danger: true }}
-                    cancelText="Cancel"
-                    onConfirm={handleBulkDelete}
-                    disabled={bulkAction !== null || bulkDeletableCount === 0}
-                  >
-                    <span>
-                      <Button
-                        danger
-                        icon={<DeleteOutlined />}
-                        loading={bulkAction === 'delete'}
-                        disabled={
-                          bulkDeletableCount === 0 || (bulkAction !== null && bulkAction !== 'delete')
-                        }
-                      >
-                        Bulk delete
-                      </Button>
-                    </span>
-                  </Popconfirm>
+                  {isAdmin ? (
+                    <Popconfirm
+                      title="Deactivate selected users?"
+                      description={
+                        bulkDeletableCount > 0
+                          ? `This will deactivate ${bulkDeletableCount} user account(s). They cannot sign in until set back to active.`
+                          : 'You cannot deactivate your own account from this action. Select other users.'
+                      }
+                      okText="Deactivate"
+                      okButtonProps={{ danger: true }}
+                      cancelText="Cancel"
+                      onConfirm={handleBulkDelete}
+                      disabled={bulkAction !== null || bulkDeletableCount === 0}
+                    >
+                      <span>
+                        <Button
+                          danger
+                          icon={<DeleteOutlined />}
+                          loading={bulkAction === 'delete'}
+                          disabled={
+                            bulkDeletableCount === 0 || (bulkAction !== null && bulkAction !== 'delete')
+                          }
+                        >
+                          Bulk deactivate
+                        </Button>
+                      </span>
+                    </Popconfirm>
+                  ) : null}
                   <Button
                     type="link"
                     onClick={() => setSelectedRowKeys([])}

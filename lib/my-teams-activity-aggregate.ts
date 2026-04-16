@@ -13,7 +13,8 @@ function empty24(): number[] {
 }
 
 /**
- * Seconds of reported time overlapping [dayStart, dayEnd], attributed across UTC hours.
+ * Seconds of reported time overlapping [dayStart, dayEnd], attributed across **local** clock hours (0–23)
+ * for the calendar day represented by `dayStart`..`dayEnd` (typically local midnight..end from the client).
  * Running sessions use `now` as stop for wall-clock span; reported seconds scale to overlap.
  */
 export function accumulateSession(
@@ -44,11 +45,8 @@ export function accumulateSession(
   let cursor = overlapStartMs
   while (cursor < overlapEndMs) {
     const d = new Date(cursor)
-    const y = d.getUTCFullYear()
-    const mo = d.getUTCMonth()
-    const day = d.getUTCDate()
-    const h = d.getUTCHours()
-    const nextHour = Date.UTC(y, mo, day, h + 1, 0, 0, 0)
+    const h = d.getHours()
+    const nextHour = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1, 0, 0, 0).getTime()
     const segEnd = Math.min(overlapEndMs, nextHour)
     const segDur = (segEnd - cursor) / 1000
     const slice = attributed * (segDur / overlapSec)

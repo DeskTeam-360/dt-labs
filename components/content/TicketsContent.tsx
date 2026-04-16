@@ -79,7 +79,6 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     handleDelete,
     handleBulkMoveToTrash,
     handleBulkMoveToSpam,
-    handleBulkDelete,
     handleSubmit,
     handleModalCancel,
     handleDragStart,
@@ -143,7 +142,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               type="info"
               showIcon
               message="Trash tickets"
-              description="Tickets moved to trash (card view). Use the sidebar to open All tickets or Spam."
+              description="Tickets moved to trash are kept here; use the sidebar to open All tickets or Spam."
               style={{ marginLeft: '24px', marginRight: '48px', marginBottom: '12px' }}
             />
           )}
@@ -178,7 +177,6 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               onDelete={handleDelete}
               onBulkMoveToSpam={!isCustomer ? handleBulkMoveToSpam : undefined}
               onBulkMoveToTrash={!isCustomer ? handleBulkMoveToTrash : undefined}
-              onBulkDelete={!isCustomer ? handleBulkDelete : undefined}
               onFilterByStatus={filterByStatusFromChip}
               onFilterByPriority={filterByPriorityFromChip}
               onFilterByTag={filterByTagFromChip}

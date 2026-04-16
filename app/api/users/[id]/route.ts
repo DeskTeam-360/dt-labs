@@ -210,7 +210,12 @@ export async function PATCH(
   if (body.first_name !== undefined) updateData.firstName = body.first_name || null
   if (body.last_name !== undefined) updateData.lastName = body.last_name || null
   if (body.role !== undefined) updateData.role = body.role
-  if (body.status !== undefined) updateData.status = body.status
+  if (body.status !== undefined) {
+    updateData.status = body.status
+    if (String(body.status).toLowerCase() === 'active') {
+      updateData.deletedAt = null
+    }
+  }
   if (body.company_id !== undefined) updateData.companyId = body.company_id || null
   if (body.avatar_url !== undefined) updateData.avatarUrl = body.avatar_url
   if (body.phone !== undefined) updateData.phone = body.phone || null
@@ -234,7 +239,10 @@ export async function PATCH(
   return NextResponse.json({ ok: true })
 }
 
-/** DELETE /api/users/[id] */
+/**
+ * DELETE /api/users/[id] — does not remove the row; deactivates the account (same as a soft delete).
+ * User cannot sign in until an admin sets status back to active (clears deleted_at).
+ */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -244,8 +252,29 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { id } = await params
-  await db.delete(users).where(eq(users.id, id))
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+  if (role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
-  return NextResponse.json({ ok: true })
+  const { id } = await params
+  if (id === session.user.id) {
+    return NextResponse.json({ error: 'You cannot deactivate your own account this way' }, { status: 400 })
+  }
+
+  const [target] = await db.select({ id: users.id }).from(users).where(eq(users.id, id)).limit(1)
+  if (!target) {
+    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  }
+
+  await db
+    .update(users)
+    .set({
+      status: 'inactive',
+      deletedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, id))
+
+  return NextResponse.json({ ok: true, deactivated: true })
 }

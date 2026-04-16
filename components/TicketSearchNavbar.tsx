@@ -6,7 +6,7 @@ import { CloseOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icon
 import { Input, Spin, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { SpaNavLink } from '@/components/SpaNavLink'
@@ -66,8 +66,6 @@ type TicketPreview = {
 export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFiltersUserId?: string | null }) {
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const listSearchKey = searchParams.toString()
   const [q, setQ] = useState('')
   const [preview, setPreview] = useState<TicketPreview[]>([])
   const [panelVisible, setPanelVisible] = useState(false)
@@ -111,11 +109,6 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
     window.addEventListener(SAVED_FILTERS_CHANGED_EVENT, load)
     return () => window.removeEventListener(SAVED_FILTERS_CHANGED_EVENT, load)
   }, [savedFiltersUserId])
-
-  useEffect(() => {
-    if (pathname !== '/tickets' && pathname !== '/tickets/') return
-    setQ(searchParams.get('search') ?? '')
-  }, [pathname, listSearchKey, searchParams])
 
   useEffect(() => {
     const onDocDown = (e: MouseEvent) => {
