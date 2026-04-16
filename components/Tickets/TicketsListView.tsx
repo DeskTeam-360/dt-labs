@@ -41,7 +41,6 @@ interface TicketsListViewProps {
   onDelete: (id: number) => void
   onBulkMoveToSpam?: (ids: number[]) => void | Promise<void>
   onBulkMoveToTrash?: (ids: number[]) => void | Promise<void>
-  onBulkDelete?: (ids: number[]) => void | Promise<void>
   onFilterByStatus?: (statusSlug: string) => void
   onFilterByPriority?: (priorityId: number) => void
   onFilterByTag?: (tagId: string) => void
@@ -58,7 +57,6 @@ export default function TicketsListView({
   onDelete,
   onBulkMoveToSpam,
   onBulkMoveToTrash,
-  onBulkDelete,
   onFilterByStatus,
   onFilterByPriority,
   onFilterByTag,
@@ -82,7 +80,7 @@ export default function TicketsListView({
     return idx >= 0 ? idx : 999
   }
 
-  const bulkEnabled = !isCustomer && (onBulkMoveToSpam || onBulkMoveToTrash || onBulkDelete)
+  const bulkEnabled = !isCustomer && (onBulkMoveToSpam || onBulkMoveToTrash)
   const inSpamFolder = filterTicketType === 'spam'
   const inTrashFolder = filterTicketType === 'trash'
   const selectedIds = selectedRowKeys.map((k) => Number(k)).filter((n) => !Number.isNaN(n))
@@ -105,26 +103,11 @@ export default function TicketsListView({
     if (!onBulkMoveToTrash || selectedIds.length === 0) return
     Modal.confirm({
       title: 'Move to trash',
-      content: `Move ${selectedIds.length} ticket(s) to trash? You can open Trash from the sidebar to delete them permanently later.`,
+      content: `Move ${selectedIds.length} ticket(s) to trash? You can open Trash from the sidebar to review or restore.`,
       okText: 'Move to trash',
       cancelText: 'Cancel',
       onOk: async () => {
         await onBulkMoveToTrash(selectedIds)
-        setSelectedRowKeys([])
-      },
-    })
-  }
-
-  const runBulkDelete = () => {
-    if (!onBulkDelete || selectedIds.length === 0) return
-    Modal.confirm({
-      title: 'Delete tickets permanently',
-      content: `Permanently delete ${selectedIds.length} ticket(s)? This cannot be undone.`,
-      okText: 'Delete',
-      okButtonProps: { danger: true },
-      cancelText: 'Cancel',
-      onOk: async () => {
-        await onBulkDelete(selectedIds)
         setSelectedRowKeys([])
       },
     })
@@ -150,11 +133,6 @@ export default function TicketsListView({
           {!inTrashFolder && onBulkMoveToTrash ? (
             <Button type="default" icon={<InboxOutlined />} onClick={runBulkTrash}>
               Move to trash
-            </Button>
-          ) : null}
-          {onBulkDelete ? (
-            <Button type="primary" danger icon={<DeleteOutlined />} onClick={runBulkDelete}>
-              Delete permanently
             </Button>
           ) : null}
         </Flex>
@@ -422,15 +400,16 @@ export default function TicketsListView({
                   items: [
                     {
                       key: 'delete',
-                      label: 'Delete',
+                      label: 'Move to trash',
                       icon: <DeleteOutlined />,
                       danger: true,
                       onClick: () => {
                         Modal.confirm({
-                          title: 'Delete Ticket',
-                          content: 'Are you sure?',
-                          okText: 'Yes',
-                          cancelText: 'No',
+                          title: 'Move ticket to trash?',
+                          content: 'The ticket will be hidden from the main list. Open Trash from the sidebar to review.',
+                          okText: 'Move to trash',
+                          okButtonProps: { danger: true },
+                          cancelText: 'Cancel',
                           onOk: () => onDelete(record.id),
                         })
                       },

@@ -883,9 +883,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setTickets((prev) => prev.filter((t) => t.id !== ticketId))
     try {
       await apiFetch(`/api/tickets/${ticketId}`, { method: 'DELETE' })
-      message.success('Ticket deleted successfully')
+      message.success('Ticket moved to trash')
     } catch (error: unknown) {
-      message.error((error as Error).message || 'Failed to delete ticket')
+      message.error((error as Error).message || 'Failed to move ticket to trash')
       fetchTickets()
     }
   }
@@ -926,19 +926,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       await fetchTickets()
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to move tickets to spam')
-      await fetchTickets()
-    }
-  }
-
-  const handleBulkDelete = async (ids: number[]) => {
-    if (!ids.length || isCustomer) return
-    setTickets((prev) => prev.filter((t) => !ids.includes(t.id)))
-    try {
-      await Promise.all(ids.map((id) => apiFetch(`/api/tickets/${id}`, { method: 'DELETE' })))
-      message.success(`Deleted ${ids.length} ticket(s)`)
-      await fetchTickets()
-    } catch (error: unknown) {
-      message.error((error as Error).message || 'Failed to delete tickets')
       await fetchTickets()
     }
   }
@@ -1199,7 +1186,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     handleDelete,
     handleBulkMoveToTrash,
     handleBulkMoveToSpam,
-    handleBulkDelete,
     handleSubmit,
     handleModalCancel,
     handleDragStart,

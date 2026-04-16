@@ -285,10 +285,10 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
   const handleDelete = async (ticketId: number) => {
     try {
       await apiFetch(`/api/tickets/${ticketId}`, { method: 'DELETE' })
-      message.success('Ticket deleted')
+      message.success('Ticket moved to trash')
       fetchTickets()
     } catch (err: unknown) {
-      message.error((err as Error).message || 'Failed to delete')
+      message.error((err as Error).message || 'Failed to move ticket to trash')
     }
   }
 

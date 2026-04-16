@@ -442,7 +442,10 @@ export async function PATCH(
   return NextResponse.json({ ok: true })
 }
 
-/** DELETE /api/tickets/[id] */
+/**
+ * DELETE /api/tickets/[id] — does not remove the ticket; moves it to trash (same as ticket_type trash).
+ * Data is retained for recovery from the Trash folder.
+ */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -460,21 +463,42 @@ export async function DELETE(
 
   const delRole = (session.user as { role?: string }).role?.toLowerCase()
   const delActorRole: TicketActorRole = delRole === 'customer' ? 'customer' : 'agent'
+  const actorUserId = session.user.id!
+
+  const [cur] = await db
+    .select({ ticketType: tickets.ticketType })
+    .from(tickets)
+    .where(eq(tickets.id, ticketId))
+    .limit(1)
+  if (!cur) {
+    return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  }
+
+  const beforeType = coerceTicketType(cur.ticketType)
+  if (beforeType === 'trash') {
+    await triggerTicketUpdatedAutomation(ticketId)
+    bumpTicketDataVersion(ticketId)
+    return NextResponse.json({ ok: true, ticket_type: 'trash' })
+  }
+
+  await db
+    .update(tickets)
+    .set({ ticketType: 'trash', updatedAt: new Date() })
+    .where(eq(tickets.id, ticketId))
+
   await logTicketActivity({
     ticketId,
-    actorUserId: session.user.id!,
+    actorUserId,
     actorRole: delActorRole,
-    action: 'ticket_deleted',
-    metadata: { ticket_ref: ticketId },
+    action: 'ticket_updated',
+    metadata: {
+      changed_keys: ['ticket_type'],
+      changes: { ticket_type: { from: beforeType, to: 'trash' }, via: 'delete_as_trash' },
+    },
   })
 
-  await db.delete(ticketAssignees).where(eq(ticketAssignees.ticketId, ticketId))
-  await db.delete(ticketChecklist).where(eq(ticketChecklist.ticketId, ticketId))
-  await db.delete(ticketComments).where(eq(ticketComments.ticketId, ticketId))
-  await db.delete(ticketAttributs).where(eq(ticketAttributs.ticketId, ticketId))
-  await db.delete(ticketTags).where(eq(ticketTags.ticketId, ticketId))
-  await db.delete(ticketAttachments).where(eq(ticketAttachments.ticketId, ticketId))
-  await db.delete(tickets).where(eq(tickets.id, ticketId))
+  await triggerTicketUpdatedAutomation(ticketId)
+  bumpTicketDataVersion(ticketId)
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, ticket_type: 'trash' })
 }

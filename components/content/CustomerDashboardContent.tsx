@@ -796,28 +796,29 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                               },
                               {
                                 key: 'delete',
-                                label: 'Delete',
+                                label: 'Move to trash',
                                 icon: <DeleteOutlined />,
                                 danger: true,
                                 onClick: (e) => {
                                   e.domEvent.stopPropagation()
                                   Modal.confirm({
-                                    title: 'Delete Ticket',
-                                    content: 'Are you sure you want to delete this ticket?',
-                                    okText: 'Yes',
-                                    cancelText: 'No',
+                                    title: 'Move ticket to trash?',
+                                    content: 'The ticket will be moved to trash instead of being removed.',
+                                    okText: 'Move to trash',
+                                    okButtonProps: { danger: true },
+                                    cancelText: 'Cancel',
                                     onOk: async () => {
                                       try {
                                         const res = await fetch(`/api/tickets/${t.id}`, { method: 'DELETE', credentials: 'include' })
                                         if (!res.ok) {
                                           const err = await res.json().catch(() => ({}))
-                                          throw new Error(err?.error || 'Failed to delete')
+                                          throw new Error(err?.error || 'Failed to move to trash')
                                         }
-                                        message.success('Ticket deleted')
+                                        message.success('Ticket moved to trash')
                                         fetchStats()
                                         fetchHourlyTimeData()
                                       } catch (err) {
-                                        message.error((err as Error).message || 'Failed to delete ticket')
+                                        message.error((err as Error).message || 'Failed to move ticket to trash')
                                       }
                                     },
                                   })

@@ -22,7 +22,6 @@ import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
-import utc from 'dayjs/plugin/utc'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Bar,
@@ -34,14 +33,13 @@ import {
   YAxis,
 } from 'recharts'
 
-import { isValidMyTeamsActivityDateYmd, utcTodayYesterday } from '@/lib/my-teams-date'
+import { isValidMyTeamsActivityDateYmd, localTodayYesterday } from '@/lib/my-teams-date'
 import { getUserDepartmentAccentColor, getUserPositionAccentColor } from '@/lib/user-work-dropdowns'
 
 import AdminMainColumn from '../AdminMainColumn'
 import AdminSidebar from '../AdminSidebar'
 import { SpaNavLink } from '../SpaNavLink'
 
-dayjs.extend(utc)
 dayjs.extend(customParseFormat)
 
 const { Content } = Layout
@@ -94,7 +92,7 @@ interface MyTeamsContentProps {
 
 export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProps) {
   const [collapsed, setCollapsed] = useState(false)
-  const { today, yesterday } = useMemo(() => utcTodayYesterday(), [])
+  const { today, yesterday } = useMemo(() => localTodayYesterday(), [])
   const [dateYmd, setDateYmd] = useState(() => today)
 
   const [teams, setTeams] = useState<TeamRow[]>([])
@@ -131,10 +129,22 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
     }
   }, [])
 
+  const buildActivityQuery = useCallback((date: string, memberId?: string) => {
+    const start = dayjs(date, 'YYYY-MM-DD').startOf('day')
+    const end = dayjs(date, 'YYYY-MM-DD').endOf('day')
+    const qs = new URLSearchParams({
+      date,
+      day_start: start.toISOString(),
+      day_end: end.toISOString(),
+    })
+    if (memberId) qs.set('member_id', memberId)
+    return qs
+  }, [])
+
   const loadSummary = useCallback(async (teamId: string, date: string) => {
     setActivityLoading(true)
     try {
-      const qs = new URLSearchParams({ date })
+      const qs = buildActivityQuery(date)
       const res = await fetch(`/api/my-teams/${teamId}/activity?${qs}`, { credentials: 'include' })
       const json = (await res.json()) as ActivityResponse
       if (res.ok && json && typeof json === 'object' && Array.isArray(json.members)) {
@@ -147,12 +157,12 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
     } finally {
       setActivityLoading(false)
     }
-  }, [])
+  }, [buildActivityQuery])
 
   const loadMemberDetail = useCallback(async (teamId: string, date: string, memberId: string) => {
     setDetailLoading(true)
     try {
-      const qs = new URLSearchParams({ date, member_id: memberId })
+      const qs = buildActivityQuery(date, memberId)
       const res = await fetch(`/api/my-teams/${teamId}/activity?${qs}`, { credentials: 'include' })
       const json = (await res.json()) as ActivityResponse
       if (res.ok && json && typeof json === 'object') {
@@ -165,7 +175,7 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
     } finally {
       setDetailLoading(false)
     }
-  }, [])
+  }, [buildActivityQuery])
 
   useEffect(() => {
     if (!selectedTeamId) {
@@ -323,10 +333,7 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
     [activity]
   )
 
-  const datePickerValue = useMemo(
-    () => dayjs.utc(dateYmd, 'YYYY-MM-DD'),
-    [dateYmd]
-  )
+  const datePickerValue = useMemo(() => dayjs(dateYmd, 'YYYY-MM-DD'), [dateYmd])
 
   const disabledActivityDate = useCallback((current: Dayjs) => {
     if (!current?.isValid()) return true
@@ -349,19 +356,19 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
               My Teams
             </Title>
             <Text type="secondary" style={{ fontSize: 13 }}>
-              Reported work time for teams you belong to. Pick any UTC calendar day (up to two years back). Click a
-              member to see their tickets and hourly breakdown.
+              Reported work time for teams you belong to. Pick any calendar day in your local time (up to two years
+              back). Click a member to see their tickets and hourly breakdown.
             </Text>
           </div>
 
           <div style={{ marginBottom: 16 }}>
             <Space wrap align="center" size="middle">
-              <Text type="secondary">Day (UTC)</Text>
+              <Text type="secondary">Day (local)</Text>
               <DatePicker
                 value={datePickerValue}
                 onChange={(d) => {
                   if (!d?.isValid()) return
-                  const next = d.utc().format('YYYY-MM-DD')
+                  const next = d.format('YYYY-MM-DD')
                   if (isValidMyTeamsActivityDateYmd(next)) setDateYmd(next)
                 }}
                 allowClear={false}
@@ -490,7 +497,7 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
                 <span>
                   {focusMember.user_name}
                   <Text type="secondary" style={{ marginLeft: 8, fontWeight: 400, fontSize: 14 }}>
-                    · {dateYmd} (UTC)
+                    · {dateYmd} (local)
                   </Text>
                 </span>
               ) : (
@@ -520,7 +527,7 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
                     </Title>
                   </div>
                   <Divider style={{ margin: '12px 0' }} />
-                  <Title level={5}>Daily activity by hour (UTC)</Title>
+                  <Title level={5}>Daily activity by hour (local)</Title>
                   {memberHourlyChartData.some((d) => d.seconds > 0) ? (
                     <div style={{ width: '100%', height: 240, marginBottom: 20 }}>
                       <ResponsiveContainer width="100%" height="100%">

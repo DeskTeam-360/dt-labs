@@ -5,14 +5,14 @@ import { auth } from '@/auth'
 import { canAccessMyTeams } from '@/lib/auth-utils'
 import { db, teamMembers, tickets, ticketTimeTracker, ticketTypes, users } from '@/lib/db'
 import { accumulateSession, roundHourly, type SessionLike } from '@/lib/my-teams-activity-aggregate'
-import { parseMyTeamsActivityDateParam, utcDayBounds, utcTodayYesterday } from '@/lib/my-teams-date'
+import { localYmd, validateMyTeamsActivityDayWindow } from '@/lib/my-teams-date'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role
 }
 
-/** GET /api/my-teams/[teamId]/activity?date=YYYY-MM-DD&member_id=uuid — UTC calendar day; past range capped in `my-teams-date`. */
+/** GET /api/my-teams/[teamId]/activity?date=YYYY-MM-DD&day_start=&day_end=&member_id= — local calendar day (client sends ISO bounds); past range capped in `my-teams-date`. */
 export async function GET(request: Request, { params }: { params: Promise<{ teamId: string }> }) {
   const session = await auth()
   if (!session?.user?.id) {
@@ -36,14 +36,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { today } = utcTodayYesterday()
   const url = new URL(request.url)
-  const date = parseMyTeamsActivityDateParam(url.searchParams.get('date'), today)
-  const bounds = utcDayBounds(date)
-  if (!bounds) {
-    return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
+  const dayStartRaw = url.searchParams.get('day_start')?.trim()
+  const dayEndRaw = url.searchParams.get('day_end')?.trim()
+  if (!dayStartRaw || !dayEndRaw) {
+    return NextResponse.json(
+      { error: 'day_start and day_end are required (ISO 8601 local day bounds from the client)' },
+      { status: 400 },
+    )
   }
-  const { start: dayStart, end: dayEnd } = bounds
+  const dayStart = new Date(dayStartRaw)
+  const dayEnd = new Date(dayEndRaw)
+  if (!validateMyTeamsActivityDayWindow(dayStart, dayEnd)) {
+    return NextResponse.json({ error: 'Invalid day window' }, { status: 400 })
+  }
+  const dateHint = url.searchParams.get('date')?.trim()
+  const date = dateHint && /^\d{4}-\d{2}-\d{2}$/.test(dateHint) ? dateHint : localYmd(dayStart)
 
   const memberFocus = url.searchParams.get('member_id')?.trim() || null
 

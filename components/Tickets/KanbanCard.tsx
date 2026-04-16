@@ -213,15 +213,16 @@ export default function KanbanCard({
                 },
                 {
                   key: 'delete',
-                  label: 'Delete',
+                  label: 'Move to trash',
                   icon: <DeleteOutlined />,
                   danger: true,
                   onClick: () => {
                     Modal.confirm({
-                      title: 'Delete Ticket',
-                      content: 'Are you sure?',
-                      okText: 'Yes',
-                      cancelText: 'No',
+                      title: 'Move ticket to trash?',
+                      content: 'The ticket will be hidden from the main list. You can open Trash from the sidebar to review.',
+                      okText: 'Move to trash',
+                      okButtonProps: { danger: true },
+                      cancelText: 'Cancel',
                       onOk: () => onDelete(ticket.id),
                     })
                   },
