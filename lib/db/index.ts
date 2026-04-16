@@ -14,8 +14,18 @@ function getConnectionString() {
 
 const connectionString = getConnectionString()
 
-// Default pool: avoid queuing when many API routes hit DB in parallel (max: 3 often felt “stuck”).
-const poolMax = Math.min(50, Math.max(3, Number(process.env.DATABASE_POOL_MAX) || 15))
-const client = postgres(connectionString, { prepare: false, max: poolMax })
+/** Vercel/serverless: each isolate is short-lived but many run at once — DB has a global connection cap (e.g. Supabase ~15–60). */
+const isServerless = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME != null
+
+const envPool = Number(process.env.DATABASE_POOL_MAX)
+const defaultPoolMax = isServerless ? 1 : 12
+const poolMax = Number.isFinite(envPool) && envPool > 0 ? Math.min(50, Math.max(1, envPool)) : defaultPoolMax
+
+const client = postgres(connectionString, {
+  prepare: false,
+  max: poolMax,
+  // Return slots to the DB when a lambda goes quiet between invocations.
+  ...(isServerless ? { idle_timeout: 20, max_lifetime: 60 * 30 } : {}),
+})
 
 export const db = drizzle(client, { schema })
