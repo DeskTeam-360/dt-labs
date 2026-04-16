@@ -10,11 +10,37 @@ export function userRowAllowsSession(row: { status: string | null; deletedAt: Da
   return s === 'active'
 }
 
+function missingUsersDeletedAtColumn(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (/deleted_at/i.test(msg)) return true
+  // PostgreSQL undefined_column
+  if (/42703/i.test(msg) && /column/i.test(msg)) return true
+  return false
+}
+
+/**
+ * JWT refresh / session gate.
+ * Returns false (no throw) when: no row (hard-deleted user or stale token id), status not active,
+ * or soft-deleted (`deleted_at` set — needs column; run `drizzle/migrations/026_users_deleted_at.sql`).
+ * If `deleted_at` is missing from the DB, falls back to `status` only (same false when row is gone).
+ */
 export async function fetchUserSessionEligibility(userId: string) {
-  const [row] = await db
-    .select({ status: users.status, deletedAt: users.deletedAt })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1)
-  return userRowAllowsSession(row)
+  try {
+    const [row] = await db
+      .select({ status: users.status, deletedAt: users.deletedAt })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+    return userRowAllowsSession(row)
+  } catch (err) {
+    if (!missingUsersDeletedAtColumn(err)) throw err
+    const [row] = await db
+      .select({ status: users.status })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+    // Must not spread undefined: { ...undefined, deletedAt: null } would look “active” via status ?? 'active'
+    if (row === undefined) return false
+    return userRowAllowsSession({ status: row.status, deletedAt: null })
+  }
 }

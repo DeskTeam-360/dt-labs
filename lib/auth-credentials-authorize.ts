@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { eq } from 'drizzle-orm'
 
-import { userRowAllowsSession } from '@/lib/auth-user-session'
+import { fetchUserSessionEligibility } from '@/lib/auth-user-session'
 import { db, users } from '@/lib/db'
 
 /** Hanya dipanggil dari Node (route sign-in), bukan Edge middleware. */
@@ -10,7 +10,20 @@ export async function authorizeWithCredentials(credentials: Record<'email' | 'pa
     if (!credentials?.email || !credentials?.password) return null
 
     const email = String(credentials.email).trim().toLowerCase()
-    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1)
+    // Avoid `select *` so sign-in still works if `users.deleted_at` is not migrated yet (see fetchUserSessionEligibility).
+    const [user] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        passwordHash: users.passwordHash,
+        fullName: users.fullName,
+        avatarUrl: users.avatarUrl,
+        role: users.role,
+        status: users.status,
+      })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1)
 
     if (!user) {
       console.error('[Auth] User not found:', email)
@@ -27,7 +40,7 @@ export async function authorizeWithCredentials(credentials: Record<'email' | 'pa
       return null
     }
 
-    if (!userRowAllowsSession({ status: user.status, deletedAt: user.deletedAt })) {
+    if (!(await fetchUserSessionEligibility(user.id))) {
       console.error('[Auth] User inactive or removed:', email)
       return null
     }
