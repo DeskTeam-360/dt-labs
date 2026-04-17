@@ -11,6 +11,7 @@ import {
   companyDataTemplates,
   companyUsers,
   companyWebsites,
+  teams,
   users,
 } from '@/lib/db'
 
@@ -89,12 +90,39 @@ export async function getCompanyDetail(id: string) {
     updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
   }))
 
+  let active_team_name: string | null = null
+  let active_manager_display: string | null = null
+  if (companyRow.activeTeamId) {
+    const [t] = await db
+      .select({ name: teams.name })
+      .from(teams)
+      .where(eq(teams.id, companyRow.activeTeamId))
+      .limit(1)
+    active_team_name = t?.name ?? null
+  }
+  if (companyRow.activeManagerId) {
+    const [m] = await db
+      .select({ fullName: users.fullName, email: users.email })
+      .from(users)
+      .where(eq(users.id, companyRow.activeManagerId))
+      .limit(1)
+    if (m?.email) {
+      active_manager_display = `${m.fullName || m.email} (${m.email})`
+    }
+  }
+
   return {
     id: company.id,
     name: company.name,
     email: company.email,
     color: company.color,
     is_active: company.isActive ?? true,
+    active_team_id: company.activeTeamId ?? null,
+    active_team_name,
+    active_manager_id: company.activeManagerId ?? null,
+    active_manager_display,
+    active_time: company.activeTime ?? 0,
+    is_customer: company.isCustomer ?? false,
     created_at: company.createdAt ? new Date(company.createdAt).toISOString() : '',
     updated_at: company.updatedAt ? new Date(company.updatedAt).toISOString() : '',
     company_users: companyUsersList,

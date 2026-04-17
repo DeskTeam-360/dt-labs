@@ -1,7 +1,7 @@
 'use client'
 
 import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, Card, Form, Input, Layout, message, Modal, Popconfirm, Select,Space, Switch, Table, Tag, Tooltip, Typography } from 'antd'
+import { Button, Card, Col, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tag, Tooltip, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo,useState } from 'react'
 
@@ -35,12 +35,28 @@ interface CompanyRecord {
   created_by?: string | null
   is_active: boolean
   color: string
+  active_team_id?: string | null
+  active_manager_id?: string | null
+  active_time?: number
+  is_customer?: boolean
   created_at: string
   updated_at: string
   last_ticket_updated_at?: string | null
 }
 
 interface LeaderOption {
+  id: string
+  full_name: string | null
+  email: string
+  role: string
+}
+
+interface TeamOption {
+  id: string
+  name: string
+}
+
+interface ManagerOption {
   id: string
   full_name: string | null
   email: string
@@ -92,6 +108,8 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
   const [searchText, setSearchText] = useState('')
   const [filterStatus, setFilterStatus] = useState<boolean | undefined>(undefined)
   const [leaderOptions, setLeaderOptions] = useState<LeaderOption[]>([])
+  const [teamOptions, setTeamOptions] = useState<TeamOption[]>([])
+  const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([])
   const [form] = Form.useForm()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
 
@@ -127,14 +145,33 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       setLeaderOptions(
         (rows || []).filter((u) => (u.role || '').toLowerCase() === 'customer' && !!u.email)
       )
+      setManagerOptions(
+        (rows || []).filter((u) => (u.role || '').toLowerCase() !== 'customer' && !!u.email)
+      )
     } catch {
       setLeaderOptions([])
+      setManagerOptions([])
+    }
+  }
+
+  const fetchTeamOptions = async () => {
+    try {
+      const rows = await apiFetch<TeamOption[]>('/api/teams')
+      setTeamOptions(
+        (rows || []).map((t) => ({
+          id: t.id,
+          name: t.name,
+        }))
+      )
+    } catch {
+      setTeamOptions([])
     }
   }
 
   useEffect(() => {
     fetchCompanies()
     fetchLeaderOptions()
+    fetchTeamOptions()
   }, [])
 
   const handleCreate = () => {
@@ -145,6 +182,10 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       color: '#000000',
       email: undefined,
       leader_user_id: undefined,
+      active_team_id: undefined,
+      active_manager_id: undefined,
+      active_time: 0,
+      is_customer: false,
     })
     setModalVisible(true)
   }
@@ -157,6 +198,10 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       is_active: record.is_active,
       color: record.color || '#000000',
       leader_user_id: record.created_by || undefined,
+      active_team_id: record.active_team_id || undefined,
+      active_manager_id: record.active_manager_id || undefined,
+      active_time: record.active_time ?? 0,
+      is_customer: record.is_customer ?? false,
     })
     setModalVisible(true)
   }
@@ -177,7 +222,17 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
     is_active: boolean
     color?: string
     leader_user_id?: string
+    active_team_id?: string | null
+    active_manager_id?: string | null
+    active_time?: number | null
+    is_customer?: boolean
   }) => {
+    const staffPayload = {
+      active_team_id: values.active_team_id ?? null,
+      active_manager_id: values.active_manager_id ?? null,
+      active_time: values.active_time ?? 0,
+      is_customer: values.is_customer === true,
+    }
     try {
       if (editingCompany) {
         await apiFetch(`/api/companies/${editingCompany.id}`, {
@@ -189,6 +244,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
             is_active: values.is_active,
             color: values.color || '#000000',
             leader_user_id: values.leader_user_id,
+            ...staffPayload,
           }),
         })
         message.success('Company updated successfully')
@@ -205,6 +261,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
             is_active: values.is_active,
             color: values.color || '#000000',
             leader_user_id: values.leader_user_id,
+            ...staffPayload,
           }),
         })
         message.success('Company created successfully')
@@ -404,7 +461,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
               form.resetFields()
             }}
             footer={null}
-            width={600}
+            width={640}
           >
             <Form
               form={form}
@@ -431,11 +488,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 name="leader_user_id"
                 label="Company Leader"
                 rules={[{ required: true, message: 'Please select a company leader!' }]}
-                extra={
-                  editingCompany
-                    ? 'Change leader by selecting another customer user. Selected user becomes company leader (company_admin).'
-                    : 'Required for new company. The selected customer becomes company leader (company_admin).'
-                }
+                
               >
                 <Select
                   showSearch
@@ -448,17 +501,75 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 />
               </Form.Item>
 
+             
+
               <Form.Item
-                name="is_active"
-                label="Status"
-                valuePropName="checked"
+                name="active_team_id"
+                label="Active team"
               >
-                <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+                <Select
+                  allowClear
+                  showSearch
+                  placeholder="Select team"
+                  optionFilterProp="label"
+                  options={teamOptions.map((t) => ({
+                    value: t.id,
+                    label: t.name,
+                  }))}
+                />
               </Form.Item>
 
-              <Form.Item name="color" label="Color (hex)" initialValue="#000000">
-                <ColorPickerWithInput />
+              <Form.Item
+                name="active_manager_id"
+                label="Active manager"
+              >
+                <Select
+                  allowClear
+                  showSearch
+                  placeholder="Select manager"
+                  optionFilterProp="label"
+                  options={managerOptions.map((u) => ({
+                    value: u.id,
+                    label: `${u.full_name || u.email} (${u.email})`,
+                  }))}
+                />
               </Form.Item>
+
+              <Row gutter={24}>
+                <Col xs={24} sm={6}>
+                  <Form.Item
+                    name="active_time"
+                    label="Active time"
+                    initialValue={0}
+                  >
+                    <InputNumber min={0} precision={0} addonAfter="H" style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={5}>
+                  <Form.Item
+                    name="Customer ?"
+                    label="Customer ?"
+                    valuePropName="checked"
+                    initialValue={false}
+                  >
+                    <Switch checkedChildren="Yes" unCheckedChildren="No" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={5}>
+                  <Form.Item
+                    name="is_active"
+                    label="Status ?"
+                    valuePropName="checked"
+                  >
+                    <Switch checkedChildren="Yes" unCheckedChildren="No" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Form.Item name="color" label="Color (hex)" initialValue="#000000">
+                    <ColorPickerWithInput />
+                  </Form.Item>
+                </Col>
+              </Row>
 
               <Form.Item>
                 <Space>

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { tags } from '@/lib/db'
+import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 
 /** PATCH /api/tags/[id] - Update tag */
 export async function PATCH(
@@ -38,6 +39,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Tag not found' }, { status: 404 })
   }
 
+  revalidateTicketsLookupCatalog()
   return NextResponse.json({
     id: updated.id,
     name: updated.name,
@@ -70,6 +72,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Tag not found' }, { status: 404 })
     }
 
+    revalidateTicketsLookupCatalog()
     return NextResponse.json({ success: true })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)

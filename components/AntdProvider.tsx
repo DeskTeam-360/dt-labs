@@ -50,11 +50,8 @@ export default function AntdProvider({
   return (
     <ThemeProvider>
       <ThemedConfig>
-        <SessionProvider
-          session={session}
-          refetchInterval={60}
-          refetchOnWindowFocus
-        >
+        {/* NextAuth: no polling + no focus refetch — avoids heavy /api/auth/session traffic. */}
+        <SessionProvider session={session} refetchInterval={0} refetchOnWindowFocus={false}>
           <SessionAccessGuard />
           <FirebaseSessionBridge />
           {children}

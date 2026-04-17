@@ -1,7 +1,7 @@
 'use client'
 
 import { ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, CheckSquareOutlined,ClockCircleOutlined, CloseCircleOutlined, CloudUploadOutlined, DatabaseOutlined, DeleteOutlined, EditOutlined, EyeOutlined, FileTextOutlined, GlobalOutlined, HistoryOutlined, PlayCircleOutlined, PlusOutlined, ReadOutlined, SaveOutlined, TeamOutlined } from '@ant-design/icons'
-import { Button, Card, Col, Descriptions, Divider, Flex,Form, Input, Layout, message, Modal, Popconfirm, Progress, Row, Select, Space, Spin, Switch, Table, Tabs, Tag, Typography } from 'antd'
+import { Button, Card, Col, Descriptions, Divider, Flex, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Progress, Row, Select, Space, Spin, Switch, Table, Tabs, Tag, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useEffect,useState } from 'react'
 
@@ -118,6 +118,13 @@ export default function CompanyDetailContent({
   const [companyEditModalOpen, setCompanyEditModalOpen] = useState(false)
   const [companyEditLoading, setCompanyEditLoading] = useState(false)
   const [companyEditForm] = Form.useForm()
+  const [companyEditLeaderOptions, setCompanyEditLeaderOptions] = useState<
+    { id: string; full_name: string | null; email: string; role: string }[]
+  >([])
+  const [companyEditManagerOptions, setCompanyEditManagerOptions] = useState<
+    { id: string; full_name: string | null; email: string; role: string }[]
+  >([])
+  const [companyEditTeamOptions, setCompanyEditTeamOptions] = useState<{ id: string; name: string }[]>([])
 
   async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
     const res = await fetch(url, { ...options, credentials: 'include' })
@@ -144,12 +151,44 @@ export default function CompanyDetailContent({
     return acc
   }, {})
 
-  const openEditCompanyModal = () => {
+  const openEditCompanyModal = async () => {
+    const isCust = variant === 'customer'
+    if (!isCust) {
+      try {
+        const userRows = await apiFetch<
+          { id: string; full_name: string | null; email: string; role: string }[]
+        >('/api/users')
+        setCompanyEditLeaderOptions(
+          (userRows || []).filter((u) => (u.role || '').toLowerCase() === 'customer' && !!u.email),
+        )
+        setCompanyEditManagerOptions(
+          (userRows || []).filter((u) => (u.role || '').toLowerCase() !== 'customer' && !!u.email),
+        )
+      } catch {
+        setCompanyEditLeaderOptions([])
+        setCompanyEditManagerOptions([])
+      }
+      try {
+        const teamRows = await apiFetch<{ id: string; name: string }[]>('/api/teams')
+        setCompanyEditTeamOptions((teamRows || []).map((t) => ({ id: t.id, name: t.name })))
+      } catch {
+        setCompanyEditTeamOptions([])
+      }
+    }
+    const adminRow = (companyData.company_users || []).find(
+      (r: { company_role?: string }) => (r.company_role || '').toLowerCase() === 'company_admin',
+    ) as { user_id?: string } | undefined
+    const leaderId = adminRow?.user_id
     companyEditForm.setFieldsValue({
       name: companyData.name,
       email: companyData.email || '',
       is_active: companyData.is_active ?? true,
       color: companyData.color || '#000000',
+      leader_user_id: leaderId,
+      active_team_id: companyData.active_team_id || undefined,
+      active_manager_id: companyData.active_manager_id || undefined,
+      active_time: companyData.active_time ?? 0,
+      is_customer: companyData.is_customer ?? false,
     })
     setCompanyEditModalOpen(true)
   }
@@ -160,24 +199,50 @@ export default function CompanyDetailContent({
       const name = (values.name ?? '').trim()
       if (!name) {
         message.warning('Company name is required')
-        return
+        throw new Error('VALIDATION')
       }
       const color = (values.color || '#000000').trim() || '#000000'
       setCompanyEditLoading(true)
       const email = (values.email ?? '').trim() || null
-      await apiFetch(`/api/companies/${companyData.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, is_active: !!values.is_active, color }),
-      })
+      const isCust = variant === 'customer'
+      if (isCust) {
+        await apiFetch(`/api/companies/${companyData.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, color }),
+        })
+      } else {
+        await apiFetch(`/api/companies/${companyData.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            email,
+            is_active: !!values.is_active,
+            color,
+            leader_user_id: values.leader_user_id,
+            active_team_id: values.active_team_id ?? null,
+            active_manager_id: values.active_manager_id ?? null,
+            active_time: values.active_time ?? 0,
+            is_customer: values.is_customer === true,
+          }),
+        })
+      }
       message.success('Company updated')
       setCompanyEditModalOpen(false)
       router.refresh()
     } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'errorFields' in e) {
+        throw e
+      }
       const err = e as { message?: string }
+      if (err?.message === 'VALIDATION') {
+        throw e
+      }
       if (err?.message && !String(err.message).includes('validateFields')) {
         message.error(err?.message || 'Failed to update company')
       }
+      throw e instanceof Error ? e : new Error('Failed to update company')
     } finally {
       setCompanyEditLoading(false)
     }
@@ -1045,11 +1110,13 @@ export default function CompanyDetailContent({
           <Card>
            
 
-            <Flex justify="space-between" align="center" >
-              <Title level={2} >
+            <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
+              <Title level={2} style={{ margin: 0 }}>
                 {companyData.name}
               </Title>
-            
+              <Button type="primary" icon={<EditOutlined />} onClick={() => void openEditCompanyModal()}>
+                Edit company
+              </Button>
             </Flex>
 
             <Modal
@@ -1058,15 +1125,92 @@ export default function CompanyDetailContent({
               onOk={handleSaveCompany}
               onCancel={() => setCompanyEditModalOpen(false)}
               confirmLoading={companyEditLoading}
-              okText="Save" 
+              okText="Save"
+              width={variant === 'customer' ? 520 : 640}
+              destroyOnHidden
             >
               <Form form={companyEditForm} layout="vertical" style={{ marginTop: 16 }}>
-                <Form.Item name="name" label="Company name" rules={[{ required: true, message: 'Company name is required' }]}>
+                <Form.Item
+                  name="name"
+                  label="Company name"
+                  rules={[{ required: true, message: 'Company name is required' }]}
+                >
                   <Input placeholder="Company name" />
                 </Form.Item>
                 <Form.Item name="email" label="Email">
                   <Input type="email" placeholder="support@company.com" />
                 </Form.Item>
+                {variant === 'customer' ? (
+                  <Form.Item name="color" label="Brand color">
+                    <ColorPickerInput />
+                  </Form.Item>
+                ) : (
+                  <>
+                    <Form.Item
+                      name="leader_user_id"
+                      label="Company leader"
+                      rules={[{ required: true, message: 'Please select a company leader' }]}
+                    >
+                      <Select
+                        showSearch
+                        placeholder="Customer user as leader"
+                        optionFilterProp="label"
+                        options={companyEditLeaderOptions.map((u) => ({
+                          value: u.id,
+                          label: `${u.full_name || u.email} (${u.email})`,
+                        }))}
+                      />
+                    </Form.Item>
+                    <Row gutter={16}>
+                      <Col xs={24} sm={12}>
+                        <Form.Item name="is_active" label="Status" valuePropName="checked">
+                          <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <Form.Item name="color" label="Color (hex)">
+                          <ColorPickerInput />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Form.Item name="active_team_id" label="Active team">
+                      <Select
+                        allowClear
+                        showSearch
+                        placeholder="Select team"
+                        optionFilterProp="label"
+                        options={companyEditTeamOptions.map((t) => ({
+                          value: t.id,
+                          label: t.name,
+                        }))}
+                      />
+                    </Form.Item>
+                    <Form.Item name="active_manager_id" label="Active manager">
+                      <Select
+                        allowClear
+                        showSearch
+                        placeholder="Non-customer user"
+                        optionFilterProp="label"
+                        options={companyEditManagerOptions.map((u) => ({
+                          value: u.id,
+                          label: `${u.full_name || u.email} (${u.email})`,
+                        }))}
+                      />
+                    </Form.Item>
+                    <Row gutter={16}>
+                      <Col xs={24} sm={12}>
+                        <Form.Item name="active_time" label="Active time" initialValue={0}>
+                          <InputNumber min={0} precision={0} addonAfter="H" style={{ width: '100%' }} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <Form.Item name="is_customer" label="Is customer" valuePropName="checked">
+                          <Switch checkedChildren="Yes" unCheckedChildren="No" />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  </>
+                )}
               </Form>
             </Modal>
 

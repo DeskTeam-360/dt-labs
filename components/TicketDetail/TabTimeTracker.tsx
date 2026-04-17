@@ -247,14 +247,17 @@ export default function TabTimeTracker({
     } else {
       rep = Number(session.duration_seconds) || 0
     }
-    adjustForm.setFieldsValue({ reportedSeconds: Math.max(0, Math.floor(rep)) })
+    adjustForm.setFieldsValue({
+      reportedMinutes: Math.round((Math.max(0, rep) / 60) * 100) / 100,
+    })
     setAdjustOpen(true)
   }
 
   const submitAdjustReported = async () => {
     if (!adjustSession) return
     const v = await adjustForm.validateFields()
-    const secs = Math.max(0, Math.floor(Number(v.reportedSeconds) || 0))
+    const mins = Math.max(0, Number(v.reportedMinutes) || 0)
+    const secs = Math.min(2147483647, Math.round(mins * 60))
     setMutating(true)
     try {
       await apiFetch(`/api/tickets/${ticketId}/time-tracker`, {
@@ -628,11 +631,11 @@ export default function TabTimeTracker({
         ) : null}
         <Form form={adjustForm} layout="vertical">
           <Form.Item
-            name="reportedSeconds"
-            label="Reported duration (seconds)"
-            rules={[{ required: true, message: 'Enter seconds' }]}
+            name="reportedMinutes"
+            label="Reported duration (minutes)"
+            rules={[{ required: true, message: 'Enter minutes' }]}
           >
-            <InputNumber min={0} max={2147483647} style={{ width: '100%' }} />
+            <InputNumber min={0} max={35791394} step={0.01} precision={2} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
       </Modal>

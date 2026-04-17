@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { companies, db, emailIntegrations,users } from '@/lib/db'
+import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 
 function encodeSubjectHeader(subject: string): string {
   if (/^[\x01-\x7F]*$/.test(subject)) return subject
@@ -236,6 +237,7 @@ export async function PATCH(
 
   await db.update(users).set({ ...updateData, updatedAt: new Date() }).where(eq(users.id, id))
 
+  revalidateTicketsLookupCatalog()
   return NextResponse.json({ ok: true })
 }
 
@@ -276,5 +278,6 @@ export async function DELETE(
     })
     .where(eq(users.id, id))
 
+  revalidateTicketsLookupCatalog()
   return NextResponse.json({ ok: true, deactivated: true })
 }

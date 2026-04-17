@@ -5,6 +5,7 @@ import { auth } from '@/auth'
 import { canAccessTeams, canAdminTeams } from '@/lib/auth-utils'
 import { db } from '@/lib/db'
 import { teamMembers,teams, users } from '@/lib/db'
+import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 
 function sessionRole(session: { user?: { role?: string; id?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role
@@ -65,6 +66,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Team not found' }, { status: 404 })
   }
 
+  revalidateTicketsLookupCatalog()
   const [creator] = await db.select().from(users).where(eq(users.id, updated.createdBy)).limit(1)
   const members = await db
     .select({
@@ -118,5 +120,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ error: 'Team not found' }, { status: 404 })
   }
 
+  revalidateTicketsLookupCatalog()
   return NextResponse.json({ success: true })
 }

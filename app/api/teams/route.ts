@@ -5,6 +5,7 @@ import { auth } from '@/auth'
 import { canAccessTeams, canAdminTeams } from '@/lib/auth-utils'
 import { db } from '@/lib/db'
 import { teamMembers,teams, users } from '@/lib/db'
+import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role
@@ -113,6 +114,7 @@ export async function POST(request: Request) {
     role: 'manager',
   })
 
+  revalidateTicketsLookupCatalog()
   return NextResponse.json({
     id: inserted.id,
     name: inserted.name,

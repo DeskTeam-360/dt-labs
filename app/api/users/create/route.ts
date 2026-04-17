@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { db, users } from '@/lib/db'
+import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 
 /** POST /api/users/create - Create user (replaces Supabase Auth) */
 export async function POST(request: Request) {
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
   }
 
+  revalidateTicketsLookupCatalog()
   return NextResponse.json({
     success: true,
     data: {

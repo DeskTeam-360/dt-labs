@@ -43,6 +43,36 @@ export default function TabInfo({ companyData, groupedDatas }: TabInfoProps) {
                 )}
               </Tag>
             </Descriptions.Item>
+            <Descriptions.Item label="Color">
+              <Space>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 24,
+                    height: 24,
+                    borderRadius: 4,
+                    backgroundColor: companyData.color || '#000000',
+                    border: '1px solid #d9d9d9',
+                    verticalAlign: 'middle',
+                  }}
+                />
+                <Text>{companyData.color || '#000000'}</Text>
+              </Space>
+            </Descriptions.Item>
+            <Descriptions.Item label="Active team">
+              <Text>{companyData.active_team_name || '—'}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Active manager">
+              <Text>{companyData.active_manager_display || '—'}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Active time">
+              <Text>{`${companyData.active_time ?? 0} H`}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Is customer">
+              <Tag color={companyData.is_customer ? 'blue' : 'default'}>
+                {companyData.is_customer ? 'Yes' : 'No'}
+              </Tag>
+            </Descriptions.Item>
             <Descriptions.Item label="Company ID">
               <Text code style={{ fontSize: 12 }}>
                 {companyData.id}

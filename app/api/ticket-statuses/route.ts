@@ -5,6 +5,7 @@ import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { ticketStatuses } from '@/lib/db'
 import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
+import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 
 /** GET /api/ticket-statuses - List all ticket statuses */
 export async function GET() {
@@ -70,6 +71,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Insert failed' }, { status: 500 })
   }
 
+  revalidateTicketsLookupCatalog()
   return NextResponse.json({
     id: inserted.id,
     slug: inserted.slug,

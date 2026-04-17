@@ -2,8 +2,20 @@ import { and, desc, eq, inArray, isNotNull, max } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { companies, companyUsers, db, tickets, users } from '@/lib/db'
+import { companies, companyUsers, db, teams, tickets, users } from '@/lib/db'
+import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
+
+function normalizeUuidBody(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null
+  if (typeof v !== 'string') return null
+  return v
+}
+
+function parseActiveTime(v: unknown): number {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return 0
+  return Math.max(0, Math.floor(v))
+}
 
 /** GET /api/companies - List companies */
 export async function GET(request: Request) {
@@ -69,6 +81,10 @@ export async function GET(request: Request) {
     created_by: leaderByCompany.get(r.id) ?? null,
     color: r.color,
     is_active: r.isActive ?? true,
+    active_team_id: r.activeTeamId ?? null,
+    active_manager_id: r.activeManagerId ?? null,
+    active_time: r.activeTime ?? 0,
+    is_customer: r.isCustomer ?? false,
     created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
     updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
     last_ticket_updated_at: lastTicketByCompany.get(r.id) ?? null,
@@ -86,6 +102,10 @@ export async function POST(request: Request) {
 
   const body = await request.json()
   const { name, email, is_active, color, leader_user_id } = body
+  const activeTeamId = normalizeUuidBody(body.active_team_id)
+  const activeManagerId = normalizeUuidBody(body.active_manager_id)
+  const activeTime = parseActiveTime(body.active_time)
+  const isCustomerCompany = body.is_customer === true
 
   if (!name) {
     return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -106,6 +126,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Company leader must be a customer user' }, { status: 400 })
   }
 
+  if (activeTeamId) {
+    const [teamRow] = await db.select({ id: teams.id }).from(teams).where(eq(teams.id, activeTeamId)).limit(1)
+    if (!teamRow) {
+      return NextResponse.json({ error: 'Active team not found' }, { status: 400 })
+    }
+  }
+
+  if (activeManagerId) {
+    const [mgr] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, activeManagerId))
+      .limit(1)
+    if (!mgr) {
+      return NextResponse.json({ error: 'Active manager not found' }, { status: 404 })
+    }
+    if ((mgr.role || '').toLowerCase() === 'customer') {
+      return NextResponse.json({ error: 'Active manager must be a non-customer user' }, { status: 400 })
+    }
+  }
+
   const [row] = await db
     .insert(companies)
     .values({
@@ -113,6 +154,10 @@ export async function POST(request: Request) {
       email: email?.trim() || null,
       color: color || '#000000',
       isActive: is_active !== undefined ? is_active : true,
+      activeTeamId,
+      activeManagerId,
+      activeTime,
+      isCustomer: isCustomerCompany,
     })
     .returning()
 
@@ -130,6 +175,7 @@ export async function POST(request: Request) {
     companyRole: 'company_admin',
   })
 
+  revalidateTicketsLookupCatalog()
   return NextResponse.json(
     {
       data: {
@@ -139,6 +185,10 @@ export async function POST(request: Request) {
         created_by: leader_user_id,
         color: row.color,
         is_active: row.isActive ?? true,
+        active_team_id: row.activeTeamId ?? null,
+        active_manager_id: row.activeManagerId ?? null,
+        active_time: row.activeTime ?? 0,
+        is_customer: row.isCustomer ?? false,
         created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',
         updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : '',
         last_ticket_updated_at: null,

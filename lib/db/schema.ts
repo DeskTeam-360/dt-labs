@@ -4,6 +4,7 @@
 import {
   bigint,
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -55,9 +56,36 @@ export const companies = pgTable('companies', {
   /** Domain list: emails with these domains belong to this company. E.g. ['acme.com','acme.co.id'] */
   domainList: text('domain_list').array().default([]),
   color: varchar('color', { length: 20 }).default('#000000'),
+  activeTeamId: uuid('active_team_id'),
+  activeManagerId: uuid('active_manager_id'),
+  activeTime: integer('active_time').notNull().default(0),
+  isCustomer: boolean('is_customer').notNull().default(false),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
+
+/** End-of-day snapshot of companies.active_* for reporting; one row per company per calendar day (UTC). */
+export const companyDailyActiveAssignments = pgTable(
+  'company_daily_active_assignments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    snapshotDate: date('snapshot_date').notNull(),
+    activeTeamId: uuid('active_team_id'),
+    activeManagerId: uuid('active_manager_id'),
+    activeTime: integer('active_time').notNull().default(0),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    unique('company_daily_active_assignments_company_id_snapshot_date_key').on(
+      t.companyId,
+      t.snapshotDate
+    ),
+    index('company_daily_active_assignments_snapshot_date_idx').on(t.snapshotDate),
+  ]
+)
 
 /** member | company_admin — company_admin can add portal users & reset their passwords */
 export const companyUsers = pgTable(

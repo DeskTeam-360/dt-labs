@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { ticketPriorities } from '@/lib/db'
+import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 
 /** PATCH /api/ticket-priorities/[id] */
 export async function PATCH(
@@ -45,6 +46,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Priority not found' }, { status: 404 })
   }
 
+  revalidateTicketsLookupCatalog()
   return NextResponse.json({
     id: updated.id,
     slug: updated.slug,
@@ -83,6 +85,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Priority not found' }, { status: 404 })
     }
 
+    revalidateTicketsLookupCatalog()
     return NextResponse.json({ success: true })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)

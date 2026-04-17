@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { tickets,ticketStatuses } from '@/lib/db'
 import { isTicketStatusInKanban } from '@/lib/ticket-status-kanban'
 import { isLockedTicketStatusSlug } from '@/lib/ticket-status-locked-slugs'
+import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 
 /** PATCH /api/ticket-statuses/[id] - Update ticket status */
 export async function PATCH(
@@ -70,6 +71,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Status not found' }, { status: 404 })
   }
 
+  revalidateTicketsLookupCatalog()
   return NextResponse.json({
     id: updated.id,
     slug: updated.slug,
@@ -139,6 +141,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Status not found' }, { status: 404 })
     }
 
+    revalidateTicketsLookupCatalog()
     return NextResponse.json({ success: true })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
