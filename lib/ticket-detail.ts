@@ -3,6 +3,7 @@
  * Replaces Supabase queries
  */
 import { and, asc, desc, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 
 import { db } from '@/lib/db'
 import {
@@ -24,6 +25,9 @@ import {
 } from '@/lib/db'
 import { getPublicUrl } from '@/lib/storage-idrive'
 import { coerceTicketType } from '@/lib/ticket-classification'
+
+const ticketCreator = alias(users, 'ticket_creator')
+const ticketContactUser = alias(users, 'ticket_contact_user')
 
 /** Initial / per-page comment batch size (newest-first window; UI shows oldest-at-top within batch). */
 export const TICKET_COMMENTS_PAGE_SIZE = 10
@@ -184,14 +188,16 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
   const [ticketRow] = await db
     .select({
       ticket: tickets,
-      creator: users,
+      creator: ticketCreator,
+      contact: ticketContactUser,
       team: teams,
       type: ticketTypes,
       priority: ticketPriorities,
       company: companies,
     })
     .from(tickets)
-    .leftJoin(users, eq(tickets.createdBy, users.id))
+    .leftJoin(ticketCreator, eq(tickets.createdBy, ticketCreator.id))
+    .leftJoin(ticketContactUser, eq(tickets.contactUserId, ticketContactUser.id))
     .leftJoin(teams, eq(tickets.teamId, teams.id))
     .leftJoin(ticketTypes, eq(tickets.typeId, ticketTypes.id))
     .leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id))
@@ -282,6 +288,7 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     description: t.description,
     short_note: t.shortNote ?? null,
     created_by: t.createdBy,
+    contact_user_id: t.contactUserId ?? null,
     due_date: t.dueDate ? new Date(t.dueDate).toISOString() : null,
     status: t.status,
     visibility: t.visibility,
@@ -300,6 +307,15 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
           id: ticketRow.creator.id,
           full_name: ticketRow.creator.fullName,
           email: ticketRow.creator.email,
+          avatar_url: ticketRow.creator.avatarUrl ?? null,
+        }
+      : null,
+    contact: ticketRow.contact
+      ? {
+          id: ticketRow.contact.id,
+          full_name: ticketRow.contact.fullName,
+          email: ticketRow.contact.email,
+          avatar_url: ticketRow.contact.avatarUrl ?? null,
         }
       : null,
     team: ticketRow.team ? { id: ticketRow.team.id, name: ticketRow.team.name } : null,

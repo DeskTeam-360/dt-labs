@@ -214,6 +214,8 @@ export const tickets = pgTable('tickets', {
   description: text('description'),
   shortNote: text('short_note'),
   createdBy: uuid('created_by'),
+  /** Customer-facing email reply recipient when set; otherwise use createdBy. */
+  contactUserId: uuid('contact_user_id'),
   dueDate: ts('due_date'),
   status: varchar('status', { length: 50 }).notNull().default('open'),
   visibility: varchar('visibility', { length: 50 }).notNull().default('private'),

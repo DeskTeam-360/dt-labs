@@ -327,7 +327,7 @@ export async function POST(
 
   try {
     const [ticketRow] = await db
-      .select({ title: tickets.title, createdBy: tickets.createdBy })
+      .select({ title: tickets.title, createdBy: tickets.createdBy, contactUserId: tickets.contactUserId })
       .from(tickets)
       .where(eq(tickets.id, ticketId))
       .limit(1)
@@ -337,11 +337,13 @@ export async function POST(
       .where(eq(ticketAssignees.ticketId, ticketId))
     const assigneeIds = assignRows.map((r) => r.userId)
     const createdBy = ticketRow?.createdBy ?? null
+    const contactUser = ticketRow?.contactUserId ?? null
     const allIds = [
       ...new Set([
         ...effectiveTaggedIds,
         ...assigneeIds,
         ...(createdBy ? [createdBy] : []),
+        ...(contactUser && contactUser !== createdBy ? [contactUser] : []),
       ]),
     ]
     const taggedSet = new Set(effectiveTaggedIds)

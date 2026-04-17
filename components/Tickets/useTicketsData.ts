@@ -848,6 +848,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       type_id: record.type_id ?? undefined,
       priority_id: record.priority_id ?? undefined,
       company_id: record.company_id ?? undefined,
+      contact_user_id: record.contact_user_id ?? undefined,
       due_date: record.due_date ? dayjs(record.due_date) : null,
     })
     setModalVisible(true)
@@ -962,6 +963,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         type_id: effectiveValues.type_id ?? null,
         priority_id: effectiveValues.priority_id ?? null,
         company_id: effectiveValues.company_id ?? null,
+        contact_user_id: effectiveValues.contact_user_id ?? null,
         due_date: effectiveValues.due_date ? (effectiveValues.due_date as dayjs.Dayjs).toISOString() : null,
       }
 
@@ -1019,6 +1021,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
             type_id: typeId ?? null,
             priority_id: priorityId ?? null,
             company_id: companyId ?? null,
+            contact_user_id: (values.contact_user_id as string | undefined) ?? null,
             due_date: values.due_date ? (values.due_date as dayjs.Dayjs).toISOString() : null,
             updated_at: new Date().toISOString(),
             team_name: teamId ? teams.find((t) => t.id === teamId)?.name ?? undefined : undefined,
@@ -1043,6 +1046,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
           description: values.description || null,
           assignees: values.visibility === 'specific_users' ? selectedAssignees : [],
           tag_ids: selectedTagIds,
+          contact_user_id: effectiveValues.contact_user_id ?? null,
           attachments: newTicketAttachments.map((a) => ({
             file_url: a.url,
             file_name: a.file_name,
@@ -1067,6 +1071,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
           description: (effectiveValues.description as string) || null,
           short_note: (effectiveValues.short_note as string) || null,
           created_by: currentUserId,
+          contact_user_id: (effectiveValues.contact_user_id as string | undefined) ?? null,
           due_date: effectiveValues.due_date ? (effectiveValues.due_date as dayjs.Dayjs).toISOString() : null,
           status: effectiveValues.status as TicketRecord['status'],
           visibility: effectiveValues.visibility as TicketRecord['visibility'],

@@ -1,4 +1,5 @@
-import { and,eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
@@ -8,6 +9,9 @@ import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-templ
 export const dynamic = 'force-dynamic'
 
 const AGENT_REPLY_TEMPLATE_KEY = 'template_agent_reply' as const
+
+const tplCreator = alias(users, 'tpl_creator')
+const tplContact = alias(users, 'tpl_contact')
 
 function requestOrigin(request: Request): string {
   const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? 'localhost:3000'
@@ -47,9 +51,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const [ticketRow] = await db
-    .select({ ticket: tickets, creator: users })
+    .select({ ticket: tickets, creator: tplCreator, contact: tplContact })
     .from(tickets)
-    .leftJoin(users, eq(tickets.createdBy, users.id))
+    .leftJoin(tplCreator, eq(tickets.createdBy, tplCreator.id))
+    .leftJoin(tplContact, eq(tickets.contactUserId, tplContact.id))
     .where(eq(tickets.id, ticketIdNum))
     .limit(1)
 
@@ -59,7 +64,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const [senderRow] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1)
 
-  const recipientMap = userRowToMergeMap(ticketRow.creator ?? null)
+  const recipientUser = ticketRow.contact ?? ticketRow.creator ?? null
+  const recipientMap = userRowToMergeMap(recipientUser)
   const senderMap = userRowToMergeMap(senderRow ?? null)
 
   const origin = requestOrigin(request)
