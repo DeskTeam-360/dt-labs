@@ -25,7 +25,10 @@ import {
   logTicketActivity,
 } from '@/lib/ticket-activity-log'
 import { coerceTicketType, parseTicketType } from '@/lib/ticket-classification'
-import { assertTicketContactUserAllowed } from '@/lib/ticket-contact-user'
+import {
+  assertTicketContactUserAllowed,
+  getEffectiveCompanyIdForUser,
+} from '@/lib/ticket-contact-user'
 
 async function triggerTicketUpdatedAutomation(ticketId: number) {
   try {
@@ -260,6 +263,13 @@ export async function PATCH(
 
   const beforeSnapshot = await loadTicketActivitySnapshot(ticketId)
 
+  let companyIdUpdate: string | null | undefined = undefined
+  if (company_id !== undefined) {
+    companyIdUpdate = company_id || null
+  }
+
+  let ticketCrossCompanyWarning: string | undefined
+
   if (contact_user_id !== undefined) {
     const [curRow] = await db
       .select({ companyId: tickets.companyId })
@@ -270,9 +280,20 @@ export async function PATCH(
       company_id !== undefined ? (company_id || null) : (curRow?.companyId ?? null)
     const nextContact =
       contact_user_id === null || contact_user_id === '' ? null : String(contact_user_id)
-    const contactCheck = await assertTicketContactUserAllowed(nextContact, mergedCompanyId)
+    const contactCheck = await assertTicketContactUserAllowed(nextContact)
     if (!contactCheck.ok) {
       return NextResponse.json({ error: contactCheck.error }, { status: 400 })
+    }
+
+    if (nextContact) {
+      const contactEffectiveCompany = await getEffectiveCompanyIdForUser(nextContact)
+      if (contactEffectiveCompany && contactEffectiveCompany !== mergedCompanyId) {
+        companyIdUpdate = contactEffectiveCompany
+        if (curRow?.companyId && curRow.companyId !== contactEffectiveCompany) {
+          ticketCrossCompanyWarning =
+            'Kontak dari perusahaan berbeda: Company tiket sudah disesuaikan ke perusahaan kontak.'
+        }
+      }
     }
   }
 
@@ -291,7 +312,7 @@ export async function PATCH(
     ...(team_id !== undefined && { teamId: team_id || null }),
     ...(type_id !== undefined && { typeId: type_id ?? null }),
     ...(priority_id !== undefined && { priorityId: priority_id ?? null }),
-    ...(company_id !== undefined && { companyId: company_id || null }),
+    ...(companyIdUpdate !== undefined && { companyId: companyIdUpdate }),
     ...(due_date !== undefined && { dueDate: due_date ? new Date(due_date) : null }),
     ...(ticketTypeUpdate !== undefined && { ticketType: ticketTypeUpdate }),
     ...(contact_user_id !== undefined && {
@@ -461,7 +482,14 @@ export async function PATCH(
 
   await triggerTicketUpdatedAutomation(ticketId)
   bumpTicketDataVersion(ticketId)
-  return NextResponse.json({ ok: true })
+  const resBody: Record<string, unknown> = { ok: true }
+  if (ticketCrossCompanyWarning) {
+    resBody.ticket_cross_company_warning = ticketCrossCompanyWarning
+  }
+  if (companyIdUpdate !== undefined) {
+    resBody.company_id = companyIdUpdate
+  }
+  return NextResponse.json(resBody)
 }
 
 /**

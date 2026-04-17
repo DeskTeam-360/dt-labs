@@ -67,6 +67,8 @@ export interface UserRecord {
   full_name: string | null
   email: string
   role?: string
+  /** From users.company_id in lookup; may be null even if user is in company_users */
+  company_id?: string | null
 }
 
 export interface TicketStatusRecord {

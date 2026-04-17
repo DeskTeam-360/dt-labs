@@ -32,7 +32,13 @@ async function loadTicketsLookupCatalog() {
   ] = await Promise.all([
     db.select({ id: teams.id, name: teams.name }).from(teams).orderBy(asc(teams.name)),
     db
-      .select({ id: users.id, fullName: users.fullName, email: users.email, role: users.role })
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        role: users.role,
+        companyId: users.companyId,
+      })
       .from(users)
       .orderBy(asc(users.fullName)),
     db
@@ -71,7 +77,13 @@ async function loadTicketsLookupCatalog() {
 
   return {
     teams: teamsData,
-    users: usersData.map((u) => ({ id: u.id, full_name: u.fullName, email: u.email, role: u.role })),
+    users: usersData.map((u) => ({
+      id: u.id,
+      full_name: u.fullName,
+      email: u.email,
+      role: u.role,
+      company_id: u.companyId ?? null,
+    })),
     ticketTypes: ticketTypesData,
     ticketPriorities: ticketPrioritiesData,
     companies: companiesData,

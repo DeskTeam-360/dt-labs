@@ -272,14 +272,29 @@ export default function TicketDetailContent({
     }, [displayTicket?.id])
 
     const contactUserOptionsForTicket = useMemo(() => {
-        if (displayTicket?.company_id) {
-            return companyCustomers
-        }
-        return (users || []).filter((u: { role?: string; email?: string }) => {
-            const r = (u?.role ?? '').toLowerCase()
-            return r === 'customer' && String(u?.email || '').trim()
-        }) as Array<{ id: string; full_name: string | null; email: string }>
-    }, [displayTicket?.company_id, companyCustomers, users])
+        const withEmail = (users || []).filter((u: { email?: string }) => String(u?.email || '').trim()) as Array<{
+            id: string
+            full_name?: string | null
+            email: string
+            company_id?: string | null
+        }>
+        const mapped = withEmail.map((u) => ({
+            id: u.id,
+            full_name: u.full_name ?? null,
+            email: u.email,
+            company_id: u.company_id ?? null,
+        }))
+        const cid = displayTicket?.company_id
+        if (!cid) return mapped
+        return [...mapped].sort((a, b) => {
+            const as = a.company_id === cid ? 0 : 1
+            const bs = b.company_id === cid ? 0 : 1
+            if (as !== bs) return as - bs
+            const al = (a.full_name || a.email).toLowerCase()
+            const bl = (b.full_name || b.email).toLowerCase()
+            return al.localeCompare(bl)
+        })
+    }, [users, displayTicket?.company_id])
 
     const VISIBILITY_OPTIONS = [
         { value: 'private', label: 'Private' },
@@ -934,12 +949,19 @@ export default function TicketDetailContent({
     const handleContactChange = async (contactUserId: string | null) => {
         setContactChanging(true)
         try {
-            await apiFetch(`/api/tickets/${displayTicket.id}`, {
+            const res = await apiFetch<{
+                ok?: boolean
+                company_id?: string | null
+                ticket_cross_company_warning?: string
+            }>(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ contact_user_id: contactUserId }),
             })
             message.success('Contact updated')
+            if (res?.ticket_cross_company_warning) {
+                message.warning(res.ticket_cross_company_warning)
+            }
             const fromLists = [...companyCustomers, ...users] as Array<{
                 id: string
                 full_name?: string | null
@@ -947,6 +969,8 @@ export default function TicketDetailContent({
                 avatar_url?: string | null
             }>
             const row = contactUserId ? fromLists.find((u) => u.id === contactUserId) : null
+            const syncedCompanyId =
+                res && typeof res === 'object' && 'company_id' in res ? res.company_id : undefined
             setDisplayTicket((prev: any) => ({
                 ...prev,
                 contact_user_id: contactUserId,
@@ -958,6 +982,14 @@ export default function TicketDetailContent({
                           avatar_url: row.avatar_url ?? null,
                       }
                     : null,
+                ...(syncedCompanyId !== undefined
+                    ? {
+                          company_id: syncedCompanyId,
+                          company: syncedCompanyId
+                              ? companies.find((c) => c.id === syncedCompanyId) ?? null
+                              : null,
+                      }
+                    : {}),
             }))
             router.refresh()
         } catch (err: unknown) {

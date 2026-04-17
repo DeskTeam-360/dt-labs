@@ -16,6 +16,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import {
+  Alert,
   Avatar,
   Button,
   Card,
@@ -108,8 +109,13 @@ interface TabGeneralProps {
   companyOptions: { id: string; name: string }[]
   onCompanyChange: (companyId: string | null) => void | Promise<void>
   companyChanging?: boolean
-  /** Users who can be set as email reply contact (company portal users, or all customers if no company). */
-  contactUserOptions?: Array<{ id: string; full_name: string | null; email: string }>
+  /** Users who can be set as email reply contact; optional company_id for cross-company hints. */
+  contactUserOptions?: Array<{
+    id: string
+    full_name: string | null
+    email: string
+    company_id?: string | null
+  }>
   selectedContactUserId?: string | null
   onContactChange?: (userId: string | null) => void | Promise<void>
   contactChanging?: boolean
@@ -293,6 +299,15 @@ export default function TabGeneral({
     }
     return active
   }, [statusOptions, ticketData?.status])
+
+  const contactCrossCompanyHint = useMemo(() => {
+    if (!selectedContactUserId || !ticketData.company_id) return null
+    const row = contactUserOptions.find((o) => o.id === selectedContactUserId)
+    const uid = row?.company_id
+    if (!uid || uid === ticketData.company_id) return null
+    const otherName = companyOptions.find((c) => c.id === uid)?.name ?? 'perusahaan lain'
+    return `Kontak dari ${otherName}. Setelah disimpan, Company tiket akan mengikuti perusahaan kontak (lintas perusahaan).`
+  }, [selectedContactUserId, ticketData.company_id, contactUserOptions, companyOptions])
 
   const creatorId = ticketData.creator?.id ?? ticketData.created_by ?? null
   const creatorEmail = ticketData.creator?.email ?? null
@@ -713,6 +728,14 @@ export default function TabGeneral({
                 <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 12 }}>
                   Agent replies are sent to this person when set; otherwise to Created By.
                 </Text>
+                {contactCrossCompanyHint ? (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    message={contactCrossCompanyHint}
+                    style={{ marginTop: 8 }}
+                  />
+                ) : null}
               </Descriptions.Item>
             ) : ticketData.contact?.id && ticketData.contact.id !== creatorId ? (
               <Descriptions.Item label="Contact">

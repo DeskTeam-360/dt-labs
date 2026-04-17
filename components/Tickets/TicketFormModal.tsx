@@ -2,6 +2,7 @@
 
 import { DeleteOutlined,PaperClipOutlined } from '@ant-design/icons'
 import {
+  Alert,
   Button,
   Col,
   DatePicker,
@@ -97,6 +98,18 @@ export default function TicketFormModal({
   }
   const fileInputId = fileInputIdRef.current
   const selectableTeams = userTeamIds.length > 0 ? teams.filter((t) => userTeamIds.includes(t.id)) : []
+
+  const watchedContactUserId = Form.useWatch('contact_user_id', form)
+  const watchedCompanyId = Form.useWatch('company_id', form)
+  const contactCompanyMismatchHint = useMemo(() => {
+    if (showSimplifiedForm || !open) return null
+    if (!watchedContactUserId || !watchedCompanyId) return null
+    const u = users.find((x) => x.id === watchedContactUserId)
+    const uc = u?.company_id
+    if (!uc || uc === watchedCompanyId) return null
+    const otherName = companies.find((c) => c.id === uc)?.name ?? 'perusahaan lain'
+    return `Kontak dari perusahaan berbeda (${otherName}). Company tiket akan mengikuti perusahaan kontak saat tiket dibuat (lintas perusahaan).`
+  }, [showSimplifiedForm, open, watchedContactUserId, watchedCompanyId, users, companies])
 
   const statusOptionsForForm = useMemo(() => {
     const active = allStatuses.filter((s) => s.is_active !== false)
@@ -302,7 +315,7 @@ export default function TicketFormModal({
               showSearch
               optionFilterProp="label"
               options={users
-                .filter((u) => (u.role || '').toLowerCase() === 'customer' && u.email?.trim())
+                .filter((u) => String(u.email || '').trim())
                 .map((u) => ({
                   value: u.id,
                   label: u.full_name ? `${u.full_name} (${u.email})` : u.email,
@@ -310,6 +323,10 @@ export default function TicketFormModal({
             />
           </Form.Item>
         )}
+
+        {!showSimplifiedForm && contactCompanyMismatchHint ? (
+          <Alert type="warning" showIcon message={contactCompanyMismatchHint} style={{ marginBottom: 16 }} />
+        ) : null}
 
         {!showSimplifiedForm && (
           <>
