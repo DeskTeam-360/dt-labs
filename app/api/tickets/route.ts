@@ -31,6 +31,7 @@ import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
 import { getPublicUrl } from '@/lib/storage-idrive'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { coerceTicketType, DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
+import { assertTicketContactUserAllowed } from '@/lib/ticket-contact-user'
 
 const DEFAULT_LIMIT = 500
 const MAX_LIMIT = 1000
@@ -483,6 +484,7 @@ export async function GET(request: Request) {
       description: t.description,
       short_note: t.shortNote ?? null,
       created_by: t.createdBy,
+      contact_user_id: t.contactUserId ?? null,
       due_date: t.dueDate ? new Date(t.dueDate).toISOString() : null,
       status: t.status,
       visibility: t.visibility,
@@ -545,6 +547,7 @@ export async function POST(request: Request) {
     tag_ids = [],
     attachments = [],
     created_via: bodyCreatedVia,
+    contact_user_id: bodyContactUserId,
   } = body
 
   /** created_via: 'portal' (admin app) | 'website' (embed/widget) | 'app' (mobile/external) - for automation conditions */
@@ -563,6 +566,18 @@ export async function POST(request: Request) {
     resolvedCompanyId = cid
   }
 
+  let contactUserId: string | null = null
+  if (bodyContactUserId !== undefined && bodyContactUserId !== null && bodyContactUserId !== '') {
+    if (typeof bodyContactUserId !== 'string') {
+      return NextResponse.json({ error: 'contact_user_id must be a UUID string' }, { status: 400 })
+    }
+    contactUserId = bodyContactUserId
+  }
+  const contactCheck = await assertTicketContactUserAllowed(contactUserId, resolvedCompanyId)
+  if (!contactCheck.ok) {
+    return NextResponse.json({ error: contactCheck.error }, { status: 400 })
+  }
+
   const [newTicket] = await db
     .insert(tickets)
     .values({
@@ -577,6 +592,7 @@ export async function POST(request: Request) {
       companyId: resolvedCompanyId,
       dueDate: due_date ? new Date(due_date) : null,
       createdBy: authUser.id,
+      contactUserId,
       createdVia,
     })
     .returning()

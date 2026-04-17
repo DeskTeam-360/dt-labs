@@ -25,6 +25,7 @@ import {
   logTicketActivity,
 } from '@/lib/ticket-activity-log'
 import { coerceTicketType, parseTicketType } from '@/lib/ticket-classification'
+import { assertTicketContactUserAllowed } from '@/lib/ticket-contact-user'
 
 async function triggerTicketUpdatedAutomation(ticketId: number) {
   try {
@@ -254,9 +255,26 @@ export async function PATCH(
     ticket_type,
     attachments_add = [],
     attachments_delete = [],
+    contact_user_id,
   } = body
 
   const beforeSnapshot = await loadTicketActivitySnapshot(ticketId)
+
+  if (contact_user_id !== undefined) {
+    const [curRow] = await db
+      .select({ companyId: tickets.companyId })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1)
+    const mergedCompanyId =
+      company_id !== undefined ? (company_id || null) : (curRow?.companyId ?? null)
+    const nextContact =
+      contact_user_id === null || contact_user_id === '' ? null : String(contact_user_id)
+    const contactCheck = await assertTicketContactUserAllowed(nextContact, mergedCompanyId)
+    if (!contactCheck.ok) {
+      return NextResponse.json({ error: contactCheck.error }, { status: 400 })
+    }
+  }
 
   let ticketTypeUpdate: string | undefined
   if (ticket_type !== undefined && actorRole !== 'customer') {
@@ -276,6 +294,10 @@ export async function PATCH(
     ...(company_id !== undefined && { companyId: company_id || null }),
     ...(due_date !== undefined && { dueDate: due_date ? new Date(due_date) : null }),
     ...(ticketTypeUpdate !== undefined && { ticketType: ticketTypeUpdate }),
+    ...(contact_user_id !== undefined && {
+      contactUserId:
+        contact_user_id === null || contact_user_id === '' ? null : String(contact_user_id),
+    }),
   }
   if (Object.keys(ticketUpdates).length > 0) {
     await db

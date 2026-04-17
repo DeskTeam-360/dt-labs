@@ -108,6 +108,11 @@ interface TabGeneralProps {
   companyOptions: { id: string; name: string }[]
   onCompanyChange: (companyId: string | null) => void | Promise<void>
   companyChanging?: boolean
+  /** Users who can be set as email reply contact (company portal users, or all customers if no company). */
+  contactUserOptions?: Array<{ id: string; full_name: string | null; email: string }>
+  selectedContactUserId?: string | null
+  onContactChange?: (userId: string | null) => void | Promise<void>
+  contactChanging?: boolean
   tagOptions: { id: string; name: string; slug: string }[]
   selectedTagIds: string[]
   onTagsChange: (tagIds: string[]) => void | Promise<void>
@@ -201,6 +206,10 @@ export default function TabGeneral({
   companyOptions,
   onCompanyChange,
   companyChanging = false,
+  contactUserOptions = [],
+  selectedContactUserId = null,
+  onContactChange,
+  contactChanging = false,
   tagOptions,
   selectedTagIds,
   onTagsChange,
@@ -679,7 +688,38 @@ export default function TabGeneral({
                 <TicketUserMention userId={creatorId} email={creatorEmail}>
                   <Space style={{ cursor: creatorId ? 'pointer' : undefined }}>
                     <UserOutlined />
-                    <Text>{creatorLabel}</Text> 
+                    <Text>{createdByPersonLabel}</Text>
+                  </Space>
+                </TicketUserMention>
+              </Descriptions.Item>
+            ) : null}
+            {canEditCompanyAndTags ? (
+              <Descriptions.Item label="Contact (email replies)">
+                <Select
+                  value={selectedContactUserId ?? undefined}
+                  allowClear
+                  placeholder="Same as Created By"
+                  loading={contactChanging}
+                  disabled={!onContactChange}
+                  onChange={(v) => onContactChange?.((v as string | undefined) ?? null)}
+                  options={contactUserOptions.map((u) => ({
+                    value: u.id,
+                    label: u.full_name ? `${u.full_name} (${u.email})` : u.email,
+                  }))}
+                  style={{ minWidth: 200, width: '100%' }}
+                  showSearch
+                  optionFilterProp="label"
+                />
+                <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 12 }}>
+                  Agent replies are sent to this person when set; otherwise to Created By.
+                </Text>
+              </Descriptions.Item>
+            ) : ticketData.contact?.id && ticketData.contact.id !== creatorId ? (
+              <Descriptions.Item label="Contact">
+                <TicketUserMention userId={ticketData.contact.id} email={ticketData.contact.email}>
+                  <Space style={{ cursor: 'pointer' }}>
+                    <UserOutlined />
+                    <Text>{ticketData.contact.full_name || ticketData.contact.email}</Text>
                   </Space>
                 </TicketUserMention>
               </Descriptions.Item>

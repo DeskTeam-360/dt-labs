@@ -20,6 +20,7 @@ export type TicketActivitySnapshot = {
   ticketType: string
   priorityId: number | null
   companyId: string | null
+  contactUserId: string | null
   dueDateIso: string | null
   assigneeIds: string[]
   tagIds: string[]
@@ -40,6 +41,7 @@ export async function loadTicketActivitySnapshot(
       ticketType: tickets.ticketType,
       priorityId: tickets.priorityId,
       companyId: tickets.companyId,
+      contactUserId: tickets.contactUserId,
       dueDate: tickets.dueDate,
     })
     .from(tickets)
@@ -68,6 +70,7 @@ export async function loadTicketActivitySnapshot(
     ticketType: t.ticketType ?? 'support',
     priorityId: t.priorityId ?? null,
     companyId: t.companyId ?? null,
+    contactUserId: t.contactUserId ?? null,
     dueDateIso: t.dueDate ? new Date(t.dueDate).toISOString() : null,
     assigneeIds: assignRows.map((r) => r.userId).sort(),
     tagIds: tagRows.map((r) => r.tagId).sort(),
@@ -90,6 +93,7 @@ export function diffTicketSnapshots(
     'ticketType',
     'priorityId',
     'companyId',
+    'contactUserId',
     'dueDateIso',
   ]
   for (const k of keys) {

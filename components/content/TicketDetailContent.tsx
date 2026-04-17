@@ -228,6 +228,7 @@ export default function TicketDetailContent({
     const [typeChanging, setTypeChanging] = useState(false)
     const [priorityChanging, setPriorityChanging] = useState(false)
     const [companyChanging, setCompanyChanging] = useState(false)
+    const [contactChanging, setContactChanging] = useState(false)
     const [tagsChanging, setTagsChanging] = useState(false)
     const [dueDateChanging, setDueDateChanging] = useState(false)
     const [form] = Form.useForm()
@@ -269,6 +270,16 @@ export default function TicketDetailContent({
             body: JSON.stringify({ mark_read: true }),
         }).catch(() => {})
     }, [displayTicket?.id])
+
+    const contactUserOptionsForTicket = useMemo(() => {
+        if (displayTicket?.company_id) {
+            return companyCustomers
+        }
+        return (users || []).filter((u: { role?: string; email?: string }) => {
+            const r = (u?.role ?? '').toLowerCase()
+            return r === 'customer' && String(u?.email || '').trim()
+        }) as Array<{ id: string; full_name: string | null; email: string }>
+    }, [displayTicket?.company_id, companyCustomers, users])
 
     const VISIBILITY_OPTIONS = [
         { value: 'private', label: 'Private' },
@@ -669,6 +680,7 @@ export default function TicketDetailContent({
             if (variant === 'admin') setCommentVisibility(null)
 
             const replyRecipientEmail =
+                (typeof displayTicket.contact?.email === 'string' && displayTicket.contact.email.trim()) ||
                 (typeof displayTicket.creator?.email === 'string' && displayTicket.creator.email.trim()) ||
                 (typeof displayTicket.company?.email === 'string' && displayTicket.company.email.trim()) ||
                 ''
@@ -916,6 +928,42 @@ export default function TicketDetailContent({
             message.error(err instanceof Error ? err.message : 'Failed to update company')
         } finally {
             setCompanyChanging(false)
+        }
+    }
+
+    const handleContactChange = async (contactUserId: string | null) => {
+        setContactChanging(true)
+        try {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contact_user_id: contactUserId }),
+            })
+            message.success('Contact updated')
+            const fromLists = [...companyCustomers, ...users] as Array<{
+                id: string
+                full_name?: string | null
+                email: string
+                avatar_url?: string | null
+            }>
+            const row = contactUserId ? fromLists.find((u) => u.id === contactUserId) : null
+            setDisplayTicket((prev: any) => ({
+                ...prev,
+                contact_user_id: contactUserId,
+                contact: row
+                    ? {
+                          id: row.id,
+                          full_name: row.full_name ?? null,
+                          email: row.email,
+                          avatar_url: row.avatar_url ?? null,
+                      }
+                    : null,
+            }))
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to update contact')
+        } finally {
+            setContactChanging(false)
         }
     }
 
@@ -1456,6 +1504,10 @@ export default function TicketDetailContent({
                                             companyOptions={companies}
                                             onCompanyChange={handleCompanyChange}
                                             companyChanging={companyChanging}
+                                            contactUserOptions={contactUserOptionsForTicket}
+                                            selectedContactUserId={displayTicket.contact_user_id ?? null}
+                                            onContactChange={handleContactChange}
+                                            contactChanging={contactChanging}
                                             tagOptions={allTags}
                                             selectedTagIds={selectedTagIds}
                                             onTagsChange={handleTagsChange}

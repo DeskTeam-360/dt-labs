@@ -210,6 +210,16 @@ export default function TabGeneralCustomer({
           </Flex>
         </Flex>
 
+        {ticketData.contact?.id && ticketData.contact.id !== creatorId ? (
+          <Text type="secondary" style={{ padding: '0 10px', display: 'block', marginBottom: 8 }}>
+            Contact for replies:{' '}
+            <TicketUserMention userId={ticketData.contact.id} email={ticketData.contact.email}>
+              <Text strong>{ticketData.contact.full_name || ticketData.contact.email}</Text>
+            </TicketUserMention>
+            <Text type="secondary"> (Created by may differ)</Text>
+          </Text>
+        ) : null}
+
         <div style={{ padding: '0 16px', marginTop: 8, marginBottom: 4 }}>
           {commentsHasOlder ? (
             <Button

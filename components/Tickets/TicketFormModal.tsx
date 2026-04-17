@@ -291,6 +291,27 @@ export default function TicketFormModal({
         </Row>
 
         {!showSimplifiedForm && (
+          <Form.Item
+            name="contact_user_id"
+            label="Contact (email replies)"
+            tooltip="Optional. When set, customer replies from the portal go to this user; agent email replies use their address. Defaults to creator."
+          >
+            <Select
+              placeholder="Same as creator (logged-in user)"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={users
+                .filter((u) => (u.role || '').toLowerCase() === 'customer' && u.email?.trim())
+                .map((u) => ({
+                  value: u.id,
+                  label: u.full_name ? `${u.full_name} (${u.email})` : u.email,
+                }))}
+            />
+          </Form.Item>
+        )}
+
+        {!showSimplifiedForm && (
           <>
 
 

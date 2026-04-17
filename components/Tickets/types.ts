@@ -26,6 +26,8 @@ export interface TicketRecord {
   description: string | null
   short_note: string | null
   created_by: string
+  /** Primary email reply recipient; null = use creator */
+  contact_user_id?: string | null
   due_date: string | null
   status: string
   visibility: 'private' | 'team' | 'specific_users' | 'public'
