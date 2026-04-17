@@ -1,13 +1,31 @@
-import { and, eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 
 import { companyUsers, db, users } from '@/lib/db'
 
 /**
- * Validates ticket.contact_user_id: must exist, have email, and belong to ticket company when company is set.
+ * Primary company for a user: `users.company_id`, else earliest `company_users` row.
+ */
+export async function getEffectiveCompanyIdForUser(userId: string): Promise<string | null> {
+  const [u] = await db
+    .select({ companyId: users.companyId })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+  if (u?.companyId) return u.companyId
+  const [cu] = await db
+    .select({ companyId: companyUsers.companyId })
+    .from(companyUsers)
+    .where(eq(companyUsers.userId, userId))
+    .orderBy(asc(companyUsers.createdAt))
+    .limit(1)
+  return cu?.companyId ?? null
+}
+
+/**
+ * Validates ticket.contact_user_id: user must exist and have an email (any company allowed).
  */
 export async function assertTicketContactUserAllowed(
-  contactUserId: string | null,
-  companyId: string | null
+  contactUserId: string | null
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!contactUserId) return { ok: true }
 
@@ -15,7 +33,6 @@ export async function assertTicketContactUserAllowed(
     .select({
       id: users.id,
       email: users.email,
-      companyId: users.companyId,
     })
     .from(users)
     .where(eq(users.id, contactUserId))
@@ -28,23 +45,5 @@ export async function assertTicketContactUserAllowed(
     return { ok: false, error: 'Contact user must have an email address' }
   }
 
-  if (!companyId) {
-    return { ok: true }
-  }
-
-  if (u.companyId === companyId) {
-    return { ok: true }
-  }
-
-  const [cu] = await db
-    .select({ userId: companyUsers.userId })
-    .from(companyUsers)
-    .where(and(eq(companyUsers.companyId, companyId), eq(companyUsers.userId, contactUserId)))
-    .limit(1)
-
-  if (cu) {
-    return { ok: true }
-  }
-
-  return { ok: false, error: 'Contact must be a member of this ticket company' }
+  return { ok: true }
 }

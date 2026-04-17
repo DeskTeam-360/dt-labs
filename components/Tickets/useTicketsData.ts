@@ -995,7 +995,11 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
           message.success('Ticket updated successfully')
           await fetchTickets()
         } else {
-          await apiFetch(`/api/tickets/${editingTicket.id}`, {
+          const patchRes = await apiFetch<{
+            ok?: boolean
+            company_id?: string | null
+            ticket_cross_company_warning?: string
+          }>(`/api/tickets/${editingTicket.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1006,10 +1010,16 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
           })
 
           message.success('Ticket updated successfully')
+          if (patchRes?.ticket_cross_company_warning) {
+            message.warning(patchRes.ticket_cross_company_warning)
+          }
 
           const typeId = values.type_id as number | undefined
           const priorityId = values.priority_id as number | undefined
-          const companyId = values.company_id as string | undefined
+          const companyId =
+            patchRes && typeof patchRes === 'object' && 'company_id' in patchRes
+              ? patchRes.company_id
+              : ((values.company_id as string | undefined) ?? null)
           const teamId = values.team_id as string | undefined
           const updatedRecord: TicketRecord = {
             ...editingTicket,
@@ -1053,17 +1063,29 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
             file_path: a.file_path,
           })),
         }
-        const newTicket = await apiFetch<{ id: number; created_at: string; updated_at: string }>('/api/tickets', {
+        const newTicket = await apiFetch<{
+          id: number
+          created_at: string
+          updated_at: string
+          company_id?: string | null
+          ticket_cross_company_warning?: string
+        }>('/api/tickets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(createPayload),
         })
 
         message.success('Ticket created successfully')
+        if (newTicket.ticket_cross_company_warning) {
+          message.warning(newTicket.ticket_cross_company_warning)
+        }
 
         const typeId = effectiveValues.type_id as number | undefined
         const priorityId = effectiveValues.priority_id as number | undefined
-        const companyId = effectiveValues.company_id as string | undefined
+        const companyId =
+          newTicket.company_id !== undefined
+            ? newTicket.company_id
+            : ((effectiveValues.company_id as string | undefined) ?? null)
         const teamId = effectiveValues.team_id as string | undefined
         const newRecord: TicketRecord = {
           id: newTicket.id,

@@ -31,7 +31,10 @@ import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
 import { getPublicUrl } from '@/lib/storage-idrive'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { coerceTicketType, DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
-import { assertTicketContactUserAllowed } from '@/lib/ticket-contact-user'
+import {
+  assertTicketContactUserAllowed,
+  getEffectiveCompanyIdForUser,
+} from '@/lib/ticket-contact-user'
 
 const DEFAULT_LIMIT = 500
 const MAX_LIMIT = 1000
@@ -573,9 +576,22 @@ export async function POST(request: Request) {
     }
     contactUserId = bodyContactUserId
   }
-  const contactCheck = await assertTicketContactUserAllowed(contactUserId, resolvedCompanyId)
+  const contactCheck = await assertTicketContactUserAllowed(contactUserId)
   if (!contactCheck.ok) {
     return NextResponse.json({ error: contactCheck.error }, { status: 400 })
+  }
+
+  const companyIdBeforeContactAlign = resolvedCompanyId
+  let ticketCrossCompanyWarning: string | undefined
+  if (contactUserId) {
+    const contactCompany = await getEffectiveCompanyIdForUser(contactUserId)
+    if (contactCompany && contactCompany !== resolvedCompanyId) {
+      if (companyIdBeforeContactAlign && companyIdBeforeContactAlign !== contactCompany) {
+        ticketCrossCompanyWarning =
+          'Kontak dari perusahaan berbeda: Company tiket disesuaikan ke perusahaan kontak.'
+      }
+      resolvedCompanyId = contactCompany
+    }
   }
 
   const [newTicket] = await db
@@ -699,5 +715,9 @@ export async function POST(request: Request) {
     id: newTicket.id,
     created_at: newTicket.createdAt ? new Date(newTicket.createdAt).toISOString() : '',
     updated_at: newTicket.updatedAt ? new Date(newTicket.updatedAt).toISOString() : '',
+    company_id: newTicket.companyId ?? null,
+    ...(ticketCrossCompanyWarning
+      ? { ticket_cross_company_warning: ticketCrossCompanyWarning }
+      : {}),
   })
 }
