@@ -114,7 +114,6 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
   const [data, setData] = useState<DashboardData | null>(null)
   const [kbArticles, setKbArticles] = useState<KnowledgeBaseArticle[]>([])
   const [kbCategory, setKbCategory] = useState<string>('')
-  const [kbDetailModal, setKbDetailModal] = useState<KnowledgeBaseArticle | null>(null)
   const [hourlyStopped, setHourlyStopped] = useState<StoppedTimeSession[]>([])
   const [hourlyActive, setHourlyActive] = useState<Array<{ ticket_id: number; start_time: string }>>([])
 
@@ -299,7 +298,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                 <Col xs={24} lg={12} style={{ padding: 16, borderRadius: 8 }}>
                   <div style={{ position: 'relative', background: 'var(--customer-dash-chart-surface)', padding: 16, borderRadius: 8, height: '100%' }}>
                     {/* Last Due Date - My Ticket */}
-                    <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', position: 'absolute', top: 16, right: 40, gap: 4, background: 'var(--customer-dash-eta-banner)', padding: '8px 16px', borderRadius: '0 0 10px 10px' }}>
+                    <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', position: 'absolute', top: 0, right: 40, gap: 4, background: 'var(--customer-dash-eta-banner)', padding: '8px 16px', borderRadius: '0 0 10px 10px' }}>
                       <Tooltip title={data?.last_due_ticket ? `#${data.last_due_ticket.id} ${data.last_due_ticket.title}` : undefined}>
                         <Text
                           type="danger"
@@ -372,7 +371,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                               </div>
                               <div
                                 style={{
-                                  width: '80%',
+                                  width: '75%',
                                   height: 8,
                                   borderRadius: 4,
                                   background: 'var(--customer-dash-priority-track)',
@@ -570,9 +569,21 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
             </Card>
           </Col>
 
-          {/* Knowledge Base */}
+          {/* Knowledge Base — whole card opens /reference */}
           <Col xs={24} lg={12}>
-            <Card>
+            <Card
+              hoverable
+              role="link"
+              tabIndex={0}
+              onClick={() => router.push('/reference')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  router.push('/reference')
+                }
+              }}
+              styles={{ body: { cursor: 'pointer' } }}
+            >
               <span style={{ fontWeight: 600, fontSize: 16 }}>Frequently asked questions</span>
               <br />
               <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>How can we help you today?</Text>
@@ -594,8 +605,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                   filteredKbArticles.map((art) => (
                     <div
                       key={art.id}
-                      style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, cursor: 'pointer' }}
-                      onClick={() => setKbDetailModal(art)}
+                      style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}
                     >
                       <QuestionCircleOutlined style={{ color: '#1890ff', marginTop: 2 }} />
                       <Text>{art.title}</Text>
@@ -603,7 +613,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                   ))
                 ) : (
                   FAQ_ITEMS.map((q, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, cursor: 'default' }}>
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
                       <QuestionCircleOutlined style={{ color: '#1890ff', marginTop: 2 }} />
                       <Text>{q}</Text>
                     </div>
@@ -612,24 +622,6 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
               </div>
             </Card>
           </Col>
-          <Modal
-            title={kbDetailModal?.title}
-            open={!!kbDetailModal}
-            onCancel={() => setKbDetailModal(null)}
-            footer={null}
-            width={960}
-            styles={{ body: { maxHeight: '80vh', overflowY: 'auto' } }}
-          >
-            {kbDetailModal && (
-              <div
-                className="kb-article-content"
-                style={{ lineHeight: 1.6 }}
-                dangerouslySetInnerHTML={{
-                  __html: kbDetailModal.description || '<p class="text-secondary">No description.</p>',
-                }}
-              />
-            )}
-          </Modal>
 
           {/* Check Tickets Status */}
           <Col xs={24} lg={12}>

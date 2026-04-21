@@ -254,12 +254,7 @@ export default function CustomerWeeklyRecapSettingsContent({ user: currentUser }
               <Title level={2} style={{ margin: '8px 0 0' }}>
                 Recap Customer Weekly
               </Title>
-              <Text type="secondary">
-                All teams are shown at once (one grid per team). Each cell is a materialized snapshot from Company Log
-                plus support ticket time. Gray cells = not embedded with that team in that week. Active customers are
-                sorted above inactive ones. Use <Text strong>Materialize all teams</Text> to rebuild cells for the
-                selected range, or schedule <Text code>POST /api/cron/customer-weekly-recap</Text>.
-              </Text>
+             
             </div>
 
             <Card size="small" title="Date range">

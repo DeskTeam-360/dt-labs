@@ -1206,19 +1206,11 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
           >
             <Flex align="center" gap={12} wrap="wrap" style={{ marginBottom: 8 }}>
               <BarChartOutlined style={{ fontSize: 28, color: 'var(--ant-color-primary, #1677ff)' }} />
-              <div>
+              
                 <Title level={2} className="settings-section-heading" style={{ margin: 0, fontSize: '1.5rem' }}>
                   C Report
                 </Title>
-                <Text type="secondary" style={{ fontSize: 13 }}>
-                  Choose one or more <Text strong>teams</Text>; companies are included automatically when their{' '}
-                  <Text strong>active team</Text> matches (Settings → company). Tickets with no completed time in the
-                  period still appear (0 reported, “Not tracked”). Date range: include if the ticket was created in range or
-                  any time session overlaps the range (including running timers). Reported seconds use completed sessions
-                  that overlap the range. Saved presets store teams and derived companies; rolling date presets are
-                  recomputed when you load the report.
-                </Text>
-              </div>
+              
             </Flex>
             <Divider style={{ margin: '12px 0 20px' }} />
 
@@ -1239,7 +1231,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                       placeholder={CUSTOMER_TIME_REPORT_PRESET_TITLE_DEFAULT}
                       maxLength={CUSTOMER_TIME_REPORT_PRESET_TITLE_MAX}
                       showCount
-                      size="large"
+                      
                     />
                   </Form.Item>
                 </Col>
@@ -1254,7 +1246,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                       disabled={!hasSavedPresets}
                       allowClear
                       style={{ width: '100%', maxWidth: 440 }}
-                      size="large"
+                      
                       value={selectedPresetId ?? undefined}
                       options={presets.map((p) => ({ value: p.id, label: p.title }))}
                       onChange={(id) => {
@@ -1287,7 +1279,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                       showSearch
                       optionFilterProp="label"
                       placeholder="Select team(s) — companies follow active team"
-                      size="large"
+                    
                       maxTagCount="responsive"
                       options={teamSelectOptions}
                       loading={loadingMeta}
@@ -1297,7 +1289,8 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                     Companies in scope: {derivedCompaniesSummary}
                   </Text>
                 </Col>
-                <Col xs={24} lg={10}>
+                <Col xs={24} lg={5}>
+               
                   <Form.Item
                     name="date_preset"
                     label={<Text strong>Rolling dates</Text>}
@@ -1306,7 +1299,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                     <Select<CustomerTimeReportDatePresetKey>
                       allowClear
                       placeholder="Custom — use calendar below"
-                      size="large"
+                   
                       style={{ width: '100%' }}
                       options={CUSTOMER_TIME_REPORT_DATE_PRESET_OPTIONS}
                       onChange={(v) => {
@@ -1319,6 +1312,8 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                       }}
                     />
                   </Form.Item>
+                  </Col>
+                <Col xs={24} lg={5}>
                   <Form.Item
                     name="range"
                     label={
@@ -1332,8 +1327,8 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                   >
                     <RangePicker
                       style={{ width: '100%' }}
-                      size="large"
-                      format="dddd, MMM DD, YYYY"
+                      
+                      format="MMM DD, YYYY"
                       onChange={() => form.setFieldValue('date_preset', undefined)}
                     />
                   </Form.Item>
@@ -1344,7 +1339,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                       mode="multiple"
                       allowClear
                       placeholder="All statuses"
-                      size="large"
+                 
                       options={statusSelectOptions}
                     />
                   </Form.Item>
@@ -1355,48 +1350,13 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                   </Form.Item>
                 </Col>
               </Row>
-              {/* {recapEligible ? ( */}
-                <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 8 }}>
-                  <Col xs={24}>
-                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-                      <Text strong>Recap snapshot</Text> — saves company log and tracker totals for the selected teams
-                      for the current date range (
-                      {recapPeriodKind === 'month'
-                        ? 'full calendar month'
-                        : recapPeriodKind === 'week'
-                          ? 'full ISO week (Mon–Sun)'
-                          : recapPeriodKind === 'custom'
-                            ? 'custom range'
-                            : 'set end ≥ start'}
-                      ). After you click <Text strong>Load report</Text>, the table below matches what Settings →
-                      Recap snapshots would save (same period and teams). Enter a title; Save switches to Update when a
-                      row already exists for the same title, period, and teams.
-                    </Text>
-                    <Form.Item name="recap_snapshot_title" label={<Text strong>Recap title</Text>}>
-                      <Input placeholder="e.g. January 2026 — SEO team" maxLength={500} showCount />
-                    </Form.Item>
-                    <Button type="default" size="large" loading={recapSaving} onClick={() => void saveRecapSnapshot()}>
-                      {recapExistingId ? 'Update recap snapshot' : 'Save recap snapshot'}
-                    </Button>
-                    {recapPreview ? (
-                      <Card
-                        title="Preview (sama seperti Settings → Recap snapshots)"
-                        style={{ marginTop: 12 }}
-                        styles={{ body: { padding: 0 } }}
-                      >
-                        <RecapSnapshotPayloadGridTable sections={recapPreviewSections} />
-                      </Card>
-                    ) : null}
-                  </Col>
-                </Row>
-              {/* ) : null} */}
+          
               <Flex gap={12} wrap="wrap" align="center">
-                <Button type="primary" htmlType="submit" size="large" loading={reportLoading}>
+                <Button type="primary" htmlType="submit"  loading={reportLoading}>
                   Load report
                 </Button>
                 <Button
                   type="default"
-                  size="large"
                   icon={<SaveOutlined />}
                   loading={savingPreset}
                   onClick={() => void saveNewPreset()}
@@ -1405,7 +1365,6 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                 </Button>
                 <Button
                   type="default"
-                  size="large"
                   loading={savingPreset}
                   disabled={selectedPresetId == null}
                   onClick={() => void updateSelectedPreset()}
@@ -1422,13 +1381,13 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                 >
                   <Button
                     danger
-                    size="large"
                     icon={<DeleteOutlined />}
                     disabled={selectedPresetId == null}
                     loading={deletingPreset}
                   >
                     Delete preset
                   </Button>
+                
                 </Popconfirm>
               </Flex>
               {selectedPreset ? (
@@ -1448,6 +1407,52 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                 </Text>
               )}
             </Form>
+
+            <Divider/>
+
+
+            <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 8 }}>
+                  <Col xs={20}>
+                   
+                    <Row gutter={[16, 16]}>
+                      <Col xs={24} lg={12}>
+                        <Form.Item name="recap_snapshot_title" label={<Text strong>Recap title</Text>} layout="horizontal">
+                          <Input placeholder="e.g. January 2026 — SEO team" maxLength={500} showCount />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} lg={12}>
+                        <Button type="default" loading={recapSaving} onClick={() => void saveRecapSnapshot()}>
+                          {recapExistingId ? 'Update recap snapshot' : 'Save recap snapshot'}
+                        </Button>
+                      </Col>
+                    </Row>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                      <Text strong>Recap snapshot</Text> — saves company log and tracker totals for the selected teams
+                      for the current date range (
+                      {recapPeriodKind === 'month'
+                        ? 'full calendar month'
+                        : recapPeriodKind === 'week'
+                          ? 'full ISO week (Mon–Sun)'
+                          : recapPeriodKind === 'custom'
+                            ? 'custom range'
+                            : 'set end ≥ start'}
+                      ). After you click <Text strong>Load report</Text>, the table below matches what Settings →
+                      Recap snapshots would save (same period and teams). Enter a title; Save switches to Update when a
+                      row already exists for the same title, period, and teams.
+                    </Text>
+
+                    
+                    {recapPreview ? (
+                      <Card
+                        title="Preview (sama seperti Settings → Recap snapshots)"
+                        style={{ marginTop: 12 }}
+                        styles={{ body: { padding: 0 } }}
+                      >
+                        <RecapSnapshotPayloadGridTable sections={recapPreviewSections} />
+                      </Card>
+                    ) : null}
+                  </Col>
+                </Row>
 
             {report ? (
               <>
