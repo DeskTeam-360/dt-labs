@@ -1285,7 +1285,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                   </Form.Item>
                 </Col>
               </Row>
-              {recapEligible ? (
+              {/* {recapEligible ? ( */}
                 <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 8 }}>
                   <Col xs={24}>
                     <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
@@ -1303,7 +1303,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                     </Button>
                   </Col>
                 </Row>
-              ) : null}
+              {/* ) : null} */}
               <Flex gap={12} wrap="wrap" align="center">
                 <Button type="primary" htmlType="submit" size="large" loading={reportLoading}>
                   Load report
