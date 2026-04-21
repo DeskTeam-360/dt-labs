@@ -3,6 +3,7 @@
 import {
   AppstoreOutlined,
   BankOutlined,
+  BarChartOutlined,
   BellOutlined,
   FileTextOutlined,
   FlagOutlined,
@@ -26,6 +27,7 @@ import {
   canAccessEmailIntegration,
   canAccessKnowledgeBase,
   canAccessMessageTemplates,
+  canAccessRecapSnapshots,
   canAccessSlackNotifications,
   canAccessTeams,
   canAccessTicketAttributes,
@@ -263,7 +265,8 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
           {(canAccessKnowledgeBase(role) ||
             canManageGlobalAnnouncement(role) ||
             canManageDashboardAnnouncements(role) ||
-            canAccessCompanyLog(role)) && (
+            canAccessCompanyLog(role) ||
+            canAccessRecapSnapshots(role)) && (
             <Section heading="General">
               <Row gutter={[16, 16]}>
                 {canAccessKnowledgeBase(role) && (
@@ -303,6 +306,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                       description="Raw daily snapshots (active team, manager, time) per company"
                       href="/settings/company-log"
                       icon={<FileTextOutlined />}
+                    />
+                  </Col>
+                )}
+                {canAccessRecapSnapshots(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Recap snapshots"
+                      description="Saved Customer time report recaps (month or week)"
+                      href="/settings/recap-snapshots"
+                      icon={<BarChartOutlined />}
                     />
                   </Col>
                 )}

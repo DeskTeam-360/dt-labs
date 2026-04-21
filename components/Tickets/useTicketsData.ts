@@ -10,7 +10,12 @@ import { Form, message } from 'antd'
 import dayjs from 'dayjs'
 
 import type { ParsedUrlFilters } from '@/lib/ticket-filter-url'
-import { buildSearchStringFromFilters, hasUrlFilterParams,parseFiltersFromUrl } from '@/lib/ticket-filter-url'
+import {
+  buildSearchStringFromFilters,
+  hasUrlFilterParams,
+  parseFiltersFromUrl,
+  parseSidebarCollapsedFromUrl,
+} from '@/lib/ticket-filter-url'
 
 const FILTER_STORAGE_KEY = 'deskteam-tickets-filter'
 
@@ -199,7 +204,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     } else {
       const state = getInitialFilterStateFromStored(null, isCustomer)
       const viewMode = getInitialViewModeCustomer(isCustomer, null)
-      initialRef.current = { state: { ...state, viewMode }, fromUrl: false }
+      const sidebarFromUrl = parseSidebarCollapsedFromUrl(searchParams)
+      const merged =
+        sidebarFromUrl !== null ? { ...state, filterSidebarCollapsed: sidebarFromUrl } : state
+      initialRef.current = { state: { ...merged, viewMode }, fromUrl: false }
     }
   }
   const initialState = initialRef.current.state
@@ -600,28 +608,33 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
       setFilterTicketType(parsed.filterTicketType ?? null)
     } else {
-      const fallbackStatus =
-        lookupReady && allStatuses.length > 0 && isCustomer
-          ? allStatuses.map((s) => s.slug)
-          : lookupReady && statusColumns.length > 0
-            ? statusColumns.map((c) => c.id)
-            : isCustomer
-              ? []
-              : DEFAULT_KANBAN_COLUMNS.map((c) => c.id)
-      setFilterStatus(fallbackStatus)
-      setFilterTypeIds([])
-      setFilterPriorityIds([])
-      setFilterCompanyIds([])
-      setFilterTagIds([])
-      setFilterVisibilityState([])
-      setFilterTeamIds([])
-      setFilterDateRange(null)
-      setFilterSearch('')
-      setViewMode('kanban')
-      setSortBy('updated_at')
-      setSortOrder('desc')
-      setFilterSidebarCollapsed(true)
-      setFilterTicketType(null)
+      const sidebarOnly = parseSidebarCollapsedFromUrl(searchParams)
+      if (sidebarOnly !== null) {
+        setFilterSidebarCollapsed(sidebarOnly)
+      } else {
+        const fallbackStatus =
+          lookupReady && allStatuses.length > 0 && isCustomer
+            ? allStatuses.map((s) => s.slug)
+            : lookupReady && statusColumns.length > 0
+              ? statusColumns.map((c) => c.id)
+              : isCustomer
+                ? []
+                : DEFAULT_KANBAN_COLUMNS.map((c) => c.id)
+        setFilterStatus(fallbackStatus)
+        setFilterTypeIds([])
+        setFilterPriorityIds([])
+        setFilterCompanyIds([])
+        setFilterTagIds([])
+        setFilterVisibilityState([])
+        setFilterTeamIds([])
+        setFilterDateRange(null)
+        setFilterSearch('')
+        setViewMode('kanban')
+        setSortBy('updated_at')
+        setSortOrder('desc')
+        setFilterSidebarCollapsed(true)
+        setFilterTicketType(null)
+      }
     }
   }, [
     pathname,
@@ -674,7 +687,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         viewMode,
         sortBy,
         sortOrder,
-        filterSidebarCollapsed,
         filterTicketType: isCustomer ? null : filterTicketType,
       })
       const url = qs ? `${pathname}?${qs}` : pathname
@@ -717,7 +729,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       viewMode,
       sortBy,
       sortOrder,
-      filterSidebarCollapsed,
       filterTicketType: isCustomer ? null : filterTicketType,
     })
   }, [
@@ -733,7 +744,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     viewMode,
     sortBy,
     sortOrder,
-    filterSidebarCollapsed,
     filterTicketType,
     isCustomer,
   ])

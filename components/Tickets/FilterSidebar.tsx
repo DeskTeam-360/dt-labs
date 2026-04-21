@@ -297,17 +297,20 @@ export default function FilterSidebar({
               </>
             )}
             {!isCustomer && onSaveViewPreset && (
-              <Button
-                type="primary"
-                icon={<BookOutlined />}
-                onClick={() => {
-                  savePresetForm.resetFields()
-                  setSavePresetOpen(true)
-                }}
-                style={{ width: '100%' }}
-              >
-                Save filter to My Filters
-              </Button>
+              <>
+                
+                <Button
+                  type="primary"
+                  icon={<BookOutlined />}
+                  onClick={() => {
+                    savePresetForm.resetFields()
+                    setSavePresetOpen(true)
+                  }}
+                  style={{ width: '100%' }}
+                >
+                  Save filter to My Filters
+                </Button>
+              </>
             )}
           </Space>
         </div>

@@ -22,9 +22,18 @@ export const URL_PARAMS = {
   priority_ids: 'priority_ids',
 } as const
 
+/** True if URL carries shareable filter/query params (excludes `sidebar` — UI-only, not part of filter semantics). */
 export function hasUrlFilterParams(searchParams: URLSearchParams): boolean {
   if (searchParams.has(URL_PARAMS.ticket_type)) return true
-  return Array.from(Object.values(URL_PARAMS)).some((key) => searchParams.has(key))
+  return Array.from(Object.values(URL_PARAMS)).some(
+    (key) => key !== URL_PARAMS.sidebar && searchParams.has(key)
+  )
+}
+
+/** Read sidebar open state from URL (`sidebar=0` = expanded). `null` = param absent. */
+export function parseSidebarCollapsedFromUrl(searchParams: URLSearchParams): boolean | null {
+  if (!searchParams.has(URL_PARAMS.sidebar)) return null
+  return searchParams.get(URL_PARAMS.sidebar) === '0' ? false : true
 }
 
 export interface ParsedUrlFilters {
@@ -131,7 +140,6 @@ export function buildSearchStringFromFilters(state: {
   viewMode: string
   sortBy: string
   sortOrder: string
-  filterSidebarCollapsed: boolean
   filterTicketType?: 'spam' | 'trash' | null
 }): string {
   const p = new URLSearchParams()
@@ -156,6 +164,6 @@ export function buildSearchStringFromFilters(state: {
   if (!inJunk && state.viewMode && state.viewMode !== 'kanban') p.set(URL_PARAMS.view, state.viewMode)
   if (state.sortBy && state.sortBy !== 'updated_at') p.set(URL_PARAMS.sort, state.sortBy)
   if (state.sortOrder && state.sortOrder !== 'desc') p.set(URL_PARAMS.order, state.sortOrder)
-  if (!state.filterSidebarCollapsed) p.set(URL_PARAMS.sidebar, '0')
+  /** Sidebar open/closed is kept in localStorage only — syncing it to the URL triggered full URL re-parse and reset filters. */
   return p.toString()
 }
