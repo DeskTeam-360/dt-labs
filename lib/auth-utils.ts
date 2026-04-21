@@ -73,6 +73,11 @@ export function canAccessCompanyLog(role: string | undefined): boolean {
   return isAdminOrManager(role)
 }
 
+/** Saved Customer time report recaps (`recap_snapshots`) in Settings → General: Admin & Manager */
+export function canAccessRecapSnapshots(role: string | undefined): boolean {
+  return isAdminOrManager(role)
+}
+
 /** Global running-text announcement (Settings): Admin only */
 export function canManageGlobalAnnouncement(role: string | undefined): boolean {
   return isAdmin(role)
@@ -121,7 +126,8 @@ export function canAccessSettingsHub(role: string | undefined): boolean {
     canAccessUsers(role) ||
     canAccessCompanies(role) ||
     canAccessTeams(role) ||
-    canAccessCompanyLog(role)
+    canAccessCompanyLog(role) ||
+    canAccessRecapSnapshots(role)
   )
 }
 

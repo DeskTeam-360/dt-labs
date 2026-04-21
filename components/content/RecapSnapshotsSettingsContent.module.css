@@ -1,0 +1,73 @@
+.scrollWrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.grid {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.th {
+  background: #002b5c;
+  color: #fff;
+  font-weight: 600;
+  text-align: center;
+  padding: 10px 12px;
+  border: 1px solid #001529;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.thSticky {
+  left: 0;
+  z-index: 2;
+  text-align: left;
+}
+
+.monthBar {
+  background: #e8ecf2;
+  color: #1a1a2e;
+  font-weight: 600;
+  padding: 8px 12px;
+  border: 1px solid #d0d7e2;
+  font-size: 13px;
+}
+
+.td {
+  padding: 8px 10px;
+  border: 1px solid #e8e8e8;
+  vertical-align: middle;
+  background: #fff;
+}
+
+.tdStrong {
+  padding: 8px 10px;
+  border: 1px solid #e8e8e8;
+  vertical-align: middle;
+  background: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.tdSticky {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+}
+
+.tdNum {
+  padding: 8px 10px;
+  border: 1px solid #e8e8e8;
+  vertical-align: middle;
+  background: #fff;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
