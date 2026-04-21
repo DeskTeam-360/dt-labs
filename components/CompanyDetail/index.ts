@@ -1,3 +1,4 @@
+export { default as TabCompanyLog } from './TabCompanyLog'
 export { default as TabContentPlanner } from './TabContentPlanner'
 export { default as TabCrawling } from './TabCrawling'
 export { default as TabDataForm } from './TabDataForm'

@@ -527,13 +527,18 @@ export default function TicketDetailContent({
         }
     }
 
-    const handleStartTimeTracker = async () => {
+    const handleStartTimeTracker = async (jobType?: string | null) => {
         setLoading(true)
         try {
             const data = await apiFetch<any>(`/api/tickets/${displayTicket.id}/time-tracker`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'start' }),
+                body: JSON.stringify({
+                    action: 'start',
+                    ...(jobType != null && String(jobType).trim() !== ''
+                        ? { job_type: String(jobType).trim() }
+                        : {}),
+                }),
             })
             setActiveTimeTracker(data)
             message.success('Time tracker started')

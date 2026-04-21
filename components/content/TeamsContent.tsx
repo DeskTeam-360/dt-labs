@@ -1,15 +1,18 @@
 'use client'
 
-import { DeleteOutlined, EyeOutlined,PlusOutlined, TeamOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EyeOutlined, PlusOutlined, TeamOutlined } from '@ant-design/icons'
 import {
   Button,
   Card,
+  Col,
+  Divider,
   Form,
   Input,
   Layout,
   message,
   Modal,
   Popconfirm,
+  Row,
   Space,
   Table,
   Tag,
@@ -17,7 +20,7 @@ import {
   Typography,
 } from 'antd'
 import Link from 'next/link'
-import { useEffect,useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import AdminMainColumn from '../AdminMainColumn'
 import AdminSidebar from '../AdminSidebar'
@@ -37,7 +40,17 @@ import { canAdminTeams } from '@/lib/auth-utils'
 import DateDisplay from '../DateDisplay'
 
 const { Content } = Layout
-const { Title } = Typography
+const { Title, Text } = Typography
+
+/** Maksimal 2 angka di belakang koma */
+function formatActiveTicketEquiv(v: number): string {
+  if (!Number.isFinite(v)) return '0'
+  const rounded = Math.round(v * 100) / 100
+  return rounded.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
+}
 
 interface TeamsContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string }
@@ -65,10 +78,36 @@ interface TeamMember {
   user_avatar_url?: string | null
 }
 
+interface CompanyListRow {
+  id: string
+  name: string | null
+  active_team_id: string | null
+  active_time: number
+}
+
+interface CompanyActivePlanRow {
+  key: string
+  no: number
+  company_label: string
+  active_time: number
+  active_ticket_equiv: number
+}
+
+/** Header tints — cycle for each team block */
+const TEAM_PLAN_HEADER_COLORS = ['#e6f4ff', '#fff7e6', '#f9f0ff', '#e6fffb', '#fff1f0', '#f6ffed']
+
+interface TeamPlanGroup {
+  teamId: string
+  teamName: string
+  headerColor: string
+  rows: CompanyActivePlanRow[]
+}
+
 export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
   const isAdmin = canAdminTeams(currentUser.role)
   const [collapsed, setCollapsed] = useState(false)
   const [teams, setTeams] = useState<TeamRecord[]>([])
+  const [teamPlanGroups, setTeamPlanGroups] = useState<TeamPlanGroup[]>([])
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingTeam, setEditingTeam] = useState<TeamRecord | null>(null)
@@ -78,8 +117,57 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
   const fetchTeams = async () => {
     setLoading(true)
     try {
-      const teamsWithMembers = await apiFetch<TeamRecord[]>('/api/teams')
+      const [teamsWithMembers, companiesRes] = await Promise.all([
+        apiFetch<TeamRecord[]>('/api/teams'),
+        fetch('/api/companies', { credentials: 'include' }),
+      ])
       setTeams(teamsWithMembers)
+
+      const teamNameById = new Map(teamsWithMembers.map((t) => [t.id, t.name]))
+      if (companiesRes.ok) {
+        const cJson = (await companiesRes.json()) as { data?: CompanyListRow[] }
+        const list = Array.isArray(cJson.data) ? cJson.data : []
+        const withTeam = list.filter((c) => {
+          const tid = c.active_team_id
+          return typeof tid === 'string' && tid.trim().length > 0
+        })
+        const byTeam = new Map<string, CompanyListRow[]>()
+        for (const c of withTeam) {
+          const tid = c.active_team_id as string
+          if (!byTeam.has(tid)) byTeam.set(tid, [])
+          byTeam.get(tid)!.push(c)
+        }
+        const groups: TeamPlanGroup[] = []
+        let colorIdx = 0
+        for (const [teamId, teamCompanies] of byTeam) {
+          const teamName = teamNameById.get(teamId) ?? 'Unknown team'
+          teamCompanies.sort((a, b) =>
+            String(a.name ?? '').localeCompare(String(b.name ?? ''), undefined, { sensitivity: 'base' })
+          )
+          const rows: CompanyActivePlanRow[] = teamCompanies.map((c, idx) => {
+            const cname = (c.name ?? '').trim() || `Company ${c.id.slice(0, 8)}…`
+            const at = Number(c.active_time) || 0
+            return {
+              key: c.id,
+              no: idx + 1,
+              company_label: cname,
+              active_time: at,
+              active_ticket_equiv: at / 3,
+            }
+          })
+          groups.push({
+            teamId,
+            teamName,
+            headerColor: TEAM_PLAN_HEADER_COLORS[colorIdx % TEAM_PLAN_HEADER_COLORS.length],
+            rows,
+          })
+          colorIdx += 1
+        }
+        groups.sort((a, b) => a.teamName.localeCompare(b.teamName, undefined, { sensitivity: 'base' }))
+        setTeamPlanGroups(groups)
+      } else {
+        setTeamPlanGroups([])
+      }
     } catch (error: any) {
       message.error(error.message || 'Failed to fetch teams')
     } finally {
@@ -225,6 +313,38 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
     },
   ]
 
+  const companyPlanColumns: ColumnsType<CompanyActivePlanRow> = [
+    {
+      title: 'No',
+      dataIndex: 'no',
+      key: 'no',
+      width: 64,
+      align: 'center',
+    },
+    {
+      title: 'Company',
+      dataIndex: 'company_label',
+      key: 'company_label',
+      ellipsis: true,
+    },
+    {
+      title: 'Time',
+      dataIndex: 'active_time',
+      key: 'active_time',
+      width: 100,
+      align: 'center',
+      render: (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString(),
+    },
+    {
+      title: 'Active ticket',
+      dataIndex: 'active_ticket_equiv',
+      key: 'active_ticket_equiv',
+      width: 140,
+      align: 'center',
+      render: (v: number) => formatActiveTicketEquiv(v),
+    },
+  ]
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
@@ -254,6 +374,79 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
                 showTotal: (total) => `Total ${total} teams`,
               }}
             />
+            <Divider />
+
+            <Title level={4} style={{ marginTop: 40, marginBottom: 8 }}>
+            Teams Condition
+            </Title>
+            
+            {teamPlanGroups.length === 0 ? (
+              <Text type="secondary">Tidak ada company dengan tim aktif — tidak ada yang ditampilkan di blok ini.</Text>
+            ) : (
+              <>
+                {Array.from({ length: Math.ceil(teamPlanGroups.length / 2) }, (_, rowIdx) => {
+                  const slice = teamPlanGroups.slice(rowIdx * 2, rowIdx * 2 + 2)
+                  return (
+                    <Row key={rowIdx} gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                      {slice.map((g) => (
+                        <Col xs={24} lg={slice.length === 1 ? 24 : 12} key={g.teamId}>
+                          <div
+                            style={{
+                              border: '1px solid var(--ant-color-border-secondary, #f0f0f0)',
+                              borderRadius: 8,
+                              overflow: 'hidden',
+                              background: 'var(--ant-color-bg-container, #fff)',
+                            }}
+                          >
+                            <div
+                              style={{
+                                background: g.headerColor,
+                                padding: '10px 14px',
+                                fontWeight: 600,
+                                borderBottom: '1px solid var(--ant-color-border-secondary, #f0f0f0)',
+                              }}
+                            >
+                              {g.teamName}
+                            </div>
+                            <Table<CompanyActivePlanRow>
+                              columns={companyPlanColumns}
+                              dataSource={g.rows}
+                              rowKey="key"
+                              loading={loading}
+                              pagination={false}
+                              size="small"
+                              scroll={{ x: 480 }}
+                              summary={() => {
+                                const teamTime = g.rows.reduce(
+                                  (s, r) => s + (Number(r.active_time) || 0),
+                                  0
+                                )
+                                const teamTicket = teamTime / 3
+                                return (
+                                  <Table.Summary fixed>
+                                    <Table.Summary.Row>
+                                      <Table.Summary.Cell index={0} colSpan={2} align="right">
+                                        <Text strong>Total</Text>
+                                      </Table.Summary.Cell>
+                                      <Table.Summary.Cell index={2} align="center">
+                                        <Text strong>{teamTime.toLocaleString()}</Text>
+                                      </Table.Summary.Cell>
+                                      <Table.Summary.Cell index={3} align="center">
+                                        <Text strong>{formatActiveTicketEquiv(teamTicket)}</Text>
+                                      </Table.Summary.Cell>
+                                    </Table.Summary.Row>
+                                  </Table.Summary>
+                                )
+                              }}
+                            />
+                          </div>
+                        </Col>
+                      ))}
+                    </Row>
+                  )
+                })}
+              </>
+            )}
           </Card>
 
           {/* Create/Edit Team Modal */}

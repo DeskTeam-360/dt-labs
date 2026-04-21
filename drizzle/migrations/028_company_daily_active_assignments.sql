@@ -13,4 +13,4 @@ CREATE TABLE IF NOT EXISTS company_daily_active_assignments (
 CREATE INDEX IF NOT EXISTS company_daily_active_assignments_snapshot_date_idx
   ON company_daily_active_assignments (snapshot_date);
 
-COMMENT ON TABLE company_daily_active_assignments IS 'Cron: copy companies active team/manager/time per calendar day (UTC) for history.';
+COMMENT ON TABLE company_daily_active_assignments IS 'Company Log: cron copies companies.active_* per UTC day; staff may add/edit via API.';

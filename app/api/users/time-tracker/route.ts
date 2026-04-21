@@ -2,7 +2,8 @@ import { and, desc, eq, gte, inArray,isNotNull, isNull, lte, sql } from 'drizzle
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { db, tickets,ticketTimeTracker } from '@/lib/db'
+import { db, tickets, ticketTimeTracker } from '@/lib/db'
+import { loadActiveJobTypeTitleMap } from '@/lib/job-types-db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 import type { UserTimeTrackerTicketSummary } from '@/lib/user-time-tracker-summary'
 
@@ -57,11 +58,14 @@ export async function GET(request: Request) {
     .orderBy(desc(ticketTimeTracker.startTime))
     .limit(limit)
 
+  const titleMap = await loadActiveJobTypeTitleMap()
   const result = rows.map((r) => ({
     id: r.tracker.id,
     ticket_id: r.tracker.ticketId,
     user_id: r.tracker.userId,
     tracker_type: r.tracker.trackerType,
+    job_type: r.tracker.jobType ?? null,
+    job_type_title: r.tracker.jobType ? titleMap.get(r.tracker.jobType) ?? null : null,
     start_time: r.tracker.startTime ? new Date(r.tracker.startTime).toISOString() : null,
     stop_time: r.tracker.stopTime ? new Date(r.tracker.stopTime).toISOString() : null,
     duration_seconds: r.tracker.durationSeconds,

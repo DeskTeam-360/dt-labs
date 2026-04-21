@@ -8,6 +8,7 @@ import { useEffect,useState } from 'react'
 import AdminMainColumn from '../AdminMainColumn'
 import AdminSidebar from '../AdminSidebar'
 import {
+  TabCompanyLog,
   TabContentPlanner,
   TabCrawling,
   TabDataForm,
@@ -60,7 +61,7 @@ interface CompanyDetailContentProps {
   companyData: any
   /** 'customer' = navbar layout for customer portal; 'admin' = sidebar layout (default) */
   variant?: 'admin' | 'customer'
-  /** When set, render only this section (no tabs). Keys: info, users, tickets, content-planner, data-form, generate, knowledge-base, websites, crawling */
+  /** When set, render only this section (no tabs). Keys include: info, users, tickets, company-log, content-planner, … (legacy activeSection `daily-active-assignments` maps to company-log) */
   activeSection?: string
   /** Used to show portal-admin toggle on Users tab (system admin only) */
   currentUserRole?: string | null
@@ -966,6 +967,15 @@ export default function CompanyDetailContent({
       ),
     },
     {
+      key: 'company-log',
+      label: (
+        <span>
+          <FileTextOutlined /> Company Log
+        </span>
+      ),
+      children: <TabCompanyLog companyId={companyData.id} />,
+    },
+    {
       key: 'content-planner',
       label: (
         <span>
@@ -1217,7 +1227,11 @@ export default function CompanyDetailContent({
 
             {activeSection ? (
               (() => {
-                const item = tabItems.find((t) => t.key === activeSection)
+                const item = tabItems.find(
+                  (t) =>
+                    t.key === activeSection ||
+                    (activeSection === 'daily-active-assignments' && t.key === 'company-log')
+                )
                 return item ? item.children : null
               })()
             ) : (

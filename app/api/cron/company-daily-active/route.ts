@@ -30,7 +30,7 @@ function cronAuthResult(request: NextRequest): 'ok' | 'missing_secret' | 'bad_ke
 
 /**
  * POST /api/cron/company-daily-active
- * Snapshot all companies' active_team_id, active_manager_id, active_time for one calendar day (UTC).
+ * Snapshot all companies: active_team_id, active_manager_id, active_time for one UTC calendar day (Company Log table).
  *
  * Auth: set COMPANY_DAILY_ACTIVE_CRON_SECRET and send Authorization: Bearer <secret> or x-api-key: <secret>.
  *

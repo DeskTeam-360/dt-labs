@@ -17,9 +17,15 @@ const connectionString = getConnectionString()
 /** Vercel/serverless: each isolate is short-lived but many run at once — DB has a global connection cap (e.g. Supabase ~15–60). */
 const isServerless = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME != null
 
+/** Hard cap — keep total client connections low (e.g. Supabase pooler limits). */
+const POOL_MAX_CAP = 5
+
 const envPool = Number(process.env.DATABASE_POOL_MAX)
-const defaultPoolMax = isServerless ? 1 : 12
-const poolMax = Number.isFinite(envPool) && envPool > 0 ? Math.min(50, Math.max(1, envPool)) : defaultPoolMax
+const defaultPoolMax = isServerless ? 1 : POOL_MAX_CAP
+const poolMax =
+  Number.isFinite(envPool) && envPool > 0
+    ? Math.min(POOL_MAX_CAP, Math.max(1, envPool))
+    : defaultPoolMax
 
 const client = postgres(connectionString, {
   prepare: false,

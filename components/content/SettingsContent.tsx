@@ -22,6 +22,7 @@ import { useState } from 'react'
 import {
   canAccessAutomationRules,
   canAccessCompanies,
+  canAccessCompanyLog,
   canAccessEmailIntegration,
   canAccessKnowledgeBase,
   canAccessMessageTemplates,
@@ -261,7 +262,8 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
 
           {(canAccessKnowledgeBase(role) ||
             canManageGlobalAnnouncement(role) ||
-            canManageDashboardAnnouncements(role)) && (
+            canManageDashboardAnnouncements(role) ||
+            canAccessCompanyLog(role)) && (
             <Section heading="General">
               <Row gutter={[16, 16]}>
                 {canAccessKnowledgeBase(role) && (
@@ -291,6 +293,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                       description="Title on dashboard, full text in a modal; by role"
                       href="/settings/dashboard-announcements"
                       icon={<BellOutlined />}
+                    />
+                  </Col>
+                )}
+                {canAccessCompanyLog(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Company Log"
+                      description="Raw daily snapshots (active team, manager, time) per company"
+                      href="/settings/company-log"
+                      icon={<FileTextOutlined />}
                     />
                   </Col>
                 )}
