@@ -670,7 +670,7 @@ export const customerTimeReportDefaults = pgTable('customer_time_report_defaults
   updatedBy: uuid('updated_by'),
 })
 
-/** Customer time report — saved recap for a full calendar month or full ISO week (see `New Feature` spec). */
+/** Customer time report — saved recap (full month, full ISO week, or custom range). */
 export const recapSnapshots = pgTable(
   'recap_snapshots',
   {
@@ -689,6 +689,34 @@ export const recapSnapshots = pgTable(
   (t) => [
     uniqueIndex('recap_snapshots_upsert_idx').on(t.teamKey, t.periodStart, t.periodEnd, t.title),
     index('recap_snapshots_period_idx').on(t.periodStart, t.periodEnd),
+  ]
+)
+
+/** Customer weekly recap: one row per team × company × ISO week (materialized; gray weeks = not embedded). */
+export const customerWeeklyRecapCells = pgTable(
+  'customer_weekly_recap_cells',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    teamId: uuid('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    weekStart: date('week_start').notNull(),
+    weekEnd: date('week_end').notNull(),
+    isoYear: integer('iso_year').notNull(),
+    isoWeek: integer('iso_week').notNull(),
+    isEmbedded: boolean('is_embedded').notNull().default(false),
+    /** Sum of `active_time` (hours) from company_daily rows where active_team_id = team_id for that week. */
+    clientTimeHours: integer('client_time_hours').notNull().default(0),
+    trackerReportedSeconds: bigint('tracker_reported_seconds', { mode: 'number' }).notNull().default(0),
+    computedAt: ts('computed_at').notNull().defaultNow(),
+  },
+  (t) => [
+    unique('customer_weekly_recap_cells_team_company_week_uid').on(t.teamId, t.companyId, t.weekStart),
+    index('customer_weekly_recap_cells_team_week_idx').on(t.teamId, t.weekStart),
+    index('customer_weekly_recap_cells_company_idx').on(t.companyId),
   ]
 )
 

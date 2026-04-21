@@ -30,6 +30,17 @@ export function classifyRecapPeriod(start: Dayjs, end: Dayjs): 'month' | 'week' 
   return null
 }
 
+/**
+ * For persisting recap snapshots: full month / full ISO week, or any range with end ≥ start (calendar days).
+ */
+export function classifyRecapPeriodForStore(start: Dayjs, end: Dayjs): 'month' | 'week' | 'custom' | null {
+  if (!start?.isValid() || !end?.isValid()) return null
+  if (end.isBefore(start, 'day')) return null
+  if (isFullCalendarMonthRange(start, end)) return 'month'
+  if (isFullIsoWeekRange(start, end)) return 'week'
+  return 'custom'
+}
+
 /** Same resolution as running the customer-time report (preset → concrete range). */
 export function resolveReportRangeFromFormValues(v: {
   range?: [Dayjs, Dayjs] | null

@@ -6,7 +6,7 @@ import { auth } from '@/auth'
 import { isAdminOrManager } from '@/lib/auth-utils'
 import { db, recapSnapshots } from '@/lib/db'
 import { buildRecapSnapshotPayload } from '@/lib/recap-snapshot-compute'
-import { classifyRecapPeriod } from '@/lib/recap-snapshot-period'
+import { classifyRecapPeriodForStore } from '@/lib/recap-snapshot-period'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
   return NextResponse.json({ id: row?.id ?? null })
 }
 
-/** POST — upsert recap snapshot (full month or full ISO week only). */
+/** POST — upsert recap snapshot (full month, full ISO week, or custom date range). */
 export async function POST(request: Request) {
   const session = await auth()
   if (!session?.user) {
@@ -109,9 +109,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'team_ids is required' }, { status: 400 })
   }
 
-  if (!classifyRecapPeriod(dayjs(periodStart), dayjs(periodEnd))) {
+  if (!classifyRecapPeriodForStore(dayjs(periodStart), dayjs(periodEnd))) {
     return NextResponse.json(
-      { error: 'Date range must be a full calendar month or a full ISO week (Mon–Sun)' },
+      { error: 'Invalid period: end date must be on or after start date (YYYY-MM-DD)' },
       { status: 400 }
     )
   }
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing user id' }, { status: 400 })
   }
 
-  let period_type: 'month' | 'week'
+  let period_type: 'month' | 'week' | 'custom'
   let payload: Record<string, unknown>
   try {
     const built = await buildRecapSnapshotPayload(teamIds, periodStart, periodEnd)

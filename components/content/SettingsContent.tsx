@@ -5,6 +5,7 @@ import {
   BankOutlined,
   BarChartOutlined,
   BellOutlined,
+  CalendarOutlined,
   FileTextOutlined,
   FlagOutlined,
   InfoCircleOutlined,
@@ -24,6 +25,7 @@ import {
   canAccessAutomationRules,
   canAccessCompanies,
   canAccessCompanyLog,
+  canAccessCustomerWeeklyRecap,
   canAccessEmailIntegration,
   canAccessKnowledgeBase,
   canAccessMessageTemplates,
@@ -266,7 +268,8 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
             canManageGlobalAnnouncement(role) ||
             canManageDashboardAnnouncements(role) ||
             canAccessCompanyLog(role) ||
-            canAccessRecapSnapshots(role)) && (
+            canAccessRecapSnapshots(role) ||
+            canAccessCustomerWeeklyRecap(role)) && (
             <Section heading="General">
               <Row gutter={[16, 16]}>
                 {canAccessKnowledgeBase(role) && (
@@ -316,6 +319,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                       description="Saved Customer time report recaps (month or week)"
                       href="/settings/recap-snapshots"
                       icon={<BarChartOutlined />}
+                    />
+                  </Col>
+                )}
+                {canAccessCustomerWeeklyRecap(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Recap Customer Weekly"
+                      description="Per-customer ISO weeks vs team (materialized grid)"
+                      href="/settings/customer-weekly-recap"
+                      icon={<CalendarOutlined />}
                     />
                   </Col>
                 )}

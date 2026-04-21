@@ -78,6 +78,11 @@ export function canAccessRecapSnapshots(role: string | undefined): boolean {
   return isAdminOrManager(role)
 }
 
+/** Customer weekly recap grid (`customer_weekly_recap_cells`) in Settings → General: Admin & Manager */
+export function canAccessCustomerWeeklyRecap(role: string | undefined): boolean {
+  return isAdminOrManager(role)
+}
+
 /** Global running-text announcement (Settings): Admin only */
 export function canManageGlobalAnnouncement(role: string | undefined): boolean {
   return isAdmin(role)
@@ -127,7 +132,8 @@ export function canAccessSettingsHub(role: string | undefined): boolean {
     canAccessCompanies(role) ||
     canAccessTeams(role) ||
     canAccessCompanyLog(role) ||
-    canAccessRecapSnapshots(role)
+    canAccessRecapSnapshots(role) ||
+    canAccessCustomerWeeklyRecap(role)
   )
 }
 

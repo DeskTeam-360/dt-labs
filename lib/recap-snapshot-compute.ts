@@ -10,10 +10,13 @@ import {
   ticketTimeTracker,
   users,
 } from '@/lib/db'
-import { classifyRecapPeriod } from '@/lib/recap-snapshot-period'
+import { classifyRecapPeriodForStore } from '@/lib/recap-snapshot-period'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 
 const HOURS_PER_MEMBER_PER_DAY = 8
+/** One "available task" unit = this many hours of leftover time (must match UI ÷4h). */
+const HOURS_PER_AVAILABLE_TASK = 4
+const SECONDS_PER_AVAILABLE_TASK = HOURS_PER_AVAILABLE_TASK * 3600
 
 function normalizePosition(p: string | null | undefined): string | null {
   if (!p?.trim()) return null
@@ -24,10 +27,10 @@ export async function buildRecapSnapshotPayload(
   teamIds: string[],
   periodStartYmd: string,
   periodEndYmd: string
-): Promise<{ period_type: 'month' | 'week'; payload: Record<string, unknown> }> {
-  const periodType = classifyRecapPeriod(dayjs(periodStartYmd), dayjs(periodEndYmd))
+): Promise<{ period_type: 'month' | 'week' | 'custom'; payload: Record<string, unknown> }> {
+  const periodType = classifyRecapPeriodForStore(dayjs(periodStartYmd), dayjs(periodEndYmd))
   if (!periodType) {
-    throw new Error('Period must be a full calendar month or a full ISO week (Mon–Sun)')
+    throw new Error('Invalid period: end date must be on or after start date (YYYY-MM-DD)')
   }
 
   const startDate = new Date(`${periodStartYmd}T00:00:00.000Z`)
@@ -172,14 +175,16 @@ export async function buildRecapSnapshotPayload(
   const leftOverTimeSeconds = totalClientTimeSeconds - totalTimeUsedSeconds
   const leftOverPerDay =
     avgLogRowsPerCompany > 0 ? leftOverTimeSeconds / avgLogRowsPerCompany : 0
-  const availableTasks = leftOverPerDay / 4
+  const availableTasks = leftOverPerDay / SECONDS_PER_AVAILABLE_TASK
 
   const roleTasks = roles
     .filter((r) => r.team_members_with_role > 0)
     .map((r) => ({
       position: r.position,
       available_tasks:
-        avgLogRowsPerCompany > 0 ? r.time_left_over_seconds / avgLogRowsPerCompany / 4 : 0,
+        avgLogRowsPerCompany > 0
+          ? r.time_left_over_seconds / avgLogRowsPerCompany / SECONDS_PER_AVAILABLE_TASK
+          : 0,
     }))
 
   const payload: Record<string, unknown> = {

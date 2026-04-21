@@ -1,0 +1,20 @@
+Ada Namanya Recap Customer Weekly
+Yang disave
+- customer_id
+- total hours client
+- periode
+- kita butuh march 2026 week 1/2/3/4
+- total tracker
+
+--- Diskusi: sel abu (tidak aktif) ---
+- Abu-abu = bukan "0% utilization", tapi minggu itu customer tidak punya status aktif dengan team yang dipilih (tidak ada embedding di periode itu).
+- Sumber kebenaran di app: company_daily_active_assignments (snapshot harian: company punya active_team_id = team laporan). Agregasi ke ISO week: kalau tidak ada satupun hari di minggu itu dengan team tersebut → sel abu.
+- Pola tangga ke bawah: customer yang lebih baru join / lebih cepat offboard → lebih banyak minggu abu di kiri (timeline baru) atau kanan (timeline lama), konsisten dengan satu definisi "aktif hanya jika ada log team untuk minggu itu".
+- "Sudah tidak aktif": setelah minggu terakhir yang punya snapshot team, minggu berikutnya abu (bukan merah 0% kecuali memang ada log tapi tracker 0).
+
+--- Aturan tambahan (dari diskusi) ---
+- Embedding / "tim mana yang dipakai": cukup **active_team_id pada snapshot terakhir** (per company–hari atau per aturan snapshot) — tim bisa pindah; kalau sudah bukan team laporan, anggap tidak aktif untuk rekap itu.
+- **Tabel snapshot baru** untuk Recap Customer Weekly: jangan hitung ulang full history live tiap buka laporan (query + join besar); materialize per (customer, ISO week, team context) sesuai jadwal/cron.
+- **Urutan baris UI**: pola tanggal di kolom tidak mengubah rule abu; yang inactive **selalu di bawah** daftar (sort: aktif dulu, lalu inactive / abu lebih banyak).
+
+Implementasi (MVP): Settings → Recap Customer Weekly `/settings/customer-weekly-recap`, tabel `customer_weekly_recap_cells`, POST `/api/reports/customer-weekly-recap/materialize`, cron `POST /api/cron/customer-weekly-recap`.

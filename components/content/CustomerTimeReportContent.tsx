@@ -46,11 +46,13 @@ import {
   normalizeDatePreset,
   resolveDatePresetToRange,
 } from '@/lib/customer-time-report-defaults'
-import { classifyRecapPeriod, resolveReportRangeFromFormValues } from '@/lib/recap-snapshot-period'
+import { recapTeamColumnLabelFromPayload } from '@/lib/recap-payload-grid'
+import { classifyRecapPeriodForStore, resolveReportRangeFromFormValues } from '@/lib/recap-snapshot-period'
 import { ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
 
 import AdminMainColumn from '../AdminMainColumn'
 import AdminSidebar from '../AdminSidebar'
+import { RecapSnapshotPayloadGridTable } from '../recap/RecapSnapshotPayloadGridTable'
 import { SpaNavLink } from '../SpaNavLink'
 
 const { Content } = Layout
@@ -333,6 +335,12 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
   const [deletingPreset, setDeletingPreset] = useState(false)
   const [recapExistingId, setRecapExistingId] = useState<string | null>(null)
   const [recapSaving, setRecapSaving] = useState(false)
+  const [recapPreview, setRecapPreview] = useState<{
+    period_type: string
+    payload: Record<string, unknown>
+    period_start: string
+    period_end: string
+  } | null>(null)
   const globalDefaultsAppliedRef = useRef(false)
 
   const loadPresetsFromApi = useCallback(async (): Promise<CustomerTimeReportPresetDTO[]> => {
@@ -691,7 +699,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
 
   const recapPeriodKind = useMemo(() => {
     if (!recapPeriodResolved) return null
-    return classifyRecapPeriod(recapPeriodResolved.start, recapPeriodResolved.end)
+    return classifyRecapPeriodForStore(recapPeriodResolved.start, recapPeriodResolved.end)
   }, [recapPeriodResolved])
 
   const recapEligible = Boolean(recapPeriodKind && (watchedTeamIds?.length ?? 0) > 0)
@@ -729,6 +737,10 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       cancelled = true
     }
   }, [recapEligible, recapPeriodResolved, watchedTeamIds, watchedRecapTitle])
+
+  useEffect(() => {
+    setRecapPreview(null)
+  }, [watchedTeamIds, watchedRangeForRecap, watchedPresetForRecap])
 
   const statusSelectOptions = useMemo(() => {
     const opts = statuses.map((s) => ({ value: s.slug, label: ticketStatusDisplayLabel(s) }))
@@ -778,17 +790,59 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
         throw new Error(err.error || res.statusText)
       }
       setReport((await res.json()) as ReportData)
+
+      const pr = resolveReportRangeFromFormValues({
+        range: values.range ?? null,
+        date_preset: normalizeDatePreset(values.date_preset),
+      })
+      const periodKind = pr ? classifyRecapPeriodForStore(pr.start, pr.end) : null
+      if (pr && periodKind && teamIds.length > 0) {
+        try {
+          const previewRes = await fetch('/api/reports/recap-snapshot/preview', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              team_ids: teamIds,
+              period_start: pr.start.format('YYYY-MM-DD'),
+              period_end: pr.end.format('YYYY-MM-DD'),
+            }),
+          })
+          const pj = (await previewRes.json().catch(() => ({}))) as {
+            error?: string
+            data?: {
+              period_type: string
+              payload: Record<string, unknown>
+              period_start: string
+              period_end: string
+            }
+          }
+          if (!previewRes.ok) throw new Error(pj.error || previewRes.statusText)
+          if (!pj.data?.payload) throw new Error('Invalid preview response')
+          setRecapPreview(pj.data)
+        } catch (pe) {
+          message.error(`Recap preview: ${(pe as Error).message}`)
+          setRecapPreview(null)
+        }
+      } else {
+        setRecapPreview(null)
+      }
     } catch (e) {
       message.error((e as Error).message)
       setReport(null)
+      setRecapPreview(null)
     } finally {
       setReportLoading(false)
     }
   }
 
   const saveRecapSnapshot = useCallback(async () => {
-    if (!recapPeriodResolved || !recapPeriodKind) {
-      message.warning('Recap snapshot needs a full calendar month or full ISO week and at least one team.')
+    if (!recapPeriodResolved) {
+      message.warning('Select a date range for the report.')
+      return
+    }
+    if (!recapPeriodKind) {
+      message.warning('End date must be on or after start date.')
       return
     }
     const title = String(form.getFieldValue('recap_snapshot_title') ?? '').trim()
@@ -824,6 +878,22 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       setRecapSaving(false)
     }
   }, [form, recapPeriodResolved, recapPeriodKind])
+
+  const recapPreviewSections = useMemo(() => {
+    if (!recapPreview?.payload) return []
+    return [
+      {
+        groupLabel: `Yang akan disimpan — ${recapPreview.period_start} → ${recapPreview.period_end} (${recapPreview.period_type})`,
+        rows: [
+          {
+            key: 'preview',
+            payload: recapPreview.payload,
+            teamColumnLabel: recapTeamColumnLabelFromPayload(recapPreview.payload, ''),
+          },
+        ],
+      },
+    ]
+  }, [recapPreview])
 
   const multiCompany = (report?.companies?.length ?? 0) > 1
 
@@ -1289,11 +1359,18 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                 <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 8 }}>
                   <Col xs={24}>
                     <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-                      <Text strong>Recap snapshot</Text> — range is a full{' '}
-                      {recapPeriodKind === 'month' ? 'calendar month' : 'ISO week (Mon–Sun)'}. Saves company log +
-                      tracker totals for the selected teams (
-                      <Text code>New Feature</Text> rules). Enter a title; the button switches to Update when a row
-                      already exists for the same title, period, and teams.
+                      <Text strong>Recap snapshot</Text> — saves company log and tracker totals for the selected teams
+                      for the current date range (
+                      {recapPeriodKind === 'month'
+                        ? 'full calendar month'
+                        : recapPeriodKind === 'week'
+                          ? 'full ISO week (Mon–Sun)'
+                          : recapPeriodKind === 'custom'
+                            ? 'custom range'
+                            : 'set end ≥ start'}
+                      ). After you click <Text strong>Load report</Text>, the table below matches what Settings →
+                      Recap snapshots would save (same period and teams). Enter a title; Save switches to Update when a
+                      row already exists for the same title, period, and teams.
                     </Text>
                     <Form.Item name="recap_snapshot_title" label={<Text strong>Recap title</Text>}>
                       <Input placeholder="e.g. January 2026 — SEO team" maxLength={500} showCount />
@@ -1301,6 +1378,15 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                     <Button type="default" size="large" loading={recapSaving} onClick={() => void saveRecapSnapshot()}>
                       {recapExistingId ? 'Update recap snapshot' : 'Save recap snapshot'}
                     </Button>
+                    {recapPreview ? (
+                      <Card
+                        title="Preview (sama seperti Settings → Recap snapshots)"
+                        style={{ marginTop: 12 }}
+                        styles={{ body: { padding: 0 } }}
+                      >
+                        <RecapSnapshotPayloadGridTable sections={recapPreviewSections} />
+                      </Card>
+                    ) : null}
                   </Col>
                 </Row>
               {/* ) : null} */}

@@ -1,30 +1,37 @@
 'use client'
 
-import { ArrowLeftOutlined, EyeOutlined } from '@ant-design/icons'
-import { Button, Card, Descriptions, Layout, message, Modal, Select, Space, Tabs, Typography } from 'antd'
+import { ArrowLeftOutlined } from '@ant-design/icons'
+import {
+  Button,
+  Card,
+  Descriptions,
+  Input,
+  Layout,
+  message,
+  Modal,
+  Select,
+  Space,
+  Tabs,
+  Typography,
+} from 'antd'
 import dayjs from 'dayjs'
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+
+import {
+  RECAP_HDR_H,
+  recapFormatHoursFromSeconds,
+  recapFormatIntCount,
+} from '@/lib/recap-payload-grid'
 
 import AdminMainColumn from '../AdminMainColumn'
 import AdminSidebar from '../AdminSidebar'
+import { RecapSnapshotPayloadGridTable } from '../recap/RecapSnapshotPayloadGridTable'
 import { SpaNavLink } from '../SpaNavLink'
-import styles from './RecapSnapshotsSettingsContent.module.css'
 
 const { Content } = Layout
 const { Title, Text } = Typography
 
 type TeamOption = { id: string; name: string }
-
-type RoleBlock = {
-  position: string
-  time_used_seconds: number
-  team_members_with_role: number
-  time_available_seconds: number
-  time_left_over_seconds: number
-  pct_used: number | null
-}
-
-type TaskByRole = { position: string; available_tasks: number }
 
 type SnapshotGridRow = {
   id: string
@@ -45,27 +52,6 @@ interface RecapSnapshotsSettingsContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string | null }
 }
 
-function formatHoursFromSeconds(sec: unknown): string {
-  const n = typeof sec === 'number' && Number.isFinite(sec) ? sec : 0
-  const h = n / 3600
-  return `${h.toFixed(2)} h`
-}
-
-function hours2(sec: unknown): string {
-  const n = typeof sec === 'number' && Number.isFinite(sec) ? sec : 0
-  return (n / 3600).toFixed(2)
-}
-
-/** Count fields (e.g. distinct clients) — show as whole number. */
-function formatIntCount(v: unknown): string {
-  if (v === null || v === undefined || v === '') return '—'
-  const n = Number(v)
-  if (!Number.isFinite(n)) return '—'
-  return String(Math.trunc(n))
-}
-
-const HDR_H = ' (H)'
-
 /** Kunci stabil untuk Select: recap tanpa judul. */
 const EMPTY_TITLE_KEY = '__empty_title__'
 
@@ -83,31 +69,9 @@ function normalizeTeamIds(raw: unknown): string[] {
   return raw.map((x) => String(x ?? '').trim()).filter(Boolean)
 }
 
-function parseRoles(payload: Record<string, unknown>): RoleBlock[] {
-  const raw = payload.by_position
-  if (!Array.isArray(raw)) return []
-  const out: RoleBlock[] = []
-  for (const x of raw) {
-    if (!x || typeof x !== 'object') continue
-    const o = x as Record<string, unknown>
-    out.push({
-      position: String(o.position ?? ''),
-      time_used_seconds: Number(o.time_used_seconds) || 0,
-      team_members_with_role: Number(o.team_members_with_role) || 0,
-      time_available_seconds: Number(o.time_available_seconds) || 0,
-      time_left_over_seconds: Number(o.time_left_over_seconds) || 0,
-      pct_used: o.pct_used === null || o.pct_used === undefined ? null : Number(o.pct_used),
-    })
-  }
-  return out
-}
-
-function getRole(payload: Record<string, unknown>, position: string): RoleBlock | null {
-  return parseRoles(payload).find((r) => r.position === position) ?? null
-}
-
 function periodGroupLabel(row: SnapshotGridRow): string {
-  if (row.periodType === 'week') {
+  const pt = row.periodType
+  if (pt === 'week' || pt === 'custom') {
     const a = dayjs(row.periodStart)
     const b = dayjs(row.periodEnd)
     if (a.isValid() && b.isValid()) {
@@ -123,25 +87,6 @@ function periodSortKey(row: SnapshotGridRow): number {
   return d.isValid() ? d.valueOf() : 0
 }
 
-function parseTaskByRole(payload: Record<string, unknown>): TaskByRole[] {
-  const raw = payload.available_tasks_by_role
-  if (!Array.isArray(raw)) return []
-  const out: TaskByRole[] = []
-  for (const x of raw) {
-    if (!x || typeof x !== 'object') continue
-    const o = x as Record<string, unknown>
-    out.push({
-      position: String(o.position ?? ''),
-      available_tasks: Number(o.available_tasks) || 0,
-    })
-  }
-  return out
-}
-
-function roleUsesSingleTimeUsedColumn(position: string): boolean {
-  return position === 'Not in team'
-}
-
 export default function RecapSnapshotsSettingsContent({ user: currentUser }: RecapSnapshotsSettingsContentProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [rows, setRows] = useState<SnapshotGridRow[]>([])
@@ -152,6 +97,10 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
   const [teamsById, setTeamsById] = useState<Record<string, string>>({})
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailEditing, setDetailEditing] = useState(false)
+  const [detailSaveLoading, setDetailSaveLoading] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editPayloadJson, setEditPayloadJson] = useState('')
   const [detailRow, setDetailRow] = useState<{
     id: string
     title: string
@@ -222,6 +171,7 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
 
   const openDetail = useCallback(async (id: string) => {
     setDetailOpen(true)
+    setDetailEditing(false)
     setDetailLoading(true)
     setDetailRow(null)
     try {
@@ -247,6 +197,90 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
     } finally {
       setDetailLoading(false)
     }
+  }, [])
+
+  const beginDetailEdit = useCallback(() => {
+    if (!detailRow) return
+    setEditTitle(detailRow.title)
+    setEditPayloadJson(JSON.stringify(detailRow.payload, null, 2))
+    setDetailEditing(true)
+  }, [detailRow])
+
+  const cancelDetailEdit = useCallback(() => {
+    setDetailEditing(false)
+  }, [])
+
+  const saveDetailEdit = useCallback(async () => {
+    if (!detailRow) return
+    const t = editTitle.trim()
+    if (!t) {
+      message.warning('Judul tidak boleh kosong')
+      return
+    }
+    let parsed: Record<string, unknown>
+    try {
+      const raw = JSON.parse(editPayloadJson) as unknown
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+        message.error('Payload harus berupa objek JSON (bukan array atau primitif).')
+        return
+      }
+      parsed = raw as Record<string, unknown>
+    } catch {
+      message.error('JSON payload tidak valid.')
+      return
+    }
+    setDetailSaveLoading(true)
+    try {
+      const res = await fetch(`/api/reports/recap-snapshots/${detailRow.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: t, payload: parsed }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error((body as { error?: string })?.error || res.statusText)
+      const d = (body as { data?: Record<string, unknown> }).data
+      if (!d || typeof d !== 'object') throw new Error('Invalid response')
+      const next: NonNullable<typeof detailRow> = {
+        id: String(d.id),
+        title: String(d.title ?? ''),
+        periodStart: String(d.periodStart ?? d.period_start ?? ''),
+        periodEnd: String(d.periodEnd ?? d.period_end ?? ''),
+        periodType: String(d.periodType ?? d.period_type ?? ''),
+        teamIds: Array.isArray(d.teamIds)
+          ? d.teamIds.map(String)
+          : Array.isArray(d.team_ids)
+            ? d.team_ids.map(String)
+            : [],
+        payload: typeof d.payload === 'object' && d.payload !== null ? (d.payload as Record<string, unknown>) : {},
+        createdAt: String(d.createdAt ?? d.created_at ?? ''),
+        updatedAt: String(d.updatedAt ?? d.updated_at ?? ''),
+      }
+      setDetailRow(next)
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === next.id
+            ? {
+                ...r,
+                title: next.title,
+                payload: next.payload,
+                updatedAt: next.updatedAt,
+              }
+            : r
+        )
+      )
+      message.success('Perubahan disimpan')
+      setDetailEditing(false)
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Gagal menyimpan')
+    } finally {
+      setDetailSaveLoading(false)
+    }
+  }, [detailRow, editTitle, editPayloadJson])
+
+  const closeDetailModal = useCallback(() => {
+    setDetailOpen(false)
+    setDetailEditing(false)
   }, [])
 
   const teamLabel = useCallback(
@@ -309,29 +343,18 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
     return groups
   }, [rowsFilteredByTitle])
 
-  const visibleRows = useMemo(() => grouped.flatMap((g) => g.rows), [grouped])
-
-  const { positionsOrdered, taskRolePositions } = useMemo(() => {
-    const pos = new Set<string>()
-    const taskPos = new Set<string>()
-    for (const row of visibleRows) {
-      for (const r of parseRoles(row.payload)) {
-        if (r.position) pos.add(r.position)
-      }
-      for (const t of parseTaskByRole(row.payload)) {
-        if (t.position) taskPos.add(t.position)
-      }
-    }
-    const sortPos = (a: string, b: string) => {
-      if (a === 'Not in team') return 1
-      if (b === 'Not in team') return -1
-      return a.localeCompare(b)
-    }
-    return {
-      positionsOrdered: [...pos].sort(sortPos),
-      taskRolePositions: [...taskPos].sort(sortPos),
-    }
-  }, [visibleRows])
+  const gridSections = useMemo(
+    () =>
+      grouped.map((g) => ({
+        groupLabel: g.label,
+        rows: g.rows.map((row) => ({
+          key: row.id,
+          payload: row.payload,
+          teamColumnLabel: rowTeamDisplay(row),
+        })),
+      })),
+    [grouped, rowTeamDisplay]
+  )
 
   const summaryTab = useMemo(() => {
     if (!detailRow) return null
@@ -348,39 +371,33 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
           {detailRow.periodStart} → {detailRow.periodEnd} ({detailRow.periodType})
         </Descriptions.Item>
         <Descriptions.Item label="Teams">{teamNames}</Descriptions.Item>
-        <Descriptions.Item label="Total clients">{formatIntCount(p.total_client)}</Descriptions.Item>
-        <Descriptions.Item label={`Client time${HDR_H}`}>
+        <Descriptions.Item label="Total clients">{recapFormatIntCount(p.total_client)}</Descriptions.Item>
+        <Descriptions.Item label={`Client time${RECAP_HDR_H}`}>
           {typeof p.total_client_time_hours === 'number' && Number.isFinite(p.total_client_time_hours)
             ? p.total_client_time_hours.toFixed(2)
             : '—'}
         </Descriptions.Item>
         <Descriptions.Item label="Company log rows">{String(companyLog.row_count ?? '—')}</Descriptions.Item>
         <Descriptions.Item label="Time used (sum)">
-          {formatHoursFromSeconds(totals.total_time_used_seconds)}
+          {recapFormatHoursFromSeconds(totals.total_time_used_seconds)}
         </Descriptions.Item>
         <Descriptions.Item label="Time available (sum)">
-          {formatHoursFromSeconds(totals.total_time_available_seconds)}
+          {recapFormatHoursFromSeconds(totals.total_time_available_seconds)}
         </Descriptions.Item>
         <Descriptions.Item label="Left-over (totals)">
-          {formatHoursFromSeconds(totals.total_time_left_over_seconds)}
+          {recapFormatHoursFromSeconds(totals.total_time_left_over_seconds)}
         </Descriptions.Item>
         <Descriptions.Item label="Left-over time (client − used)">
-          {formatHoursFromSeconds(p.left_over_time_seconds)}
+          {recapFormatHoursFromSeconds(p.left_over_time_seconds)}
         </Descriptions.Item>
-        <Descriptions.Item label="Available tasks (÷4h)">{String(p.available_tasks ?? '—')}</Descriptions.Item>
+        <Descriptions.Item label="Available tasks (÷4h)">
+          {typeof p.available_tasks === 'number' && Number.isFinite(p.available_tasks)
+            ? Number(p.available_tasks).toFixed(2)
+            : '—'}
+        </Descriptions.Item>
       </Descriptions>
     )
   }, [detailRow, teamLabel])
-
-  const colCount =
-    1 +
-    3 +
-    positionsOrdered.reduce((acc, p) => acc + (roleUsesSingleTimeUsedColumn(p) ? 1 : 4), 0) +
-    3 +
-    3 +
-    1 +
-    taskRolePositions.length +
-    1
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -450,134 +467,11 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
                   </Text>
                 </div>
               ) : (
-                <div className={styles.scrollWrap}>
-                  <table className={styles.grid}>
-                    <thead>
-                      <tr>
-                        <th className={`${styles.th} ${styles.thSticky}`}>Team</th>
-                        <th className={styles.th}>Total Team</th>
-                        <th className={styles.th}>Total Client</th>
-                        <th className={styles.th}>Total Client Time{HDR_H}</th>
-                        {positionsOrdered.map((pos) =>
-                          roleUsesSingleTimeUsedColumn(pos) ? (
-                            <th key={pos} className={styles.th}>
-                              {pos} Time Used{HDR_H}
-                            </th>
-                          ) : (
-                            <Fragment key={pos}>
-                              <th className={styles.th}>{pos} Time Used{HDR_H}</th>
-                              <th className={styles.th}>{pos} Time Available{HDR_H}</th>
-                              <th className={styles.th}>{pos} Time Left Over{HDR_H}</th>
-                              <th className={styles.th}>{pos} % Used</th>
-                            </Fragment>
-                          )
-                        )}
-                        <th className={styles.th}>Total Time Used{HDR_H}</th>
-                        <th className={styles.th}>Total Time Available{HDR_H}</th>
-                        <th className={styles.th}>Total Time Left Over{HDR_H}</th>
-                        <th className={styles.th}>Left over time{HDR_H}</th>
-                        <th className={styles.th}>Left over per day{HDR_H}</th>
-                        <th className={styles.th}>Available Tasks</th>
-                        {taskRolePositions.map((pos) => (
-                          <th key={`at-${pos}`} className={styles.th}>
-                            Available Tasks - {pos}
-                          </th>
-                        ))}
-                        <th className={styles.th} style={{ width: 88 }}>
-                          {' '}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {grouped.map((g) => (
-                        <Fragment key={g.periodKey}>
-                          <tr>
-                            <td className={styles.monthBar} colSpan={colCount}>
-                              {g.label}
-                            </td>
-                          </tr>
-                          {g.rows.map((row) => {
-                            const p = row.payload
-                            const totals =
-                              p.totals && typeof p.totals === 'object' ? (p.totals as Record<string, unknown>) : {}
-                            const tasksByPos = new Map(
-                              parseTaskByRole(p).map((t) => [t.position, t.available_tasks])
-                            )
-                            return (
-                              <tr key={row.id}>
-                                <td className={`${styles.tdStrong} ${styles.tdSticky}`}>{rowTeamDisplay(row)}</td>
-                                <td className={styles.td}>{String(p.total_team ?? '—')}</td>
-                                <td className={styles.td}>{formatIntCount(p.total_client)}</td>
-                                <td className={styles.tdNum}>
-                                  {typeof p.total_client_time_hours === 'number'
-                                    ? p.total_client_time_hours.toFixed(2)
-                                    : '—'}
-                                </td>
-                                {positionsOrdered.map((pos) => {
-                                  const role = getRole(p, pos)
-                                  if (roleUsesSingleTimeUsedColumn(pos)) {
-                                    return (
-                                      <td key={pos} className={styles.tdNum}>
-                                        {role ? hours2(role.time_used_seconds) : '—'}
-                                      </td>
-                                    )
-                                  }
-                                  if (!role) {
-                                    return (
-                                      <Fragment key={`${row.id}-${pos}`}>
-                                        <td className={styles.tdNum}>—</td>
-                                        <td className={styles.tdNum}>—</td>
-                                        <td className={styles.tdNum}>—</td>
-                                        <td className={styles.tdNum}>—</td>
-                                      </Fragment>
-                                    )
-                                  }
-                                  const pct =
-                                    role.pct_used === null || role.pct_used === undefined
-                                      ? '—'
-                                      : `${Number(role.pct_used).toFixed(2)}%`
-                                  return (
-                                    <Fragment key={`${row.id}-${pos}`}>
-                                      <td className={styles.tdNum}>{hours2(role.time_used_seconds)}</td>
-                                      <td className={styles.tdNum}>{hours2(role.time_available_seconds)}</td>
-                                      <td className={styles.tdNum}>{hours2(role.time_left_over_seconds)}</td>
-                                      <td className={styles.tdNum}>{pct}</td>
-                                    </Fragment>
-                                  )
-                                })}
-                                <td className={styles.tdNum}>{hours2(totals.total_time_used_seconds)}</td>
-                                <td className={styles.tdNum}>{hours2(totals.total_time_available_seconds)}</td>
-                                <td className={styles.tdNum}>{hours2(totals.total_time_left_over_seconds)}</td>
-                                <td className={styles.tdNum}>{hours2(p.left_over_time_seconds)}</td>
-                                <td className={styles.tdNum}>{hours2(p.left_over_per_day_seconds)}</td>
-                                <td className={styles.tdNum}>
-                                  {typeof p.available_tasks === 'number'
-                                    ? Number(p.available_tasks).toFixed(2)
-                                    : '—'}
-                                </td>
-                                {taskRolePositions.map((pos) => (
-                                  <td key={`${row.id}-at-${pos}`} className={styles.tdNum}>
-                                    {tasksByPos.has(pos) ? Number(tasksByPos.get(pos)).toFixed(2) : '—'}
-                                  </td>
-                                ))}
-                                <td className={styles.td}>
-                                  <Button
-                                    type="link"
-                                    size="small"
-                                    icon={<EyeOutlined />}
-                                    onClick={() => void openDetail(row.id)}
-                                  >
-                                    View
-                                  </Button>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <RecapSnapshotPayloadGridTable
+                  sections={gridSections}
+                  showActionColumn
+                  onViewRow={(id) => void openDetail(id)}
+                />
               )}
             </Card>
           </Space>
@@ -585,44 +479,92 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
       </AdminMainColumn>
 
       <Modal
-        title={detailRow?.title ?? 'Recap detail'}
+        title={detailEditing ? 'Ubah recap' : detailRow?.title || 'Recap detail'}
         open={detailOpen}
-        onCancel={() => setDetailOpen(false)}
-        footer={[
-          <Button key="close" onClick={() => setDetailOpen(false)}>
-            Close
-          </Button>,
-        ]}
-        width={720}
+        onCancel={closeDetailModal}
+        footer={
+          detailEditing
+            ? [
+                <Button key="cancel" onClick={cancelDetailEdit}>
+                  Batal
+                </Button>,
+                <Button
+                  key="save"
+                  type="primary"
+                  loading={detailSaveLoading}
+                  onClick={() => void saveDetailEdit()}
+                >
+                  Simpan
+                </Button>,
+              ]
+            : [
+                <Button key="close" onClick={closeDetailModal}>
+                  Tutup
+                </Button>,
+                <Button key="edit" type="primary" disabled={!detailRow || detailLoading} onClick={beginDetailEdit}>
+                  Ubah judul & payload
+                </Button>,
+              ]
+        }
+        width={detailEditing ? 920 : 720}
         destroyOnHidden
       >
         {detailLoading ? (
           <Text type="secondary">Loading…</Text>
         ) : detailRow ? (
-          <Tabs
-            items={[
-              { key: 'summary', label: 'Summary', children: summaryTab },
-              {
-                key: 'json',
-                label: 'Raw JSON',
-                children: (
-                  <pre
-                    style={{
-                      maxHeight: 420,
-                      overflow: 'auto',
-                      fontSize: 12,
-                      margin: 0,
-                      padding: 12,
-                      background: 'var(--ant-color-fill-quaternary, #f5f5f5)',
-                      borderRadius: 8,
-                    }}
-                  >
-                    {JSON.stringify(detailRow.payload, null, 2)}
-                  </pre>
-                ),
-              },
-            ]}
-          />
+          detailEditing ? (
+            <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+              <div>
+                <Text strong>Judul</Text>
+                <Input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  maxLength={500}
+                  showCount
+                  placeholder="Judul recap"
+                  style={{ marginTop: 8 }}
+                />
+              </div>
+              <div>
+                <Text strong>Payload (JSON)</Text>
+                <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 4 }}>
+                  Objek JSON penuh seperti yang disimpan. Salah sintaks atau bukan objek akan ditolak.
+                </Text>
+                <Input.TextArea
+                  value={editPayloadJson}
+                  onChange={(e) => setEditPayloadJson(e.target.value)}
+                  spellCheck={false}
+                  autoSize={{ minRows: 14, maxRows: 28 }}
+                  style={{ marginTop: 8, fontFamily: 'monospace', fontSize: 12 }}
+                />
+              </div>
+            </Space>
+          ) : (
+            <Tabs
+              items={[
+                { key: 'summary', label: 'Summary', children: summaryTab },
+                {
+                  key: 'json',
+                  label: 'Raw JSON',
+                  children: (
+                    <pre
+                      style={{
+                        maxHeight: 420,
+                        overflow: 'auto',
+                        fontSize: 12,
+                        margin: 0,
+                        padding: 12,
+                        background: 'var(--ant-color-fill-quaternary, #f5f5f5)',
+                        borderRadius: 8,
+                      }}
+                    >
+                      {JSON.stringify(detailRow.payload, null, 2)}
+                    </pre>
+                  ),
+                },
+              ]}
+            />
+          )
         ) : null}
       </Modal>
     </Layout>
