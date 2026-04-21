@@ -90,6 +90,8 @@ export function resolveDatePresetToRange(
 /** Stored JSON in `customer_time_report_defaults.filters` (one row per named preset). */
 export type CustomerTimeReportGlobalFilters = {
   company_ids: string[]
+  /** When set, UI filters by team(s); companies are derived from `active_team_id`. Legacy presets omit this. */
+  team_ids: string[] | null
   start: string | null
   end: string | null
   /** When set, start/end are ignored until load time; range is recomputed from “now”. */
@@ -109,6 +111,7 @@ export type CustomerTimeReportPresetDTO = {
 export function emptyGlobalFilters(): CustomerTimeReportGlobalFilters {
   return {
     company_ids: [],
+    team_ids: null,
     start: null,
     end: null,
     date_preset: null,
@@ -124,6 +127,12 @@ export function normalizeGlobalFilters(raw: unknown): CustomerTimeReportGlobalFi
 
   if (Array.isArray(o.company_ids)) {
     base.company_ids = [...new Set(o.company_ids.map((id) => String(id).trim()).filter(Boolean))]
+  }
+
+  if (Array.isArray(o.team_ids) && o.team_ids.length > 0) {
+    base.team_ids = [...new Set(o.team_ids.map((id) => String(id).trim()).filter(Boolean))]
+  } else {
+    base.team_ids = null
   }
 
   base.date_preset = normalizeDatePreset(o.date_preset)

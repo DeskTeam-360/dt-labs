@@ -27,7 +27,7 @@ import {
   Typography,
 } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import DateDisplay from '../DateDisplay'
 
@@ -85,7 +85,7 @@ export interface TabTimeTrackerProps {
   formatTime: (seconds: number) => string
   timeTrackerSessions: unknown[]
   timeTrackerLoading?: boolean
-  onStartTimeTracker: () => void
+  onStartTimeTracker: (jobType?: string | null) => void | Promise<void>
   onStopTimeTracker: () => void
   currentUserId: string
   onTimeTrackingChanged: () => Promise<void>
@@ -123,6 +123,31 @@ export default function TabTimeTracker({
   const [adjustSession, setAdjustSession] = useState<Record<string, unknown> | null>(null)
   const [adjustForm] = Form.useForm()
 
+  type JobTypeOpt = { slug: string; title: string }
+  const [jobTypeOptions, setJobTypeOptions] = useState<JobTypeOpt[]>([])
+  const [timerJobType, setTimerJobType] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const rows = await apiFetch<JobTypeOpt[]>('/api/job-types')
+        if (cancelled) return
+        setJobTypeOptions(Array.isArray(rows) ? rows : [])
+        setTimerJobType((prev) => {
+          if (prev != null) return prev
+          const other = rows.find((r) => r.slug === 'other')
+          return other?.slug ?? rows[0]?.slug ?? null
+        })
+      } catch {
+        if (!cancelled) setJobTypeOptions([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const isOwner = (session: Record<string, unknown>) =>
     String(
       session.userId ?? session.user_id ?? (session.user as { id?: string } | undefined)?.id ?? ''
@@ -139,6 +164,7 @@ export default function TabTimeTracker({
     if (canManageOthersTime) {
       base.forUserId = currentUserId
     }
+    base.job_type = timerJobType ?? jobTypeOptions.find((o) => o.slug === 'other')?.slug ?? jobTypeOptions[0]?.slug
     manualForm.setFieldsValue(base)
     setManualOpen(true)
   }
@@ -177,6 +203,9 @@ export default function TabTimeTracker({
       if (canManageOthersTime && v.forUserId) {
         payload.user_id = v.forUserId
       }
+      if (v.job_type != null && String(v.job_type).trim() !== '') {
+        payload.job_type = String(v.job_type).trim()
+      }
       await apiFetch(`/api/tickets/${ticketId}/time-tracker`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -197,6 +226,7 @@ export default function TabTimeTracker({
     setEditingSession(session)
     editForm.setFieldsValue({
       range: [dayjs(session.start_time as string), dayjs(session.stop_time as string)],
+      job_type: (session.job_type as string | null | undefined) ?? undefined,
     })
     setEditOpen(true)
   }
@@ -223,6 +253,8 @@ export default function TabTimeTracker({
           session_id: editingSession.id,
           start_time: start.toISOString(),
           stop_time: end.toISOString(),
+          job_type:
+            v.job_type != null && String(v.job_type).trim() !== '' ? String(v.job_type).trim() : null,
         }),
       })
       message.success('Time entry updated')
@@ -329,7 +361,18 @@ export default function TabTimeTracker({
           </Button>
         </Flex>
         <Space orientation="vertical" style={{ width: '100%' }} size="middle">
-          <Space wrap>
+          <Space wrap align="center">
+            {jobTypeOptions.length > 0 ? (
+              <Select
+                style={{ minWidth: 200, maxWidth: 320 }}
+                placeholder="Job type"
+                value={timerJobType ?? undefined}
+                onChange={(v) => setTimerJobType(v ?? null)}
+                options={jobTypeOptions.map((o) => ({ value: o.slug, label: o.title }))}
+                disabled={!!activeTimeTracker}
+                allowClear
+              />
+            ) : null}
             {activeTimeTracker ? (
               <>
                 <Button
@@ -350,7 +393,7 @@ export default function TabTimeTracker({
               <Button
                 type="primary"
                 icon={<PlayCircleOutlined />}
-                onClick={onStartTimeTracker}
+                onClick={() => void onStartTimeTracker(timerJobType)}
                 loading={timeTrackerLoading}
               >
                 Start Timer
@@ -456,6 +499,11 @@ export default function TabTimeTracker({
                           {session.tracker_type === 'timer' && completed ? (
                             <Tag color="blue">Timer</Tag>
                           ) : null}
+                          {(session.job_type_title as string | null) || (session.job_type as string | null) ? (
+                            <Tag color="purple">
+                              {(session.job_type_title as string) || (session.job_type as string)}
+                            </Tag>
+                          ) : null}
                         </Space>
                       }
                       description={
@@ -527,6 +575,19 @@ export default function TabTimeTracker({
               />
             </Form.Item>
           ) : null}
+          <Form.Item
+            name="job_type"
+            label="Job type"
+            rules={jobTypeOptions.length ? [{ required: true, message: 'Select job type' }] : []}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="What was this work for?"
+              style={{ width: '100%' }}
+              options={jobTypeOptions.map((o) => ({ value: o.slug, label: o.title }))}
+            />
+          </Form.Item>
           <Space wrap>
             <Form.Item
               name="hours"
@@ -604,6 +665,16 @@ export default function TabTimeTracker({
               format="YYYY-MM-DD HH:mm"
               disabledDate={disabledDateNotAfterToday}
               disabledTime={(d) => getDisabledTimeNotAfterNow(d)}
+            />
+          </Form.Item>
+          <Form.Item name="job_type" label="Job type">
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="What was this work for?"
+              style={{ width: '100%' }}
+              options={jobTypeOptions.map((o) => ({ value: o.slug, label: o.title }))}
             />
           </Form.Item>
         </Form>

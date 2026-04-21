@@ -13,6 +13,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core'
@@ -64,7 +65,7 @@ export const companies = pgTable('companies', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
 
-/** End-of-day snapshot of companies.active_* for reporting; one row per company per calendar day (UTC). */
+/** Company Log: end-of-day snapshot of companies.active_*; one row per company per UTC calendar day (cron + manual). */
 export const companyDailyActiveAssignments = pgTable(
   'company_daily_active_assignments',
   {
@@ -304,12 +305,23 @@ export const ticketAttributs = pgTable(
 export const ticketTimeTrackerTypes = ['timer', 'manual'] as const
 export type TicketTimeTrackerType = (typeof ticketTimeTrackerTypes)[number]
 
+/** Work category for time sessions; slug stored on tracker (no join for list rows). */
+export const jobTypes = pgTable('job_types', {
+  slug: varchar('slug', { length: 64 }).primaryKey(),
+  title: varchar('title', { length: 255 }).notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: ts('created_at').notNull().defaultNow(),
+})
+
 export const ticketTimeTracker = pgTable('ticket_time_tracker', {
   id: uuid('id').primaryKey().defaultRandom(),
   ticketId: integer('ticket_id').notNull(),
   userId: uuid('user_id').notNull(),
   /** timer | manual — enables parallel timer sessions across tickets; manual rows are closed entries */
   trackerType: varchar('tracker_type', { length: 32 }).notNull().default('timer'),
+  /** job_types.slug — what this session was for (string; title resolved in API via catalog map). */
+  jobType: varchar('job_type', { length: 64 }).references(() => jobTypes.slug, { onDelete: 'set null' }),
   startTime: ts('start_time').notNull(),
   stopTime: ts('stop_time'),
   durationSeconds: integer('duration_seconds'),
@@ -657,6 +669,28 @@ export const customerTimeReportDefaults = pgTable('customer_time_report_defaults
   updatedAt: ts('updated_at').notNull().defaultNow(),
   updatedBy: uuid('updated_by'),
 })
+
+/** Customer time report — saved recap for a full calendar month or full ISO week (see `New Feature` spec). */
+export const recapSnapshots = pgTable(
+  'recap_snapshots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    title: varchar('title', { length: 500 }).notNull(),
+    periodStart: date('period_start').notNull(),
+    periodEnd: date('period_end').notNull(),
+    periodType: varchar('period_type', { length: 16 }).notNull(),
+    teamIds: jsonb('team_ids').notNull().$type<string[]>(),
+    teamKey: varchar('team_key', { length: 2000 }).notNull(),
+    payload: jsonb('payload').notNull(),
+    createdBy: uuid('created_by'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('recap_snapshots_upsert_idx').on(t.teamKey, t.periodStart, t.periodEnd, t.title),
+    index('recap_snapshots_period_idx').on(t.periodStart, t.periodEnd),
+  ]
+)
 
 /** Dashboard announcements: title preview on dashboard, full body in modal; optional role targeting (see KB roles). */
 export const dashboardAnnouncements = pgTable('dashboard_announcements', {

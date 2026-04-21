@@ -3,8 +3,65 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { isAdminOrManager } from '@/lib/auth-utils'
-import { companies, db, ticketPriorities,tickets, ticketTimeTracker } from '@/lib/db'
+import {
+  companies,
+  companyDailyActiveAssignments,
+  db,
+  jobTypes,
+  ticketPriorities,
+  tickets,
+  ticketTimeTracker,
+} from '@/lib/db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
+
+type CompanyRow = typeof companies.$inferSelect
+
+type JobAggCell = { seconds: number; ticketIds: Set<number> }
+
+function makeCompanySummary(
+  companyIds: string[],
+  companyById: Map<string, CompanyRow>,
+  logAggMap: Map<string, { days: number; hours: number }>,
+  ticketCountByCompany: Map<string, number>,
+  trackerSecondsByCompany: Map<string, number>,
+  byCompanyJob: Map<string, Map<string, JobAggCell>>,
+  jobTitleBySlug: Map<string, string>
+) {
+  return companyIds.map((id) => {
+    const log = logAggMap.get(id) ?? { days: 0, hours: 0 }
+    const planHours = companyById.get(id)?.activeTime ?? 0
+    const ticketCount = ticketCountByCompany.get(id) ?? 0
+    const trSec = trackerSecondsByCompany.get(id) ?? 0
+    const trHours = trSec / 3600
+    const avgLogVsTrackerPct =
+      trHours > 0 ? Math.round((log.hours / trHours) * 10000) / 100 : null
+    const avgHoursPerLogDay =
+      log.days > 0 ? Math.round((log.hours / log.days) * 100) / 100 : null
+
+    const jm = byCompanyJob.get(id) ?? new Map<string, JobAggCell>()
+    const by_job_type = [...jm.entries()]
+      .map(([slug, v]) => ({
+        slug: slug.length ? slug : null,
+        title: slug.length ? (jobTitleBySlug.get(slug) ?? slug) : 'Unspecified',
+        ticket_count: v.ticketIds.size,
+        reported_seconds: v.seconds,
+      }))
+      .sort((a, b) => b.reported_seconds - a.reported_seconds)
+
+    return {
+      company_id: id,
+      company_name: companyById.get(id)?.name ?? null,
+      plan_active_time_hours: planHours,
+      log_days_count: log.days,
+      log_total_active_time_hours: log.hours,
+      ticket_count: ticketCount,
+      total_tracker_reported_seconds: trSec,
+      avg_log_vs_tracker_percent: avgLogVsTrackerPct,
+      avg_hours_per_log_day: avgHoursPerLogDay,
+      by_job_type,
+    }
+  })
+}
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role
@@ -130,35 +187,71 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Invalid end' }, { status: 400 })
   }
 
-  const emptyResponse = () =>
-    NextResponse.json({
-      companies: companiesPayload,
-      filters: {
-        start: startParam,
-        end: endParam,
-        status: statusSlugs,
-        urgent_only: urgentOnly,
-        company_ids: companyIds,
-      },
-      summary: {
-        ticket_count: 0,
-        completed_ticket_count: 0,
-        urgent_ticket_count: 0,
-        total_reported_seconds: 0,
-        session_count: 0,
-        untouched_ticket_count: 0,
-      },
-      tickets: [],
-    })
+  const hasDateWindow = startDate != null || endDate != null
+
+  const logConds = [inArray(companyDailyActiveAssignments.companyId, companyIds)]
+  if (startDate) {
+    logConds.push(gte(companyDailyActiveAssignments.snapshotDate, startDate.toISOString().slice(0, 10)))
+  }
+  if (endDate) {
+    logConds.push(lte(companyDailyActiveAssignments.snapshotDate, endDate.toISOString().slice(0, 10)))
+  }
+
+  const [logAggRows, jobTypeRows] = await Promise.all([
+    db
+      .select({
+        companyId: companyDailyActiveAssignments.companyId,
+        days: sql<number>`count(*)::int`,
+        hours: sql<number>`coalesce(sum(${companyDailyActiveAssignments.activeTime}), 0)::int`,
+      })
+      .from(companyDailyActiveAssignments)
+      .where(and(...logConds))
+      .groupBy(companyDailyActiveAssignments.companyId),
+    db.select({ slug: jobTypes.slug, title: jobTypes.title }).from(jobTypes),
+  ])
+
+  const logAggMap = new Map<string, { days: number; hours: number }>()
+  for (const lr of logAggRows) {
+    logAggMap.set(lr.companyId, { days: Number(lr.days), hours: Number(lr.hours) })
+  }
+  const jobTitleBySlug = new Map(jobTypeRows.map((r) => [r.slug, r.title]))
+
+  const emptyTicketPayload = () => ({
+    companies: companiesPayload,
+    filters: {
+      start: startParam,
+      end: endParam,
+      status: statusSlugs,
+      urgent_only: urgentOnly,
+      company_ids: companyIds,
+    },
+    summary: {
+      ticket_count: 0,
+      completed_ticket_count: 0,
+      urgent_ticket_count: 0,
+      total_reported_seconds: 0,
+      session_count: 0,
+      untouched_ticket_count: 0,
+    },
+    tickets: [],
+    company_summary: makeCompanySummary(
+      companyIds,
+      companyById,
+      logAggMap,
+      new Map<string, number>(),
+      new Map<string, number>(),
+      new Map<string, Map<string, JobAggCell>>(),
+      jobTitleBySlug
+    ),
+  })
 
   const baseParts = ticketFilterParts(companyIds, statusSlugs, urgentOnly, urgentPriorityId)
   if (baseParts === null) {
-    return emptyResponse()
+    const p = emptyTicketPayload()
+    return NextResponse.json(p)
   }
 
   const candidateRows = await db.select().from(tickets).where(and(...baseParts))
-
-  const hasDateWindow = startDate != null || endDate != null
 
   let includedRows = candidateRows
   if (hasDateWindow) {
@@ -180,25 +273,7 @@ export async function GET(request: Request) {
 
   const includedIds = includedRows.map((t) => t.id)
   if (includedIds.length === 0) {
-    return NextResponse.json({
-      companies: companiesPayload,
-      filters: {
-        start: startParam,
-        end: endParam,
-        status: statusSlugs,
-        urgent_only: urgentOnly,
-        company_ids: companyIds,
-      },
-      summary: {
-        ticket_count: 0,
-        completed_ticket_count: 0,
-        urgent_ticket_count: 0,
-        total_reported_seconds: 0,
-        session_count: 0,
-        untouched_ticket_count: 0,
-      },
-      tickets: [],
-    })
+    return NextResponse.json(emptyTicketPayload())
   }
 
   const aggConds = [isNotNull(ticketTimeTracker.stopTime), inArray(ticketTimeTracker.ticketId, includedIds)]
@@ -216,6 +291,8 @@ export async function GET(request: Request) {
     .where(and(...aggConds))
 
   const secondsByTicket = new Map<number, number>()
+  const trackerSecondsByCompany = new Map<string, number>()
+  const byCompanyJob = new Map<string, Map<string, JobAggCell>>()
   let totalReported = 0
   for (const r of rows) {
     const sec = reportedDurationSeconds({
@@ -225,6 +302,17 @@ export async function GET(request: Request) {
     totalReported += sec
     const tid = r.ticket.id
     secondsByTicket.set(tid, (secondsByTicket.get(tid) ?? 0) + sec)
+    const cid = r.ticket.companyId
+    if (cid) {
+      trackerSecondsByCompany.set(cid, (trackerSecondsByCompany.get(cid) ?? 0) + sec)
+      const slug = r.tracker.jobType ?? ''
+      if (!byCompanyJob.has(cid)) byCompanyJob.set(cid, new Map())
+      const jm = byCompanyJob.get(cid)!
+      if (!jm.has(slug)) jm.set(slug, { seconds: 0, ticketIds: new Set() })
+      const cell = jm.get(slug)!
+      cell.seconds += sec
+      cell.ticketIds.add(tid)
+    }
   }
 
   const ticketMeta = new Map<
@@ -239,8 +327,12 @@ export async function GET(request: Request) {
     }
   >()
 
+  const ticketCountByCompany = new Map<string, number>()
   for (const t of includedRows) {
     const cid = t.companyId
+    if (cid) {
+      ticketCountByCompany.set(cid, (ticketCountByCompany.get(cid) ?? 0) + 1)
+    }
     const ca = t.createdAt
     ticketMeta.set(t.id, {
       status: t.status,
@@ -306,5 +398,14 @@ export async function GET(request: Request) {
       untouched_ticket_count: untouchedTicketCount,
     },
     tickets: ticketList.slice(0, 500),
+    company_summary: makeCompanySummary(
+      companyIds,
+      companyById,
+      logAggMap,
+      ticketCountByCompany,
+      trackerSecondsByCompany,
+      byCompanyJob,
+      jobTitleBySlug
+    ),
   })
 }

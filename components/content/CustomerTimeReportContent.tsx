@@ -46,6 +46,7 @@ import {
   normalizeDatePreset,
   resolveDatePresetToRange,
 } from '@/lib/customer-time-report-defaults'
+import { classifyRecapPeriod, resolveReportRangeFromFormValues } from '@/lib/recap-snapshot-period'
 import { ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
 
 import AdminMainColumn from '../AdminMainColumn'
@@ -103,18 +104,75 @@ function canonicalCompanyIdsFromSaved(f: CustomerTimeReportGlobalFilters, compan
   return out
 }
 
+interface TeamOpt {
+  id: string
+  name: string
+}
+
+/** Companies whose `active_team_id` is one of the selected teams (unique). */
+function companyIdsFromTeamIds(teamIds: string[], companies: CompanyOpt[]): string[] {
+  if (!teamIds.length) return []
+  const set = new Set(teamIds.map((t) => t.toLowerCase()))
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const c of companies) {
+    const tid = c.active_team_id
+    if (!tid || !set.has(tid.toLowerCase())) continue
+    if (seen.has(c.id)) continue
+    seen.add(c.id)
+    out.push(c.id)
+  }
+  return out
+}
+
+function canonicalTeamIdsFromSaved(rawTeamIds: string[] | null | undefined, teams: TeamOpt[]): string[] {
+  if (!rawTeamIds?.length) return []
+  const byLower = new Map(teams.map((t) => [t.id.toLowerCase(), t.id]))
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const part of rawTeamIds) {
+    const id = String(part).trim()
+    if (!id) continue
+    const canon = byLower.get(id.toLowerCase())
+    if (!canon) continue
+    if (seen.has(canon)) continue
+    seen.add(canon)
+    out.push(canon)
+  }
+  return out
+}
+
 function savedFiltersToFormValues(
   f: CustomerTimeReportGlobalFilters,
   companies: CompanyOpt[],
-  statuses: StatusOpt[]
+  statuses: StatusOpt[],
+  teams: TeamOpt[]
 ): {
-  company_ids: string[]
+  team_ids: string[]
   range: [Dayjs, Dayjs] | null
   date_preset?: CustomerTimeReportDatePreset
   status_slugs: string[] | undefined
   urgent_only: boolean
 } {
-  const company_ids = canonicalCompanyIdsFromSaved(f, companies)
+  const hasStoredTeams = Array.isArray(f.team_ids) && f.team_ids.length > 0
+  let team_ids: string[]
+
+  if (hasStoredTeams) {
+    team_ids = canonicalTeamIdsFromSaved(f.team_ids, teams)
+  } else {
+    const cids = canonicalCompanyIdsFromSaved(f, companies)
+    const tidSet = new Set<string>()
+    for (const cid of cids) {
+      const co = companies.find((c) => c.id.toLowerCase() === cid.toLowerCase())
+      if (co?.active_team_id) tidSet.add(co.active_team_id)
+    }
+    team_ids = [...tidSet].sort((a, b) => {
+      const na = teams.find((t) => t.id === a)?.name ?? a
+      const nb = teams.find((t) => t.id === b)?.name ?? b
+      return na.localeCompare(nb, undefined, { sensitivity: 'base' })
+    })
+  }
+
   const preset = f.date_preset ?? null
   let range: [Dayjs, Dayjs] | null = null
   if (preset) {
@@ -141,7 +199,7 @@ function savedFiltersToFormValues(
     status_slugs = out.length ? out : undefined
   }
   return {
-    company_ids,
+    team_ids,
     range,
     date_preset: preset ? preset : undefined,
     status_slugs,
@@ -164,7 +222,10 @@ function formatTicketCreatedAt(iso: string | null): { dateLine: string; ageLine:
 type TimeTrackerSessionRow = {
   id: string
   userId: string
+  user_id?: string
   tracker_type: string
+  job_type?: string | null
+  job_type_title?: string | null
   start_time: string
   stop_time: string | null
   reported_duration_seconds: number
@@ -174,6 +235,7 @@ type TimeTrackerSessionRow = {
 interface CompanyOpt {
   id: string
   name: string
+  active_team_id?: string | null
 }
 
 interface StatusOpt {
@@ -201,6 +263,26 @@ type ReportTicket = {
   has_reported_time?: boolean
 }
 
+type CompanySummaryByJobRow = {
+  slug: string | null
+  title: string
+  ticket_count: number
+  reported_seconds: number
+}
+
+type CompanySummaryRow = {
+  company_id: string
+  company_name: string | null
+  plan_active_time_hours: number
+  log_days_count: number
+  log_total_active_time_hours: number
+  ticket_count: number
+  total_tracker_reported_seconds: number
+  avg_log_vs_tracker_percent: number | null
+  avg_hours_per_log_day: number | null
+  by_job_type: CompanySummaryByJobRow[]
+}
+
 type ReportData = {
   companies: { id: string; name: string | null }[]
   filters: {
@@ -219,19 +301,22 @@ type ReportData = {
     untouched_ticket_count: number
   }
   tickets: ReportTicket[]
+  company_summary?: CompanySummaryRow[]
 }
 
 export default function CustomerTimeReportContent({ user: currentUser }: CustomerTimeReportProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [form] = Form.useForm<{
-    company_ids: string[]
+    team_ids: string[]
     range: [Dayjs, Dayjs] | null
     date_preset?: CustomerTimeReportDatePresetKey
     status_slugs: string[] | undefined
     urgent_only: boolean
     preset_title?: string
+    recap_snapshot_title?: string
   }>()
   const [companies, setCompanies] = useState<CompanyOpt[]>([])
+  const [teams, setTeams] = useState<TeamOpt[]>([])
   const [statuses, setStatuses] = useState<StatusOpt[]>([])
   const [loadingMeta, setLoadingMeta] = useState(true)
   const [reportLoading, setReportLoading] = useState(false)
@@ -246,6 +331,8 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
   const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null)
   const [savingPreset, setSavingPreset] = useState(false)
   const [deletingPreset, setDeletingPreset] = useState(false)
+  const [recapExistingId, setRecapExistingId] = useState<string | null>(null)
+  const [recapSaving, setRecapSaving] = useState(false)
   const globalDefaultsAppliedRef = useRef(false)
 
   const loadPresetsFromApi = useCallback(async (): Promise<CustomerTimeReportPresetDTO[]> => {
@@ -299,19 +386,34 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
     const load = async () => {
       setLoadingMeta(true)
       try {
-        const [cRes, sRes] = await Promise.all([
+        const [cRes, sRes, tRes] = await Promise.all([
           fetch('/api/companies', { credentials: 'include' }),
           fetch('/api/ticket-statuses', { credentials: 'include' }),
+          fetch('/api/teams', { credentials: 'include' }),
         ])
         if (!cRes.ok) throw new Error('Failed to load companies')
         if (!sRes.ok) throw new Error('Failed to load statuses')
-        const cJson = (await cRes.json()) as { data?: CompanyOpt[] }
+        const cJson = (await cRes.json()) as {
+          data?: Array<{ id: string; name: string; active_team_id?: string | null }>
+        }
         const sJson = (await sRes.json()) as StatusOpt[]
         const companyList = (cJson.data ?? []).map((r) => ({
           id: r.id,
           name: r.name,
+          active_team_id: r.active_team_id ?? null,
         }))
         setCompanies(companyList)
+        if (tRes.ok) {
+          const tJson = (await tRes.json()) as Array<{ id: string; name: string }>
+          setTeams(
+            (Array.isArray(tJson) ? tJson : []).map((r) => ({
+              id: r.id,
+              name: r.name,
+            }))
+          )
+        } else {
+          setTeams([])
+        }
         setStatuses(
           (Array.isArray(sJson) ? sJson : []).map((r) => ({
             id: r.id,
@@ -332,21 +434,20 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
   useEffect(() => {
     if (globalDefaultsAppliedRef.current || presets.length === 0 || companies.length === 0) return
     const latest = presetsSortedNewestFirst(presets)[0]
-    if (!latest?.filters?.company_ids?.length) return
-    const fields = savedFiltersToFormValues(latest.filters, companies, statuses)
-    if (fields.company_ids.length > 0) {
-      form.setFieldsValue({
-        company_ids: fields.company_ids,
-        range: fields.range ?? undefined,
-        date_preset: fields.date_preset,
-        status_slugs: fields.status_slugs,
-        urgent_only: fields.urgent_only,
-        preset_title: latest.title,
-      } as Parameters<typeof form.setFieldsValue>[0])
-      setSelectedPresetId(latest.id)
-      globalDefaultsAppliedRef.current = true
-    }
-  }, [presets, companies, statuses, form])
+    if (!latest?.filters) return
+    const fields = savedFiltersToFormValues(latest.filters, companies, statuses, teams)
+    if (fields.team_ids.length === 0) return
+    form.setFieldsValue({
+      team_ids: fields.team_ids,
+      range: fields.range ?? undefined,
+      date_preset: fields.date_preset,
+      status_slugs: fields.status_slugs,
+      urgent_only: fields.urgent_only,
+      preset_title: latest.title,
+    } as Parameters<typeof form.setFieldsValue>[0])
+    setSelectedPresetId(latest.id)
+    globalDefaultsAppliedRef.current = true
+  }, [presets, companies, statuses, teams, form])
 
   const buildQuery = useCallback(
     (values: {
@@ -378,13 +479,24 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
 
   const applyPresetToForm = useCallback(
     (preset: CustomerTimeReportPresetDTO) => {
-      const fields = savedFiltersToFormValues(preset.filters, companies, statuses)
-      if (fields.company_ids.length === 0) {
-        message.warning('Preset has no companies you can access; edit companies and save again')
+      const fields = savedFiltersToFormValues(preset.filters, companies, statuses, teams)
+      if (fields.team_ids.length === 0) {
+        message.warning(
+          'Preset has no teams to restore (companies may lack an active team). Assign active teams on companies and save again.'
+        )
         return
       }
+      const fromCanonical = canonicalCompanyIdsFromSaved(preset.filters, companies)
+      const fromTeams = companyIdsFromTeamIds(fields.team_ids, companies)
+      const legacyNoTeamStored =
+        !preset.filters.team_ids || preset.filters.team_ids.length === 0
+      if (legacyNoTeamStored && fromCanonical.length > fromTeams.length) {
+        message.warning(
+          `${fromCanonical.length - fromTeams.length} company(ies) from this preset had no active team and are skipped until each has an active team.`
+        )
+      }
       form.setFieldsValue({
-        company_ids: fields.company_ids,
+        team_ids: fields.team_ids,
         range: fields.range ?? undefined,
         date_preset: fields.date_preset,
         status_slugs: fields.status_slugs,
@@ -393,23 +505,25 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       } as Parameters<typeof form.setFieldsValue>[0])
       message.success(`Loaded: ${preset.title}`)
     },
-    [companies, statuses, form]
+    [companies, statuses, teams, form]
   )
 
   const buildFiltersFromForm = useCallback(() => {
     const v = form.getFieldsValue() as {
-      company_ids?: string[]
+      team_ids?: string[]
       range?: [Dayjs, Dayjs] | null
       date_preset?: CustomerTimeReportDatePreset
       status_slugs?: string[]
       urgent_only?: boolean
       preset_title?: string
     }
-    const ids = [...new Set((v.company_ids ?? []).map((id) => String(id).trim()).filter(Boolean))]
-    if (ids.length === 0) return null
+    const teamIds = [...new Set((v.team_ids ?? []).map((id) => String(id).trim()).filter(Boolean))]
+    const company_ids = companyIdsFromTeamIds(teamIds, companies)
+    if (company_ids.length === 0) return null
     const datePreset = normalizeDatePreset(v.date_preset)
     const filters: CustomerTimeReportGlobalFilters = {
-      company_ids: ids,
+      company_ids,
+      team_ids: teamIds,
       date_preset: datePreset,
       start: datePreset
         ? null
@@ -419,13 +533,13 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       urgent_only: Boolean(v.urgent_only),
     }
     return filters
-  }, [form])
+  }, [form, companies])
 
   const saveNewPreset = useCallback(async () => {
     const v = form.getFieldsValue() as { preset_title?: string }
     const filters = buildFiltersFromForm()
     if (!filters) {
-      message.warning('Select at least one company before saving')
+      message.warning('Select at least one team with at least one company before saving')
       return
     }
     setSavingPreset(true)
@@ -466,7 +580,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
     const v = form.getFieldsValue() as { preset_title?: string }
     const filters = buildFiltersFromForm()
     if (!filters) {
-      message.warning('Select at least one company before saving')
+      message.warning('Select at least one team with at least one company before saving')
       return
     }
     setSavingPreset(true)
@@ -524,22 +638,97 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
     [presets, selectedPresetId]
   )
 
-  const companySelectOptions = useMemo(() => {
-    const opts = companies.map((c) => ({ value: c.id, label: c.name }))
+  const teamSelectOptions = useMemo(() => {
+    const opts = teams.map((t) => ({ value: t.id, label: t.name }))
     const lowerSeen = new Set(opts.map((o) => o.value.toLowerCase()))
     for (const p of presets) {
-      for (const raw of p.filters.company_ids ?? []) {
+      for (const raw of p.filters.team_ids ?? []) {
         const id = String(raw).trim()
         if (!id || lowerSeen.has(id.toLowerCase())) continue
         lowerSeen.add(id.toLowerCase())
         opts.push({
           value: id,
-          label: `Company (${id.slice(0, 8)}…)`,
+          label: `Team (${id.slice(0, 8)}…)`,
+        })
+      }
+      for (const raw of p.filters.company_ids ?? []) {
+        const cid = String(raw).trim()
+        if (!cid) continue
+        const co = companies.find((c) => c.id.toLowerCase() === cid.toLowerCase())
+        const tid = co?.active_team_id
+        if (!tid || lowerSeen.has(tid.toLowerCase())) continue
+        lowerSeen.add(tid.toLowerCase())
+        opts.push({
+          value: tid,
+          label: `Team (${tid.slice(0, 8)}…)`,
         })
       }
     }
     return opts
-  }, [companies, presets])
+  }, [teams, companies, presets])
+
+  const watchedTeamIds = Form.useWatch('team_ids', form) as string[] | undefined
+  const watchedRangeForRecap = Form.useWatch('range', form) as [Dayjs, Dayjs] | null | undefined
+  const watchedPresetForRecap = Form.useWatch('date_preset', form) as CustomerTimeReportDatePresetKey | undefined
+  const watchedRecapTitle = Form.useWatch('recap_snapshot_title', form) as string | undefined
+
+  const derivedCompaniesSummary = useMemo(() => {
+    const ids = companyIdsFromTeamIds(watchedTeamIds ?? [], companies)
+    if (ids.length === 0) return '—'
+    return ids
+      .map((id) => companies.find((c) => c.id === id)?.name ?? id.slice(0, 8))
+      .join(', ')
+  }, [watchedTeamIds, companies])
+
+  const recapPeriodResolved = useMemo(
+    () =>
+      resolveReportRangeFromFormValues({
+        range: watchedRangeForRecap ?? null,
+        date_preset: watchedPresetForRecap,
+      }),
+    [watchedRangeForRecap, watchedPresetForRecap]
+  )
+
+  const recapPeriodKind = useMemo(() => {
+    if (!recapPeriodResolved) return null
+    return classifyRecapPeriod(recapPeriodResolved.start, recapPeriodResolved.end)
+  }, [recapPeriodResolved])
+
+  const recapEligible = Boolean(recapPeriodKind && (watchedTeamIds?.length ?? 0) > 0)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!recapEligible || !recapPeriodResolved) {
+        if (!cancelled) setRecapExistingId(null)
+        return
+      }
+      const title = (watchedRecapTitle ?? '').trim()
+      if (!title) {
+        if (!cancelled) setRecapExistingId(null)
+        return
+      }
+      const ps = recapPeriodResolved.start.format('YYYY-MM-DD')
+      const pe = recapPeriodResolved.end.format('YYYY-MM-DD')
+      const qs = new URLSearchParams({
+        title,
+        period_start: ps,
+        period_end: pe,
+        team_ids: (watchedTeamIds ?? []).join(','),
+      })
+      try {
+        const res = await fetch(`/api/reports/recap-snapshot?${qs.toString()}`, { credentials: 'include' })
+        if (!res.ok || cancelled) return
+        const j = (await res.json()) as { id: string | null }
+        if (!cancelled) setRecapExistingId(j.id)
+      } catch {
+        if (!cancelled) setRecapExistingId(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [recapEligible, recapPeriodResolved, watchedTeamIds, watchedRecapTitle])
 
   const statusSelectOptions = useMemo(() => {
     const opts = statuses.map((s) => ({ value: s.slug, label: ticketStatusDisplayLabel(s) }))
@@ -559,7 +748,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
 
   const fetchReport = async () => {
     let values: {
-      company_ids: string[]
+      team_ids: string[]
       range?: [Dayjs, Dayjs] | null
       date_preset?: CustomerTimeReportDatePreset
       status_slugs?: string[]
@@ -570,9 +759,15 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
     } catch {
       return
     }
-    const qs = buildQuery(values)
+    const teamIds = [...new Set((values.team_ids ?? []).map((id) => String(id).trim()).filter(Boolean))]
+    const company_ids = companyIdsFromTeamIds(teamIds, companies)
+    if (company_ids.length === 0) {
+      message.warning('No companies use the selected team(s) as active team. Assign teams on companies in Settings.')
+      return
+    }
+    const qs = buildQuery({ ...values, company_ids })
     if (!qs) {
-      message.warning('Select at least one company')
+      message.warning('Select at least one team')
       return
     }
     setReportLoading(true)
@@ -591,6 +786,45 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
     }
   }
 
+  const saveRecapSnapshot = useCallback(async () => {
+    if (!recapPeriodResolved || !recapPeriodKind) {
+      message.warning('Recap snapshot needs a full calendar month or full ISO week and at least one team.')
+      return
+    }
+    const title = String(form.getFieldValue('recap_snapshot_title') ?? '').trim()
+    if (!title) {
+      message.warning('Enter a recap title before saving.')
+      return
+    }
+    const team_ids = [...new Set((form.getFieldValue('team_ids') as string[] | undefined) ?? [])].filter(Boolean)
+    if (team_ids.length === 0) {
+      message.warning('Select at least one team.')
+      return
+    }
+    setRecapSaving(true)
+    try {
+      const res = await fetch('/api/reports/recap-snapshot', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          team_ids,
+          period_start: recapPeriodResolved.start.format('YYYY-MM-DD'),
+          period_end: recapPeriodResolved.end.format('YYYY-MM-DD'),
+        }),
+      })
+      const j = (await res.json().catch(() => ({}))) as { error?: string; id?: string; updated?: boolean }
+      if (!res.ok) throw new Error(j.error || res.statusText)
+      if (j.id) setRecapExistingId(j.id)
+      message.success(j.updated ? 'Recap snapshot updated' : 'Recap snapshot saved')
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setRecapSaving(false)
+    }
+  }, [form, recapPeriodResolved, recapPeriodKind])
+
   const multiCompany = (report?.companies?.length ?? 0) > 1
 
   const chartRows = useMemo(() => {
@@ -603,7 +837,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
         const prefix = multiCompany && t.company_name ? `${t.company_name} · ` : ''
         return {
           key: String(t.id),
-          label: truncateLabel(prefix + base, multiCompany ? 36 : 42),
+          label: truncateLabel('#'+t.id+' '+ base, 42),
           hours: hoursFromSeconds(t.reported_seconds),
           fullTitle: prefix + base,
         }
@@ -614,6 +848,108 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
     if (!report?.tickets) return []
     return [...report.tickets].sort((a, b) => b.reported_seconds - a.reported_seconds)
   }, [report])
+
+  const companySummaryData = useMemo(() => {
+    const rows = report?.company_summary
+    if (!rows?.length) return []
+    return [...rows]
+  }, [report?.company_summary])
+
+  const companySummaryColumns: ColumnsType<CompanySummaryRow> = useMemo(
+    () => [
+      {
+        title: 'Company Name',
+        key: 'company',
+
+        fixed: 'left',
+        ellipsis: true,
+        render: (_: unknown, r) => <Text strong>{r.company_name ?? r.company_id}</Text>,
+      },
+      {
+        title: 'Plan Package',
+        dataIndex: 'plan_active_time_hours',
+        width: 150,
+        align: 'center',
+        render: (v: number) => (Number(v) || 0).toLocaleString(),
+      },
+      {
+        title: 'Days work',
+        dataIndex: 'log_days_count',
+        width: 150,
+        align: 'center',
+        render: (v: number) => (Number(v) || 0).toLocaleString(),
+      },
+      {
+        title: 'Total Hours',
+        dataIndex: 'log_total_active_time_hours',
+        width: 150,
+        align: 'center',
+        render: (v: number) => (Number(v) || 0).toLocaleString(),
+      },
+      {
+        title: 'Total Tickets',
+        dataIndex: 'ticket_count',
+        width: 150,
+        align: 'center',
+        render: (v: number) => (Number(v) || 0).toLocaleString(),
+      },
+      {
+        title: 'Total Time Spent (in hours)',
+        dataIndex: 'total_tracker_reported_seconds',
+        width: 140,
+        align: 'center',
+        render: (sec: number) => (Number(sec) || 0).toLocaleString(),
+      },
+      {
+        title: 'Average Time Spent (in percent)',
+        dataIndex: 'avg_log_vs_tracker_percent',
+        width: 150,
+        align: 'center',
+        render: (pct: number | null) =>
+          pct == null ? <Text type="secondary">—</Text> : <Text>{pct}%</Text>,
+      },
+      {
+        title: 'Average Time Spent (per days)',
+        dataIndex: 'avg_hours_per_log_day',
+        width: 150,
+        align: 'center',
+        render: (h: number | null) =>
+          h == null ? <Text type="secondary">—</Text> : <Text>{h}</Text>,
+      },
+    ],
+    []
+  )
+
+  const jobBreakdownColumns: ColumnsType<CompanySummaryByJobRow> = useMemo(
+    () => [
+      {
+        title: 'Job type',
+        dataIndex: 'title',
+        key: 'title',
+        ellipsis: true,
+        render: (t: string, r) => (
+          <Text ellipsis={{ tooltip: true }}>
+            {t}
+            {r.slug ? <Text type="secondary"> ({r.slug})</Text> : null}
+          </Text>
+        ),
+      },
+      {
+        title: 'Tickets',
+        dataIndex: 'ticket_count',
+        width: 88,
+        align: 'right',
+      },
+      {
+        title: 'Reported time',
+        dataIndex: 'reported_seconds',
+        width: 120,
+        align: 'right',
+        render: (sec: number) => formatDuration(Number(sec) || 0),
+      },
+    ],
+    []
+  )
 
   const workersByPerson = useMemo(() => {
     const m = new Map<string, { label: string; seconds: number; sessions: number }>()
@@ -641,6 +977,18 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       dataIndex: 'tracker_type',
       width: 88,
       render: (t: string) => <Tag>{t || '—'}</Tag>,
+    },
+    {
+      title: 'Job',
+      key: 'job',
+      width: 140,
+      ellipsis: true,
+      render: (_: unknown, s) =>
+        s.job_type_title || s.job_type ? (
+          <Text ellipsis>{s.job_type_title || s.job_type}</Text>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
     },
     {
       title: 'Started',
@@ -793,18 +1141,23 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                   C Report
                 </Title>
                 <Text type="secondary" style={{ fontSize: 13 }}>
-                  Select one or more companies. Tickets with no completed time in the period still appear (0 reported,
-                  “Not tracked”). Date range: include if the ticket was created in range or any time session overlaps the
-                  range (including running timers). Reported seconds use completed sessions that overlap the range. You can
-                  save many named presets for everyone with access; Saved filters loads one into the fields below. Rolling
-                  date presets (this month, last week, …) are saved by name and recomputed when you load the report. Save as
-                  new adds a row; Update overwrites the preset selected in the dropdown.
+                  Choose one or more <Text strong>teams</Text>; companies are included automatically when their{' '}
+                  <Text strong>active team</Text> matches (Settings → company). Tickets with no completed time in the
+                  period still appear (0 reported, “Not tracked”). Date range: include if the ticket was created in range or
+                  any time session overlaps the range (including running timers). Reported seconds use completed sessions
+                  that overlap the range. Saved presets store teams and derived companies; rolling date presets are
+                  recomputed when you load the report.
                 </Text>
               </div>
             </Flex>
             <Divider style={{ margin: '12px 0 20px' }} />
 
-            <Form form={form} layout="vertical" initialValues={{ urgent_only: false }} onFinish={fetchReport}>
+            <Form
+              form={form}
+              layout="vertical"
+              initialValues={{ urgent_only: false, team_ids: [], recap_snapshot_title: '' }}
+              onFinish={fetchReport}
+            >
               <Row gutter={[16, 16]}>
                 <Col xs={24} lg={12} xl={10}>
                   <Form.Item
@@ -847,14 +1200,14 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
               <Row gutter={[16, 16]}>
                 <Col xs={24} lg={8}>
                   <Form.Item
-                    name="company_ids"
-                    label={<Text strong>Companies</Text>}
+                    name="team_ids"
+                    label={<Text strong>Teams</Text>}
                     rules={[
-                      { required: true, message: 'Select at least one company' },
+                      { required: true, message: 'Select at least one team' },
                       {
                         type: 'array',
                         min: 1,
-                        message: 'Select at least one company',
+                        message: 'Select at least one team',
                       },
                     ]}
                   >
@@ -863,13 +1216,16 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                       allowClear
                       showSearch
                       optionFilterProp="label"
-                      placeholder="Select one or more companies"
+                      placeholder="Select team(s) — companies follow active team"
                       size="large"
                       maxTagCount="responsive"
-                      options={companySelectOptions}
+                      options={teamSelectOptions}
                       loading={loadingMeta}
                     />
                   </Form.Item>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: -8, marginBottom: 8 }}>
+                    Companies in scope: {derivedCompaniesSummary}
+                  </Text>
                 </Col>
                 <Col xs={24} lg={10}>
                   <Form.Item
@@ -929,6 +1285,25 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                   </Form.Item>
                 </Col>
               </Row>
+              {recapEligible ? (
+                <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 8 }}>
+                  <Col xs={24}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                      <Text strong>Recap snapshot</Text> — range is a full{' '}
+                      {recapPeriodKind === 'month' ? 'calendar month' : 'ISO week (Mon–Sun)'}. Saves company log +
+                      tracker totals for the selected teams (
+                      <Text code>New Feature</Text> rules). Enter a title; the button switches to Update when a row
+                      already exists for the same title, period, and teams.
+                    </Text>
+                    <Form.Item name="recap_snapshot_title" label={<Text strong>Recap title</Text>}>
+                      <Input placeholder="e.g. January 2026 — SEO team" maxLength={500} showCount />
+                    </Form.Item>
+                    <Button type="default" size="large" loading={recapSaving} onClick={() => void saveRecapSnapshot()}>
+                      {recapExistingId ? 'Update recap snapshot' : 'Save recap snapshot'}
+                    </Button>
+                  </Col>
+                </Row>
+              ) : null}
               <Flex gap={12} wrap="wrap" align="center">
                 <Button type="primary" htmlType="submit" size="large" loading={reportLoading}>
                   Load report
@@ -1036,6 +1411,47 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                     </Col>
                   ))}
                 </Row>
+
+                <div className="customer-time-report-section-title" style={{ marginTop: 8 }}>
+                  <Text strong>Summary by company</Text>
+                </div>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
+                  Company log (days and total h) uses <Text code>company_daily_active_assignments</Text>
+                  {report.filters.start || report.filters.end
+                    ? ', filtered by the same start/end dates as this report (UTC calendar day).'
+                    : ' (all snapshot rows for the selected companies).'}{' '}
+                  Tracker totals count completed sessions in scope (same rules as the chart and ticket list). Expand a
+                  row for tickets and time by <Text code>job_type</Text>.
+                </Text>
+                <div className="customer-time-report-table-wrap">
+                  <Table<CompanySummaryRow>
+                    rowKey="company_id"
+                    size="small"
+                    bordered
+                    columns={companySummaryColumns}
+                    dataSource={companySummaryData}
+                    loading={reportLoading}
+                    pagination={false}
+                    scroll={{ x: 1100 }}
+                    expandable={{
+                      expandedRowRender: (r) =>
+                        r.by_job_type.length > 0 ? (
+                          <Table<CompanySummaryByJobRow>
+                            size="small"
+                            bordered
+                            pagination={false}
+                            rowKey={(j) => `${r.company_id}-${j.slug ?? 'none'}`}
+                            dataSource={r.by_job_type}
+                            columns={jobBreakdownColumns}
+                          />
+                        ) : (
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            No completed tracker time in scope for this company (or no sessions with a job type).
+                          </Text>
+                        ),
+                    }}
+                  />
+                </div>
 
                 {chartRows.length > 0 ? (
                   <>

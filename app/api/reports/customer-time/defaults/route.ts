@@ -76,11 +76,15 @@ export async function POST(request: Request) {
   )
 
   if (parsed.company_ids.length === 0) {
-    return NextResponse.json({ error: 'Select at least one company to save' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Select at least one team that includes companies (active team) to save' },
+      { status: 400 }
+    )
   }
 
   const filters: CustomerTimeReportGlobalFilters = {
     company_ids: parsed.company_ids,
+    team_ids: parsed.team_ids,
     start: parsed.start,
     end: parsed.end,
     date_preset: parsed.date_preset,

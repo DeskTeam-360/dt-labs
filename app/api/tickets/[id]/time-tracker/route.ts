@@ -4,17 +4,43 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { isAdmin, isAdminOrManager } from '@/lib/auth-utils'
 import { db, ticketTimeTracker, users } from '@/lib/db'
+import { assertValidJobTypeSlugOrNull, loadActiveJobTypeTitleMap } from '@/lib/job-types-db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
+
+/** When body omits `job_type` key entirely, returns `undefined` so callers can skip updating the column. */
+async function normalizeJobTypeFromBodyOptional(
+  body: Record<string, unknown>
+): Promise<string | null | undefined> {
+  if (!Object.prototype.hasOwnProperty.call(body, 'job_type')) return undefined
+  const raw = body.job_type
+  if (raw === null || raw === undefined || raw === '') {
+    return null
+  }
+  if (typeof raw !== 'string') {
+    throw new Error('job_type must be a string or null')
+  }
+  const s = raw.trim().slice(0, 64)
+  if (s === '') {
+    return null
+  }
+  await assertValidJobTypeSlugOrNull(s)
+  return s
+}
 
 function mapTrackerRow(
   t: typeof ticketTimeTracker.$inferSelect,
-  user: typeof users.$inferSelect | null = null
+  user: typeof users.$inferSelect | null = null,
+  titleMap?: Map<string, string>
 ) {
+  const slug = t.jobType ?? null
+  const job_type_title = slug && titleMap?.get(slug) != null ? titleMap.get(slug) ?? null : null
   return {
     id: t.id,
     ticketId: t.ticketId,
     userId: t.userId,
     tracker_type: t.trackerType,
+    job_type: slug,
+    job_type_title,
     start_time: t.startTime,
     stop_time: t.stopTime,
     duration_seconds: t.durationSeconds,
@@ -87,7 +113,8 @@ export async function GET(
     .orderBy(desc(ticketTimeTracker.createdAt))
     .limit(activeOnly ? 1 : 100)
 
-  const result = rows.map((r) => mapTrackerRow(r.tracker, r.user))
+  const titleMap = await loadActiveJobTypeTitleMap()
+  const result = rows.map((r) => mapTrackerRow(r.tracker, r.user, titleMap))
 
   return NextResponse.json(activeOnly ? (result[0] ?? null) : result)
 }
@@ -111,21 +138,29 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid ticket ID' }, { status: 400 })
   }
 
-  const body = await request.json()
+  const body = (await request.json()) as Record<string, unknown>
   const action = body.action // 'start' | 'stop'
 
   if (action === 'start') {
-    const [row] = await db
-      .insert(ticketTimeTracker)
-      .values({
-        ticketId: ticketId,
-        userId: session.user.id,
-        trackerType: 'timer',
-        startTime: new Date(),
-      })
-      .returning()
+    let jobTypeVal: string | null | undefined
+    try {
+      jobTypeVal = await normalizeJobTypeFromBodyOptional(body)
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 400 })
+    }
+    const values: typeof ticketTimeTracker.$inferInsert = {
+      ticketId: ticketId,
+      userId: session.user.id,
+      trackerType: 'timer',
+      startTime: new Date(),
+    }
+    if (jobTypeVal !== undefined) {
+      values.jobType = jobTypeVal
+    }
+    const [row] = await db.insert(ticketTimeTracker).values(values).returning()
 
-    return NextResponse.json(mapTrackerRow(row, null))
+    const titleMap = await loadActiveJobTypeTitleMap()
+    return NextResponse.json(mapTrackerRow(row, null, titleMap))
   }
 
   if (action === 'manual') {
@@ -164,20 +199,28 @@ export async function POST(
       targetUserId = uid
     }
 
-    const [row] = await db
-      .insert(ticketTimeTracker)
-      .values({
-        ticketId,
-        userId: targetUserId,
-        trackerType: 'manual',
-        startTime,
-        stopTime,
-        durationSeconds: capped,
-        durationAdjustment: capped,
-      })
-      .returning()
+    let jobTypeVal: string | null | undefined
+    try {
+      jobTypeVal = await normalizeJobTypeFromBodyOptional(body)
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 400 })
+    }
+    const manualValues: typeof ticketTimeTracker.$inferInsert = {
+      ticketId,
+      userId: targetUserId,
+      trackerType: 'manual',
+      startTime,
+      stopTime,
+      durationSeconds: capped,
+      durationAdjustment: capped,
+    }
+    if (jobTypeVal !== undefined) {
+      manualValues.jobType = jobTypeVal
+    }
+    const [row] = await db.insert(ticketTimeTracker).values(manualValues).returning()
 
-    return NextResponse.json(mapTrackerRow(row, null))
+    const titleMap = await loadActiveJobTypeTitleMap()
+    return NextResponse.json(mapTrackerRow(row, null, titleMap))
   }
 
   if (action === 'stop') {
@@ -237,15 +280,59 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid ticket ID' }, { status: 400 })
   }
 
-  const body = await request.json().catch(() => ({}))
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
   const sessionId = body.session_id as string | undefined
   const startRaw = body.start_time as string | undefined
   const stopRaw = body.stop_time as string | undefined
+  const hasJobTypeKey = Object.prototype.hasOwnProperty.call(body, 'job_type')
+
   const adjustOnly =
     sessionId &&
     body.duration_adjustment !== undefined &&
     startRaw === undefined &&
     stopRaw === undefined
+
+  const jobTypeOnly =
+    sessionId &&
+    hasJobTypeKey &&
+    startRaw === undefined &&
+    stopRaw === undefined &&
+    body.duration_adjustment === undefined
+
+  const titleMap = await loadActiveJobTypeTitleMap()
+
+  if (jobTypeOnly) {
+    let jobTypeVal: string | null | undefined
+    try {
+      jobTypeVal = await normalizeJobTypeFromBodyOptional(body)
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 400 })
+    }
+
+    const [row] = await db
+      .select()
+      .from(ticketTimeTracker)
+      .where(eq(ticketTimeTracker.id, sessionId))
+      .limit(1)
+
+    if (!row || row.ticketId !== ticketId) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    }
+    if (row.userId !== session.user.id && !admin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const [updated] = await db
+      .update(ticketTimeTracker)
+      .set({ jobType: jobTypeVal ?? null })
+      .where(eq(ticketTimeTracker.id, sessionId))
+      .returning()
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Update failed' }, { status: 500 })
+    }
+    return NextResponse.json(mapTrackerRow(updated, null, titleMap))
+  }
 
   if (adjustOnly) {
     if (!isAdminOrManager(role)) {
@@ -259,6 +346,15 @@ export async function PATCH(
     }
     const MAX = 2147483647
     const capped = Math.min(adj, MAX)
+
+    let jobTypeVal: string | null | undefined
+    if (hasJobTypeKey) {
+      try {
+        jobTypeVal = await normalizeJobTypeFromBodyOptional(body)
+      } catch (e) {
+        return NextResponse.json({ error: (e as Error).message }, { status: 400 })
+      }
+    }
 
     const [row] = await db
       .select()
@@ -276,9 +372,14 @@ export async function PATCH(
       )
     }
 
+    const setPayload: Partial<typeof ticketTimeTracker.$inferInsert> = { durationAdjustment: capped }
+    if (jobTypeVal !== undefined) {
+      setPayload.jobType = jobTypeVal
+    }
+
     const [updated] = await db
       .update(ticketTimeTracker)
-      .set({ durationAdjustment: capped })
+      .set(setPayload)
       .where(eq(ticketTimeTracker.id, sessionId))
       .returning()
 
@@ -286,12 +387,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'Update failed' }, { status: 500 })
     }
 
-    return NextResponse.json(mapTrackerRow(updated, null))
+    return NextResponse.json(mapTrackerRow(updated, null, titleMap))
   }
 
   if (!sessionId || !startRaw || !stopRaw) {
     return NextResponse.json(
-      { error: 'session_id, start_time, and stop_time are required (or session_id + duration_adjustment for managers)' },
+      {
+        error:
+          'session_id, start_time, and stop_time are required (or session_id + duration_adjustment for managers, or session_id + job_type)',
+      },
       { status: 400 }
     )
   }
@@ -338,15 +442,29 @@ export async function PATCH(
     return NextResponse.json({ error: 'Duration must be at least 1 second' }, { status: 400 })
   }
 
+  let jobTypeVal: string | null | undefined
+  if (hasJobTypeKey) {
+    try {
+      jobTypeVal = await normalizeJobTypeFromBodyOptional(body)
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 400 })
+    }
+  }
+
+  const editSet: Partial<typeof ticketTimeTracker.$inferInsert> = {
+    startTime,
+    stopTime,
+    durationSeconds,
+    durationAdjustment: durationSeconds,
+    trackerType: 'manual',
+  }
+  if (jobTypeVal !== undefined) {
+    editSet.jobType = jobTypeVal
+  }
+
   const [updated] = await db
     .update(ticketTimeTracker)
-    .set({
-      startTime,
-      stopTime,
-      durationSeconds,
-      durationAdjustment: durationSeconds,
-      trackerType: 'manual',
-    })
+    .set(editSet)
     .where(eq(ticketTimeTracker.id, sessionId))
     .returning()
 
@@ -354,7 +472,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   }
 
-  return NextResponse.json(mapTrackerRow(updated, null))
+  return NextResponse.json(mapTrackerRow(updated, null, titleMap))
 }
 
 /** DELETE — remove entry (own rows). Query: ?session_id=uuid. Active timer rows can be deleted to discard. */
