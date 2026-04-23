@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { canDeleteTickets } from '@/lib/auth-utils'
 import { runAutomationRules } from '@/lib/automation-engine'
 import { db } from '@/lib/db'
 import {
@@ -21,6 +22,7 @@ import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
 import type { TicketActorRole } from '@/lib/ticket-activity-log'
 import {
   diffTicketSnapshots,
+  enrichActivityEntityLabels,
   loadTicketActivitySnapshot,
   logTicketActivity,
 } from '@/lib/ticket-activity-log'
@@ -185,6 +187,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     const cls = parseTicketType(body.ticket_type)
+    if (cls === 'trash' && !canDeleteTickets(role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
     if (!cls) {
       return NextResponse.json({ error: 'Invalid ticket_type' }, { status: 400 })
     }
@@ -300,7 +305,12 @@ export async function PATCH(
   let ticketTypeUpdate: string | undefined
   if (ticket_type !== undefined && actorRole !== 'customer') {
     const cls = parseTicketType(ticket_type)
-    if (cls) ticketTypeUpdate = cls
+    if (cls) {
+      if (cls === 'trash' && !canDeleteTickets(role)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      ticketTypeUpdate = cls
+    }
   }
 
   const ticketUpdates: Record<string, unknown> = {
@@ -383,6 +393,12 @@ export async function PATCH(
       if (Object.keys(changes).length > 0) meta.changes = changes
       const changedKeys = Object.keys(changes)
       if (changedKeys.length > 0) meta.changed_keys = changedKeys
+      if (changes.teamId) {
+        const entityLabels = await enrichActivityEntityLabels(changes)
+        if (Object.keys(entityLabels).length > 0) {
+          meta.entity_labels = entityLabels
+        }
+      }
       if (attachments_add.length > 0) {
         meta.attachments_added = attachments_add.map((a: { file_name?: string }) => ({
           file_name: a.file_name ?? '',
@@ -505,13 +521,18 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const delRoleRaw = (session.user as { role?: string }).role
+  if (!canDeleteTickets(delRoleRaw)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const { id } = await params
   const ticketId = parseInt(id, 10)
   if (isNaN(ticketId)) {
     return NextResponse.json({ error: 'Invalid ticket ID' }, { status: 400 })
   }
 
-  const delRole = (session.user as { role?: string }).role?.toLowerCase()
+  const delRole = delRoleRaw?.toLowerCase()
   const delActorRole: TicketActorRole = delRole === 'customer' ? 'customer' : 'agent'
   const actorUserId = session.user.id!
 

@@ -23,6 +23,11 @@ export function isAdminOrManager(role: string | undefined): boolean {
   return r === 'admin' || r === 'manager'
 }
 
+/** Move ticket to trash (DELETE or `ticket_type: trash`): Admin & Manager only */
+export function canDeleteTickets(role: string | undefined): boolean {
+  return isAdminOrManager(role)
+}
+
 /** Companies: Admin only */
 export function canAccessCompanies(role: string | undefined): boolean {
   return isAdmin(role)

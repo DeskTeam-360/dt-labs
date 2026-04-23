@@ -13,11 +13,13 @@ import {
   UploadOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { Alert,Avatar, Button, Card, Col, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tag, Tooltip, Typography, Upload } from 'antd'
+import { Alert,Avatar, Button, Card, Col, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Row, Select, Space, Switch, Tag, Tooltip, Typography, Upload } from 'antd'
 import { useRouter } from 'next/navigation'
 import { type Key,useEffect, useMemo, useState } from 'react'
 
 import { createUser } from '@/app/actions/users'
+import AppTable from '@/components/AppTable'
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
 import { uploadAvatar } from '@/utils/storage'
 
@@ -785,7 +787,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 WebkitOverflowScrolling: 'touch',
               }}
             >
-              <Table<UserRecord>
+              <AppTable<UserRecord>
                 columns={columns}
                 dataSource={filteredUsers}
                 rowKey="id"
@@ -800,8 +802,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                   current: pagination.current,
                   pageSize: pagination.pageSize,
                   showSizeChanger: true,
-                  pageSizeOptions: ['10', '15', '20', '50'],
-                  showTotal: (total) => `Total ${total} users`,
+                  pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
+                  showTotal: appTableShowTotal('users'),
                   onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
                   responsive: true,
                 }}
@@ -996,13 +998,15 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                       </Form.Item>
                     </Col>
                   </Row>
-                  {(selectedRole === 'customer') && (
+                  {selectedRole === 'customer' && (
                     <Form.Item name="company_id" label="Company">
-                      <Select placeholder="Select Company (optional)" allowClear>
-                        {companies.map((c) => (
-                          <Option key={c.id} value={c.id}>{c.name}</Option>
-                        ))}
-                      </Select>
+                      <Select
+                        placeholder="Select Company (optional)"
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        options={companies.map((c) => ({ label: c.name, value: c.id }))}
+                      />
                     </Form.Item>
                   )}
                   {(selectedRole !== 'customer') && (

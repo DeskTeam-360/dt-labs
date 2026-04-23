@@ -41,6 +41,8 @@ interface FilterSidebarProps {
   onFilterTeamIdsChange: (v: string[]) => void
   filterDateRange: [Dayjs | null, Dayjs | null] | null
   onFilterDateRangeChange: (dates: [Dayjs | null, Dayjs | null] | null) => void
+  filterDueDateRange: [Dayjs | null, Dayjs | null] | null
+  onFilterDueDateRangeChange: (dates: [Dayjs | null, Dayjs | null] | null) => void
   filterSearch: string
   onFilterSearchChange: (v: string) => void
   allStatuses: { slug: string; title: string }[]
@@ -52,7 +54,7 @@ interface FilterSidebarProps {
   filteredCount: number
   totalCount: number
   onClearFilters: () => void
-  /** When true, show only Status, Type, Date Range, Search */
+  /** When true, show only Status, Type, created/due date ranges, Search */
   isCustomer?: boolean
   /** Staff/admin: save current filters as a named shortcut (navbar). */
   onSaveViewPreset?: (name: string) => { ok: boolean; error?: string }
@@ -78,6 +80,8 @@ export default function FilterSidebar({
   onFilterTeamIdsChange,
   filterDateRange,
   onFilterDateRangeChange,
+  filterDueDateRange,
+  onFilterDueDateRangeChange,
   filterSearch,
   onFilterSearchChange,
   allStatuses,
@@ -277,10 +281,20 @@ export default function FilterSidebar({
               </>
             )}
             <div>
-              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Date range</Text>
+              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Created date</Text>
               <DatePicker.RangePicker
                 value={filterDateRange}
                 onChange={(dates) => onFilterDateRangeChange(dates)}
+                allowClear
+                style={{ width: '100%' }}
+                placeholder={['Start', 'End']}
+              />
+            </div>
+            <div>
+              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Due date</Text>
+              <DatePicker.RangePicker
+                value={filterDueDateRange}
+                onChange={(dates) => onFilterDueDateRangeChange(dates)}
                 allowClear
                 style={{ width: '100%' }}
                 placeholder={['Start', 'End']}

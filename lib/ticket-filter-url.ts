@@ -12,6 +12,8 @@ export const URL_PARAMS = {
   team_ids: 'team_ids',
   date_from: 'date_from',
   date_to: 'date_to',
+  due_date_from: 'due_date_from',
+  due_date_to: 'due_date_to',
   search: 'search',
   view: 'view',
   sort: 'sort',
@@ -44,6 +46,7 @@ export interface ParsedUrlFilters {
   filterVisibility: string[]
   filterTeamIds: string[]
   filterDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
+  filterDueDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
   filterSearch: string
   viewMode: 'kanban' | 'list' | 'card' | 'roundrobin'
   sortBy: TicketSortField
@@ -82,6 +85,14 @@ export function parseFiltersFromUrl(
     const d1 = dayjs(dateTo)
     if (d0.isValid() && d1.isValid()) filterDateRange = [d0, d1]
   }
+  const dueFrom = searchParams.get(URL_PARAMS.due_date_from)
+  const dueTo = searchParams.get(URL_PARAMS.due_date_to)
+  let filterDueDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null = null
+  if (dueFrom && dueTo) {
+    const d0 = dayjs(dueFrom)
+    const d1 = dayjs(dueTo)
+    if (d0.isValid() && d1.isValid()) filterDueDateRange = [d0, d1]
+  }
   const viewRaw = searchParams.get(URL_PARAMS.view) as 'kanban' | 'list' | 'card' | 'roundrobin' | null
   const viewMode = ['kanban', 'list', 'card', 'roundrobin'].includes(viewRaw || '') ? viewRaw! : 'kanban'
   const sortRaw = searchParams.get(URL_PARAMS.sort)
@@ -118,6 +129,7 @@ export function parseFiltersFromUrl(
     filterVisibility: inJunkFolder ? [] : visibility,
     filterTeamIds: teamIds,
     filterDateRange,
+    filterDueDateRange,
     filterSearch: searchParams.get(URL_PARAMS.search)?.trim() ?? '',
     viewMode: resolvedViewMode,
     sortBy,
@@ -136,6 +148,7 @@ export function buildSearchStringFromFilters(state: {
   filterVisibility: string[]
   filterTeamIds: string[]
   filterDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
+  filterDueDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
   filterSearch: string
   viewMode: string
   sortBy: string
@@ -159,6 +172,10 @@ export function buildSearchStringFromFilters(state: {
   if (state.filterDateRange?.[0] && state.filterDateRange?.[1]) {
     p.set(URL_PARAMS.date_from, state.filterDateRange[0].toISOString())
     p.set(URL_PARAMS.date_to, state.filterDateRange[1].toISOString())
+  }
+  if (state.filterDueDateRange?.[0] && state.filterDueDateRange?.[1]) {
+    p.set(URL_PARAMS.due_date_from, state.filterDueDateRange[0].toISOString())
+    p.set(URL_PARAMS.due_date_to, state.filterDueDateRange[1].toISOString())
   }
   if (state.filterSearch.trim()) p.set(URL_PARAMS.search, state.filterSearch.trim())
   if (!inJunk && state.viewMode && state.viewMode !== 'kanban') p.set(URL_PARAMS.view, state.viewMode)

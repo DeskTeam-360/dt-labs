@@ -21,7 +21,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (token.error === 'AccessRevoked') {
         return token
       }
@@ -44,35 +44,60 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       const now = Date.now()
+      const mergeProfileFromDb = (
+        refresh: { active: boolean; fullName: string | null; avatarUrl: string | null }
+      ) => {
+        if (!refresh.active) {
+          return {
+            ...token,
+            sub: undefined,
+            id: undefined,
+            email: undefined,
+            role: undefined,
+            name: undefined,
+            picture: undefined,
+            error: 'AccessRevoked' as const,
+            userCheckedAt: now,
+          }
+        }
+        const email = (token.email as string | undefined) ?? ''
+        const nextName = (refresh.fullName && String(refresh.fullName).trim()) || email || 'User'
+        return {
+          ...token,
+          error: undefined,
+          userCheckedAt: now,
+          name: nextName,
+          picture: refresh.avatarUrl || undefined,
+        }
+      }
+
+      /** Client `useSession().update()` after profile (etc.): refresh name/avatar without waiting for throttle. */
+      if (trigger === 'update') {
+        try {
+          const { fetchUserJwtRefreshData } = await import('@/lib/auth-user-session')
+          const refresh = await fetchUserJwtRefreshData(uid)
+          return mergeProfileFromDb(refresh)
+        } catch (err) {
+          console.error('[auth] jwt trigger=update DB fetch failed:', err)
+          return token
+        }
+      }
+
       const last = typeof token.userCheckedAt === 'number' ? token.userCheckedAt : 0
       if (now - last < JWT_USER_RECHECK_MS) {
         return token
       }
 
-      let ok = false
+      let refresh: { active: boolean; fullName: string | null; avatarUrl: string | null }
       try {
-        const { fetchUserSessionEligibility } = await import('@/lib/auth-user-session')
-        ok = await fetchUserSessionEligibility(uid)
+        const { fetchUserJwtRefreshData } = await import('@/lib/auth-user-session')
+        refresh = await fetchUserJwtRefreshData(uid)
       } catch (err) {
         console.error('[auth] jwt eligibility DB check failed (session kept, will retry):', err)
         return { ...token, error: undefined, userCheckedAt: now }
       }
 
-      if (!ok) {
-        return {
-          ...token,
-          sub: undefined,
-          id: undefined,
-          email: undefined,
-          role: undefined,
-          name: undefined,
-          picture: undefined,
-          error: 'AccessRevoked',
-          userCheckedAt: now,
-        }
-      }
-
-      return { ...token, error: undefined, userCheckedAt: now }
+      return mergeProfileFromDb(refresh)
     },
     async session({ session, token }) {
       if (token.error === 'AccessRevoked') {
@@ -86,6 +111,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id as string
         session.user.email = token.email as string
         ;(session.user as { role?: string }).role = token.role as string
+        if (typeof token.name === 'string' && token.name.length > 0) {
+          session.user.name = token.name
+        }
+        if (typeof token.picture === 'string') {
+          session.user.image = token.picture
+        }
       }
       return session
     },

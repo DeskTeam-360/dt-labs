@@ -15,6 +15,7 @@ interface KanbanColumnProps {
   column: StatusColumn
   tickets: TicketRecord[]
   dragDisabled?: boolean
+  canDeleteTicket?: boolean
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
   sortBy?: TicketSortField
@@ -31,6 +32,7 @@ export default function KanbanColumn({
   column,
   tickets,
   dragDisabled = false,
+  canDeleteTicket = false,
   onEdit,
   onDelete,
   sortBy = 'updated_at',
@@ -121,6 +123,7 @@ export default function KanbanColumn({
                   key={ticket.id}
                   ticket={ticket}
                   dragDisabled={dragDisabled}
+                  canDeleteTicket={canDeleteTicket}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   allStatusColumns={allStatusColumns}

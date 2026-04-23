@@ -1,17 +1,18 @@
 'use client'
 
 import { BellOutlined } from '@ant-design/icons'
-import { App, Badge, Empty, Popover, Spin, Tooltip,Typography } from 'antd'
+import { App, Badge, Empty, Popover, Spin, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { type CSSProperties,useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, useCallback, useMemo, useState } from 'react'
+
+import { type TicketNotificationItem, useNotificationPoll } from '@/components/NotificationPollProvider'
 
 dayjs.extend(relativeTime)
 
 const { Text } = Typography
-const POLL_MS = 12_000
 
 /** Decode HTML entities like &nbsp; to regular characters */
 const decodeHtmlEntities = (text: string): string => {
@@ -37,140 +38,13 @@ const navControlButtonStyle = (base?: CSSProperties): CSSProperties => ({
   ...base,
 })
 
-export type TicketNotificationItem = {
-  id: string
-  ticketId: number
-  ticketTitle: string
-  type: string
-  title: string
-  body: string
-  read: boolean
-  createdAt: string | null
-  actorUserId: string
-  actorName: string
-}
-
 export default function TicketNotificationBell() {
-  const { notification, message } = App.useApp()
-  const { status, data: session } = useSession()
+  const { message } = App.useApp()
+  const { status } = useSession()
   const router = useRouter()
-  const sessionUserId = session?.user?.id
+  const { items, loading, unreadCount, readCount, setItems } = useNotificationPoll()
   const [open, setOpen] = useState(false)
-  const [items, setItems] = useState<TicketNotificationItem[]>([])
-  const [loading, setLoading] = useState(false)
   const [deletingRead, setDeletingRead] = useState(false)
-
-  const initialHydratedRef = useRef(false)
-  const alertedIdsRef = useRef<Set<string>>(new Set())
-
-  /** App.useApp() may return new `notification` every render — use refs so polling effect stays stable */
-  const notificationRef = useRef(notification)
-  const routerRef = useRef(router)
-  notificationRef.current = notification
-  routerRef.current = router
-
-  const enabled = status === 'authenticated'
-
-  const fetchNotifications = useCallback(async () => {
-    const res = await fetch('/api/notifications', { credentials: 'include' })
-    const data = (await res.json().catch(() => ({}))) as {
-      items?: TicketNotificationItem[]
-    }
-    return Array.isArray(data.items) ? data.items : []
-  }, [])
-
-  const processNewUnreadAlerts = useCallback((list: TicketNotificationItem[]) => {
-    if (!initialHydratedRef.current) {
-      initialHydratedRef.current = true
-      for (const n of list) {
-        if (!n.read) alertedIdsRef.current.add(n.id)
-      }
-      return
-    }
-    const nApi = notificationRef.current
-    const nav = routerRef.current
-    for (const n of list) {
-      if (n.read || alertedIdsRef.current.has(n.id)) continue
-      alertedIdsRef.current.add(n.id)
-      nApi.info({
-        message: n.title,
-        description: decodeHtmlEntities(n.body),
-        placement: 'topRight',
-        duration: 10,
-        onClick: () => {
-          nApi.destroy()
-          nav.push(`/tickets/${n.ticketId}`)
-        },
-      })
-      if (typeof window !== 'undefined' && Notification.permission === 'granted') {
-        try {
-          new Notification(n.title, { body: decodeHtmlEntities(n.body.slice(0, 200)), tag: `ticket-${n.id}` })
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      void Notification.requestPermission()
-    }
-  }, [])
-
-  useEffect(() => {
-    initialHydratedRef.current = false
-    alertedIdsRef.current = new Set()
-  }, [sessionUserId])
-
-  useEffect(() => {
-    if (!enabled) {
-      setItems([])
-      initialHydratedRef.current = false
-      alertedIdsRef.current = new Set()
-      return
-    }
-
-    let cancelled = false
-    let visibilityTickTimer: ReturnType<typeof setTimeout> | null = null
-
-    const tick = async () => {
-      setLoading(true)
-      try {
-        const list = await fetchNotifications()
-        if (cancelled) return
-        setItems(list)
-        processNewUnreadAlerts(list)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    void tick()
-    const interval = setInterval(() => void tick(), POLL_MS)
-
-    const onVis = () => {
-      if (document.visibilityState !== 'visible') return
-      if (visibilityTickTimer) clearTimeout(visibilityTickTimer)
-      visibilityTickTimer = setTimeout(() => {
-        visibilityTickTimer = null
-        void tick()
-      }, 400)
-    }
-
-    document.addEventListener('visibilitychange', onVis)
-
-    return () => {
-      cancelled = true
-      if (visibilityTickTimer) clearTimeout(visibilityTickTimer)
-      clearInterval(interval)
-      document.removeEventListener('visibilitychange', onVis)
-    }
-    // Only re-subscribe when auth gate or fetcher identity changes — not when Ant Design context identity changes
-  }, [enabled, fetchNotifications, processNewUnreadAlerts])
-
-  const unreadCount = useMemo(() => items.filter((i) => !i.read).length, [items])
-  const readCount = useMemo(() => items.filter((i) => i.read).length, [items])
 
   const markReadApi = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return
@@ -187,7 +61,7 @@ export default function TicketNotificationBell() {
       await markReadApi([id])
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, read: true } : i)))
     },
-    [markReadApi]
+    [markReadApi, setItems]
   )
 
   const markAllRead = useCallback(async () => {
@@ -195,7 +69,7 @@ export default function TicketNotificationBell() {
     if (unread.length === 0) return
     await markReadApi(unread)
     setItems((prev) => prev.map((i) => (i.read ? i : { ...i, read: true })))
-  }, [items, markReadApi])
+  }, [items, markReadApi, setItems])
 
   const deleteAllRead = useCallback(async () => {
     if (readCount === 0) return
@@ -221,7 +95,7 @@ export default function TicketNotificationBell() {
     } finally {
       setDeletingRead(false)
     }
-  }, [readCount, message])
+  }, [readCount, message, setItems])
 
   const onItemClick = useCallback(
     (n: TicketNotificationItem) => {
@@ -239,7 +113,7 @@ export default function TicketNotificationBell() {
     e.currentTarget.style.background = 'var(--ticket-nav-icon-btn-bg)'
   }
 
-  if (!enabled) return null
+  if (status !== 'authenticated') return null
 
   const popoverContent = (
     <div style={{ width: 360, maxWidth: 'calc(100vw - 32px)' }}>

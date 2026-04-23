@@ -1,7 +1,7 @@
 'use client'
 
 import { ClockCircleOutlined, DeleteOutlined,EditOutlined, PaperClipOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons'
-import { Avatar, Button, Col, Descriptions, Empty, Flex, Modal, Popconfirm, Row, Select,Space, Tag, Typography } from 'antd'
+import { Avatar, Button, Col, Descriptions, Empty, Flex, Modal, Popconfirm, Row, Select, Space, Tag, Typography } from 'antd'
 
 import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
@@ -80,6 +80,8 @@ interface TabGeneralCustomerProps {
   onCancelEditComment: () => void
   onDeleteComment: (commentId: string) => void
   canDeleteComment: (createdAt: string) => boolean
+  onRemoveCommentAttachment: (commentId: string, attachmentId: string) => void | Promise<void>
+  removingCommentAttachmentKey?: string | null
   onAddComment: (
     commentText: string,
     attachments: { url: string; file_name: string; file_path: string }[],
@@ -121,6 +123,8 @@ export default function TabGeneralCustomer({
   onCancelEditComment,
   onDeleteComment,
   canDeleteComment,
+  onRemoveCommentAttachment,
+  removingCommentAttachmentKey = null,
   onAddComment,
   addCommentLoading = false,
   commentsHasOlder = false,
@@ -200,7 +204,7 @@ export default function TabGeneralCustomer({
                     href={att.file_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'blue' }}
                   >
                     <PaperClipOutlined /> {att.file_name}
                   </a>
@@ -382,17 +386,44 @@ export default function TabGeneralCustomer({
 
                         {comment.comment_attachments?.length ? (
                           <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
-                            {comment.comment_attachments.map((att) => (
-                              <a
-                                key={att.id || att.file_url}
-                                href={att.file_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-                              >
-                                <PaperClipOutlined /> {att.file_name}
-                              </a>
-                            ))}
+                            {comment.comment_attachments.map((att) => {
+                              const attKey = att.id ? `${comment.id}:${att.id}` : ''
+                              return (
+                                <Flex key={att.id || att.file_url} align="center" gap={4} wrap="nowrap">
+                                  <a
+                                    href={att.file_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                      color: '#1677ff',
+                                      textDecoration: 'underline',
+                                    }}
+                                  >
+                                    <PaperClipOutlined /> {att.file_name}
+                                  </a>
+                                  {editingComment === comment.id && att.id ? (
+                                    <Popconfirm
+                                      title="Remove this attachment?"
+                                      okText="Remove"
+                                      cancelText="Cancel"
+                                      onConfirm={() => void onRemoveCommentAttachment(comment.id, att.id)}
+                                    >
+                                      <Button
+                                        type="text"
+                                        danger
+                                        size="small"
+                                        icon={<DeleteOutlined />}
+                                        aria-label="Remove attachment"
+                                        loading={removingCommentAttachmentKey === attKey}
+                                      />
+                                    </Popconfirm>
+                                  ) : null}
+                                </Flex>
+                              )
+                            })}
                           </Flex>
                         ) : null}
                       </Space>

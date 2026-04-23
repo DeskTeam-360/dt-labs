@@ -349,7 +349,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           >
             <Avatar
               icon={<UserOutlined />}
-              src={user.image ?? user.user_metadata?.avatar_url}
+              src={session?.user?.image ?? user.image ?? user.user_metadata?.avatar_url}
               size={collapsed ? 'default' : 40}
             />
             {!collapsed && (
@@ -365,7 +365,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {user.name ?? user.user_metadata?.full_name ?? 'User'}
+                  {session?.user?.name ?? user.name ?? user.user_metadata?.full_name ?? 'User'}
                 </Text>
                 <Text
                   style={{

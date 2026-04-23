@@ -21,6 +21,7 @@ const tagStyle = {
 interface CardViewCardProps {
   ticket: TicketRecord
   allStatusColumns?: StatusColumn[]
+  canDeleteTicket?: boolean
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
   /** Click priority / status / tag chips to apply list filters */
@@ -33,6 +34,7 @@ interface CardViewCardProps {
 export default function CardViewCard({
   ticket,
   allStatusColumns,
+  canDeleteTicket = false,
   onEdit,
   onDelete,
   onFilterByStatus,
@@ -92,12 +94,12 @@ export default function CardViewCard({
           {ticket.due_date && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--kanban-card-muted)' }}>
               <FlagOutlined style={{ fontSize: 12 }} />
-              Due {dayjs(ticket.due_date).format('MMM DD, YYYY').toUpperCase()}
+              Due {dayjs(ticket.due_date).format('MMM DD, YYYY')}
             </span>
           )}
           <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--kanban-card-muted)' }}>
             <ClockCircleOutlined style={{ fontSize: 12 }} />
-            Updated {dayjs(ticket.updated_at).format('MMM DD, YYYY').toUpperCase()}
+            Updated {dayjs(ticket.updated_at).format('MMM DD, YYYY')}
           </span>
         </div>
         {Number(ticket.checklist_total) > 0 && (
@@ -206,22 +208,26 @@ export default function CardViewCard({
           menu={{
             items: [
               { key: 'edit', label: 'Edit', icon: <EditOutlined />, onClick: () => onEdit(ticket) },
-              {
-                key: 'delete',
-                label: 'Move to trash',
-                icon: <DeleteOutlined />,
-                danger: true,
-                onClick: () => {
-                  Modal.confirm({
-                    title: 'Move ticket to trash?',
-                    content: 'The ticket will be hidden from the main list. Open Trash from the sidebar to review.',
-                    okText: 'Move to trash',
-                    okButtonProps: { danger: true },
-                    cancelText: 'Cancel',
-                    onOk: () => onDelete(ticket.id),
-                  })
-                },
-              },
+              ...(canDeleteTicket
+                ? [
+                    {
+                      key: 'delete',
+                      label: 'Move to trash',
+                      icon: <DeleteOutlined />,
+                      danger: true,
+                      onClick: () => {
+                        Modal.confirm({
+                          title: 'Move ticket to trash?',
+                          content: 'The ticket will be hidden from the main list. Open Trash from the sidebar to review.',
+                          okText: 'Move to trash',
+                          okButtonProps: { danger: true },
+                          cancelText: 'Cancel',
+                          onOk: () => onDelete(ticket.id),
+                        })
+                      },
+                    },
+                  ]
+                : []),
             ],
           }}
           trigger={['click']}

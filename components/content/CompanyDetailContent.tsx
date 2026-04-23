@@ -962,6 +962,7 @@ export default function CompanyDetailContent({
         <TabTickets
           companyData={companyData}
           currentUser={currentUser}
+          viewerRole={currentUserRole ?? (currentUser as { role?: string }).role ?? null}
           basePath={isCustomer ? '/customer' : undefined}
         />
       ),

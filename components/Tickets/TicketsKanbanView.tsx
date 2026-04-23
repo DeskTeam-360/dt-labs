@@ -2,11 +2,13 @@
 
 import {
   closestCorners,
+  type CollisionDetection,
   DndContext,
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  pointerWithin,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -17,6 +19,13 @@ import type { StatusColumn, TicketRecord, TicketSortField, TicketSortOrder } fro
 
 const { Text } = Typography
 
+/** Prefer droppable/cards under the pointer; avoids wrong column with horizontal scroll + dense cards. */
+const kanbanCollisionDetection: CollisionDetection = (args) => {
+  const byPointer = pointerWithin(args)
+  if (byPointer.length > 0) return byPointer
+  return closestCorners(args)
+}
+
 interface TicketsKanbanViewProps {
   tickets: TicketRecord[]
   columnsToShow: StatusColumn[]
@@ -26,6 +35,7 @@ interface TicketsKanbanViewProps {
   onDragEnd: (event: DragEndEvent) => void | Promise<void>
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
+  canDeleteTicket?: boolean
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
   allPriorities?: Array<{ id: number }>
@@ -45,6 +55,7 @@ export default function TicketsKanbanView({
   onDragEnd,
   onEdit,
   onDelete,
+  canDeleteTicket = false,
   sortBy = 'updated_at',
   sortOrder = 'desc',
   allPriorities = [],
@@ -56,8 +67,9 @@ export default function TicketsKanbanView({
 }: TicketsKanbanViewProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
+      /** Slightly more than a click; still responsive for drag. */
       activationConstraint: {
-        distance: 8,
+        distance: 6,
       },
     })
   )
@@ -84,6 +96,7 @@ export default function TicketsKanbanView({
           column={column}
           tickets={tickets}
           dragDisabled={isCustomer}
+          canDeleteTicket={canDeleteTicket}
           onEdit={onEdit}
           onDelete={onDelete}
           sortBy={sortBy}
@@ -106,7 +119,7 @@ export default function TicketsKanbanView({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={kanbanCollisionDetection}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
     >

@@ -9,6 +9,7 @@ export const TICKET_ACTIVITY_ACTIONS = [
   'comment_added',
   'comment_updated',
   'comment_deleted',
+  'comment_attachment_deleted',
 ] as const
 
 export type TicketActivityAction = (typeof TICKET_ACTIVITY_ACTIONS)[number]

@@ -152,7 +152,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                 <Col xs={24} sm={12} md={8}>
                   <HubTile
                     title="Ticket Types"
-                    description="Request categories (bug, feature, …)"
+                    description="Request categories (bug, feature, etc)"
                     href="/settings/ticket-types"
                     icon={<AppstoreOutlined />}
                   />

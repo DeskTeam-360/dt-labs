@@ -50,7 +50,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 }
 import dayjs from 'dayjs'
 
-import { isAdmin, isAdminOrManager } from '@/lib/auth-utils'
+import { canDeleteTickets, isAdmin, isAdminOrManager } from '@/lib/auth-utils'
 import { useTicketDetailLiveSync } from '@/lib/firebase/useTicketDetailLiveSync'
 
 import AdminMainColumn from '../AdminMainColumn'
@@ -200,6 +200,7 @@ export default function TicketDetailContent({
     }, [displayTicket?.id])
     const [editingComment, setEditingComment] = useState<string | null>(null)
     const [editingCommentValue, setEditingCommentValue] = useState('')
+    const [removingCommentAttachmentKey, setRemovingCommentAttachmentKey] = useState<string | null>(null)
     const [editingAttribute, setEditingAttribute] = useState<string | null>(null)
     const [newAttributeKey, setNewAttributeKey] = useState('')
     const [newAttributeValue, setNewAttributeValue] = useState('')
@@ -761,6 +762,32 @@ export default function TicketDetailContent({
         }
     }
 
+    const handleRemoveCommentAttachment = async (commentId: string, attachmentId: string) => {
+        if (!attachmentId) return
+        const key = `${commentId}:${attachmentId}`
+        setRemovingCommentAttachmentKey(key)
+        try {
+            await apiFetch(`/api/tickets/${displayTicket.id}/comments/${commentId}/attachments/${attachmentId}`, {
+                method: 'DELETE',
+            })
+            setComments((prev) =>
+                prev.map((c) =>
+                    c.id === commentId
+                        ? {
+                              ...c,
+                              comment_attachments: (c.comment_attachments || []).filter((a) => a.id !== attachmentId),
+                          }
+                        : c
+                )
+            )
+            message.success('Attachment removed')
+        } catch (err: any) {
+            message.error(err?.message || 'Failed to remove attachment')
+        } finally {
+            setRemovingCommentAttachmentKey(null)
+        }
+    }
+
     const handleDeleteComment = async (commentId: string) => {
         try {
             await apiFetch(`/api/tickets/${displayTicket.id}/comments/${commentId}`, { method: 'DELETE' })
@@ -1193,6 +1220,7 @@ export default function TicketDetailContent({
     const isCustomer = variant === 'customer'
     const isTicketAdmin = isAdmin((currentUser as { role?: string }).role)
     const canAdjustReportedDuration = isAdminOrManager((currentUser as { role?: string }).role)
+    const canMoveTicketToTrash = canDeleteTickets((currentUser as { role?: string }).role)
     const rowTicketType = (displayTicket?.ticket_type as string | undefined) ?? 'support'
 
     const patchTicketClassification = useCallback(
@@ -1431,7 +1459,7 @@ export default function TicketDetailContent({
                                             </Button>
                                             ) }
                                             
-                                            { rowTicketType !=='trash'&&(
+                                            {canMoveTicketToTrash && rowTicketType !== 'trash' && (
                                             <Button
                                             
                                                 icon={<DeleteOutlined />}
@@ -1443,7 +1471,7 @@ export default function TicketDetailContent({
                                             >
                                                 Trash
                                             </Button>
-                                            ) }
+                                            )}
                                             
                                             {rowTicketType !== 'support' && (
                                                 <Button
@@ -1507,6 +1535,8 @@ export default function TicketDetailContent({
                                 }}
                                 onDeleteComment={handleDeleteComment}
                                 canDeleteComment={canDeleteComment}
+                                onRemoveCommentAttachment={handleRemoveCommentAttachment}
+                                removingCommentAttachmentKey={removingCommentAttachmentKey}
                                 onAddComment={handleAddComment}
                                 addCommentLoading={loading}
                                 commentsHasOlder={commentsHasOlder}
@@ -1596,6 +1626,8 @@ export default function TicketDetailContent({
                                             }}
                                             onDeleteComment={handleDeleteComment}
                                             canDeleteComment={canDeleteComment}
+                                            onRemoveCommentAttachment={handleRemoveCommentAttachment}
+                                            removingCommentAttachmentKey={removingCommentAttachmentKey}
                                             onAddComment={handleAddComment}
                                             addCommentLoading={loading}
                                             commentsHasOlder={commentsHasOlder}

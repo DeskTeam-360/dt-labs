@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 
-import { db, ticketActivityLog,ticketAssignees, tickets, ticketTags } from '@/lib/db'
+import { db, teams, ticketActivityLog, ticketAssignees, tickets, ticketTags } from '@/lib/db'
 
 import type { TicketActivityAction } from './ticket-activity-actions'
 
@@ -108,6 +108,32 @@ export function diffTicketSnapshots(
     changes.tag_ids = { from: before.tagIds, to: after.tagIds }
   }
   return changes
+}
+
+/** Resolve UUIDs in activity `changes` to display names (e.g. team) for ticket activity UI. */
+export async function enrichActivityEntityLabels(
+  changes: Record<string, { from: unknown; to: unknown }>
+): Promise<{ teams?: Record<string, string> }> {
+  const out: { teams?: Record<string, string> } = {}
+  const teamDelta = changes.teamId
+  if (!teamDelta) return out
+
+  const ids = new Set<string>()
+  if (teamDelta.from != null && teamDelta.from !== '') ids.add(String(teamDelta.from))
+  if (teamDelta.to != null && teamDelta.to !== '') ids.add(String(teamDelta.to))
+  if (ids.size === 0) return out
+
+  const rows = await db
+    .select({ id: teams.id, name: teams.name })
+    .from(teams)
+    .where(inArray(teams.id, [...ids]))
+
+  const map: Record<string, string> = {}
+  for (const r of rows) {
+    map[r.id] = (r.name?.trim() || r.id) as string
+  }
+  out.teams = map
+  return out
 }
 
 export async function logTicketActivity(params: {

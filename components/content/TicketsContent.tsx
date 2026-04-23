@@ -1,7 +1,10 @@
 'use client'
 
-import { Alert,Empty, Layout, Spin } from 'antd'
+import { Alert, Empty, Layout, message, Spin } from 'antd'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useRef } from 'react'
 
+import { canDeleteTickets } from '@/lib/auth-utils'
 import { addSavedTicketFilterPreset } from '@/lib/ticket-saved-filters'
 
 import AdminMainColumn from '../AdminMainColumn'
@@ -19,8 +22,41 @@ interface TicketsContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string }
 }
 
+const TICKET_ERROR_MESSAGES: Record<string, string> = {
+  not_found: 'Ticket not found or has been removed.',
+  no_access: 'You do not have permission to view that ticket.',
+  invalid: 'That ticket link is not valid.',
+}
+
 export default function TicketsContent({ user: currentUser }: TicketsContentProps) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const ticketErrorHandledRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const err = searchParams.get('ticket_error')
+    if (!err) {
+      ticketErrorHandledRef.current = null
+      return
+    }
+    if (ticketErrorHandledRef.current === err) return
+    ticketErrorHandledRef.current = err
+
+    message.open({
+      key: 'ticket-detail-redirect',
+      type: 'warning',
+      content: TICKET_ERROR_MESSAGES[err] ?? 'Unable to open that ticket.',
+      duration: 6,
+    })
+
+    const next = new URLSearchParams(searchParams.toString())
+    next.delete('ticket_error')
+    const q = next.toString()
+    router.replace(q ? `/tickets?${q}` : '/tickets', { scroll: false })
+  }, [searchParams, router])
+
   const isCustomer = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'customer'
+  const canDeleteTicket = canDeleteTickets(currentUser.role)
   const {
     collapsed,
     setCollapsed,
@@ -51,6 +87,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     setFilterTeamIds,
     filterDateRange,
     setFilterDateRange,
+    filterDueDateRange,
+    setFilterDueDateRange,
     filterSearch,
     setFilterSearch,
     filterSidebarCollapsed,
@@ -97,7 +135,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     filterByTagFromChip,
     filterByCompanyFromChip,
     submitting,
-  } = useTicketsData(currentUser.id, isCustomer)
+  } = useTicketsData(currentUser.id, isCustomer, canDeleteTicket)
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -158,6 +196,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               allStatusColumns={allStatusColumns}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              canDeleteTicket={canDeleteTicket}
               sortBy={sortBy}
               sortOrder={sortOrder}
               allPriorities={ticketPriorities}
@@ -175,8 +214,9 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               filterTicketType={filterTicketType}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              canDeleteTicket={canDeleteTicket}
               onBulkMoveToSpam={!isCustomer ? handleBulkMoveToSpam : undefined}
-              onBulkMoveToTrash={!isCustomer ? handleBulkMoveToTrash : undefined}
+              onBulkMoveToTrash={!isCustomer && canDeleteTicket ? handleBulkMoveToTrash : undefined}
               onFilterByStatus={filterByStatusFromChip}
               onFilterByPriority={filterByPriorityFromChip}
               onFilterByTag={filterByTagFromChip}
@@ -188,6 +228,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               statusColumns={allStatusColumns}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              canDeleteTicket={canDeleteTicket}
             />
           ) : (
             <TicketsKanbanView
@@ -199,6 +240,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               onDragEnd={handleDragEnd}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              canDeleteTicket={canDeleteTicket}
               sortBy={sortBy}
               sortOrder={sortOrder}
               allPriorities={ticketPriorities}
@@ -232,6 +274,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         onFilterTeamIdsChange={setFilterTeamIds}
         filterDateRange={filterDateRange}
         onFilterDateRangeChange={setFilterDateRange}
+        filterDueDateRange={filterDueDateRange}
+        onFilterDueDateRangeChange={setFilterDueDateRange}
         filterSearch={filterSearch}
         onFilterSearchChange={setFilterSearch}
         allStatuses={allStatuses}

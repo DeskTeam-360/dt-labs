@@ -27,14 +27,21 @@ export default async function ProfilePage() {
       }
     : undefined
 
+  const displayName =
+    (userRow?.fullName && String(userRow.fullName).trim()) ||
+    session.user.name ||
+    session.user.email ||
+    'User'
+  const displayAvatar = userRow?.avatarUrl ?? session.user.image ?? null
+
   return (
     <ProfileContent
       user={{
         id: session.user.id!,
         email: session.user.email ?? null,
-        name: session.user.name ?? null,
-        image: session.user.image ?? null,
-        user_metadata: { full_name: session.user.name, avatar_url: userRow?.avatarUrl ?? null },
+        name: displayName,
+        image: displayAvatar,
+        user_metadata: { full_name: displayName, avatar_url: displayAvatar },
       }}
       userData={userData}
     />
