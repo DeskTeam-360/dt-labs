@@ -1,9 +1,12 @@
 'use client'
 
 import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, Card, Col, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tag, Tooltip, Typography } from 'antd'
+import { Button, Card, Col, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Row, Select, Space, Switch, Tag, Tooltip, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo,useState } from 'react'
+
+import AppTable from '@/components/AppTable'
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 
 import AdminMainColumn from '../AdminMainColumn'
 import AdminSidebar from '../AdminSidebar'
@@ -437,7 +440,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
               </Space>
             </div>
 
-            <Table
+            <AppTable
               columns={columns}
               dataSource={filteredCompanies}
               rowKey="id"
@@ -446,8 +449,8 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 current: pagination.current,
                 pageSize: pagination.pageSize,
                 showSizeChanger: true,
-                pageSizeOptions: ['10', '15', '20', '50'],
-                showTotal: (total) => `Total ${total} companies`,
+                pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
+                showTotal: appTableShowTotal('companies'),
                 onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
               }}
             />

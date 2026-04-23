@@ -349,6 +349,28 @@ html.dark .ql-editor.comment-html {
   color: var(--foreground);
 }
 
+/* ticket thread: links must read as links (Quill may omit underline in saved HTML) */
+.comment-html a,
+.ql-editor.comment-html a {
+  color: #1677ff !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+}
+.comment-html a:hover,
+.ql-editor.comment-html a:hover {
+  color: #4096ff;
+}
+html.dark .comment-html a,
+html.dark .ql-editor.comment-html a {
+  color: #69b1ff !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+}
+html.dark .comment-html a:hover,
+html.dark .ql-editor.comment-html a:hover {
+  color: #91caff !important;
+}
+
 /* Quill: font size classes (toolbar + saved HTML in threads / descriptions) */
 .ql-editor .ql-size-small,
 .comment-html .ql-size-small {
@@ -787,6 +809,11 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
   color: var(--foreground) !important;
 }
 
+/* Kanban: horizontal scroll + dnd-kit — prefer column-level hit testing; avoid broken drops */
+.tickets-kanban-board {
+  touch-action: pan-x;
+}
+
 /* Kanban: Ant Design Card can inject default light surfaces over inline styles */
 .tickets-kanban-board .kanban-column-card.ant-card {
   background: var(--kanban-column-bg) !important;
@@ -931,4 +958,10 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
 .dark .customer-time-report-table-wrap .ant-table-thead > tr > th {
   background: var(--ant-color-primary, #1668dc);
   color: #fff;
+}
+
+/* components/AppTable.tsx — full-width list tables */
+.app-table.ant-table-wrapper {
+  width: 100%;
+  max-width: 100%;
 }

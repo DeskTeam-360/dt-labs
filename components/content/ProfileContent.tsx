@@ -2,6 +2,8 @@
 
 import { CopyOutlined, DeleteOutlined, KeyOutlined, MailOutlined, PhoneOutlined, PlusOutlined,UploadOutlined, UserOutlined } from '@ant-design/icons'
 import { Avatar, Button, Card, Col, Divider, Form, Input, Layout, message, Popconfirm,Row, Select, Space, Tag, Typography, Upload } from 'antd'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useEffect,useState } from 'react'
 
 import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
@@ -50,6 +52,8 @@ interface ApiToken {
 }
 
 export default function ProfileContent({ user, userData }: ProfileContentProps) {
+  const router = useRouter()
+  const { update: updateSession, data: clientSession } = useSession()
   const [collapsed, setCollapsed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -158,6 +162,8 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to update profile')
       message.success('Avatar uploaded successfully!')
+      await updateSession({})
+      router.refresh()
     } catch (error: unknown) {
       message.error(error instanceof Error ? error.message : 'Failed to upload avatar')
     } finally {
@@ -197,7 +203,8 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to update profile')
       message.success('Profile updated successfully!')
-      window.location.reload()
+      await updateSession({})
+      router.refresh()
     } catch (error: unknown) {
       message.error(error instanceof Error ? error.message : 'Failed to update profile')
     } finally {
@@ -221,7 +228,7 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
                   <Avatar
                     size={100}
                     icon={<UserOutlined />}
-                    src={avatarUrl || user.user_metadata?.avatar_url}
+                    src={avatarUrl || clientSession?.user?.image || user.user_metadata?.avatar_url}
                   />
                   <div style={{ marginTop: 16 }}>
                     <Upload
@@ -254,7 +261,7 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
                 </div>
                 <div>
                   <Text strong style={{ fontSize: 18, display: 'block' }}>
-                    {user.user_metadata?.full_name || 'User'}
+                    {clientSession?.user?.name || user.user_metadata?.full_name || 'User'}
                   </Text>
                   <Text type="secondary">{user.email}</Text>
                 </div>

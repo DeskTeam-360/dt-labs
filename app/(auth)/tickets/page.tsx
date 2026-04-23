@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
 import { auth } from '@/auth'
 import TicketsContent from '@/components/content/TicketsContent'
@@ -10,5 +11,9 @@ export default async function TicketsPage() {
     redirect('/login')
   }
 
-  return <TicketsContent user={session.user} />
+  return (
+    <Suspense fallback={<div style={{ padding: 48, textAlign: 'center' }}>Loading…</div>}>
+      <TicketsContent user={session.user} />
+    </Suspense>
+  )
 }

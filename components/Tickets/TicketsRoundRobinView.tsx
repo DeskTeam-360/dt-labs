@@ -20,6 +20,7 @@ interface TicketsRoundRobinViewProps {
   statusColumns?: StatusColumn[]
   onEdit?: (ticket: TicketRecord) => void
   onDelete?: (id: number) => void
+  canDeleteTicket?: boolean
 }
 
 function getStatusColor(status: string, columns: StatusColumn[]): string {
@@ -41,6 +42,7 @@ export default function TicketsRoundRobinView({
   statusColumns = DEFAULT_ALL_STATUS_COLUMNS,
   onEdit,
   onDelete,
+  canDeleteTicket = false,
 }: TicketsRoundRobinViewProps) {
   const router = useRouter()
   // Group tickets by company
@@ -132,22 +134,26 @@ export default function TicketsRoundRobinView({
                 menu={{
                   items: [
                     { key: 'edit', label: 'Edit', icon: <EditOutlined />, onClick: () => onEdit?.(ticket) },
-                    {
-                      key: 'delete',
-                      label: 'Move to trash',
-                      icon: <DeleteOutlined />,
-                      danger: true,
-                      onClick: () => {
-                        Modal.confirm({
-                          title: 'Move ticket to trash?',
-                          content: 'The ticket will be hidden from the main list. Open Trash from the sidebar to review.',
-                          okText: 'Move to trash',
-                          okButtonProps: { danger: true },
-                          cancelText: 'Cancel',
-                          onOk: () => onDelete?.(ticket.id),
-                        })
-                      },
-                    },
+                    ...(canDeleteTicket
+                      ? [
+                          {
+                            key: 'delete',
+                            label: 'Move to trash',
+                            icon: <DeleteOutlined />,
+                            danger: true,
+                            onClick: () => {
+                              Modal.confirm({
+                                title: 'Move ticket to trash?',
+                                content: 'The ticket will be hidden from the main list. Open Trash from the sidebar to review.',
+                                okText: 'Move to trash',
+                                okButtonProps: { danger: true },
+                                cancelText: 'Cancel',
+                                onOk: () => onDelete?.(ticket.id),
+                              })
+                            },
+                          },
+                        ]
+                      : []),
                   ],
                 }}
                 trigger={['click']}

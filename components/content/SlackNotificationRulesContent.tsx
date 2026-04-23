@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Col,
   Form,
   Input,
   InputNumber,
@@ -12,6 +13,7 @@ import {
   message,
   Modal,
   Popconfirm,
+  Row,
   Select,
   Space,
   Switch,
@@ -19,6 +21,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { Flex } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -27,6 +30,7 @@ import AdminSidebar from '../AdminSidebar'
 
 const { Content } = Layout
 const { Title, Text, Paragraph } = Typography
+const { TextArea } = Input
 
 type RuleRow = {
   id: string
@@ -47,6 +51,13 @@ type Option = { label: string; value: string | number }
 
 function filterFromApi(f: Record<string, unknown> | undefined) {
   const raw = f && typeof f === 'object' ? f : {}
+  const toSlugs = Array.isArray(raw.to_status_slugs)
+    ? (raw.to_status_slugs as unknown[]).filter((s): s is string => typeof s === 'string' && s.length > 0)
+    : []
+  const slackNote = typeof raw.slack_note === 'string' ? raw.slack_note : ''
+  const tagIds = Array.isArray(raw.tag_ids)
+    ? (raw.tag_ids as unknown[]).filter((id): id is string => typeof id === 'string' && id.length > 0)
+    : []
   return {
     on_ticket_created: raw.on_ticket_created !== false,
     on_status_changed: raw.on_status_changed === true,
@@ -55,6 +66,9 @@ function filterFromApi(f: Record<string, unknown> | undefined) {
     priority_ids: Array.isArray(raw.priority_ids) ? (raw.priority_ids as number[]) : [],
     company_ids: Array.isArray(raw.company_ids) ? (raw.company_ids as string[]) : [],
     type_ids: Array.isArray(raw.type_ids) ? (raw.type_ids as number[]) : [],
+    to_status_slugs: toSlugs,
+    tag_ids: tagIds,
+    slack_note: slackNote,
   }
 }
 
@@ -71,6 +85,8 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
   const [priorityOpts, setPriorityOpts] = useState<Option[]>([])
   const [companyOpts, setCompanyOpts] = useState<Option[]>([])
   const [typeOpts, setTypeOpts] = useState<Option[]>([])
+  const [statusOpts, setStatusOpts] = useState<Option[]>([])
+  const [tagOpts, setTagOpts] = useState<Option[]>([])
 
   const loadRules = useCallback(async () => {
     setLoading(true)
@@ -103,16 +119,20 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
 
   const loadSelectData = useCallback(async () => {
     try {
-      const [teamsRes, priRes, compRes, typRes] = await Promise.all([
+      const [teamsRes, priRes, compRes, typRes, statusRes, tagsRes] = await Promise.all([
         fetch('/api/teams', { credentials: 'include' }),
         fetch('/api/ticket-priorities', { credentials: 'include' }),
         fetch('/api/companies', { credentials: 'include' }),
         fetch('/api/ticket-types', { credentials: 'include' }),
+        fetch('/api/ticket-statuses', { credentials: 'include' }),
+        fetch('/api/tags', { credentials: 'include' }),
       ])
       const teamsJson = teamsRes.ok ? await teamsRes.json() : []
       const priJson = priRes.ok ? await priRes.json() : []
       const compWrap = compRes.ok ? await compRes.json() : {}
       const typJson = typRes.ok ? await typRes.json() : []
+      const statusJson = statusRes.ok ? await statusRes.json() : []
+      const tagsJson = tagsRes.ok ? await tagsRes.json() : []
       const compList = Array.isArray(compWrap.data) ? compWrap.data : []
 
       setTeamOpts(
@@ -136,6 +156,20 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       setTypeOpts(
         (Array.isArray(typJson) ? typJson : []).map((t: { id: number; title: string }) => ({
           label: t.title,
+          value: t.id,
+        }))
+      )
+      setStatusOpts(
+        (Array.isArray(statusJson) ? statusJson : [])
+          .filter((s: { is_active?: boolean }) => s.is_active !== false)
+          .map((s: { slug: string; title: string }) => ({
+            label: s.title,
+            value: s.slug,
+          }))
+      )
+      setTagOpts(
+        (Array.isArray(tagsJson) ? tagsJson : []).map((t: { id: string; name: string }) => ({
+          label: t.name,
           value: t.id,
         }))
       )
@@ -164,6 +198,9 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       priority_ids: [],
       company_ids: [],
       type_ids: [],
+      to_status_slugs: [],
+      tag_ids: [],
+      slack_note: '',
     })
     setModalOpen(true)
   }
@@ -183,6 +220,9 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       priority_ids: f.priority_ids,
       company_ids: f.company_ids,
       type_ids: f.type_ids,
+      to_status_slugs: f.to_status_slugs,
+      tag_ids: f.tag_ids,
+      slack_note: f.slack_note,
     })
     setModalOpen(true)
   }
@@ -202,6 +242,9 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       priority_ids: v.priority_ids?.length ? v.priority_ids : [],
       company_ids: v.company_ids?.length ? v.company_ids : [],
       type_ids: v.type_ids?.length ? v.type_ids : [],
+      to_status_slugs: v.to_status_slugs?.length ? v.to_status_slugs : [],
+      tag_ids: v.tag_ids?.length ? v.tag_ids : [],
+      slack_note: typeof v.slack_note === 'string' ? v.slack_note.trim().slice(0, 1000) : '',
     }
     setSaving(true)
     try {
@@ -287,7 +330,8 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
             {f.on_ticket_created ? <Tag color="blue">Created</Tag> : null}
             {f.on_status_changed ? <Tag color="purple">Status</Tag> : null}
             {f.on_client_reply ? <Tag color="orange">Client reply</Tag> : null}
-            {!f.on_ticket_created && !f.on_status_changed && !f.on_client_reply ? (
+            {f.slack_note?.trim() ? <Tag>Note</Tag> : null}
+            {!f.on_ticket_created && !f.on_status_changed && !f.on_client_reply && !f.slack_note?.trim() ? (
               <Text type="secondary">—</Text>
             ) : null}
           </Space>
@@ -304,6 +348,7 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
         if (f.priority_ids.length) parts.push(`${f.priority_ids.length} priority`)
         if (f.company_ids.length) parts.push(`${f.company_ids.length} company`)
         if (f.type_ids.length) parts.push(`${f.type_ids.length} type`)
+        if (f.to_status_slugs.length) parts.push(`${f.to_status_slugs.length} new status`)
         return parts.length > 0 ? (
           <Text type="secondary">{parts.join(' · ')}</Text>
         ) : (
@@ -355,8 +400,10 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
             <Paragraph type="secondary" style={{ marginBottom: 16 }}>
               In Slack: <Text strong>App</Text> → choose your workspace → <Text strong>Incoming Webhooks</Text> → add to a
               channel → copy the URL that starts with <Text code>https://hooks.slack.com/services/</Text>. One URL = one
-              channel. Leave all team / priority / company / type filters empty so every ticket that matches the selected
-              events is included.
+              channel. Leave all team / priority / company / type / tag / new-status filters empty so every ticket that
+              matches the selected events is included. When you use more than one of those filters, they combine with{' '}
+              <Text strong>AND</Text> (ticket must match all of them); inside one field, multiple values are{' '}
+              <Text strong>OR</Text> (e.g. any of the selected companies).
             </Paragraph>
             <div style={{ marginBottom: 16 }}>
               <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
@@ -380,13 +427,14 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
         onCancel={() => setModalOpen(false)}
         onOk={submit}
         confirmLoading={saving}
-        width={560}
+        width={800}
         destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 8 }}>
           <Form.Item name="name" label="Label (optional)">
             <Input placeholder="e.g. Urgent → #alerts" maxLength={255} />
           </Form.Item>
+          <Flex gap={16}>
           <Form.Item
             name="webhook_url"
             label={editing ? 'New webhook URL (optional)' : 'Incoming Webhook URL'}
@@ -417,7 +465,23 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
           <Form.Item name="sort_order" label="Sort order">
             <InputNumber className="w-full" min={0} style={{ width: '100%' }} />
           </Form.Item>
+          </Flex>
+
+        
+          <Form.Item
+            name="slack_note"
+            label="Additional note for Slack (optional)"
+            extra={
+              <Text type="secondary">
+                Plain text; displayed above the ticket line in Slack (italic format). Suitable for context, @channel, or
+                link runbook.
+              </Text>
+            }
+          >
+            <TextArea rows={3} placeholder="mis. P1 — mohon konfirmasi di thread" maxLength={1000} showCount />
+          </Form.Item>
           <Title level={5}>When to notify</Title>
+          <Flex gap={16}>
           <Form.Item name="on_ticket_created" valuePropName="checked" initialValue>
             <Checkbox>Ticket created</Checkbox>
           </Form.Item>
@@ -427,18 +491,52 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
           <Form.Item name="on_client_reply" valuePropName="checked">
             <Checkbox>Client / portal reply (comment)</Checkbox>
           </Form.Item>
+          </Flex>
+        
           <Title level={5}>Only if ticket matches (optional)</Title>
-          <Form.Item name="team_ids" label="Teams">
+          <Paragraph type="secondary" style={{ marginTop: -8, marginBottom: 12 }}>
+            Across Team, Priority, Company, Type, Tags, etc., each filled section must pass — that is <Text strong>AND</Text>.
+            Inside one multi-select, any selected value can match — that is <Text strong>OR</Text> (e.g. Company A or
+            Company B).
+          </Paragraph>
+          <Flex gap={16}>
+          <Form.Item name="team_ids" label="Teams" style={{ width: '50%' }}>
             <Select mode="multiple" allowClear placeholder="Any team" options={teamOpts} optionFilterProp="label" />
           </Form.Item>
-          <Form.Item name="priority_ids" label="Priorities">
+          <Form.Item name="priority_ids" label="Priorities" style={{ width: '50%' }}>
             <Select mode="multiple" allowClear placeholder="Any priority" options={priorityOpts} optionFilterProp="label" />
           </Form.Item>
-          <Form.Item name="company_ids" label="Companies">
+          
+          <Form.Item name="company_ids" label="Companies" style={{ width: '50%' }}>
             <Select mode="multiple" allowClear placeholder="Any company" options={companyOpts} optionFilterProp="label" />
           </Form.Item>
-          <Form.Item name="type_ids" label="Ticket types">
+          <Form.Item name="type_ids" label="Ticket types" style={{ width: '50%' }}>
             <Select mode="multiple" allowClear placeholder="Any type" options={typeOpts} optionFilterProp="label" />
+          </Form.Item>
+          </Flex>
+          <Form.Item
+            name="tag_ids"
+            label="Tags"
+            extra={
+              <Text type="secondary">
+                If you pick one or more tags, only tickets that have <Text strong>at least one</Text> of those tags are
+                included. Leave empty for any tags.
+              </Text>
+            }
+          >
+            <Select mode="multiple" allowClear placeholder="Any tags" options={tagOpts} optionFilterProp="label" />
+          </Form.Item>
+          <Form.Item
+            name="to_status_slugs"
+            label="New status (after change)"
+            extra={
+              <Text type="secondary">
+                Only applies when <Text strong>Status changed</Text> is enabled. Leave empty for any new status; otherwise
+                notify only if the ticket moves into one of the selected statuses.
+              </Text>
+            }
+          >
+            <Select mode="multiple" allowClear placeholder="Any new status" options={statusOpts} optionFilterProp="label" />
           </Form.Item>
         </Form>
       </Modal>

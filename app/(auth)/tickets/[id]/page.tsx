@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import TicketDetailContentClient from '@/components/TicketDetailContentClient'
 import { db } from '@/lib/db'
-import { companyUsers,users } from '@/lib/db'
+import { companyUsers, tickets, users } from '@/lib/db'
 import { getTicketDetail } from '@/lib/ticket-detail'
 
 export default async function TicketDetailPage({
@@ -19,8 +19,8 @@ export default async function TicketDetailPage({
 
   const { id } = await params
   const ticketId = parseInt(id, 10)
-  if (isNaN(ticketId)) {
-    redirect('/tickets')
+  if (Number.isNaN(ticketId)) {
+    redirect('/tickets?ticket_error=invalid')
   }
 
   const role = (session.user as { role?: string }).role?.toLowerCase()
@@ -38,9 +38,14 @@ export default async function TicketDetailPage({
       cid = cu?.companyId ?? null
     }
     if (!cid) {
-      redirect('/tickets')
+      redirect('/tickets?ticket_error=no_access')
     }
     customerCompanyId = cid
+  }
+
+  const [ticketExists] = await db.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)).limit(1)
+  if (!ticketExists) {
+    redirect('/tickets?ticket_error=not_found')
   }
 
   const data = await getTicketDetail(ticketId, {
@@ -49,7 +54,7 @@ export default async function TicketDetailPage({
   })
 
   if (!data) {
-    redirect('/tickets')
+    redirect('/tickets?ticket_error=no_access')
   }
 
   const isCustomer = role === 'customer'

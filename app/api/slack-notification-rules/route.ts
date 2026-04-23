@@ -4,26 +4,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { isAdmin } from '@/lib/auth-utils'
 import { db, slackTicketNotificationRules } from '@/lib/db'
+import { normalizeSlackRuleFilter } from '@/lib/slack-notification-rule-filter'
 import { isSlackIncomingWebhookUrl, maskWebhookUrlForDisplay } from '@/lib/slack-ticket-notify'
-
-function normalizeFilter(body: Record<string, unknown>) {
-  const f = (body.filter && typeof body.filter === 'object' ? body.filter : {}) as Record<string, unknown>
-  return {
-    on_ticket_created: f.on_ticket_created !== false,
-    on_status_changed: f.on_status_changed === true,
-    on_client_reply: f.on_client_reply === true,
-    team_ids: Array.isArray(f.team_ids) ? f.team_ids.filter((x): x is string => typeof x === 'string') : [],
-    priority_ids: Array.isArray(f.priority_ids)
-      ? f.priority_ids.filter((x): x is number => typeof x === 'number' && Number.isInteger(x))
-      : [],
-    company_ids: Array.isArray(f.company_ids)
-      ? f.company_ids.filter((x): x is string => typeof x === 'string')
-      : [],
-    type_ids: Array.isArray(f.type_ids)
-      ? f.type_ids.filter((x): x is number => typeof x === 'number' && Number.isInteger(x))
-      : [],
-  }
-}
 
 function dbErrorMessage(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e)
@@ -98,7 +80,7 @@ export async function POST(request: Request) {
   const name = typeof body.name === 'string' ? body.name.trim().slice(0, 255) : null
   const sortOrder = typeof body.sort_order === 'number' && Number.isInteger(body.sort_order) ? body.sort_order : 0
   const isEnabled = body.is_enabled !== false
-  const filter = normalizeFilter(body)
+  const filter = normalizeSlackRuleFilter(body)
 
   const [created] = await db
     .insert(slackTicketNotificationRules)

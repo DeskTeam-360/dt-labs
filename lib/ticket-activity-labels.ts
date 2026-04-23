@@ -5,6 +5,7 @@ const ACTION_LABELS: Record<string, string> = {
   comment_added: 'Comment added',
   comment_updated: 'Comment updated',
   comment_deleted: 'Comment deleted',
+  comment_attachment_deleted: 'Comment file removed',
 }
 
 /**

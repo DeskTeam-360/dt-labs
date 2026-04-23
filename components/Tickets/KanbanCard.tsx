@@ -19,6 +19,7 @@ const { Text } = Typography
 interface KanbanCardProps {
   ticket: TicketRecord
   dragDisabled?: boolean
+  canDeleteTicket?: boolean
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
   onFilterByStatus?: (statusSlug: string) => void
@@ -31,6 +32,7 @@ interface KanbanCardProps {
 export default function KanbanCard({
   ticket,
   dragDisabled = false,
+  canDeleteTicket = false,
   onEdit,
   onDelete,
   onFilterByStatus,
@@ -60,13 +62,21 @@ export default function KanbanCard({
   }
 
   return (
-    <div ref={setNodeRef} style={style} {...(!dragDisabled ? attributes : {})}>
+    <div
+      ref={setNodeRef}
+      className="kanban-sortable-ticket"
+      style={{
+        ...style,
+        cursor: dragDisabled ? 'default' : 'grab',
+      }}
+      {...(!dragDisabled ? attributes : {})}
+      {...(!dragDisabled ? listeners : {})}
+    >
       <Card
         className="kanban-ticket-card"
         size="small"
         style={{
           margin: 6,
-          cursor: dragDisabled ? 'default' : 'grab',
           borderRadius: 12,
           boxShadow: 'var(--kanban-card-shadow)',
           maxWidth: 300,
@@ -75,7 +85,6 @@ export default function KanbanCard({
           border: '1px solid var(--kanban-card-border)',
         }}
         styles={{ body: { padding: 14, background: 'transparent' } }}
-        {...(!dragDisabled ? listeners : {})}
       >
         {/* Tags + menu row — stop drag sensor when interacting with filter chips */}
         <Flex justify="space-between" align="flex-start" style={{ marginBottom: 10 }}>
@@ -202,7 +211,7 @@ export default function KanbanCard({
               </Tag>
             )}
           </Flex>
-          <Dropdown 
+          <Dropdown
             menu={{
               items: [
                 {
@@ -211,22 +220,26 @@ export default function KanbanCard({
                   icon: <EditOutlined />,
                   onClick: () => onEdit(ticket),
                 },
-                {
-                  key: 'delete',
-                  label: 'Move to trash',
-                  icon: <DeleteOutlined />,
-                  danger: true,
-                  onClick: () => {
-                    Modal.confirm({
-                      title: 'Move ticket to trash?',
-                      content: 'The ticket will be hidden from the main list. You can open Trash from the sidebar to review.',
-                      okText: 'Move to trash',
-                      okButtonProps: { danger: true },
-                      cancelText: 'Cancel',
-                      onOk: () => onDelete(ticket.id),
-                    })
-                  },
-                },
+                ...(canDeleteTicket
+                  ? [
+                      {
+                        key: 'delete',
+                        label: 'Move to trash',
+                        icon: <DeleteOutlined />,
+                        danger: true,
+                        onClick: () => {
+                          Modal.confirm({
+                            title: 'Move ticket to trash?',
+                            content: 'The ticket will be hidden from the main list. You can open Trash from the sidebar to review.',
+                            okText: 'Move to trash',
+                            okButtonProps: { danger: true },
+                            cancelText: 'Cancel',
+                            onOk: () => onDelete(ticket.id),
+                          })
+                        },
+                      },
+                    ]
+                  : []),
               ],
             }}
             trigger={['click']}

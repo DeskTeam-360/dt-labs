@@ -32,6 +32,7 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { useRouter } from 'next/navigation'
 import { useCallback,useEffect, useMemo, useState } from 'react'
 
+import { canDeleteTickets } from '@/lib/auth-utils'
 import { resolveDefaultNewTicketStatusSlug } from '@/lib/ticket-default-status'
 import { ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
 
@@ -44,6 +45,8 @@ const { Option } = Select
 interface TabTicketsProps {
   companyData: { id: string; name?: string }
   currentUser?: { id: string; email?: string | null; name?: string | null } | null
+  /** Used to hide ticket delete (trash) for non–admin/manager */
+  viewerRole?: string | null
   basePath?: string
 }
 
@@ -95,8 +98,9 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-export default function TabTickets({ companyData, currentUser, basePath }: TabTicketsProps) {
+export default function TabTickets({ companyData, currentUser, viewerRole, basePath }: TabTicketsProps) {
   const router = useRouter()
+  const canMoveTicketToTrash = canDeleteTickets(viewerRole ?? undefined)
   const [tickets, setTickets] = useState<TicketRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [statuses, setStatuses] = useState<StatusOption[]>([])
@@ -460,22 +464,24 @@ export default function TabTickets({ companyData, currentUser, basePath }: TabTi
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             Edit
           </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => {
-              Modal.confirm({
-                title: 'Delete ticket?',
-                okText: 'Delete',
-                okButtonProps: { danger: true },
-                onOk: () => handleDelete(record.id),
-              })
-            }}
-          >
-            Delete
-          </Button>
+          {canMoveTicketToTrash ? (
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => {
+                Modal.confirm({
+                  title: 'Delete ticket?',
+                  okText: 'Delete',
+                  okButtonProps: { danger: true },
+                  onOk: () => handleDelete(record.id),
+                })
+              }}
+            >
+              Delete
+            </Button>
+          ) : null}
         </Space>
       ),
     },

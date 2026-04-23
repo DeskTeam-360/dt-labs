@@ -12,6 +12,7 @@ interface TicketsCardViewProps {
   allStatusColumns?: StatusColumn[]
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
+  canDeleteTicket?: boolean
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
   allPriorities?: Array<{ id: number }>
@@ -26,6 +27,7 @@ export default function TicketsCardView({
   allStatusColumns,
   onEdit,
   onDelete,
+  canDeleteTicket = false,
   sortBy = 'updated_at',
   sortOrder = 'desc',
   allPriorities = [],
@@ -56,6 +58,7 @@ export default function TicketsCardView({
             allStatusColumns={allStatusColumns}
             onEdit={onEdit}
             onDelete={onDelete}
+            canDeleteTicket={canDeleteTicket}
             onFilterByStatus={onFilterByStatus}
             onFilterByPriority={onFilterByPriority}
             onFilterByTag={onFilterByTag}

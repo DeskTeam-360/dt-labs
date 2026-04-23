@@ -26,6 +26,8 @@ declare module 'next-auth/jwt' {
     id?: string
     email?: string
     role?: string
+    name?: string
+    picture?: string
     error?: 'AccessRevoked'
     userCheckedAt?: number
   }

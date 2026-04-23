@@ -44,3 +44,45 @@ export async function fetchUserSessionEligibility(userId: string) {
     return userRowAllowsSession({ status: row.status, deletedAt: null })
   }
 }
+
+/**
+ * JWT refresh (Node): one DB round-trip for active gate + display fields so session name/avatar
+ * stay aligned with `users` after profile edits.
+ */
+export async function fetchUserJwtRefreshData(userId: string): Promise<{
+  active: boolean
+  fullName: string | null
+  avatarUrl: string | null
+}> {
+  try {
+    const [row] = await db
+      .select({
+        status: users.status,
+        deletedAt: users.deletedAt,
+        fullName: users.fullName,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+    if (!row || !userRowAllowsSession(row)) {
+      return { active: false, fullName: null, avatarUrl: null }
+    }
+    return { active: true, fullName: row.fullName, avatarUrl: row.avatarUrl }
+  } catch (err) {
+    if (!missingUsersDeletedAtColumn(err)) throw err
+    const [row] = await db
+      .select({
+        status: users.status,
+        fullName: users.fullName,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+    if (row === undefined || !userRowAllowsSession({ status: row.status, deletedAt: null })) {
+      return { active: false, fullName: null, avatarUrl: null }
+    }
+    return { active: true, fullName: row.fullName, avatarUrl: row.avatarUrl }
+  }
+}

@@ -415,16 +415,14 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
           <Space orientation="vertical" size="large" style={{ width: '100%' }}>
             <div>
               <SpaNavLink href="/settings">
-                <Button type="link" icon={<ArrowLeftOutlined />} style={{ paddingLeft: 0 }}>
+                <Button type="default" icon={<ArrowLeftOutlined />}>
                   Back to Settings
                 </Button>
               </SpaNavLink>
               <Title level={2} style={{ margin: '8px 0 0' }}>
                 Recap snapshots
               </Title>
-              <Text type="secondary">
-                Ringkasan tersimpan dari Customer time report — grup periode seperti lembar rekap. {total} total.
-              </Text>
+              
             </div>
 
             {!loading && rows.length > 0 && (

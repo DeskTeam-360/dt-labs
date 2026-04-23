@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ilike, inArray, lte,or } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, lte, or } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import { google } from 'googleapis'
 import { NextResponse } from 'next/server'
@@ -240,6 +240,8 @@ export async function GET(request: Request) {
   const teamIdsParam = url.searchParams.get('team_ids')
   const dateFrom = url.searchParams.get('date_from')
   const dateTo = url.searchParams.get('date_to')
+  const dueDateFrom = url.searchParams.get('due_date_from')
+  const dueDateTo = url.searchParams.get('due_date_to')
   const search = url.searchParams.get('search')?.trim()
   const limit = Math.min(
     Math.max(1, parseInt(url.searchParams.get('limit') || String(DEFAULT_LIMIT), 10)),
@@ -332,6 +334,20 @@ export async function GET(request: Request) {
     if (!isNaN(d.getTime())) {
       d.setHours(23, 59, 59, 999)
       conditions.push(lte(tickets.createdAt, d))
+    }
+  }
+  if (dueDateFrom || dueDateTo) {
+    conditions.push(isNotNull(tickets.dueDate))
+    if (dueDateFrom) {
+      const d = new Date(dueDateFrom)
+      if (!isNaN(d.getTime())) conditions.push(gte(tickets.dueDate, d))
+    }
+    if (dueDateTo) {
+      const d = new Date(dueDateTo)
+      if (!isNaN(d.getTime())) {
+        d.setHours(23, 59, 59, 999)
+        conditions.push(lte(tickets.dueDate, d))
+      }
     }
   }
   if (search) {

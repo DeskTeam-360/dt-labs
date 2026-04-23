@@ -1,4 +1,4 @@
-import { asc,eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 
 import { db } from '@/lib/db'
 import {
@@ -7,6 +7,7 @@ import {
   teams,
   ticketPriorities,
   tickets,
+  ticketTags,
   ticketTypes,
   users,
 } from '@/lib/db'
@@ -25,6 +26,15 @@ export type SlackNotifyRuleFilter = {
   priority_ids?: number[]
   company_ids?: string[]
   type_ids?: number[]
+  /**
+   * When non-empty and event is `status_changed`, the ticket's **new** status slug must be one of these.
+   * Ignored for `ticket_created` and `client_reply`.
+   */
+  to_status_slugs?: string[]
+  /** When non-empty, the ticket must have at least one of these tag IDs (`ticket_tags`). */
+  tag_ids?: string[]
+  /** Optional line(s) prepended to the Slack message for this rule (plain text; shortened when posting). */
+  slack_note?: string
 }
 
 export type SlackTicketPayload = {
@@ -53,8 +63,13 @@ function eventAllowed(filter: SlackNotifyRuleFilter, event: SlackTicketNotifyEve
   return false
 }
 
-function matchesDimensions(filter: SlackNotifyRuleFilter, ticket: SlackTicketPayload): boolean {
-  const { team_ids, priority_ids, company_ids, type_ids } = filter
+function matchesDimensions(
+  filter: SlackNotifyRuleFilter,
+  ticket: SlackTicketPayload,
+  event: SlackTicketNotifyEvent,
+  ticketTagIds: string[]
+): boolean {
+  const { team_ids, priority_ids, company_ids, type_ids, to_status_slugs, tag_ids } = filter
   if (team_ids && team_ids.length > 0) {
     if (!ticket.teamId || !team_ids.includes(ticket.teamId)) return false
   }
@@ -67,7 +82,22 @@ function matchesDimensions(filter: SlackNotifyRuleFilter, ticket: SlackTicketPay
   if (type_ids && type_ids.length > 0) {
     if (ticket.typeId == null || !type_ids.includes(ticket.typeId)) return false
   }
+  if (to_status_slugs && to_status_slugs.length > 0 && event === 'status_changed') {
+    if (!to_status_slugs.includes(ticket.status)) return false
+  }
+  if (tag_ids && tag_ids.length > 0) {
+    const has = tag_ids.some((id) => ticketTagIds.includes(id))
+    if (!has) return false
+  }
   return true
+}
+
+async function loadTicketTagIds(ticketId: number): Promise<string[]> {
+  const rows = await db
+    .select({ tagId: ticketTags.tagId })
+    .from(ticketTags)
+    .where(eq(ticketTags.ticketId, ticketId))
+  return rows.map((r) => r.tagId)
 }
 
 function maskForSlack(s: string, maxLen: number): string {
@@ -234,10 +264,16 @@ export async function notifySlackTicketEvent(
       .where(eq(slackTicketNotificationRules.isEnabled, true))
       .orderBy(asc(slackTicketNotificationRules.sortOrder), asc(slackTicketNotificationRules.createdAt))
 
+    const needTagLookup = rules.some((r) => {
+      const f = parseFilter(r.filter)
+      return Array.isArray(f.tag_ids) && f.tag_ids.length > 0
+    })
+    const ticketTagIds = needTagLookup ? await loadTicketTagIds(ticket.id) : []
+
     const matched = rules.filter((r) => {
       const f = parseFilter(r.filter)
       if (!eventAllowed(f, event)) return false
-      return matchesDimensions(f, ticket)
+      return matchesDimensions(f, ticket, event, ticketTagIds)
     })
     if (matched.length === 0) return
 
@@ -247,11 +283,14 @@ export async function notifySlackTicketEvent(
     const text = buildMessage(event, ticket, labels, ticketUrl)
 
     await Promise.all(
-      matched.map((r) =>
-        postWebhook(r.webhookUrl, text).catch((err) => {
+      matched.map((r) => {
+        const f = parseFilter(r.filter)
+        const rawNote = typeof f.slack_note === 'string' ? f.slack_note.trim() : ''
+        const prefix = rawNote.length > 0 ? `_${maskForSlack(rawNote, 900)}_\n\n` : ''
+        return postWebhook(r.webhookUrl, prefix + text).catch((err) => {
           console.error('[slack-ticket-notify] webhook failed', r.id, err)
         })
-      )
+      })
     )
   } catch (e) {
     console.error('[slack-ticket-notify]', e)

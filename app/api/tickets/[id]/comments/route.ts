@@ -304,16 +304,29 @@ export async function POST(
     }
   }
 
+  let commentAttachmentsOut: Array<{ id: string; file_url: string; file_name: string }> = []
   if (attachments.length > 0) {
-    await db.insert(commentAttachments).values(
-      attachments.map((a: { file_url: string; file_name: string; file_path: string }) => ({
-        commentId: row.id,
-        fileUrl: a.file_url,
-        fileName: a.file_name,
-        filePath: a.file_path,
-        uploadedBy: authUser.id,
-      }))
-    )
+    const inserted = await db
+      .insert(commentAttachments)
+      .values(
+        attachments.map((a: { file_url: string; file_name: string; file_path: string }) => ({
+          commentId: row.id,
+          fileUrl: a.file_url,
+          fileName: a.file_name,
+          filePath: a.file_path,
+          uploadedBy: authUser.id,
+        }))
+      )
+      .returning({
+        id: commentAttachments.id,
+        fileUrl: commentAttachments.fileUrl,
+        fileName: commentAttachments.fileName,
+      })
+    commentAttachmentsOut = inserted.map((r) => ({
+      id: r.id,
+      file_url: r.fileUrl,
+      file_name: r.fileName,
+    }))
   }
 
   try {
@@ -497,6 +510,6 @@ export async function POST(
     cc_emails: row.ccEmails ?? [],
     bcc_emails: row.bccEmails ?? [],
     user: { id: authUser.id, full_name: authUser.name, email: authUser.email, avatar_url: authUser.image },
-    comment_attachments: attachments.map((a: { file_url: string; file_name: string }) => ({ id: '', file_url: a.file_url, file_name: a.file_name })),
+    comment_attachments: commentAttachmentsOut,
   })
 }

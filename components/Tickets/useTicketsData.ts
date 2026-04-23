@@ -30,6 +30,7 @@ interface StoredFilter {
   filterTeamId?: string | null
   filterTeamIds?: string[] | null
   filterDateRange?: [string | null, string | null] | null
+  filterDueDateRange?: [string | null, string | null] | null
   filterSearch?: string | null
   viewMode?: 'kanban' | 'list' | 'card' | 'roundrobin'
   filterSidebarCollapsed?: boolean
@@ -162,6 +163,13 @@ function getInitialFilterStateFromStored(stored: StoredFilter | null, isCustomer
       const d1 = dayjs(dr[1])
       return d0.isValid() && d1.isValid() ? [d0, d1] : null
     })(),
+    filterDueDateRange: ((): [dayjs.Dayjs | null, dayjs.Dayjs | null] | null => {
+      const dr = stored?.filterDueDateRange
+      if (!dr || !dr[0] || !dr[1]) return null
+      const d0 = dayjs(dr[0])
+      const d1 = dayjs(dr[1])
+      return d0.isValid() && d1.isValid() ? [d0, d1] : null
+    })(),
     filterSearch: stored?.filterSearch ?? '',
     filterSidebarCollapsed: stored?.filterSidebarCollapsed ?? true,
     viewMode: (stored?.viewMode as 'kanban' | 'list' | 'card' | 'roundrobin') || 'kanban',
@@ -177,7 +185,7 @@ function getInitialViewModeCustomer(isCustomer: boolean, stored: StoredFilter | 
   return storedMode || 'kanban'
 }
 
-export function useTicketsData(currentUserId: string, isCustomer = false) {
+export function useTicketsData(currentUserId: string, isCustomer = false, canDeleteTicket = false) {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const router = useRouter()
@@ -246,6 +254,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   const [filterVisibility, setFilterVisibilityState] = useState<string[]>(initialState.filterVisibility)
   const [filterTeamIds, setFilterTeamIds] = useState<string[]>(initialState.filterTeamIds)
   const [filterDateRange, setFilterDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(initialState.filterDateRange)
+  const [filterDueDateRange, setFilterDueDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(
+    initialState.filterDueDateRange ?? null
+  )
   const [filterSearch, setFilterSearch] = useState(initialState.filterSearch)
   const [submitting, setSubmitting] = useState(false)
   const [filterSidebarCollapsed, setFilterSidebarCollapsed] = useState(initialState.filterSidebarCollapsed)
@@ -298,6 +309,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterVisibility.length > 0 ||
     filterTeamIds.length > 0 ||
     (filterDateRange != null && filterDateRange[0] != null && filterDateRange[1] != null) ||
+    (filterDueDateRange != null && filterDueDateRange[0] != null && filterDueDateRange[1] != null) ||
     filterSearch.trim() !== '' ||
     filterTicketType != null ||
     filterPriorityIds.length > 0
@@ -316,6 +328,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setFilterVisibilityState([])
     setFilterTeamIds([])
     setFilterDateRange(null)
+    setFilterDueDateRange(null)
     setFilterSearch('')
   }, [statusColumns, isCustomer, allStatuses])
 
@@ -352,6 +365,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       params.set('date_from', filterDateRange[0].startOf('day').toISOString())
       params.set('date_to', filterDateRange[1].endOf('day').toISOString())
     }
+    if (filterDueDateRange?.[0] && filterDueDateRange?.[1]) {
+      params.set('due_date_from', filterDueDateRange[0].startOf('day').toISOString())
+      params.set('due_date_to', filterDueDateRange[1].endOf('day').toISOString())
+    }
     if (filterSearch.trim()) params.set('search', filterSearch.trim())
     params.set('limit', '500')
 
@@ -376,6 +393,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterVisibility,
     filterTeamIds,
     filterDateRange,
+    filterDueDateRange,
     filterSearch,
     filterTicketType,
     filterPriorityIds,
@@ -403,6 +421,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setFilterVisibilityState(state.filterVisibility)
     setFilterTeamIds(state.filterTeamIds)
     setFilterDateRange(state.filterDateRange)
+    setFilterDueDateRange(state.filterDueDateRange ?? null)
     setFilterSearch(state.filterSearch)
     setFilterSidebarCollapsed(state.filterSidebarCollapsed)
     setViewMode(vm)
@@ -601,6 +620,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       setFilterVisibilityState(parsed.filterVisibility)
       setFilterTeamIds(parsed.filterTeamIds)
       setFilterDateRange(parsed.filterDateRange)
+      setFilterDueDateRange(parsed.filterDueDateRange ?? null)
       setFilterSearch(parsed.filterSearch)
       setViewMode(parsed.viewMode)
       setSortBy(parsed.sortBy)
@@ -628,6 +648,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         setFilterVisibilityState([])
         setFilterTeamIds([])
         setFilterDateRange(null)
+        setFilterDueDateRange(null)
         setFilterSearch('')
         setViewMode('kanban')
         setSortBy('updated_at')
@@ -660,6 +681,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         filterDateRange?.[0] && filterDateRange?.[1]
           ? [filterDateRange[0].toISOString(), filterDateRange[1].toISOString()]
           : null,
+      filterDueDateRange:
+        filterDueDateRange?.[0] && filterDueDateRange?.[1]
+          ? [filterDueDateRange[0].toISOString(), filterDueDateRange[1].toISOString()]
+          : null,
       filterSearch: filterSearch || null,
       viewMode: viewMode,
       filterSidebarCollapsed: filterSidebarCollapsed,
@@ -683,6 +708,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
         filterVisibility,
         filterTeamIds,
         filterDateRange,
+        filterDueDateRange,
         filterSearch,
         viewMode,
         sortBy,
@@ -705,6 +731,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterVisibility,
     filterTeamIds,
     filterDateRange,
+    filterDueDateRange,
     filterSearch,
     viewMode,
     filterSidebarCollapsed,
@@ -725,6 +752,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
       filterVisibility,
       filterTeamIds,
       filterDateRange,
+      filterDueDateRange,
       filterSearch,
       viewMode,
       sortBy,
@@ -740,6 +768,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterVisibility,
     filterTeamIds,
     filterDateRange,
+    filterDueDateRange,
     filterSearch,
     viewMode,
     sortBy,
@@ -782,7 +811,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   }, [filterTicketType, viewMode, isCustomer])
 
   const handleDragStart: TicketsDragStartHandler = (event) => {
-    setActiveId(event.active.id as number)
+    const raw = event.active.id
+    const id = typeof raw === 'string' ? Number.parseInt(raw, 10) : (raw as number)
+    setActiveId(Number.isFinite(id) ? id : null)
   }
 
   const handleDragEnd: TicketsDragEndHandler = async (event) => {
@@ -791,16 +822,20 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
 
     if (!over) return
 
-    const ticketId = active.id as number
-    let newStatus = over.id as string
+    const activeRaw = active.id
+    const ticketId = typeof activeRaw === 'string' ? Number.parseInt(activeRaw, 10) : (activeRaw as number)
+    if (Number.isNaN(ticketId)) return
 
-    if (!columnsToShow.some((c) => c.id === newStatus)) {
-      const ticket = tickets.find((t) => t.id === Number(newStatus))
-      if (ticket) {
-        newStatus = ticket.status as string
-      } else {
-        return
-      }
+    const overId = over.id
+    const overAsColumnId = String(overId)
+    let newStatus: string
+    if (columnsToShow.some((c) => c.id === overAsColumnId)) {
+      newStatus = overAsColumnId
+    } else {
+      const overNum = typeof overId === 'string' ? Number.parseInt(overId, 10) : (overId as number)
+      const hit = tickets.find((t) => t.id === overNum)
+      if (!hit) return
+      newStatus = hit.status as string
     }
 
     setTickets((prevTickets) =>
@@ -891,6 +926,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   }
 
   const handleDelete = async (ticketId: number) => {
+    if (!canDeleteTicket) {
+      message.error('Only admins and managers can move tickets to trash')
+      return
+    }
     setTickets((prev) => prev.filter((t) => t.id !== ticketId))
     try {
       await apiFetch(`/api/tickets/${ticketId}`, { method: 'DELETE' })
@@ -902,7 +941,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
   }
 
   const handleBulkMoveToTrash = async (ids: number[]) => {
-    if (!ids.length || isCustomer) return
+    if (!ids.length || isCustomer || !canDeleteTicket) return
     try {
       await Promise.all(
         ids.map((id) =>
@@ -1206,6 +1245,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     setFilterTeamIds,
     filterDateRange,
     setFilterDateRange,
+    filterDueDateRange,
+    setFilterDueDateRange,
     filterSearch,
     setFilterSearch,
     filterSidebarCollapsed,
@@ -1243,5 +1284,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false) {
     filterByTagFromChip,
     filterByCompanyFromChip,
     submitting,
+    canDeleteTicket,
   }
 }

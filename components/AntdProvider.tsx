@@ -5,6 +5,7 @@ import type { Session } from 'next-auth'
 import { SessionProvider } from 'next-auth/react'
 
 import FirebaseSessionBridge from '@/components/FirebaseSessionBridge'
+import NotificationPollProvider from '@/components/NotificationPollProvider'
 import SessionAccessGuard from '@/components/SessionAccessGuard'
 import { ThemeProvider, useTheme } from '@/components/ThemeProvider'
 
@@ -32,6 +33,23 @@ function ThemedConfig({ children }: { children: React.ReactNode }) {
             darkItemSelectedBg: '#f0f2f5',
             darkItemSelectedColor: '#141414',
           },
+          Table: isDark
+            ? {
+                headerBg: '#1a1a1a',
+                headerColor: 'rgba(255, 255, 255, 0.88)',
+                borderColor: '#303030',
+                headerSplitColor: 'rgba(255, 255, 255, 0.12)',
+                rowHoverBg: 'rgba(255, 255, 255, 0.04)',
+                headerBorderRadius: 8,
+              }
+            : {
+                headerBg: '#fafafa',
+                headerColor: 'rgba(0, 0, 0, 0.88)',
+                borderColor: '#f0f0f0',
+                headerSplitColor: '#f0f0f0',
+                rowHoverBg: '#f5f8ff',
+                headerBorderRadius: 8,
+              },
         },
       }}
     >
@@ -52,9 +70,11 @@ export default function AntdProvider({
       <ThemedConfig>
         {/* NextAuth: no polling + no focus refetch — avoids heavy /api/auth/session traffic. */}
         <SessionProvider session={session} refetchInterval={0} refetchOnWindowFocus={false}>
-          <SessionAccessGuard />
-          <FirebaseSessionBridge />
-          {children}
+          <NotificationPollProvider>
+            <SessionAccessGuard />
+            <FirebaseSessionBridge />
+            {children}
+          </NotificationPollProvider>
         </SessionProvider>
       </ThemedConfig>
     </ThemeProvider>

@@ -37,6 +37,7 @@ interface TicketsListViewProps {
   allPriorities?: PriorityOption[]
   isCustomer?: boolean
   filterTicketType?: 'spam' | 'trash' | null
+  canDeleteTicket?: boolean
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
   onBulkMoveToSpam?: (ids: number[]) => void | Promise<void>
@@ -53,6 +54,7 @@ export default function TicketsListView({
   allPriorities = [],
   isCustomer = false,
   filterTicketType = null,
+  canDeleteTicket = false,
   onEdit,
   onDelete,
   onBulkMoveToSpam,
@@ -395,36 +397,32 @@ export default function TicketsListView({
               <Tooltip title="Edit">
                 <Button type="text" size="small" icon={<EditOutlined />} onClick={() => onEdit(record)} />
               </Tooltip>
-              <Dropdown
-                menu={{
-                  items: [
-                    {
-                      key: 'delete',
-                      label: 'Move to trash',
-                      icon: <DeleteOutlined />,
-                      danger: true,
-                      onClick: () => {
-                        Modal.confirm({
-                          title: 'Move ticket to trash?',
-                          content: 'The ticket will be hidden from the main list. Open Trash from the sidebar to review.',
-                          okText: 'Move to trash',
-                          okButtonProps: { danger: true },
-                          cancelText: 'Cancel',
-                          onOk: () => onDelete(record.id),
-                        })
-                      },
-                    },
-                  ],
-                }}
-                trigger={['click']}
-              >
-                <Button type="text" size="small" icon={<MoreOutlined />} />
-              </Dropdown>
+              {canDeleteTicket ? (
+                <Tooltip title="Move to trash">
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => {
+                      Modal.confirm({
+                        title: 'Move ticket to trash?',
+                        content:
+                          'The ticket will be hidden from the main list. You can open Trash from the sidebar to review.',
+                        okText: 'Move to trash',
+                        okButtonProps: { danger: true },
+                        cancelText: 'Cancel',
+                        onOk: () => onDelete(record.id),
+                      })
+                    }}
+                  />
+                </Tooltip>
+              ) : null}
             </Space>
           ),
-        },
-      ]}
+        },]
+      }
     />
-    </div>
-  )
+  </div>
+)
 }

@@ -35,11 +35,26 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
   if (action === 'ticket_updated') {
     const parts: string[] = []
     const changes = m.changes
+    const entityLabels = m.entity_labels as { teams?: Record<string, string> } | undefined
+    const teamNames = entityLabels?.teams
+
+    const formatTeamRef = (id: unknown): string => {
+      if (id == null || id === '') return 'None'
+      const s = String(id)
+      const name = teamNames?.[s]
+      if (name) return trunc(name.replace(/\s+/g, ' '))
+      return str(id)
+    }
+
     if (changes && typeof changes === 'object' && !Array.isArray(changes)) {
       for (const [key, val] of Object.entries(changes)) {
         if (val && typeof val === 'object' && 'from' in val && 'to' in val) {
           const ft = val as { from: unknown; to: unknown }
-          parts.push(`${key}: ${str(ft.from)} → ${str(ft.to)}`)
+          if (key === 'teamId') {
+            parts.push(`Team: ${formatTeamRef(ft.from)} → ${formatTeamRef(ft.to)}`)
+          } else {
+            parts.push(`${key}: ${str(ft.from)} → ${str(ft.to)}`)
+          }
         }
       }
     }
@@ -58,6 +73,11 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
       parts.push(names.length ? `−files: ${names.join(', ')}` : `−${removed.length} file(s)`)
     }
     return parts.join(' · ')
+  }
+
+  if (action === 'comment_attachment_deleted') {
+    const fn = typeof m.file_name === 'string' ? m.file_name.trim() : ''
+    return fn ? trunc(fn) : ''
   }
 
   return ''
