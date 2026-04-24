@@ -1,6 +1,7 @@
 # Deskteam360 (my-app) — Node 20, Next.js, PM2
 # Secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY, DEPLOY_PATH
 # Production: port 3003, PM2 name: dt-labs
+# Deploy: exit 137 saat npm = sering OOM; skrip memakai batas parallel install + heap Node. Masih 137? Tambah swap di VPS, atau upgrade RAM.
 
 name: Deskteam360 CI/CD
 
@@ -78,7 +79,11 @@ jobs:
             git fetch origin main
             git checkout main
             git reset --hard origin/main
-            npm ci
+            # Batasi memori/parallel saat install (VPS 1–2GB sering 137 OOM)
+            export NODE_OPTIONS=--max-old-space-size=2048
+            export npm_config_maxsockets=1
+            npm ci --no-audit --no-fund
+            export NODE_OPTIONS=--max-old-space-size=4096
             npm run build
             if command -v pm2 >/dev/null 2>&1; then
               pm2 restart dt-labs || pm2 start npm --name dt-labs -- run start -- -p 3003
