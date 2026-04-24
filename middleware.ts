@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
+import { authSecureCookieFromRequest } from '@/lib/auth-secure-cookies'
+
 /**
  * Jangan import `auth` dari `@/auth` di sini — itu menarik Drizzle + postgres + bcrypt ke Edge
  * (timeout Vercel / memori besar). Cukup decode JWT sesi dengan getToken (ringan).
@@ -15,7 +17,7 @@ export async function middleware(req: NextRequest) {
   const token = await getToken({
     req,
     secret,
-    secureCookie: process.env.NODE_ENV === 'production',
+    secureCookie: authSecureCookieFromRequest(req),
   })
 
   const accessRevoked = token?.error === 'AccessRevoked'
