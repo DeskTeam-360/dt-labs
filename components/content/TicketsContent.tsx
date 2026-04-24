@@ -164,6 +164,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             onSortOrderChange={setSortOrder}
             filterSearch={filterSearch}
             onFilterSearchChange={setFilterSearch}
+            filterTicketType={filterTicketType}
           />
 
           {!isCustomer && filterTicketType === 'spam' && (

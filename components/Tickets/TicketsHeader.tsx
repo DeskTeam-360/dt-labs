@@ -21,6 +21,8 @@ interface TicketsHeaderProps {
   onSortOrderChange?: (v: TicketSortOrder) => void
   filterSearch?: string
   onFilterSearchChange?: (v: string) => void
+  /** Row classification list (staff junk folders) — spam/trash set title and hide view mode picker */
+  filterTicketType?: 'spam' | 'trash' | null
 }
 
 const SORT_FIELD_OPTIONS: { value: TicketSortField; label: string }[] = [
@@ -45,7 +47,11 @@ export default function TicketsHeader({
   onSortOrderChange,
   filterSearch = '',
   onFilterSearchChange,
+  filterTicketType = null,
 }: TicketsHeaderProps) {
+  const inJunkFolder = !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
+  const junkTitle =
+    filterTicketType === 'spam' ? 'Spam' : filterTicketType === 'trash' ? 'Trash' : null
   const viewOptions = [
     { label: <span style={{ marginRight: 8 }}><AppstoreOutlined /> Kanban</span>, value: 'kanban' },
     { label: <span style={{ marginRight: 8 }}><UnorderedListOutlined /> List</span>, value: 'list' },
@@ -59,13 +65,14 @@ export default function TicketsHeader({
       <Flex vertical gap={12} style={{ flex: 1, minWidth: 0 }}>
         <Flex align="center" justify="space-between" wrap="wrap" gap={16}>
           <Typography.Title level={2} style={{ margin: 0 }}>
-            My Tickets
+            {junkTitle ?? 'My Tickets'}
           </Typography.Title>
           <Button type="primary" icon={<PlusOutlined />} onClick={onCreateClick} loading={loading}>
             Add Ticket
           </Button>
         </Flex>
 
+        {!inJunkFolder && (
         <Flex>
         <Segmented
             value={isCustomer && viewMode === 'roundrobin' ? 'kanban' : viewMode}
@@ -74,6 +81,7 @@ export default function TicketsHeader({
             size="large"
           />
         </Flex>
+        )}
 
         <Flex align="center" gap={16} wrap="wrap">
      
