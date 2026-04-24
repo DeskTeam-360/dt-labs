@@ -1,0 +1,87 @@
+# Deskteam360 (my-app) — Node 20, Next.js, PM2
+# Secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY, DEPLOY_PATH
+# Production: port 3003, PM2 name: dt-labs
+
+name: Deskteam360 CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  HUSKY: 0
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: ci-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    env:
+      # NextAuth / DB — nilai placeholder agar `next build` & import modul jalan di runner tanpa .env
+      AUTH_SECRET: ci-build-auth-secret-must-be-at-least-32-chars
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?sslmode=disable
+      NEXT_PUBLIC_APP_NAME: Deskteam360
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: npm run build
+
+  deploy:
+    name: Deploy production (main)
+    needs: ci
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: deploy-server-main
+      cancel-in-progress: false
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            export HUSKY=0
+            cd "${{ secrets.DEPLOY_PATH }}"
+            git remote -v
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
+            npm ci
+            npm run build
+            if command -v pm2 >/dev/null 2>&1; then
+              pm2 restart dt-labs || pm2 start npm --name dt-labs -- run start -- -p 3003
+            else
+              echo "PM2 not found. Start manually, e.g.: nohup npm run start -- -p 3003 &"
+            fi
