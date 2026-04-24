@@ -1,7 +1,7 @@
 'use client'
 
-import { ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, CheckSquareOutlined,ClockCircleOutlined, CloseCircleOutlined, CloudUploadOutlined, DatabaseOutlined, DeleteOutlined, EditOutlined, EyeOutlined, FileTextOutlined, GlobalOutlined, HistoryOutlined, PlayCircleOutlined, PlusOutlined, ReadOutlined, SaveOutlined, TeamOutlined } from '@ant-design/icons'
-import { Button, Card, Col, Descriptions, Divider, Flex, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Progress, Row, Select, Space, Spin, Switch, Table, Tabs, Tag, Typography } from 'antd'
+import { CheckSquareOutlined, DeleteOutlined, EditOutlined, FileTextOutlined, GlobalOutlined, PlayCircleOutlined, PlusOutlined, TeamOutlined } from '@ant-design/icons'
+import { Button, Card, Col, Divider, Flex, Form, Input, InputNumber, Layout, message, Modal, Row, Select, Space, Switch, Tabs, Tag, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useEffect,useState } from 'react'
 
@@ -9,21 +9,13 @@ import AdminMainColumn from '../AdminMainColumn'
 import AdminSidebar from '../AdminSidebar'
 import {
   TabCompanyLog,
-  TabContentPlanner,
   TabCrawling,
-  TabDataForm,
-  TabGenerate,
   TabInfo,
-  TabKnowledgeBase,
   TabTickets,
   TabUsers,
   TabWebsites,
 } from '../CompanyDetail'
 import CustomerNavbar from '../CustomerNavbar'
-import DateDisplay from '../DateDisplay'
-
-/** Temporary: company KB API errors on load — set true to restore tab + fetches */
-const COMPANY_DETAIL_KNOWLEDGE_BASE_ENABLED = false
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -61,7 +53,7 @@ interface CompanyDetailContentProps {
   companyData: any
   /** 'customer' = navbar layout for customer portal; 'admin' = sidebar layout (default) */
   variant?: 'admin' | 'customer'
-  /** When set, render only this section (no tabs). Keys include: info, users, tickets, company-log, content-planner, … (legacy activeSection `daily-active-assignments` maps to company-log) */
+  /** When set, render only this section (no tabs). Keys include: info, users, tickets, company-log, … (legacy activeSection `daily-active-assignments` maps to company-log) */
   activeSection?: string
   /** Used to show portal-admin toggle on Users tab (system admin only) */
   currentUserRole?: string | null
@@ -77,17 +69,9 @@ export default function CompanyDetailContent({
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [form] = Form.useForm()
-  const [generateForm] = Form.useForm()
   const [saving, setSaving] = useState(false)
   const [dataTemplates, setDataTemplates] = useState<any[]>([])
   const [loadingTemplates, setLoadingTemplates] = useState(false)
-  const [contentTemplates, setContentTemplates] = useState<any[]>([])
-  const [loadingContentTemplates, setLoadingContentTemplates] = useState(false)
-  const [selectedContentTemplate, setSelectedContentTemplate] = useState<string | null>(null)
-  const [generatedContent, setGeneratedContent] = useState<string>('')
-  const [usedFieldsInGenerated, setUsedFieldsInGenerated] = useState<string[]>([])
-  const [usedSourceIdsFromCompanyDatas, setUsedSourceIdsFromCompanyDatas] = useState<string[]>([])
-  const [savingToKb, setSavingToKb] = useState(false)
   const [websites, setWebsites] = useState<any[]>([])
   const [loadingWebsites, setLoadingWebsites] = useState(false)
   const [websiteModalVisible, setWebsiteModalVisible] = useState(false)
@@ -97,25 +81,6 @@ export default function CompanyDetailContent({
   const [loadingCrawlSessions, setLoadingCrawlSessions] = useState(false)
   const [crawlModalVisible, setCrawlModalVisible] = useState(false)
   const [crawlForm] = Form.useForm()
-  const [knowledgeBases, setKnowledgeBases] = useState<any[]>([])
-  const [loadingKnowledgeBases, setLoadingKnowledgeBases] = useState(false)
-  const [kbPreviewVisible, setKbPreviewVisible] = useState(false)
-  const [kbPreviewContent, setKbPreviewContent] = useState('')
-  const [kbPreviewTitle, setKbPreviewTitle] = useState('')
-  const [embeddingLoadingId, setEmbeddingLoadingId] = useState<string | null>(null)
-  const [aiSystemTemplates, setAiSystemTemplates] = useState<{ id: string; title: string }[]>([])
-  const [loadingAiSystemTemplates, setLoadingAiSystemTemplates] = useState(false)
-  const [ragTemplateId, setRagTemplateId] = useState<string | null>(null)
-  const [ragPrompt, setRagPrompt] = useState('')
-  const [ragLoading, setRagLoading] = useState(false)
-  const [ragResult, setRagResult] = useState<Record<string, unknown> | null>(null)
-  const [ragErrorFull, setRagErrorFull] = useState<string>('')
-  const [generationHistory, setGenerationHistory] = useState<any[]>([])
-  const [loadingGenerationHistory, setLoadingGenerationHistory] = useState(false)
-  const [historyPreviewVisible, setHistoryPreviewVisible] = useState(false)
-  const [historyPreviewContent, setHistoryPreviewContent] = useState('')
-  const [historyPreviewPrompt, setHistoryPreviewPrompt] = useState('')
-  const [generationHistoryError, setGenerationHistoryError] = useState<string>('')
   const [companyEditModalOpen, setCompanyEditModalOpen] = useState(false)
   const [companyEditLoading, setCompanyEditLoading] = useState(false)
   const [companyEditForm] = Form.useForm()
@@ -262,55 +227,8 @@ export default function CompanyDetailContent({
     }
   }
 
-  const fetchKnowledgeBases = async () => {
-    if (!companyData?.id) return
-    setLoadingKnowledgeBases(true)
-    try {
-      const list = await apiFetch<any[]>(`/api/companies/${companyData.id}/knowledge-bases`)
-      setKnowledgeBases(list || [])
-    } catch (error: any) {
-      message.error('Failed to load knowledge base')
-    } finally {
-      setLoadingKnowledgeBases(false)
-    }
-  }
-
-  const fetchAiSystemTemplates = async () => {
-    setLoadingAiSystemTemplates(true)
-    try {
-      const data = await apiFetch<{ id: string; title: string }[]>('/api/company-ai-system-templates')
-      setAiSystemTemplates(data ?? [])
-    } catch (error: any) {
-      message.error('Failed to load AI system templates')
-    } finally {
-      setLoadingAiSystemTemplates(false)
-    }
-  }
-
-  const fetchGenerationHistory = async () => {
-    if (!companyData?.id) return
-    setLoadingGenerationHistory(true)
-    setGenerationHistoryError('')
-    try {
-      const data = await apiFetch<any[]>(`/api/companies/${companyData.id}/generation-history`)
-      setGenerationHistory(data ?? [])
-    } catch (error: any) {
-      setGenerationHistoryError(error?.message || '')
-      message.error('Failed to load generation history')
-    } finally {
-      setLoadingGenerationHistory(false)
-    }
-  }
-
   useEffect(() => {
-    fetchDataTemplates()
-    fetchContentTemplates()
     fetchWebsites()
-    if (COMPANY_DETAIL_KNOWLEDGE_BASE_ENABLED) {
-      fetchAiSystemTemplates()
-      fetchKnowledgeBases()
-      fetchGenerationHistory()
-    }
   }, [companyData?.id])
 
   useEffect(() => {
@@ -322,117 +240,6 @@ export default function CompanyDetailContent({
   // Create map of last crawl session per website
   const getLastCrawlSession = (websiteId: string) => {
     return crawlSessions.find(session => session.company_website_id === websiteId)
-  }
-
-  // Re-initialize form when dataTemplates are loaded and company_datas are available
-  useEffect(() => {
-    if (dataTemplates.length > 0) {
-      const freshDatasMap = (companyData.company_datas || []).reduce((acc: any, item: any) => {
-        // Handle both direct data_template_id and nested structure
-        const templateId = item.data_template_id || item.company_data_templates?.id
-        const value = item.value || ''
-        if (templateId) {
-          acc[templateId] = value
-        }
-        return acc
-      }, {})
-      
-      console.log('Company datas:', companyData.company_datas)
-      console.log('Fresh datas map:', freshDatasMap)
-      console.log('Data templates:', dataTemplates)
-      
-      const formValues: any = {}
-      dataTemplates.forEach((template: any) => {
-        const existingValue = freshDatasMap[template.id]
-        formValues[`template_${template.id}`] = existingValue !== undefined && existingValue !== null ? existingValue : ''
-      })
-      
-      console.log('Form values to set:', formValues)
-      
-      // Use a small delay to ensure form is ready
-      const timer = setTimeout(() => {
-        form.setFieldsValue(formValues)
-        console.log('Form values after setFieldsValue:', form.getFieldsValue())
-      }, 100)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [dataTemplates, companyData.company_datas, form])
-
-  useEffect(() => {
-    if (selectedContentTemplate) {
-      generateContent()
-    } else {
-      setGeneratedContent('')
-    }
-  }, [selectedContentTemplate])
-
-  useEffect(() => {
-    if (selectedContentTemplate) {
-      generateContent()
-    }
-  }, [companyData.company_datas])
-
-  const fetchDataTemplates = async () => {
-    setLoadingTemplates(true)
-    try {
-      const res = await apiFetch<{ data: any[] }>('/api/company-data-templates?is_active=true')
-      const data = res?.data || []
-      setDataTemplates(data)
-      
-      // Initialize form with existing values after templates are loaded
-      // Recreate existingDatasMap from fresh companyData
-      const freshDatasMap = (companyData.company_datas || []).reduce((acc: any, item: any) => {
-        acc[item.data_template_id] = item.value || ''
-        return acc
-      }, {})
-      
-      console.log('Company datas:', companyData.company_datas)
-      console.log('Fresh datas map:', freshDatasMap)
-      console.log('Data templates:', data)
-      
-      const formValues: any = {}
-      if (data) {
-        data.forEach((template: any) => {
-          const existingValue = freshDatasMap[template.id]
-          console.log(`Template ${template.id} (${template.title}): existingValue =`, existingValue)
-          
-          // Set value even if empty (so form knows about the field)
-          if (existingValue !== undefined && existingValue !== null) {
-            formValues[`template_${template.id}`] = existingValue
-          } else {
-            formValues[`template_${template.id}`] = ''
-          }
-        })
-      }
-      
-      console.log('Form values to set:', formValues)
-      
-      // Use setTimeout to ensure form is ready
-      setTimeout(() => {
-        form.setFieldsValue(formValues)
-        console.log('Form values after setFieldsValue:', form.getFieldsValue())
-      }, 100)
-    } catch (error: any) {
-      message.error('Failed to load data templates')
-      console.error('Error fetching data templates:', error)
-    } finally {
-      setLoadingTemplates(false)
-    }
-  }
-
-  const fetchContentTemplates = async () => {
-    setLoadingContentTemplates(true)
-    try {
-      const res = await apiFetch<{ data: any[] }>('/api/company-content-templates')
-      const data = res?.data || []
-      setContentTemplates(data)
-    } catch (error: any) {
-      message.error('Failed to load content templates')
-      console.error('Error fetching content templates:', error)
-    } finally {
-      setLoadingContentTemplates(false)
-    }
   }
 
   const fetchWebsites = async () => {
@@ -464,258 +271,6 @@ export default function CompanyDetailContent({
     } finally {
       setLoadingCrawlSessions(false)
     }
-  }
-
-  const generateContent = () => {
-    if (!selectedContentTemplate) {
-      setGeneratedContent('')
-      setUsedFieldsInGenerated([])
-      setUsedSourceIdsFromCompanyDatas([])
-      return
-    }
-
-    // Find the selected content template
-    const contentTemplate = contentTemplates.find((t) => t.id === selectedContentTemplate)
-    if (!contentTemplate || !contentTemplate.content) {
-      setGeneratedContent('')
-      setUsedFieldsInGenerated([])
-      setUsedSourceIdsFromCompanyDatas([])
-      return
-    }
-
-    // Create multiple maps for different lookup methods
-    const dataMapById: { [key: string]: string } = {}
-    const dataMapByTitle: { [key: string]: string } = {}
-    const templateIdToTitle: { [key: string]: string } = {}
-    // templateId -> company_datas.id (for source_ids)
-    const dataTemplateIdToCompanyDataId: { [key: string]: string } = {}
-
-    // Build template ID to title map first
-    dataTemplates.forEach((template: any) => {
-      if (template.id && template.title) {
-        templateIdToTitle[template.id] = template.title.toLowerCase().replace(/\s+/g, '')
-      }
-    })
-
-    // Build data maps from company_datas (and map templateId -> company_datas.id)
-    if (companyData.company_datas) {
-      companyData.company_datas.forEach((item: any) => {
-        const templateId = item.data_template_id || item.company_data_templates?.id
-        const value = item.value || ''
-        const companyDataId = item.id
-
-        if (templateId && companyDataId) {
-          dataMapById[templateId] = value
-          dataTemplateIdToCompanyDataId[templateId] = companyDataId
-
-          const template = dataTemplates.find((t: any) => t.id === templateId)
-          if (template && template.title) {
-            const normalizedTitle = template.title.toLowerCase().replace(/\s+/g, '')
-            dataMapByTitle[normalizedTitle] = value
-          }
-        }
-      })
-    }
-
-    console.log('Generate Content - Data Map by ID:', dataMapById)
-    console.log('Generate Content - Data Map by Title:', dataMapByTitle)
-    console.log('Generate Content - Template ID to Title:', templateIdToTitle)
-
-    // Replace placeholders {{template-id}} or {{template-title}} with actual values
-    let generated = contentTemplate.content
-    const placeholderRegex = /\{\{([^}]+)\}\}/g
-    const usedPlaceholders: string[] = []
-
-    generated = generated.replace(placeholderRegex, (match: string, placeholder: string) => {
-      const key = placeholder.trim()
-      if (key && !usedPlaceholders.includes(key)) {
-        usedPlaceholders.push(key)
-      }
-      const normalizedPlaceholder = key.toLowerCase().replace(/\s+/g, '')
-
-      // Try to find value by:
-      // 1. Exact ID match (original format - e.g., {{uuid-123}})
-      let value = dataMapById[key]
-
-      // 2. If not found, try normalized title match (e.g., {{company}})
-      if (!value && normalizedPlaceholder) {
-        value = dataMapByTitle[normalizedPlaceholder]
-      }
-
-      // 3. If still not found, try to find template by title and get its ID
-      if (!value) {
-        const matchingTemplate = dataTemplates.find((t: any) => {
-          const normalizedTemplateTitle = (t.title || '').toLowerCase().replace(/\s+/g, '')
-          return normalizedTemplateTitle === normalizedPlaceholder
-        })
-
-        if (matchingTemplate && matchingTemplate.id) {
-          value = dataMapById[matchingTemplate.id]
-        }
-      }
-
-      // Return value if found, otherwise return original placeholder
-      return value !== undefined && value !== null && value !== '' ? value : match
-    })
-
-    // Resolve used placeholders to company_datas IDs for source_ids
-    const sourceIds: string[] = []
-    const seenIds = new Set<string>()
-    usedPlaceholders.forEach((key) => {
-      const normalizedPlaceholder = key.toLowerCase().replace(/\s+/g, '')
-      let templateId: string | undefined
-      if (dataMapById[key]) {
-        templateId = key
-      } else if (dataMapByTitle[normalizedPlaceholder]) {
-        const matchingTemplate = dataTemplates.find((t: any) => {
-          const norm = (t.title || '').toLowerCase().replace(/\s+/g, '')
-          return norm === normalizedPlaceholder
-        })
-        templateId = matchingTemplate?.id
-      }
-      const companyDataId = templateId ? dataTemplateIdToCompanyDataId[templateId] : undefined
-      if (companyDataId && !seenIds.has(companyDataId)) {
-        seenIds.add(companyDataId)
-        sourceIds.push(companyDataId)
-      }
-    })
-
-    setGeneratedContent(generated)
-    setUsedFieldsInGenerated(usedPlaceholders)
-    setUsedSourceIdsFromCompanyDatas(sourceIds)
-  }
-
-  const handleSaveToKnowledgeBase = async () => {
-    if (!generatedContent || !companyData?.id || !selectedContentTemplate) {
-      message.warning('Generate content first and select a template')
-      return
-    }
-    setSavingToKb(true)
-    try {
-      const contentTemplate = contentTemplates.find((t) => t.id === selectedContentTemplate)
-      const templateType = contentTemplate?.type ?? contentTemplate?.type ?? 'generated'
-
-      await apiFetch(`/api/companies/${companyData.id}/knowledge-bases`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: templateType,
-          content: generatedContent,
-          content_template_id: selectedContentTemplate,
-          source_ids: usedSourceIdsFromCompanyDatas.length > 0 ? usedSourceIdsFromCompanyDatas : null,
-        }),
-      })
-      message.success('Saved to Knowledge Base')
-      fetchKnowledgeBases()
-    } catch (error: any) {
-      message.error(error?.message ?? 'Failed to save to Knowledge Base')
-    } finally {
-      setSavingToKb(false)
-    }
-  }
-
-  const handleKbPreview = (record: any) => {
-    setKbPreviewTitle(record.company_content_templates?.title || record.type || 'Content')
-    setKbPreviewContent(record.content || '')
-    setKbPreviewVisible(true)
-  }
-
-  const handleDeleteKb = async (id: string) => {
-    try {
-      await apiFetch(`/api/knowledge-bases/${id}`, { method: 'DELETE' })
-      message.success('Removed from Knowledge Base')
-      fetchKnowledgeBases()
-    } catch (error: any) {
-      message.error(error?.message ?? 'Failed to delete')
-    }
-  }
-
-  const handleAddToOpenAI = async (record: any) => {
-    if (!record.content?.trim()) {
-      message.warning('No content to embed')
-      return
-    }
-    setEmbeddingLoadingId(record.id)
-    try {
-      const res = await fetch(`/api/knowledge-bases/${record.id}/embed`, { method: 'POST' })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        message.error(data?.error ?? 'Failed to add to OpenAI')
-        return
-      }
-      message.success('Embedding saved to OpenAI / Knowledge Base')
-      fetchKnowledgeBases()
-    } catch (error: any) {
-      message.error(error?.message ?? 'Failed to add to OpenAI')
-    } finally {
-      setEmbeddingLoadingId(null)
-    }
-  }
-
-  const handleGenerateFromKb = async () => {
-    if (!ragTemplateId) {
-      message.warning('Select an AI System Template')
-      return
-    }
-    if (!companyData?.id) return
-    setRagLoading(true)
-    setRagResult(null)
-    setRagErrorFull('')
-    try {
-      const res = await fetch(`/api/companies/${companyData.id}/generate-content`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template_id: ragTemplateId, prompt: ragPrompt.trim() || undefined }),
-      })
-      const rawText = await res.text()
-      let data: Record<string, unknown> = {}
-      try {
-        data = rawText ? JSON.parse(rawText) : {}
-      } catch {
-        data = { _raw: rawText }
-      }
-      if (!res.ok) {
-        const fullError = [
-          `HTTP ${res.status} ${res.statusText}`,
-          `URL: ${res.url}`,
-          '',
-          'Response body:',
-          typeof data === 'object' && data !== null
-            ? JSON.stringify(data, null, 2)
-            : String(rawText),
-        ].join('\n')
-        setRagErrorFull(fullError)
-        message.error(data?.error ? String(data.error) : `Failed to generate content (${res.status})`)
-        return
-      }
-      const result =
-        data?.result !== undefined && data?.result !== null && typeof data.result === 'object'
-          ? (data.result as Record<string, unknown>)
-          : null
-      setRagResult(result)
-      if (result) {
-        message.success('Content generated successfully')
-        if (data?.historyError) {
-          message.warning('History not saved: ' + (data.historyError as string))
-        }
-        fetchGenerationHistory()
-      }
-    } catch (error: any) {
-      const fullError = [
-        'Exception:',
-        error?.message ?? String(error),
-        error?.stack ? `\nStack:\n${error.stack}` : '',
-      ].join('\n')
-      setRagErrorFull(fullError)
-      message.error(error?.message ?? 'Failed to generate content')
-    } finally {
-      setRagLoading(false)
-    }
-  }
-
-  const handleContentTemplateChange = (templateId: string) => {
-    setSelectedContentTemplate(templateId)
-    generateForm.setFieldsValue({ content_template_id: templateId })
   }
 
   const handleWebsiteCreate = () => {
@@ -829,106 +384,6 @@ export default function CompanyDetailContent({
     }
   }
 
-  const handleSaveAll = async () => {
-    setSaving(true)
-    try {
-      const values = form.getFieldsValue()
-      
-      console.log('Form values:', values)
-      console.log('Company ID:', companyData.id)
-      console.log('Data templates:', dataTemplates)
-      
-      // Create map of existing values for comparison
-      const existingDatasMapForComparison = (companyData.company_datas || []).reduce((acc: any, item: any) => {
-        const templateId = item.data_template_id || item.company_data_templates?.id
-        const value = item.value || ''
-        if (templateId) {
-          acc[templateId] = value
-        }
-        return acc
-      }, {})
-      
-      // Prepare data for API - only include data that has changed
-      const changedDatas = dataTemplates
-        .map((template) => {
-          const currentValue = values[`template_${template.id}`] || ''
-          const trimmedValue = typeof currentValue === 'string' ? currentValue.trim() : String(currentValue)
-          const existingValue = existingDatasMapForComparison[template.id] || ''
-          const trimmedExistingValue = typeof existingValue === 'string' ? existingValue.trim() : String(existingValue)
-          
-          // Only include if value has actually changed
-          if (trimmedValue !== trimmedExistingValue) {
-            return {
-              data_template_id: template.id,
-              value: trimmedValue,
-            }
-          }
-          return null
-        })
-        .filter((item) => item !== null) // Remove null entries (unchanged fields)
-
-      console.log('Changed datas:', changedDatas)
-      console.log('Existing datas map:', existingDatasMapForComparison)
-
-      // If no data changed, show message and don't save
-      if (changedDatas.length === 0) {
-        message.info('No changes detected. Nothing to save.')
-        setSaving(false)
-        return
-      }
-
-      // For fields that changed, filter to only save meaningful changes:
-      // - If new value is not empty, save it (new field or update)
-      // - If new value is empty but existing had a value, save empty to clear it
-      // - Skip if both are empty (empty to empty change - no point saving)
-      const datasToSave = changedDatas.filter((item) => {
-        const newValue = (item.value || '').trim()
-        const existingValue = (existingDatasMapForComparison[item.data_template_id] || '').trim()
-        
-        // Save if new value is not empty (adding new field or updating existing), 
-        // OR if existing had a value but new is empty (clearing existing value)
-        const hasNewValue = newValue !== ''
-        const wasClearingValue = existingValue !== '' && newValue === ''
-        
-        return hasNewValue || wasClearingValue
-      })
-      
-      // If no meaningful changes after filtering, show message and don't save
-      if (datasToSave.length === 0) {
-        message.info('No valid changes to save.')
-        setSaving(false)
-        return
-      }
-
-      // Ensure companyData.id exists
-      if (!companyData.id) {
-        throw new Error('Company ID is missing')
-      }
-
-      await apiFetch(`/api/companies/${companyData.id}/company-datas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ datas: datasToSave }),
-      })
-
-      message.success(`${datasToSave.length} data field(s) saved successfully`)
-      
-      // Refresh the page to show updated data
-      router.refresh()
-    } catch (error: any) {
-      message.error(error.message || 'Failed to save company data')
-      console.error('Error saving company data:', error)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleHistoryPreview = (record: any) => {
-    setHistoryPreviewPrompt(record.prompt ?? '')
-    setHistoryPreviewContent(record.content ?? '')
-    setHistoryPreviewVisible(true)
-  }
-
   const isCustomer = variant === 'customer'
 
   const tabItems = [
@@ -976,96 +431,6 @@ export default function CompanyDetailContent({
       ),
       children: <TabCompanyLog companyId={companyData.id} />,
     },
-    {
-      key: 'content-planner',
-      label: (
-        <span>
-          <FileTextOutlined /> Content Planner
-        </span>
-      ),
-      children: (
-        <TabContentPlanner
-          companyData={companyData}
-          basePath={variant === 'customer' ? '/customer' : undefined}
-        />
-      ),
-    },
-    {
-      key: 'data-form',
-      label: (
-        <span>
-          <DatabaseOutlined /> Company Data (Form)
-        </span>
-      ),
-      children: (
-        <TabDataForm
-          form={form}
-          dataTemplates={dataTemplates}
-          loadingTemplates={loadingTemplates}
-          saving={saving}
-          onSaveAll={handleSaveAll}
-        />
-      ),
-    },
-    {
-      key: 'generate',
-      label: (
-        <span>
-          <FileTextOutlined /> Generate Content
-        </span>
-      ),
-      children: (
-        <TabGenerate
-          generateForm={generateForm}
-          contentTemplates={contentTemplates}
-          loadingContentTemplates={loadingContentTemplates}
-          selectedContentTemplate={selectedContentTemplate}
-          generatedContent={generatedContent}
-          usedFieldsInGenerated={usedFieldsInGenerated}
-          savingToKb={savingToKb}
-          onContentTemplateChange={handleContentTemplateChange}
-          onSaveToKnowledgeBase={
-            COMPANY_DETAIL_KNOWLEDGE_BASE_ENABLED ? handleSaveToKnowledgeBase : undefined
-          }
-        />
-      ),
-    },
-    ...(COMPANY_DETAIL_KNOWLEDGE_BASE_ENABLED
-      ? [
-          {
-            key: 'knowledge-base' as const,
-            label: (
-              <span>
-                <ReadOutlined /> Knowledge Base ({knowledgeBases.length})
-              </span>
-            ),
-            children: (
-              <TabKnowledgeBase
-                aiSystemTemplates={aiSystemTemplates}
-                loadingAiSystemTemplates={loadingAiSystemTemplates}
-                ragTemplateId={ragTemplateId}
-                setRagTemplateId={setRagTemplateId}
-                ragPrompt={ragPrompt}
-                setRagPrompt={setRagPrompt}
-                ragLoading={ragLoading}
-                ragResult={ragResult}
-                ragErrorFull={ragErrorFull}
-                onGenerate={handleGenerateFromKb}
-                generationHistory={generationHistory}
-                loadingGenerationHistory={loadingGenerationHistory}
-                generationHistoryError={generationHistoryError}
-                onHistoryPreview={handleHistoryPreview}
-                knowledgeBases={knowledgeBases}
-                loadingKnowledgeBases={loadingKnowledgeBases}
-                onKbPreview={handleKbPreview}
-                embeddingLoadingId={embeddingLoadingId}
-                onAddToOpenAI={handleAddToOpenAI}
-                onDeleteKb={handleDeleteKb}
-              />
-            ),
-          },
-        ]
-      : []),
     {
       key: 'websites',
       label: (
@@ -1433,81 +798,6 @@ export default function CompanyDetailContent({
                   </Space>
                 </Form.Item>
               </Form>
-            </Modal>
-
-            {/* Knowledge Base Preview Modal */}
-            <Modal
-              title={kbPreviewTitle}
-              open={kbPreviewVisible}
-              onCancel={() => setKbPreviewVisible(false)}
-              footer={[<Button key="close" onClick={() => setKbPreviewVisible(false)}>Close</Button>]}
-              width={800}
-            >
-              <div
-                style={{
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  maxHeight: '60vh',
-                  overflowY: 'auto',
-                }}
-                dangerouslySetInnerHTML={{ __html: kbPreviewContent }}
-              />
-            </Modal>
-
-            {/* Generation History Preview Modal */}
-            <Modal
-              title="Generation history"
-              open={historyPreviewVisible}
-              onCancel={() => setHistoryPreviewVisible(false)}
-              footer={[<Button key="close" onClick={() => setHistoryPreviewVisible(false)}>Close</Button>]}
-              width={800}
-            >
-              {historyPreviewPrompt ? (
-                <div style={{ marginBottom: 12 }}>
-                  <Text strong>Prompt:</Text>
-                  <div style={{ marginTop: 4, padding: 8, background: '#f5f5f5', borderRadius: 4 }}>{historyPreviewPrompt}</div>
-                </div>
-              ) : null}
-              <Text strong>Content:</Text>
-              <div
-                style={{
-                  marginTop: 8,
-                  maxHeight: '50vh',
-                  overflowY: 'auto',
-                  padding: 12,
-                  background: '#fafafa',
-                  borderRadius: 8,
-                  border: '1px solid #e8e8e8',
-                }}
-              >
-                {(() => {
-                  try {
-                    const parsed = JSON.parse(historyPreviewContent || '')
-                    if (typeof parsed === 'object' && parsed !== null) {
-                      return (
-                        <pre
-                          style={{
-                            margin: 0,
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                            fontFamily: 'monospace',
-                            fontSize: 13,
-                          }}
-                        >
-                          {JSON.stringify(parsed, null, 2)}
-                        </pre>
-                      )
-                    }
-                  } catch {
-                    /* not JSON */
-                  }
-                  return (
-                    <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                      {historyPreviewContent || '—'}
-                    </div>
-                  )
-                })()}
-              </div>
             </Modal>
           </Card>
         </Content>

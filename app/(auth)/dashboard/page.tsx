@@ -46,7 +46,20 @@ export default async function DashboardPage() {
     completedTicketsCount = completedResult.length
     totalTicketsCount = totalResult.length
   } catch (err) {
-    console.error('Dashboard query failed. Run `npm run db:push` if tables do not exist:', err)
+    const cause = err instanceof Error && err.cause instanceof Error ? err.cause : null
+    const code =
+      (cause as NodeJS.ErrnoException | null)?.code ??
+      (err as NodeJS.ErrnoException)?.code
+    const isNetwork =
+      code === 'ETIMEDOUT' || code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'EAI_AGAIN'
+    if (isNetwork) {
+      console.error(
+        'Dashboard: cannot connect to PostgreSQL. Check DATABASE_URL, VPN, and whether your IP is allowed to reach the DB (not a missing-table issue).',
+        err
+      )
+    } else {
+      console.error('Dashboard query failed. If tables are missing, run `npm run db:push`.', err)
+    }
   }
 
   return (

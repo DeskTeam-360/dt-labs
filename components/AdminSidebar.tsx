@@ -22,7 +22,7 @@ import { Avatar, Dropdown, Layout, Menu, Typography } from 'antd'
 import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { useEffect, useMemo,useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { signOutAction } from '@/app/actions/auth'
 import { shouldOpenHrefInNewTab,SpaNavLink } from '@/components/SpaNavLink'
@@ -84,17 +84,6 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
   const pathname = usePathname()
   const ticketsListSearch = useSearchParams().toString()
   const [openKeys, setOpenKeys] = useState<string[]>([])
-
-  // Set open keys after mount to avoid hydration mismatch
-  useEffect(() => {
-    if (pathname) {
-      if (pathname.startsWith('/company-data-templates') || pathname.startsWith('/company-content-templates') || pathname.startsWith('/company-ai-system-templates')) {
-        setOpenKeys(['templates'])
-      } else if (pathname.startsWith('/content-planner')) {
-        setOpenKeys(['content-planner'])
-      }
-    }
-  }, [pathname, role, isCustomer])
 
   const linkLabel = (path: string, text: string) => (
     <SpaNavLink href={path} title={text} className="admin-sidebar-menu-link" onClick={(e) => e.stopPropagation()}>

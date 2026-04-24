@@ -575,8 +575,8 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
               }
               style={{ marginBottom: 16 }}
             >
-              <div style={{ width: '100%', height: 320 }}>
-                <ResponsiveContainer>
+              <div style={{ width: '100%', height: 320, minHeight: 280, minWidth: 0 }}>
+                <ResponsiveContainer width="100%" height="100%" minHeight={280}>
                   <RadarChart data={chartData}>
                     <PolarGrid />
                     <PolarAngleAxis dataKey="short" />

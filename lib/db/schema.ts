@@ -110,17 +110,6 @@ export const companyDataTemplates = pgTable('company_data_templates', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
 
-export const companyContentTemplates = pgTable('company_content_templates', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  title: varchar('title', { length: 255 }).notNull(),
-  content: text('content'),
-  description: text('description'),
-  fields: text('fields').array(),
-  type: text('type'),
-  createdAt: ts('created_at').notNull().defaultNow(),
-  updatedAt: ts('updated_at').notNull().defaultNow(),
-})
-
 export const companyDatas = pgTable(
   'company_datas',
   {
@@ -438,64 +427,6 @@ export const crawlPages = pgTable('crawl_pages', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
 
-// ============ Content Planner ============
-export const contentPlannerIntents = pgTable('content_planner_intents', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  title: varchar('title', { length: 100 }).notNull(),
-  description: text('description'),
-  createdAt: ts('created_at').notNull().defaultNow(),
-  updatedAt: ts('updated_at').notNull().defaultNow(),
-})
-
-export const contentPlannerChannels = pgTable('content_planner_channels', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  title: varchar('title', { length: 100 }).notNull(),
-  description: text('description'),
-  companyAiSystemTemplateId: uuid('company_ai_system_template_id'),
-  createdAt: ts('created_at').notNull().defaultNow(),
-  updatedAt: ts('updated_at').notNull().defaultNow(),
-})
-
-export const contentPlannerTopicTypes = pgTable('content_planner_topic_types', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  title: varchar('title', { length: 100 }).notNull(),
-  description: text('description'),
-  createdAt: ts('created_at').notNull().defaultNow(),
-  updatedAt: ts('updated_at').notNull().defaultNow(),
-})
-
-export const companyAiSystemTemplate = pgTable('company_ai_system_template', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  title: text('title').notNull(),
-  content: text('content').default(''),
-  format: text('format'),
-  createdAt: ts('created_at').notNull().defaultNow(),
-  updatedAt: ts('updated_at').notNull().defaultNow(),
-})
-
-export const companyContentPlanners = pgTable('company_content_planners', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  companyId: uuid('company_id').notNull(),
-  channelId: uuid('channel_id'),
-  topic: varchar('topic', { length: 255 }),
-  primaryKeyword: varchar('primary_keyword', { length: 255 }),
-  secondaryKeywords: text('secondary_keywords'),
-  intents: text('intents').array().default([]),
-  location: varchar('location', { length: 255 }),
-  ctaDynamic: boolean('cta_dynamic').default(false),
-  ctaType: text('cta_type'),
-  ctaText: text('cta_text'),
-  publishDate: timestamp('publish_date', { mode: 'date' }),
-  status: varchar('status', { length: 50 }).default('planned'),
-  insight: text('insight'),
-  aiContentResults: jsonb('ai_content_results'),
-  hashtags: text('hashtags'),
-  topicDescription: text('topic_description'),
-  topicTypeId: uuid('topic_type_id'),
-  createdAt: ts('created_at').notNull().defaultNow(),
-  updatedAt: ts('updated_at').notNull().defaultNow(),
-})
-
 export const companyKnowledgeBases = pgTable('company_knowledge_bases',
   {
     id: uuid('id').primaryKey().defaultRandom(),
@@ -526,15 +457,6 @@ export const knowledgeBaseArticles = pgTable('knowledge_base_articles', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
 
-export const companyContentGenerationHistory = pgTable('company_content_generation_history', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  companyId: uuid('company_id').notNull(),
-  prompt: text('prompt').notNull(),
-  content: text('content').notNull(),
-  createdBy: uuid('created_by'),
-  createdAt: ts('created_at').notNull().defaultNow(),
-})
-
 export const aiTokenUsage = pgTable('ai_token_usage', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id'),
@@ -549,7 +471,6 @@ export const aiTokenUsage = pgTable('ai_token_usage', {
   completionTokens: integer('completion_tokens').default(0),
   totalTokens: integer('total_tokens').default(0),
   companyId: uuid('company_id'),
-  companyContentPlannerId: uuid('company_content_planner_id'),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
 
