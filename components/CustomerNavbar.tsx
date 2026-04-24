@@ -3,8 +3,6 @@
 import {
   AppstoreOutlined,
   CheckSquareOutlined,
-  DatabaseOutlined,
-  FileTextOutlined,
   GlobalOutlined,
   HomeOutlined,
   InfoCircleOutlined,
@@ -45,10 +43,6 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
     if (pathname.startsWith('/customer/info')) return ['info']
     if (pathname.startsWith('/customer/users')) return ['users']
     if (pathname.startsWith('/customer/tickets')) return ['tickets']
-    if (pathname.startsWith('/customer/content-planner')) return ['content-planner']
-    if (pathname.startsWith('/customer/data-form')) return ['data-form']
-    if (pathname.startsWith('/customer/generate')) return ['generate']
-    if (pathname.startsWith('/customer/knowledge-base')) return ['knowledge-base']
     if (pathname.startsWith('/customer/websites')) return ['websites']
     if (pathname.startsWith('/customer/crawling')) return ['crawling']
     return []
@@ -159,8 +153,6 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
             { key: 'info', icon: <InfoCircleOutlined />, label: 'Info' },
             { key: 'users', icon: <TeamOutlined />, label: 'Users' },
             { key: 'tickets', icon: <CheckSquareOutlined />, label: 'Tickets' },
-            { key: 'data-form', icon: <DatabaseOutlined />, label: 'Company Data' },
-            { key: 'content-planner', icon: <FileTextOutlined />, label: 'Content Planner' },
             { key: 'websites', icon: <GlobalOutlined />, label: 'Websites' },
             { key: 'crawling', icon: <GlobalOutlined />, label: 'Crawling' },
           ]}
@@ -170,8 +162,6 @@ export default function CustomerNavbar({ user }: CustomerNavbarProps) {
               info: '/customer/info',
               users: '/customer/users',
               tickets: '/customer/tickets',
-              'data-form': '/customer/data-form',
-              'content-planner': '/customer/content-planner',
               websites: '/customer/websites',
               crawling: '/customer/crawling',
             }
