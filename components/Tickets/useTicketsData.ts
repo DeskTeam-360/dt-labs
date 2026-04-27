@@ -1,21 +1,45 @@
 'use client'
 
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
-import { usePathname, useRouter,useSearchParams } from 'next/navigation'
-import { useCallback,useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-
-export type TicketsDragStartHandler = (event: DragStartEvent) => void
-export type TicketsDragEndHandler = (event: DragEndEvent) => Promise<void>
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Form, message } from 'antd'
 import dayjs from 'dayjs'
+import { usePathname, useRouter,useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
+import { resolveDefaultNewTicketStatusSlug } from '@/lib/ticket-default-status'
 import type { ParsedUrlFilters } from '@/lib/ticket-filter-url'
 import {
   buildSearchStringFromFilters,
+  canParseTicketsUrl,
   hasUrlFilterParams,
   parseFiltersFromUrl,
   parseSidebarCollapsedFromUrl,
+  URL_PARAMS,
 } from '@/lib/ticket-filter-url'
+import { isTicketStatusInKanban, ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
+import {
+  buildTicketsListQueryKey,
+  normalizeTicketsPageLimit,
+  ticketsListQueryKeyPrefix,
+  type TicketsPageLimit,
+} from '@/lib/tickets-list-query'
+import { deleteFile, uploadTicketFileDraft } from '@/utils/storage'
+
+import type { Team, TicketRecord, UserRecord } from './types'
+import type { NewTicketAttachment } from './types'
+import type { TicketStatusRecord } from './types'
+import {
+  DEFAULT_ALL_STATUS_COLUMNS,
+  DEFAULT_ALL_STATUSES,
+  DEFAULT_KANBAN_COLUMNS,
+  type StatusColumn,
+  type TicketSortField,
+  type TicketSortOrder,
+} from './types'
+
+export type TicketsDragStartHandler = (event: DragStartEvent) => void
+export type TicketsDragEndHandler = (event: DragEndEvent) => Promise<void>
 
 const FILTER_STORAGE_KEY = 'deskteam-tickets-filter'
 
@@ -37,6 +61,8 @@ interface StoredFilter {
   sortBy?: TicketSortField | null
   sortOrder?: TicketSortOrder | null
   filterPriorityIds?: number[] | null
+  /** Jumlah tiket per request API daftar (50 / 100 / 200). */
+  ticketsPageLimit?: number | null
 }
 
 function loadFiltersFromStorage(): StoredFilter | null {
@@ -59,21 +85,6 @@ function saveFiltersToStorage(stored: StoredFilter) {
     // ignore
   }
 }
-import { resolveDefaultNewTicketStatusSlug } from '@/lib/ticket-default-status'
-import { isTicketStatusInKanban, ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
-import { deleteFile,uploadTicketFileDraft } from '@/utils/storage'
-
-import type { Team, TicketRecord, UserRecord } from './types'
-import type { NewTicketAttachment } from './types'
-import type { TicketStatusRecord } from './types'
-import {
-  DEFAULT_ALL_STATUS_COLUMNS,
-  DEFAULT_ALL_STATUSES,
-  DEFAULT_KANBAN_COLUMNS,
-  type StatusColumn,
-  type TicketSortField,
-  type TicketSortOrder,
-} from './types'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...options, credentials: 'include' })
@@ -197,25 +208,45 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
    */
   const initialRef = useRef<{ state: ParsedUrlFilters; fromUrl: boolean } | null>(null)
   if (initialRef.current === null) {
-    const fromUrl = parseFiltersFromUrl(searchParams, { isCustomer })
-    if (fromUrl) {
-      let viewMode = fromUrl.viewMode
+    const parsed = canParseTicketsUrl(searchParams)
+      ? parseFiltersFromUrl(searchParams, { isCustomer })
+      : null
+
+    if (parsed && hasUrlFilterParams(searchParams)) {
+      let viewMode = parsed.viewMode
       if (isCustomer && viewMode === 'roundrobin') viewMode = 'kanban'
-      let filterTicketType = fromUrl.filterTicketType
+      let filterTicketType = parsed.filterTicketType
       if (
         isCustomer &&
         (filterTicketType === 'spam' || filterTicketType === 'trash')
       ) {
         filterTicketType = null
       }
-      initialRef.current = { state: { ...fromUrl, viewMode, filterTicketType }, fromUrl: true }
+      initialRef.current = { state: { ...parsed, viewMode, filterTicketType }, fromUrl: true }
     } else {
       const state = getInitialFilterStateFromStored(null, isCustomer)
       const viewMode = getInitialViewModeCustomer(isCustomer, null)
       const sidebarFromUrl = parseSidebarCollapsedFromUrl(searchParams)
-      const merged =
-        sidebarFromUrl !== null ? { ...state, filterSidebarCollapsed: sidebarFromUrl } : state
-      initialRef.current = { state: { ...merged, viewMode }, fromUrl: false }
+      let merged: ParsedUrlFilters = {
+        ...state,
+        filterSidebarCollapsed:
+          sidebarFromUrl !== null ? sidebarFromUrl : state.filterSidebarCollapsed,
+        viewMode,
+      }
+      if (parsed) {
+        if (searchParams.has(URL_PARAMS.view)) {
+          let vm = parsed.viewMode
+          if (isCustomer && vm === 'roundrobin') vm = 'kanban'
+          merged = { ...merged, viewMode: vm }
+        }
+        if (searchParams.has(URL_PARAMS.sort) || searchParams.has(URL_PARAMS.order)) {
+          merged = { ...merged, sortBy: parsed.sortBy, sortOrder: parsed.sortOrder }
+        }
+        if (searchParams.has(URL_PARAMS.sidebar)) {
+          merged = { ...merged, filterSidebarCollapsed: parsed.filterSidebarCollapsed }
+        }
+      }
+      initialRef.current = { state: merged, fromUrl: false }
     }
   }
   const initialState = initialRef.current.state
@@ -225,8 +256,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
   const prevTicketsListSearchRef = useRef<string | null>(null)
 
   const [collapsed, setCollapsed] = useState(true)
-  const [tickets, setTickets] = useState<TicketRecord[]>([])
-  const [loading, setLoading] = useState(false)
+  const [ticketsPageLimit, setTicketsPageLimitState] = useState<TicketsPageLimit>(50)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingTicket, setEditingTicket] = useState<TicketRecord | null>(null)
   const [form] = Form.useForm()
@@ -269,11 +299,16 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
   const [newTicketAttachments, setNewTicketAttachments] = useState<NewTicketAttachment[]>([])
   const [deletedTicketAttachmentIds, setDeletedTicketAttachmentIds] = useState<string[]>([])
   const [attachmentUploading, setAttachmentUploading] = useState(false)
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null)
+  const [userTeamIds, setUserTeamIds] = useState<string[]>([])
 
-  /** Server returns filtered data - no client-side filtering */
-  const filteredTickets = tickets
+  const [debouncedSearch, setDebouncedSearch] = useState(initialState.filterSearch)
+  useEffect(() => {
+    const delay = filterSearch.trim() ? 350 : 0
+    const t = window.setTimeout(() => setDebouncedSearch(filterSearch), delay)
+    return () => window.clearTimeout(t)
+  }, [filterSearch])
 
-  
   const columnsToShow = useMemo(() => {
     if (allStatusColumns.length === 0) return []
     if (filterStatus.length === 0) return allStatusColumns
@@ -336,73 +371,109 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setFilterVisibilityState(v ?? [])
   }, [])
 
-  const fetchTickets = useCallback(async () => {
-    const params = new URLSearchParams()
-    const inJunkFolder =
-      !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
-    if (inJunkFolder) params.set('ticket_type', filterTicketType!)
-    if (!isCustomer) {
-      if (filterCompanyIds.length > 0) params.set('company_ids', filterCompanyIds.join(','))
-      if (filterVisibility.length > 0 && !inJunkFolder) params.set('visibility', filterVisibility.join(','))
-      if (filterTeamIds.length > 0 && !inJunkFolder) params.set('team_ids', filterTeamIds.join(','))
-    }
-    if (filterTagIds.length > 0) params.set('tag_ids', filterTagIds.join(','))
-    if (filterPriorityIds.length > 0) params.set('priority_ids', filterPriorityIds.join(','))
-    /** Staff: always honor status filter. Customer: omit status param when still loading or when filter is "all statuses" (same as unrestricted list). */
-    const customerShowsAllStatuses =
-      isCustomer &&
-      lookupReady &&
-      allStatuses.length > 0 &&
-      filterStatus.length === allStatuses.length &&
-      allStatuses.every((s) => filterStatus.includes(s.slug))
-    const sendStatusToApi =
-      filterStatus.length > 0 &&
-      !inJunkFolder &&
-      (isCustomer ? lookupReady && !customerShowsAllStatuses : true)
-    if (sendStatusToApi) params.set('status', filterStatus.join(','))
-    if (filterTypeIds.length > 0) params.set('type_ids', filterTypeIds.join(','))
-    if (filterDateRange?.[0] && filterDateRange?.[1]) {
-      params.set('date_from', filterDateRange[0].startOf('day').toISOString())
-      params.set('date_to', filterDateRange[1].endOf('day').toISOString())
-    }
-    if (filterDueDateRange?.[0] && filterDueDateRange?.[1]) {
-      params.set('due_date_from', filterDueDateRange[0].startOf('day').toISOString())
-      params.set('due_date_to', filterDueDateRange[1].endOf('day').toISOString())
-    }
-    if (filterSearch.trim()) params.set('search', filterSearch.trim())
-    params.set('limit', '500')
+  const queryClient = useQueryClient()
 
-    const qs = params.toString()
-    const url = qs ? `/api/tickets?${qs}` : '/api/tickets'
+  const ticketsListQueryKey = useMemo(
+    () =>
+      buildTicketsListQueryKey({
+        isCustomer,
+        ticketsPageLimit,
+        filterCompanyIds,
+        filterStatus,
+        filterTypeIds,
+        filterTagIds,
+        filterPriorityIds,
+        filterVisibility,
+        filterTeamIds,
+        filterDateRange,
+        filterDueDateRange,
+        debouncedSearch,
+        filterTicketType,
+        lookupReady,
+      }),
+    [
+      isCustomer,
+      ticketsPageLimit,
+      filterCompanyIds,
+      filterStatus,
+      filterTypeIds,
+      filterTagIds,
+      filterPriorityIds,
+      filterVisibility,
+      filterTeamIds,
+      filterDateRange,
+      filterDueDateRange,
+      debouncedSearch,
+      filterTicketType,
+      lookupReady,
+    ]
+  )
 
-    setLoading(true)
-    try {
-      const data = await apiFetch<TicketRecord[]>(url)
-      setTickets(data || [])
-    } catch (error: unknown) {
-      message.error((error as Error).message || 'Failed to fetch tickets')
-    } finally {
-      setLoading(false)
-    }
-  }, [
-    isCustomer,
-    filterCompanyIds,
-    filterStatus,
-    filterTypeIds,
-    filterTagIds,
-    filterVisibility,
-    filterTeamIds,
-    filterDateRange,
-    filterDueDateRange,
-    filterSearch,
-    filterTicketType,
-    filterPriorityIds,
-    lookupReady,
-    allStatuses,
-  ])
+  const ticketsListQueryKeyRef = useRef(ticketsListQueryKey)
+  ticketsListQueryKeyRef.current = ticketsListQueryKey
 
-  const [userCompanyId, setUserCompanyId] = useState<string | null>(null)
-  const [userTeamIds, setUserTeamIds] = useState<string[]>([])
+  const ticketsQuery = useQuery({
+    queryKey: ticketsListQueryKey,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams()
+      const inJunkFolder =
+        !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
+      if (inJunkFolder) params.set('ticket_type', filterTicketType!)
+      if (!isCustomer) {
+        if (filterCompanyIds.length > 0) params.set('company_ids', filterCompanyIds.join(','))
+        if (filterVisibility.length > 0 && !inJunkFolder) params.set('visibility', filterVisibility.join(','))
+        if (filterTeamIds.length > 0 && !inJunkFolder) params.set('team_ids', filterTeamIds.join(','))
+      }
+      if (filterTagIds.length > 0) params.set('tag_ids', filterTagIds.join(','))
+      if (filterPriorityIds.length > 0) params.set('priority_ids', filterPriorityIds.join(','))
+      const customerShowsAllStatuses =
+        isCustomer &&
+        lookupReady &&
+        allStatuses.length > 0 &&
+        filterStatus.length === allStatuses.length &&
+        allStatuses.every((s) => filterStatus.includes(s.slug))
+      const sendStatusToApi =
+        filterStatus.length > 0 &&
+        !inJunkFolder &&
+        (isCustomer ? lookupReady && !customerShowsAllStatuses : true)
+      if (sendStatusToApi) params.set('status', filterStatus.join(','))
+      if (filterTypeIds.length > 0) params.set('type_ids', filterTypeIds.join(','))
+      if (filterDateRange?.[0] && filterDateRange?.[1]) {
+        params.set('date_from', filterDateRange[0].startOf('day').toISOString())
+        params.set('date_to', filterDateRange[1].endOf('day').toISOString())
+      }
+      if (filterDueDateRange?.[0] && filterDueDateRange?.[1]) {
+        params.set('due_date_from', filterDueDateRange[0].startOf('day').toISOString())
+        params.set('due_date_to', filterDueDateRange[1].endOf('day').toISOString())
+      }
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
+      params.set('limit', String(ticketsPageLimit))
+
+      const qs = params.toString()
+      const url = qs ? `/api/tickets?${qs}` : '/api/tickets'
+      try {
+        return await apiFetch<TicketRecord[]>(url, { signal })
+      } catch (error: unknown) {
+        message.error((error as Error).message || 'Failed to fetch tickets')
+        throw error
+      }
+    },
+  })
+
+  const tickets = ticketsQuery.data ?? []
+  const loading = ticketsQuery.isLoading
+
+  /** Server returns filtered data - no client-side filtering */
+  const filteredTickets = tickets
+
+  const invalidateTicketsList = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ticketsListQueryKeyPrefix() })
+  }, [queryClient])
+
+  const setTicketsPageLimit = useCallback((v: TicketsPageLimit) => {
+    setTicketsPageLimitState(v)
+  }, [])
 
   const storageHydratedRef = useRef(false)
   useLayoutEffect(() => {
@@ -427,6 +498,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setViewMode(vm)
     setSortBy(state.sortBy)
     setSortOrder(state.sortOrder)
+    setTicketsPageLimitState(normalizeTicketsPageLimit(stored.ticketsPageLimit))
+    setDebouncedSearch(state.filterSearch)
   }, [isCustomer])
 
   const fetchLookup = async () => {
@@ -546,22 +619,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     fetchLookup()
   }, [isCustomer])
 
-  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => {
-    if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current)
-    const delay = filterSearch.trim() ? 350 : 0
-    if (delay > 0) {
-      fetchDebounceRef.current = setTimeout(() => {
-        fetchTickets()
-        fetchDebounceRef.current = null
-      }, delay)
-      return () => {
-        if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current)
-      }
-    }
-    fetchTickets()
-  }, [fetchTickets])
-
   const searchParamsKey = searchParams.toString()
 
   useEffect(() => {
@@ -593,40 +650,93 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         parsed = { ...parsed, filterTicketType: null }
       }
       const isJunkUrl = parsed.filterTicketType === 'spam' || parsed.filterTicketType === 'trash'
-      let statuses = parsed.filterStatus
-      if (
-        !isJunkUrl &&
-        lookupReady &&
-        allStatuses.length > 0 &&
-        statusColumns.length > 0
-      ) {
-        const valid = new Set(allStatuses.map((s) => s.slug))
-        const pruned = statuses.filter((s) => valid.has(s))
-        if (pruned.length > 0) {
-          statuses = pruned
-        } else if (statuses.length === 0) {
-          statuses = []
-        } else if (isCustomer && allStatuses.length > 0) {
-          statuses = allStatuses.map((s) => s.slug)
-        } else {
-          statuses = statusColumns.map((c) => c.id)
+
+      const applyStatusFromParsed = () => {
+        let statuses = parsed.filterStatus
+        if (
+          !isJunkUrl &&
+          lookupReady &&
+          allStatuses.length > 0 &&
+          statusColumns.length > 0
+        ) {
+          const valid = new Set(allStatuses.map((s) => s.slug))
+          const pruned = statuses.filter((s) => valid.has(s))
+          if (pruned.length > 0) {
+            statuses = pruned
+          } else if (statuses.length === 0) {
+            statuses = []
+          } else if (isCustomer && allStatuses.length > 0) {
+            statuses = allStatuses.map((s) => s.slug)
+          } else {
+            statuses = statusColumns.map((c) => c.id)
+          }
         }
+        setFilterStatus(statuses)
       }
-      setFilterStatus(statuses)
-      setFilterTypeIds(parsed.filterTypeIds)
-      setFilterPriorityIds(parsed.filterPriorityIds ?? [])
-      setFilterCompanyIds(parsed.filterCompanyIds)
-      setFilterTagIds(parsed.filterTagIds)
-      setFilterVisibilityState(parsed.filterVisibility)
-      setFilterTeamIds(parsed.filterTeamIds)
-      setFilterDateRange(parsed.filterDateRange)
-      setFilterDueDateRange(parsed.filterDueDateRange ?? null)
-      setFilterSearch(parsed.filterSearch)
-      setViewMode(parsed.viewMode)
-      setSortBy(parsed.sortBy)
-      setSortOrder(parsed.sortOrder)
-      setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
-      setFilterTicketType(parsed.filterTicketType ?? null)
+
+      if (isJunkUrl) {
+        applyStatusFromParsed()
+        setFilterTypeIds(parsed.filterTypeIds)
+        setFilterPriorityIds(parsed.filterPriorityIds ?? [])
+        setFilterCompanyIds(parsed.filterCompanyIds)
+        setFilterTagIds(parsed.filterTagIds)
+        setFilterVisibilityState(parsed.filterVisibility)
+        setFilterTeamIds(parsed.filterTeamIds)
+        setFilterDateRange(parsed.filterDateRange)
+        setFilterDueDateRange(parsed.filterDueDateRange ?? null)
+        setFilterSearch(parsed.filterSearch)
+        setViewMode(parsed.viewMode)
+        setSortBy(parsed.sortBy)
+        setSortOrder(parsed.sortOrder)
+        setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
+        setFilterTicketType(parsed.filterTicketType ?? null)
+      } else {
+        /** Hanya terapkan field yang benar-benar ada di URL. Param `view` saja (tanpa `status`) dulu membuat parsed.filterStatus [] dan menimpa state → fetch ulang. */
+        if (searchParams.has(URL_PARAMS.status)) applyStatusFromParsed()
+        if (searchParams.has(URL_PARAMS.type_ids)) setFilterTypeIds(parsed.filterTypeIds)
+        if (searchParams.has(URL_PARAMS.priority_ids))
+          setFilterPriorityIds(parsed.filterPriorityIds ?? [])
+        if (searchParams.has(URL_PARAMS.company_ids)) setFilterCompanyIds(parsed.filterCompanyIds)
+        if (searchParams.has(URL_PARAMS.tag_ids)) setFilterTagIds(parsed.filterTagIds)
+        if (searchParams.has(URL_PARAMS.visibility)) setFilterVisibilityState(parsed.filterVisibility)
+        if (searchParams.has(URL_PARAMS.team_ids)) setFilterTeamIds(parsed.filterTeamIds)
+        if (searchParams.has(URL_PARAMS.date_from) && searchParams.has(URL_PARAMS.date_to)) {
+          setFilterDateRange(parsed.filterDateRange)
+        }
+        if (searchParams.has(URL_PARAMS.due_date_from) && searchParams.has(URL_PARAMS.due_date_to)) {
+          setFilterDueDateRange(parsed.filterDueDateRange ?? null)
+        }
+        if (searchParams.has(URL_PARAMS.search)) setFilterSearch(parsed.filterSearch)
+        if (searchParams.has(URL_PARAMS.view)) setViewMode(parsed.viewMode)
+        if (searchParams.has(URL_PARAMS.sort) || searchParams.has(URL_PARAMS.order)) {
+          setSortBy(parsed.sortBy)
+          setSortOrder(parsed.sortOrder)
+        }
+        if (searchParams.has(URL_PARAMS.sidebar)) setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
+        if (searchParams.has(URL_PARAMS.ticket_type)) setFilterTicketType(parsed.filterTicketType ?? null)
+      }
+    } else if (canParseTicketsUrl(searchParams)) {
+      /** Hanya param UI (view / sort / order / sidebar) — tanpa mengubah filter data atau memanggil fetch. */
+      let parsed = parseFiltersFromUrl(searchParams, { isCustomer })
+      if (!parsed) {
+        applyingFromUrlRef.current = false
+        return
+      }
+      if (isCustomer && parsed.viewMode === 'roundrobin') {
+        parsed = { ...parsed, viewMode: 'kanban' }
+      }
+      if (
+        isCustomer &&
+        (parsed.filterTicketType === 'spam' || parsed.filterTicketType === 'trash')
+      ) {
+        parsed = { ...parsed, filterTicketType: null }
+      }
+      if (searchParams.has(URL_PARAMS.view)) setViewMode(parsed.viewMode)
+      if (searchParams.has(URL_PARAMS.sort) || searchParams.has(URL_PARAMS.order)) {
+        setSortBy(parsed.sortBy)
+        setSortOrder(parsed.sortOrder)
+      }
+      if (searchParams.has(URL_PARAMS.sidebar)) setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
     } else {
       const sidebarOnly = parseSidebarCollapsedFromUrl(searchParams)
       if (sidebarOnly !== null) {
@@ -690,6 +800,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       filterSidebarCollapsed: filterSidebarCollapsed,
       sortBy: sortBy || null,
       sortOrder: sortOrder || null,
+      ticketsPageLimit,
     })
 
     if (applyingFromUrlRef.current) {
@@ -740,6 +851,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     filterTicketType,
     filterPriorityIds,
     isCustomer,
+    ticketsPageLimit,
   ])
 
   const getFilterQueryString = useCallback(() => {
@@ -838,8 +950,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       newStatus = hit.status as string
     }
 
-    setTickets((prevTickets) =>
-      prevTickets.map((t) => (t.id === ticketId ? { ...t, status: newStatus as TicketRecord['status'] } : t))
+    queryClient.setQueryData<TicketRecord[]>(ticketsListQueryKeyRef.current, (prev) =>
+      (prev ?? []).map((t) => (t.id === ticketId ? { ...t, status: newStatus as TicketRecord['status'] } : t))
     )
 
     try {
@@ -851,7 +963,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       message.success('Ticket status updated successfully')
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to update ticket status')
-      fetchTickets()
+      invalidateTicketsList()
     }
   }
 
@@ -930,13 +1042,15 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       message.error('Only admins and managers can move tickets to trash')
       return
     }
-    setTickets((prev) => prev.filter((t) => t.id !== ticketId))
+    queryClient.setQueryData<TicketRecord[]>(ticketsListQueryKeyRef.current, (prev) =>
+      (prev ?? []).filter((t) => t.id !== ticketId)
+    )
     try {
       await apiFetch(`/api/tickets/${ticketId}`, { method: 'DELETE' })
       message.success('Ticket moved to trash')
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to move ticket to trash')
-      fetchTickets()
+      invalidateTicketsList()
     }
   }
 
@@ -953,10 +1067,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         )
       )
       message.success(`Moved ${ids.length} ticket(s) to trash`)
-      await fetchTickets()
+      await queryClient.invalidateQueries({ queryKey: ticketsListQueryKeyPrefix() })
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to move tickets to trash')
-      await fetchTickets()
+      await queryClient.invalidateQueries({ queryKey: ticketsListQueryKeyPrefix() })
     }
   }
 
@@ -973,10 +1087,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         )
       )
       message.success(`Moved ${ids.length} ticket(s) to spam`)
-      await fetchTickets()
+      await queryClient.invalidateQueries({ queryKey: ticketsListQueryKeyPrefix() })
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to move tickets to spam')
-      await fetchTickets()
+      await queryClient.invalidateQueries({ queryKey: ticketsListQueryKeyPrefix() })
     }
   }
 
@@ -1042,7 +1156,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
           })
 
           message.success('Ticket updated successfully')
-          await fetchTickets()
+          await queryClient.invalidateQueries({ queryKey: ticketsListQueryKeyPrefix() })
         } else {
           const patchRes = await apiFetch<{
             ok?: boolean
@@ -1097,7 +1211,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
                   }))
                 : [],
           }
-          setTickets((prev) => prev.map((t) => (t.id === editingTicket.id ? updatedRecord : t)))
+          queryClient.setQueryData<TicketRecord[]>(ticketsListQueryKeyRef.current, (prev) =>
+            (prev ?? []).map((t) => (t.id === editingTicket.id ? updatedRecord : t))
+          )
         }
       } else {
         const createPayload = {
@@ -1170,7 +1286,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
           checklist_total: 0,
           has_unread_replies: false,
         }
-        setTickets((prev) => [newRecord, ...prev])
+        queryClient.setQueryData<TicketRecord[]>(ticketsListQueryKeyRef.current, (prev) => [
+          newRecord,
+          ...(prev ?? []),
+        ])
       }
 
       setModalVisible(false)
@@ -1285,5 +1404,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     filterByCompanyFromChip,
     submitting,
     canDeleteTicket,
+    ticketsPageLimit,
+    setTicketsPageLimit,
   }
 }

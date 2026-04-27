@@ -155,6 +155,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
     try {
       const params = new URLSearchParams()
       params.set('company_id', companyData.id)
+      params.set('limit', '200')
       if (filterDateRange) {
         params.set('date_from', filterDateRange[0].startOf('day').toISOString())
         params.set('date_to', filterDateRange[1].endOf('day').toISOString())

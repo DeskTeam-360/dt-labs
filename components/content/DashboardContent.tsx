@@ -13,7 +13,7 @@ import {
 import { App, Button, Card, Col, Empty,Layout, List, Row, Space, Statistic, Typography } from 'antd'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef,useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 
@@ -31,22 +31,9 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 import dayjs from 'dayjs'
-import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
-  Line,
-  PolarAngleAxis,
-  PolarGrid,
-  PolarRadiusAxis,
-  Radar,
-  RadarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+
+import StaffDashboardCharts from '@/components/dashboard/DashboardStaffChartsLazy'
+
 const { Content } = Layout
 const { Title, Text } = Typography
 
@@ -218,40 +205,30 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
     return days
   }, [allSessionsForStats])
 
-  const fetchLastTrackers = async () => {
+  const loadTrackerDashboardData = useCallback(async () => {
     setLoadingTrackers(true)
     try {
-      const data = await apiFetch<Array<{ id: string; ticket_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null; ticket?: { id: number; title: string } }>>(
-        `/api/users/time-tracker?user_id=${user.id}&filter=all&limit=${RECENT_TRACKERS_LIMIT}`
-      )
-      setLastTrackers(Array.isArray(data) ? data : [])
+      const [lastData, , activeData] = await Promise.all([
+        apiFetch<Array<{ id: string; ticket_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null; ticket?: { id: number; title: string } }>>(
+          `/api/users/time-tracker?user_id=${user.id}&filter=all&limit=${RECENT_TRACKERS_LIMIT}`
+        ),
+        fetchAllSessionsForStats(),
+        apiFetch<ActiveTrackerRow[]>(`/api/users/time-tracker?user_id=${user.id}&active_only=1`),
+      ])
+      setLastTrackers(Array.isArray(lastData) ? lastData : [])
+      const list = Array.isArray(activeData) ? activeData : []
+      setActiveTrackers(list)
     } catch {
       setLastTrackers([])
+      setActiveTrackers([])
     } finally {
       setLoadingTrackers(false)
     }
-  }
-
-  useEffect(() => {
-    fetchLastTrackers()
-    fetchAllSessionsForStats()
   }, [user.id])
 
-  const fetchActiveTracker = async () => {
-    try {
-      const data = await apiFetch<ActiveTrackerRow[]>(
-        `/api/users/time-tracker?user_id=${user.id}&active_only=1`
-      )
-      const list = Array.isArray(data) ? data : []
-      setActiveTrackers(list)
-    } catch {
-      setActiveTrackers([])
-    }
-  }
-
   useEffect(() => {
-    fetchActiveTracker()
-  }, [user.id])
+    void loadTrackerDashboardData()
+  }, [loadTrackerDashboardData])
 
   useEffect(() => {
     if (activeTrackers.length === 0) {
@@ -280,8 +257,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
       })
       setActiveTrackers((prev) => prev.filter((t) => t.id !== row.id))
       message.success('Time tracker stopped')
-      fetchLastTrackers()
-      fetchAllSessionsForStats()
+      void loadTrackerDashboardData()
     } catch (error: unknown) {
       const errMsg =
         error instanceof Error ? error.message : 'Failed to stop tracker'
@@ -575,18 +551,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
               }
               style={{ marginBottom: 16 }}
             >
-              <div style={{ width: '100%', height: 320, minHeight: 280, minWidth: 0 }}>
-                <ResponsiveContainer width="100%" height="100%" minHeight={280}>
-                  <RadarChart data={chartData}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="short" />
-                    <PolarRadiusAxis angle={90} domain={[0, 'auto']} tickFormatter={(v) => `${v}m`} />
-                    <Radar name="Minutes" dataKey="duration" stroke="#1890ff" fill="#1890ff" fillOpacity={0.4} />
-                    <Tooltip formatter={(value: number | undefined) => [`${value ?? 0} min`, 'Duration']} labelFormatter={(label) => chartData.find((d) => d.short === label)?.day ?? label} />
-                    <Legend />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
+              <StaffDashboardCharts chartData={chartData} />
             </Card>
           </Col>
           <Col xs={24} lg={8}>

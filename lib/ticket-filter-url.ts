@@ -24,12 +24,25 @@ export const URL_PARAMS = {
   priority_ids: 'priority_ids',
 } as const
 
-/** True if URL carries shareable filter/query params (excludes `sidebar` — UI-only, not part of filter semantics). */
+/** Tampilan / preferensi UI — tidak disinkronkan ke URL (kecuali junk `view=card`) agar ganti view tidak memicu `router.replace` dan re-fetch. */
+const URL_UI_ONLY_KEYS = new Set<string>([
+  URL_PARAMS.sidebar,
+  URL_PARAMS.view,
+  URL_PARAMS.sort,
+  URL_PARAMS.order,
+])
+
+/** True jika URL punya param yang mempengaruhi query data tiket (bukan view/sort/order/sidebar saja). */
 export function hasUrlFilterParams(searchParams: URLSearchParams): boolean {
   if (searchParams.has(URL_PARAMS.ticket_type)) return true
   return Array.from(Object.values(URL_PARAMS)).some(
-    (key) => key !== URL_PARAMS.sidebar && searchParams.has(key)
+    (key) => !URL_UI_ONLY_KEYS.has(key) && searchParams.has(key)
   )
+}
+
+/** Ada salah satu param tiket yang dikenal (untuk parse awal / bookmark). */
+export function canParseTicketsUrl(searchParams: URLSearchParams): boolean {
+  return Array.from(Object.values(URL_PARAMS)).some((key) => searchParams.has(key))
 }
 
 /** Read sidebar open state from URL (`sidebar=0` = expanded). `null` = param absent. */
@@ -60,7 +73,7 @@ export function parseFiltersFromUrl(
   searchParams: URLSearchParams,
   opts?: { isCustomer?: boolean }
 ): ParsedUrlFilters | null {
-  if (!hasUrlFilterParams(searchParams)) return null
+  if (!canParseTicketsUrl(searchParams)) return null
   const isCustomer = opts?.isCustomer ?? false
   const split = (s: string | null) => (s ? s.split(',').map((x) => x.trim()).filter(Boolean) : [])
   const status = split(searchParams.get(URL_PARAMS.status))
@@ -178,7 +191,7 @@ export function buildSearchStringFromFilters(state: {
     p.set(URL_PARAMS.due_date_to, state.filterDueDateRange[1].toISOString())
   }
   if (state.filterSearch.trim()) p.set(URL_PARAMS.search, state.filterSearch.trim())
-  if (!inJunk && state.viewMode && state.viewMode !== 'kanban') p.set(URL_PARAMS.view, state.viewMode)
+  /** viewMode tidak ditulis ke URL — localStorage + state; hindari `&view=list` memicu replace/re-parse. */
   if (state.sortBy && state.sortBy !== 'updated_at') p.set(URL_PARAMS.sort, state.sortBy)
   if (state.sortOrder && state.sortOrder !== 'desc') p.set(URL_PARAMS.order, state.sortOrder)
   /** Sidebar open/closed is kept in localStorage only — syncing it to the URL triggered full URL re-parse and reset filters. */
