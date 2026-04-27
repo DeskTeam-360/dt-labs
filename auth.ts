@@ -107,16 +107,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           error: 'AccessRevoked',
         }
       }
-      if (session.user && token.id) {
-        session.user.id = token.id as string
-        session.user.email = token.email as string
-        ;(session.user as { role?: string }).role = token.role as string
-        if (typeof token.name === 'string' && token.name.length > 0) {
-          session.user.name = token.name
+      /** Subjek sesi: jangan bergantung pada `session.user` yang sudah ada — Auth.js Credentials sering mengirim `user` kosong/undefined; getToken di middleware tetap melihat `id` di JWT → loop login↔dashboard. */
+      const userId =
+        (typeof token.id === 'string' && token.id.length > 0 ? token.id : undefined) ??
+        (typeof token.sub === 'string' && token.sub.length > 0 ? token.sub : undefined)
+      if (!userId) {
+        return session
+      }
+
+      if (!session.user) {
+        session.user = {
+          id: userId,
+          email: (token.email as string | undefined) ?? '',
+          name: '',
+          emailVerified: null,
         }
-        if (typeof token.picture === 'string') {
-          session.user.image = token.picture
-        }
+      }
+
+      session.user.id = userId
+      session.user.email = (token.email as string | undefined) ?? session.user.email ?? ''
+      ;(session.user as { role?: string }).role = token.role as string
+      if (typeof token.name === 'string' && token.name.length > 0) {
+        session.user.name = token.name
+      } else if (!session.user.name || String(session.user.name).trim().length === 0) {
+        session.user.name = session.user.email || 'User'
+      }
+      if (typeof token.picture === 'string') {
+        session.user.image = token.picture
       }
       return session
     },

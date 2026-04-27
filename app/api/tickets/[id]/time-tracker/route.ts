@@ -224,13 +224,17 @@ export async function POST(
   }
 
   if (action === 'stop') {
-    const { session_id } = body
+    const sessionIdRaw = body.session_id
+    if (typeof sessionIdRaw !== 'string' || sessionIdRaw.trim() === '') {
+      return NextResponse.json({ error: 'session_id is required' }, { status: 400 })
+    }
+    const sessionId = sessionIdRaw.trim()
     const stopTime = new Date()
 
     const [active] = await db
       .select()
       .from(ticketTimeTracker)
-      .where(eq(ticketTimeTracker.id, session_id))
+      .where(eq(ticketTimeTracker.id, sessionId))
 
     if (!active || (active.userId !== session.user.id && !admin)) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
@@ -251,7 +255,7 @@ export async function POST(
     await db
       .update(ticketTimeTracker)
       .set({ stopTime, durationSeconds, durationAdjustment: durationSeconds })
-      .where(eq(ticketTimeTracker.id, session_id))
+      .where(eq(ticketTimeTracker.id, sessionId))
 
     return NextResponse.json({ ok: true })
   }

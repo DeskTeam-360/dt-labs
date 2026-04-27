@@ -155,6 +155,18 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
     }
   }, [user?.id])
 
+  /** Refetch dashboard aggregates (e.g. after moving a ticket to trash). */
+  const refreshDashboard = useCallback(async () => {
+    try {
+      const dashRes = await fetch('/api/customer/dashboard', { credentials: 'include' })
+      if (dashRes.ok) {
+        setData(await dashRes.json())
+      }
+    } catch {
+      /* keep current data */
+    }
+  }, [])
+
   useEffect(() => {
     fetchHourlyTimeData()
   }, [fetchHourlyTimeData])
@@ -746,8 +758,8 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                                                 throw new Error(err?.error || 'Failed to move to trash')
                                               }
                                               message.success('Ticket moved to trash')
-                                              fetchStats()
-                                              fetchHourlyTimeData()
+                                              void refreshDashboard()
+                                              void fetchHourlyTimeData()
                                             } catch (err) {
                                               message.error((err as Error).message || 'Failed to move ticket to trash')
                                             }
