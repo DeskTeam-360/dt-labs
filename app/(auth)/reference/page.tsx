@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import TicketReferenceContent from '@/components/content/TicketReferenceContent'
+import TicketReferenceContent from '@/components/content/settings/TicketReferenceContent'
 import { canAccessTickets } from '@/lib/auth-utils'
 
 export default async function ReferencePage() {

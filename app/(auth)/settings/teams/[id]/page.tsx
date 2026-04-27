@@ -2,7 +2,7 @@ import { asc,eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import TeamDetailContent from '@/components/content/TeamDetailContent'
+import TeamDetailContent from '@/components/content/team/TeamDetailContent'
 import { db, teamMembers,teams, users } from '@/lib/db'
 
 export default async function SettingsTeamDetailPage({ params }: { params: Promise<{ id: string }> }) {

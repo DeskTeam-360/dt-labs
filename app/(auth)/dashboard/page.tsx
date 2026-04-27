@@ -1,8 +1,8 @@
 import { inArray } from 'drizzle-orm'
 
 import { auth } from '@/auth'
-import CustomerDashboardContent from '@/components/content/CustomerDashboardContent'
-import DashboardContent from '@/components/content/DashboardContent'
+import CustomerDashboardContent from '@/components/content/customer/CustomerDashboardContent'
+import DashboardContent from '@/components/content/dashboard/DashboardContent'
 import { db, teams, tickets,users } from '@/lib/db'
 
 export default async function DashboardPage() {

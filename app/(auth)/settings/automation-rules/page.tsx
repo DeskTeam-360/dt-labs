@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import AutomationRulesContent from '@/components/content/AutomationRulesContent'
+import AutomationRulesContent from '@/components/content/settings/AutomationRulesContent'
 import { canAccessAutomationRules } from '@/lib/auth-utils'
 
 export default async function AutomationRulesPage() {

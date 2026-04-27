@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import CustomerWeeklyRecapSettingsContent from '@/components/content/CustomerWeeklyRecapSettingsContent'
+import CustomerWeeklyRecapSettingsContent from '@/components/content/customer/CustomerWeeklyRecapSettingsContent'
 import { canAccessCustomerWeeklyRecap } from '@/lib/auth-utils'
 
 export default async function CustomerWeeklyRecapSettingsPage() {

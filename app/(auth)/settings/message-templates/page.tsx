@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import MessageTemplatesContent from '@/components/content/MessageTemplatesContent'
+import MessageTemplatesContent from '@/components/content/message-template/MessageTemplatesContent'
 import { canAccessMessageTemplates } from '@/lib/auth-utils'
 
 export default async function MessageTemplatesPage() {

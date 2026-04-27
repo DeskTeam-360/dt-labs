@@ -1,7 +1,7 @@
 import { desc,eq } from 'drizzle-orm'
 
 import { auth } from '@/auth'
-import ScreenshotsContent from '@/components/content/ScreenshotsContent'
+import ScreenshotsContent from '@/components/content/settings/ScreenshotsContent'
 import { db, screenshots, tickets } from '@/lib/db'
 
 export default async function ScreenshotsPage() {

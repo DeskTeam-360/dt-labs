@@ -2,7 +2,7 @@ import { and,eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import EmailIntegrationContent from '@/components/content/EmailIntegrationContent'
+import EmailIntegrationContent from '@/components/content/settings/EmailIntegrationContent'
 import { db, emailIntegrations } from '@/lib/db'
 
 export default async function EmailIntegrationPage() {
