@@ -31,7 +31,7 @@ export async function GET() {
 
     const userCompanyId = typeof userCompanyRow === 'string' ? userCompanyRow : null
     const userTeamIds = userTeamRows.map((r) => r.teamId)
-    return NextResponse.json({
+    const body = {
       userCompanyId,
       userTeamIds,
       teams: catalog.teams,
@@ -41,6 +41,12 @@ export async function GET() {
       companies: catalog.companies,
       tags: catalog.tags,
       statuses: catalog.statuses,
+    }
+    return NextResponse.json(body, {
+      headers: {
+        /** Katalog lookup jarang berubah; browser boleh cache singkat. */
+        'Cache-Control': 'private, max-age=60, stale-while-revalidate=120',
+      },
     })
   } catch (err: unknown) {
     console.error('[API /api/tickets/lookup]', err)

@@ -1268,7 +1268,7 @@ export default function TicketDetailContent({
                     created_by: string
                     ticket_type?: string
                 }
-                const list = await apiFetch<TicketListRow[]>('/api/tickets?limit=500')
+                const list = await apiFetch<TicketListRow[]>('/api/tickets?limit=200')
                 const uid = currentUser.id
                 const openMine = list.filter(
                     (t) =>

@@ -6,6 +6,7 @@ import { SessionProvider } from 'next-auth/react'
 
 import FirebaseSessionBridge from '@/components/FirebaseSessionBridge'
 import NotificationPollProvider from '@/components/NotificationPollProvider'
+import QueryProvider from '@/components/QueryProvider'
 import SessionAccessGuard from '@/components/SessionAccessGuard'
 import { ThemeProvider, useTheme } from '@/components/ThemeProvider'
 
@@ -70,11 +71,13 @@ export default function AntdProvider({
       <ThemedConfig>
         {/* NextAuth: no polling + no focus refetch — avoids heavy /api/auth/session traffic. */}
         <SessionProvider session={session} refetchInterval={0} refetchOnWindowFocus={false}>
-          <NotificationPollProvider>
-            <SessionAccessGuard />
-            <FirebaseSessionBridge />
-            {children}
-          </NotificationPollProvider>
+          <QueryProvider>
+            <NotificationPollProvider>
+              <SessionAccessGuard />
+              <FirebaseSessionBridge />
+              {children}
+            </NotificationPollProvider>
+          </QueryProvider>
         </SessionProvider>
       </ThemedConfig>
     </ThemeProvider>

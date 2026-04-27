@@ -36,8 +36,9 @@ import {
   getEffectiveCompanyIdForUser,
 } from '@/lib/ticket-contact-user'
 
-const DEFAULT_LIMIT = 500
-const MAX_LIMIT = 1000
+const DEFAULT_LIMIT = 50
+/** Maksimum per request untuk daftar tiket (UI: 50 / 100 / 200). */
+const MAX_LIMIT = 200
 const REQUESTER_NEW_TICKET_TEMPLATE_KEY = 'requester_notification_new_ticket_created' as const
 
 function encodeSubjectHeader(subject: string): string {

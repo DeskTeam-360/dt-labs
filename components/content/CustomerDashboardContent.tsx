@@ -12,20 +12,12 @@ import {
 import { Button, Card, Col, Dropdown, Flex, Layout, message, Modal, Row, Select, Space, Spin, Tooltip,Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
-import { type CSSProperties,useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react'
 
+import {
+  LazyCustomerDashboardBarBlock,
+  LazyCustomerDashboardDonutBlock,
+} from '@/components/dashboard/CustomerDashboardChartsLazy'
 import { canDeleteTickets } from '@/lib/auth-utils'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 
@@ -168,37 +160,41 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
     fetchHourlyTimeData()
   }, [fetchHourlyTimeData])
 
-  const fetchStats = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch('/api/customer/dashboard', { credentials: 'include' })
-      if (!res.ok) throw new Error('Failed to fetch')
-      const json = await res.json()
-      setData(json)
-    } catch {
-      setData(null)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
-    fetchStats()
-  }, [])
-
-  const fetchKbArticles = async () => {
-    try {
-      const res = await fetch('/api/knowledge-base-articles?published=true', { credentials: 'include' })
-      if (!res.ok) return
-      const json = await res.json()
-      setKbArticles(json || [])
-    } catch {
-      setKbArticles([])
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      try {
+        const [dashRes, kbRes] = await Promise.all([
+          fetch('/api/customer/dashboard', { credentials: 'include' }),
+          fetch('/api/knowledge-base-articles?published=true', { credentials: 'include' }),
+        ])
+        if (!cancelled) {
+          if (dashRes.ok) {
+            setData(await dashRes.json())
+          } else {
+            setData(null)
+          }
+          if (kbRes.ok) {
+            const json = await kbRes.json()
+            setKbArticles(json || [])
+          } else {
+            setKbArticles([])
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setData(null)
+          setKbArticles([])
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
-  }
-
-  useEffect(() => {
-    fetchKbArticles()
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const filteredKbArticles = useMemo(() => {
@@ -267,35 +263,16 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
 
                     {barChartData.length > 0 ? (
                       <div className="customer-dash-recharts" style={{ height: 300 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={barChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis allowDecimals={false} />
-                            <RechartsTooltip contentStyle={RECHARTS_TOOLTIP_STYLE} />
-                            <Bar
-                              dataKey="count"
-                              radius={[4, 4, 0, 0]}
-                              cursor={
-                                barChartData.some((d) => d.count > 0 && d.type_id != null)
-                                  ? 'pointer'
-                                  : 'default'
-                              }
-                              onClick={(barProps: { payload?: { type_id?: number | null; count?: number } }) => {
-                                const payload = barProps?.payload
-                                if (!payload || payload.count === 0 || payload.type_id == null) return
-                                const qs = new URLSearchParams()
-                                qs.set('view', 'list')
-                                qs.set('type_ids', String(payload.type_id))
-                                router.push(`/tickets?${qs.toString()}`)
-                              }}
-                            >
-                              {barChartData.map((entry, idx) => (
-                                <Cell key={idx} fill={entry.fill} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
+                        <LazyCustomerDashboardBarBlock
+                          barChartData={barChartData}
+                          tooltipStyle={RECHARTS_TOOLTIP_STYLE}
+                          onBarTypeClick={(typeId) => {
+                            const qs = new URLSearchParams()
+                            qs.set('view', 'list')
+                            qs.set('type_ids', String(typeId))
+                            router.push(`/tickets?${qs.toString()}`)
+                          }}
+                        />
                       </div>
                     ) : (
                       <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -439,59 +416,11 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                 </div>
               </Flex>
               {donutData.length > 0 ? (
-                <div className="customer-dash-recharts" style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-                  <div style={{ width: 140, height: 140, flexShrink: 0 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={donutData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={45}
-                          outerRadius={65}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {donutData.map((entry, idx) => (
-                            <Cell key={idx} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip
-                          formatter={(v: number | undefined) => formatTime(v ?? 0)}
-                          contentStyle={RECHARTS_TOOLTIP_STYLE}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div
-                    style={{
-                      flex: 1,
-                      background: 'var(--customer-dash-chart-legend-bg)',
-                      borderRadius: 8,
-                      padding: 16,
-                    }}
-                  >
-                    {donutData.map((d, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 12,
-                          padding: i < donutData.length - 1 ? '10px 0' : '0 0 0 0',
-                          borderBottom: i < donutData.length - 1 ? '1px solid var(--customer-dash-subtle-border)' : 'none',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ width: 12, height: 12, borderRadius: 2, background: d.fill, flexShrink: 0 }} />
-                          <Text style={{ fontSize: 13 }}>{d.name}</Text>
-                        </div>
-                        <Text strong style={{ fontSize: 13 }}>{formatTime(d.value)}</Text>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <LazyCustomerDashboardDonutBlock
+                  donutData={donutData}
+                  formatTime={formatTime}
+                  tooltipStyle={RECHARTS_TOOLTIP_STYLE}
+                />
               ) : (
                 <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Text type="secondary">No time tracked yet</Text>

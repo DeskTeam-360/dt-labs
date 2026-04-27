@@ -1,6 +1,6 @@
 'use client'
 
-import { Alert, Empty, Layout, message, Spin } from 'antd'
+import { Alert, Layout, message, Spin } from 'antd'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useRef } from 'react'
 
@@ -123,7 +123,6 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     handleDragEnd,
     activeId,
     columnsToShow,
-    tickets,
     userTeamIds,
     lookupReady,
     getFilterQueryString,
@@ -135,6 +134,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     filterByTagFromChip,
     filterByCompanyFromChip,
     submitting,
+    ticketsPageLimit,
+    setTicketsPageLimit,
   } = useTicketsData(currentUser.id, isCustomer, canDeleteTicket)
 
   return (
@@ -165,6 +166,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             filterSearch={filterSearch}
             onFilterSearchChange={setFilterSearch}
             filterTicketType={filterTicketType}
+            ticketsPageLimit={ticketsPageLimit}
+            onTicketsPageLimitChange={setTicketsPageLimit}
           />
 
           {!isCustomer && filterTicketType === 'spam' && (

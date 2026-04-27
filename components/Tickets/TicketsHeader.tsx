@@ -3,6 +3,8 @@
 import { AppstoreOutlined, IdcardOutlined, PlusOutlined, SearchOutlined,SortAscendingOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import { Button, Flex, Input,Segmented, Select, Typography } from 'antd'
 
+import { TICKETS_PAGE_LIMIT_OPTIONS, type TicketsPageLimit } from '@/lib/tickets-list-query'
+
 import type { TicketSortField, TicketSortOrder } from './types'
 
 type ViewMode = 'kanban' | 'list' | 'card' | 'roundrobin'
@@ -23,6 +25,8 @@ interface TicketsHeaderProps {
   onFilterSearchChange?: (v: string) => void
   /** Row classification list (staff junk folders) — spam/trash set title and hide view mode picker */
   filterTicketType?: 'spam' | 'trash' | null
+  ticketsPageLimit?: TicketsPageLimit
+  onTicketsPageLimitChange?: (v: TicketsPageLimit) => void
 }
 
 const SORT_FIELD_OPTIONS: { value: TicketSortField; label: string }[] = [
@@ -48,6 +52,8 @@ export default function TicketsHeader({
   filterSearch = '',
   onFilterSearchChange,
   filterTicketType = null,
+  ticketsPageLimit = 50,
+  onTicketsPageLimitChange,
 }: TicketsHeaderProps) {
   const inJunkFolder = !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
   const junkTitle =
@@ -111,6 +117,29 @@ export default function TicketsHeader({
                   { value: 'desc', label: 'Desc' },
                 ]}
                 style={{ width: 90 }}
+              />
+              {onTicketsPageLimitChange && (
+                <Select
+                  value={ticketsPageLimit}
+                  onChange={(v) => onTicketsPageLimitChange(v as TicketsPageLimit)}
+                  options={TICKETS_PAGE_LIMIT_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
+                  style={{ width: 72 }}
+                  aria-label="Tickets per load"
+                />
+              )}
+            </Flex>
+          )}
+          {!showSort && onTicketsPageLimitChange && (
+            <Flex align="center" gap={8}>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                Load
+              </Typography.Text>
+              <Select
+                value={ticketsPageLimit}
+                onChange={(v) => onTicketsPageLimitChange(v as TicketsPageLimit)}
+                options={TICKETS_PAGE_LIMIT_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
+                style={{ width: 72 }}
+                aria-label="Tickets per load"
               />
             </Flex>
           )}
