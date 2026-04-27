@@ -95,6 +95,14 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+/** React Query membatalkan `fetch` lama saat `queryKey` berubah / unmount — bukan kegagalan jaringan. */
+function isRequestAborted(error: unknown, signal?: AbortSignal): boolean {
+  if (signal?.aborted) return true
+  if (error instanceof DOMException && error.name === 'AbortError') return true
+  if (error instanceof Error && error.name === 'AbortError') return true
+  return false
+}
+
 function getInitialFilterStateFromStored(stored: StoredFilter | null, isCustomer = false): ParsedUrlFilters {
   const defaultStatus = isCustomer
     ? []
@@ -455,6 +463,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       try {
         return await apiFetch<TicketRecord[]>(url, { signal })
       } catch (error: unknown) {
+        if (isRequestAborted(error, signal)) {
+          throw error
+        }
         message.error((error as Error).message || 'Failed to fetch tickets')
         throw error
       }
