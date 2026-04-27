@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import CustomerTimeReportContent from '@/components/content/CustomerTimeReportContent'
+import CustomerTimeReportContent from '@/components/content/customer/CustomerTimeReportContent'
 import { isAdminOrManager } from '@/lib/auth-utils'
 
 export default async function CustomerTimeReportPage() {

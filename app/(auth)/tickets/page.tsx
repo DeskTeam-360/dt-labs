@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 
 import { auth } from '@/auth'
-import TicketsContent from '@/components/content/TicketsContent'
+import TicketsContent from '@/components/content/ticket/TicketsContent'
 
 export default async function TicketsPage() {
   const session = await auth()

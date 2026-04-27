@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 
-import type { TicketSortField, TicketSortOrder } from '@/components/Tickets/types'
+import type { TicketSortField, TicketSortOrder } from '@/components/ticket/list/types'
 
 /** URL param keys - used for shareable filter links and saved presets */
 export const URL_PARAMS = {

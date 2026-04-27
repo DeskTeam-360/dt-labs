@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import KnowledgeBaseArticleForm from '@/components/KnowledgeBaseArticleForm'
+import KnowledgeBaseArticleForm from '@/components/knowledge-base/KnowledgeBaseArticleForm'
 import { db, knowledgeBaseArticles } from '@/lib/db'
 
 export default async function KnowledgeBaseEditPage({

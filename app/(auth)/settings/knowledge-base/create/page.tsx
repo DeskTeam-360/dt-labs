@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import KnowledgeBaseArticleForm from '@/components/KnowledgeBaseArticleForm'
+import KnowledgeBaseArticleForm from '@/components/knowledge-base/KnowledgeBaseArticleForm'
 
 export default async function KnowledgeBaseCreatePage() {
   const session = await auth()

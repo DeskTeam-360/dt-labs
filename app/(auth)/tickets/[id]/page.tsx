@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import TicketDetailContentClient from '@/components/TicketDetailContentClient'
+import TicketDetailContentClient from '@/components/ticket/TicketDetailContentClient'
 import { db } from '@/lib/db'
 import { companyUsers, tickets, users } from '@/lib/db'
 import { getTicketDetail } from '@/lib/ticket-detail'

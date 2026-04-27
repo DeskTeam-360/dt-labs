@@ -4,6 +4,7 @@ import { EyeOutlined } from '@ant-design/icons'
 import { Button } from 'antd'
 import { Fragment, useMemo } from 'react'
 
+import styles from '@/components/content/settings/RecapSnapshotsSettingsContent.module.css'
 import {
   RECAP_HDR_H,
   recapCollectRolePositionsFromPayloads,
@@ -14,8 +15,6 @@ import {
   recapParseTaskByRole,
   recapRoleUsesSingleTimeUsedColumn,
 } from '@/lib/recap-payload-grid'
-
-import styles from '../content/RecapSnapshotsSettingsContent.module.css'
 
 export type RecapGridRow = { key: string; payload: Record<string, unknown>; teamColumnLabel: string }
 

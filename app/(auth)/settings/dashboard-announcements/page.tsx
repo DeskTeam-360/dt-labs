@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import DashboardAnnouncementsSettingsContent from '@/components/content/DashboardAnnouncementsSettingsContent'
+import DashboardAnnouncementsSettingsContent from '@/components/content/dashboard/DashboardAnnouncementsSettingsContent'
 import { isAdmin } from '@/lib/auth-utils'
 
 export default async function DashboardAnnouncementsSettingsPage() {

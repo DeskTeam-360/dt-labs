@@ -1,5 +1,5 @@
 import { auth } from '@/auth'
-import ChangePasswordContent from '@/components/content/ChangePasswordContent'
+import ChangePasswordContent from '@/components/content/settings/ChangePasswordContent'
 
 export default async function ChangePasswordPage() {
   const session = await auth()

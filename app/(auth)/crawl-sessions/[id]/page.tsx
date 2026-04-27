@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import CrawlSessionDetailContent from '@/components/content/CrawlSessionDetailContent'
+import CrawlSessionDetailContent from '@/components/content/crawl/CrawlSessionDetailContent'
 import { companies,companyWebsites, crawlSessions, db } from '@/lib/db'
 
 export default async function CrawlSessionDetailPage({ params }: { params: Promise<{ id: string }> }) {

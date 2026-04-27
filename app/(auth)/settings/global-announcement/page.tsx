@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import GlobalAnnouncementSettingsContent from '@/components/content/GlobalAnnouncementSettingsContent'
+import GlobalAnnouncementSettingsContent from '@/components/content/settings/GlobalAnnouncementSettingsContent'
 import { isAdmin } from '@/lib/auth-utils'
 
 export default async function GlobalAnnouncementSettingsPage() {

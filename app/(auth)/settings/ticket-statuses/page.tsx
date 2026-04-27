@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import TicketStatusesContent from '@/components/content/TicketStatusesContent'
+import TicketStatusesContent from '@/components/content/ticket/TicketStatusesContent'
 
 export default async function TicketStatusesPage() {
   const session = await auth()

@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import UserDetailContent from '@/components/content/UserDetailContent'
+import UserDetailContent from '@/components/content/user/UserDetailContent'
 import { canAccessUsers, isAdminOrManager } from '@/lib/auth-utils'
 import { companies,db, users } from '@/lib/db'
 

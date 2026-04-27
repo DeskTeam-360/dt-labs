@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import CompanyLogSettingsContent from '@/components/content/CompanyLogSettingsContent'
+import CompanyLogSettingsContent from '@/components/content/company/CompanyLogSettingsContent'
 import { canAccessCompanyLog } from '@/lib/auth-utils'
 
 export default async function CompanyLogSettingsPage() {

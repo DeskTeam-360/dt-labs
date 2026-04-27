@@ -5,7 +5,7 @@ import Script from "next/script";
 
 import { auth } from "@/auth";
 // import { Geist, Geist_Mono } from "next/font/google";
-import AntdProvider from "@/components/AntdProvider";
+import AntdProvider from "@/components/providers/AntdProvider";
 
 const themeInitScript = `
 (function(){

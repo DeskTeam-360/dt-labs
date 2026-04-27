@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
-import CompaniesContent from '@/components/content/CompaniesContent'
+import CompaniesContent from '@/components/content/company/CompaniesContent'
 
 export default async function SettingsCompaniesPage() {
   const session = await auth()

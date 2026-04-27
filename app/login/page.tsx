@@ -5,7 +5,7 @@ import { Alert,Button, Card, Form, Input, message, Typography } from 'antd'
 import { signIn } from 'next-auth/react'
 import { useEffect,useState } from 'react'
 
-import ThemeToggle from '@/components/ThemeToggle'
+import ThemeToggle from '@/components/common/ThemeToggle'
 
 const { Title, Text } = Typography
 
