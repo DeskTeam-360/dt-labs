@@ -246,7 +246,7 @@ export default function TicketPrioritiesContent({ user: currentUser }: TicketPri
       key: 'actions',
       render: (_, record) => (
         <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+          <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             Edit
           </Button>
           <Popconfirm
@@ -256,7 +256,7 @@ export default function TicketPrioritiesContent({ user: currentUser }: TicketPri
             okText="Delete"
             okButtonProps={{ danger: true }}
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+            <Button type="primary" danger icon={<DeleteOutlined />}>
               Delete
             </Button>
           </Popconfirm>
@@ -270,7 +270,6 @@ export default function TicketPrioritiesContent({ user: currentUser }: TicketPri
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ margin: '24px' }}>
-          <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <Title level={4} style={{ margin: 0 }}>
                 Ticket priorities
@@ -286,7 +285,6 @@ export default function TicketPrioritiesContent({ user: currentUser }: TicketPri
               dataSource={priorities}
               pagination={false}
             />
-          </Card>
 
           <Modal
             title={editing ? 'Edit priority' : 'New priority'}

@@ -112,7 +112,7 @@ export default function TicketActivityHistoryContent({ user: currentUser }: Tick
         collapsed={collapsed}
         user={currentUser}
         style={{
-          borderRadius: '16px 0 0 16px',
+          // borderRadius: '16px 0 0 16px',
           overflow: 'hidden',
         }}
       >

@@ -71,3 +71,21 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+:global(html.dark) .monthBar {
+  background: #1f1f1f;
+  color: rgba(255, 255, 255, 0.88);
+  border-color: #303030;
+}
+
+:global(html.dark) .td,
+:global(html.dark) .tdStrong,
+:global(html.dark) .tdNum {
+  background: #141414;
+  color: rgba(255, 255, 255, 0.88);
+  border-color: #303030;
+}
+
+:global(html.dark) .tdSticky {
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.35);
+}

@@ -109,6 +109,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
   const [editingCompany, setEditingCompany] = useState<CompanyRecord | null>(null)
   const [searchText, setSearchText] = useState('')
   const [filterStatus, setFilterStatus] = useState<boolean | undefined>(undefined)
+  const [filterIsCustomer, setFilterIsCustomer] = useState<boolean | undefined>(undefined)
   const [leaderOptions, setLeaderOptions] = useState<LeaderOption[]>([])
   const [teamOptions, setTeamOptions] = useState<TeamOption[]>([])
   const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([])
@@ -125,9 +126,10 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
         if (!matchesSearch) return false
       }
       if (filterStatus !== undefined && c.is_active !== filterStatus) return false
+      if (filterIsCustomer !== undefined && (c.is_customer ?? false) !== filterIsCustomer) return false
       return true
     })
-  }, [companies, searchText, filterStatus])
+  }, [companies, searchText, filterStatus, filterIsCustomer])
 
   const fetchCompanies = async () => {
     setLoading(true)
@@ -306,6 +308,18 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       ),
     },
     {
+      title: 'Is customer',
+      dataIndex: 'is_customer',
+      key: 'is_customer',
+      width: 140,
+      align: 'center',
+      sorter: (a, b) => Number(a.is_customer ?? false) - Number(b.is_customer ?? false),
+      sortDirections: ['ascend', 'descend'],
+      render: (is_customer: boolean | undefined) => (
+        <Tag color={is_customer ? 'blue' : 'default'}>{is_customer ? 'Yes' : 'No'}</Tag>
+      ),
+    },
+    {
       title: 'Color',
       dataIndex: 'color',
       key: 'color',
@@ -401,7 +415,6 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
-          <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
               <Title level={2} style={{ margin: 0 }}>Companies Management</Title>
               <Space wrap>
@@ -429,6 +442,19 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                   <Option value={true}>Active</Option>
                   <Option value={false}>Inactive</Option>
                 </Select>
+                <Select
+                  placeholder="Filter Is Customer"
+                  allowClear
+                  value={filterIsCustomer}
+                  onChange={(v) => {
+                    setFilterIsCustomer(v)
+                    setPagination((p) => ({ ...p, current: 1 }))
+                  }}
+                  style={{ width: 160 }}
+                >
+                  <Option value={true}>Customer</Option>
+                  <Option value={false}>Non-customer</Option>
+                </Select>
                 <Button
                 type="primary"
                 icon={<PlusOutlined />}
@@ -453,7 +479,6 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
               }}
             />
-          </Card>
 
           <Modal
             title={editingCompany ? 'Edit Company' : 'Create Company'}
@@ -549,8 +574,8 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 </Col>
                 <Col xs={24} sm={5}>
                   <Form.Item
-                    name="Customer ?"
-                    label="Customer ?"
+                    name="is_customer"
+                    label="Is customer"
                     valuePropName="checked"
                     initialValue={false}
                   >

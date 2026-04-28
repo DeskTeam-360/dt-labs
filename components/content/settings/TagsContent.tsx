@@ -219,7 +219,7 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
       width: 120,
       render: (_, record) => (
         <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+          <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             Edit
           </Button>
           <Popconfirm
@@ -229,7 +229,7 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
             okText="Delete"
             okButtonProps={{ danger: true }}
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+            <Button type="primary" danger icon={<DeleteOutlined />}>
               Delete
             </Button>
           </Popconfirm>
@@ -243,7 +243,7 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ margin: '24px' }}>
-          <Card>
+          
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <Title level={4} style={{ margin: 0 }}>
                 Tags
@@ -259,7 +259,6 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
               dataSource={tags}
               pagination={false}
             />
-          </Card>
 
           <Modal
             title={editingTag ? 'Edit Tag' : 'Add Tag'}

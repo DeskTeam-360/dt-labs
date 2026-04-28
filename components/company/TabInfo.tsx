@@ -9,10 +9,9 @@ const { Text } = Typography
 
 interface TabInfoProps {
   companyData: any
-  groupedDatas: Record<string, any[]>
 }
 
-export default function TabInfo({ companyData, groupedDatas }: TabInfoProps) {
+export default function TabInfo({ companyData }: TabInfoProps) {
   return (
     <>
       <Row gutter={[24, 24]}>
@@ -94,33 +93,7 @@ export default function TabInfo({ companyData, groupedDatas }: TabInfoProps) {
         </Col>
       </Row>
       <br />
-      <div>
-        {Object.keys(groupedDatas).length > 0 ? (
-          Object.entries(groupedDatas).map(([group, items]: [string, any]) => (
-            <div key={group}>
-              <Text strong style={{ fontSize: 18, textTransform: 'uppercase' }}>{group}</Text>
-              <Descriptions bordered column={1} style={{ marginTop: 16 }}>
-                {items.map((item: any, index: number) => (
-                  <Descriptions.Item
-                    key={index}
-                    label={item.company_data_templates?.title || 'Data'}
-                  >
-                    <Space orientation="vertical" size="small">
-                      <Text>{item.value || 'N/A'}</Text>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        Updated: <DateDisplay date={item.updated_at} />
-                      </Text>
-                    </Space>
-                  </Descriptions.Item>
-                ))}
-              </Descriptions>
-              <br />
-            </div>
-          ))
-        ) : (
-          <Text type="secondary">No data available for this company</Text>
-        )}
-      </div>
+   
     </>
   )
 }

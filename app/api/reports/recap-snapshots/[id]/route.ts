@@ -145,3 +145,31 @@ export async function PATCH(
 
   return NextResponse.json({ data: updated ?? null })
 }
+
+/** DELETE — remove recap snapshot (admin/manager). */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!isAdminOrManager(sessionRole(session))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { id } = await params
+  if (!id || typeof id !== 'string') {
+    return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+  }
+
+  const [existing] = await db.select().from(recapSnapshots).where(eq(recapSnapshots.id, id)).limit(1)
+  if (!existing) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  await db.delete(recapSnapshots).where(eq(recapSnapshots.id, id))
+
+  return NextResponse.json({ ok: true })
+}

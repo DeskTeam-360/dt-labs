@@ -68,6 +68,24 @@ function normalizeTeamIds(raw: unknown): string[] {
   return raw.map((x) => String(x ?? '').trim()).filter(Boolean)
 }
 
+function mapApiRowToSnapshotGridRow(r: Record<string, unknown>): SnapshotGridRow {
+  return {
+    id: String(r.id),
+    title: String(r.title ?? ''),
+    periodStart: String(r.periodStart ?? r.period_start ?? ''),
+    periodEnd: String(r.periodEnd ?? r.period_end ?? ''),
+    periodType: String(r.periodType ?? r.period_type ?? ''),
+    teamIds: normalizeTeamIds(r.teamIds ?? r.team_ids),
+    payload:
+      typeof r.payload === 'object' && r.payload !== null ? (r.payload as Record<string, unknown>) : {},
+    createdAt: String(r.createdAt ?? r.created_at ?? ''),
+    updatedAt: String(r.updatedAt ?? r.updated_at ?? ''),
+    createdBy: r.createdBy != null ? String(r.createdBy) : null,
+    creatorEmail: r.creatorEmail != null ? String(r.creatorEmail) : null,
+    creatorFullName: r.creatorFullName != null ? String(r.creatorFullName) : null,
+  }
+}
+
 function periodGroupLabel(row: SnapshotGridRow): string {
   const pt = row.periodType
   if (pt === 'week' || pt === 'custom') {
@@ -111,6 +129,7 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
     createdAt: string
     updatedAt: string
   } | null>(null)
+  const [recalculateLoadingId, setRecalculateLoadingId] = useState<string | null>(null)
 
   const loadTeams = useCallback(async () => {
     try {
@@ -136,23 +155,7 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body?.error || res.statusText)
       const raw = Array.isArray(body.data) ? body.data : []
-      setRows(
-        raw.map((r: Record<string, unknown>) => ({
-          id: String(r.id),
-          title: String(r.title ?? ''),
-          periodStart: String(r.periodStart ?? r.period_start ?? ''),
-          periodEnd: String(r.periodEnd ?? r.period_end ?? ''),
-          periodType: String(r.periodType ?? r.period_type ?? ''),
-          teamIds: normalizeTeamIds(r.teamIds ?? r.team_ids),
-          payload:
-            typeof r.payload === 'object' && r.payload !== null ? (r.payload as Record<string, unknown>) : {},
-          createdAt: String(r.createdAt ?? r.created_at ?? ''),
-          updatedAt: String(r.updatedAt ?? r.updated_at ?? ''),
-          createdBy: r.createdBy != null ? String(r.createdBy) : null,
-          creatorEmail: r.creatorEmail != null ? String(r.creatorEmail) : null,
-          creatorFullName: r.creatorFullName != null ? String(r.creatorFullName) : null,
-        }))
-      )
+      setRows(raw.map((r: Record<string, unknown>) => mapApiRowToSnapshotGridRow(r)))
       setTotal(typeof body.total === 'number' ? body.total : 0)
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to load recaps')
@@ -168,7 +171,8 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
     void loadList()
   }, [loadList, loadTeams])
 
-  const openDetail = useCallback(async (id: string) => {
+  const openDetail = useCallback(async (id: string, opts?: { initialMode?: 'view' | 'edit' }) => {
+    const initialMode = opts?.initialMode ?? 'view'
     setDetailOpen(true)
     setDetailEditing(false)
     setDetailLoading(true)
@@ -179,17 +183,27 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
       if (!res.ok) throw new Error(body?.error || res.statusText)
       const d = body.data
       if (!d || typeof d !== 'object') throw new Error('Invalid response')
-      setDetailRow({
+      const next = {
         id: String(d.id),
         title: String(d.title ?? ''),
         periodStart: String(d.periodStart ?? d.period_start ?? ''),
         periodEnd: String(d.periodEnd ?? d.period_end ?? ''),
         periodType: String(d.periodType ?? d.period_type ?? ''),
-        teamIds: Array.isArray(d.teamIds) ? d.teamIds.map(String) : Array.isArray(d.team_ids) ? d.team_ids.map(String) : [],
+        teamIds: Array.isArray(d.teamIds)
+          ? d.teamIds.map(String)
+          : Array.isArray(d.team_ids)
+            ? d.team_ids.map(String)
+            : [],
         payload: typeof d.payload === 'object' && d.payload !== null ? (d.payload as Record<string, unknown>) : {},
         createdAt: String(d.createdAt ?? d.created_at ?? ''),
         updatedAt: String(d.updatedAt ?? d.updated_at ?? ''),
-      })
+      }
+      setDetailRow(next)
+      if (initialMode === 'edit') {
+        setEditTitle(next.title)
+        setEditPayloadJson(JSON.stringify(next.payload, null, 2))
+        setDetailEditing(true)
+      }
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to load recap')
       setDetailOpen(false)
@@ -213,7 +227,7 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
     if (!detailRow) return
     const t = editTitle.trim()
     if (!t) {
-      message.warning('Judul tidak boleh kosong')
+      message.warning('Title cannot be empty')
       return
     }
     let parsed: Record<string, unknown>
@@ -268,10 +282,10 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
             : r
         )
       )
-      message.success('Perubahan disimpan')
+      message.success('Changes saved')
       setDetailEditing(false)
     } catch (e) {
-      message.error(e instanceof Error ? e.message : 'Gagal menyimpan')
+      message.error(e instanceof Error ? e.message : 'Failed to save')
     } finally {
       setDetailSaveLoading(false)
     }
@@ -281,6 +295,81 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
     setDetailOpen(false)
     setDetailEditing(false)
   }, [])
+
+  const deleteRecapSnapshot = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/reports/recap-snapshots/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        if (!res.ok) throw new Error(body?.error || res.statusText)
+        setRows((prev) => prev.filter((r) => r.id !== id))
+        setTotal((t) => (t > 0 ? t - 1 : 0))
+        message.success('Recap dihapus')
+        if (detailRow?.id === id) closeDetailModal()
+      } catch (e) {
+        message.error(e instanceof Error ? e.message : 'Gagal menghapus')
+      }
+    },
+    [closeDetailModal, detailRow?.id]
+  )
+
+  const recalculateRecapSnapshot = useCallback(
+    async (id: string) => {
+      const snapshot = rows.find((r) => r.id === id)
+      if (!snapshot) return
+      const title = snapshot.title.trim()
+      if (!title) {
+        message.warning('Title is empty — cannot recalculate this row.')
+        return
+      }
+      setRecalculateLoadingId(id)
+      try {
+        const res = await fetch('/api/reports/recap-snapshot', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            team_ids: snapshot.teamIds,
+            period_start: snapshot.periodStart,
+            period_end: snapshot.periodEnd,
+          }),
+        })
+        const pj = (await res.json().catch(() => ({}))) as { error?: string }
+        if (!res.ok) throw new Error(pj.error || res.statusText)
+
+        const refreshed = await fetch(`/api/reports/recap-snapshots/${encodeURIComponent(id)}`, {
+          credentials: 'include',
+        })
+        const rb = await refreshed.json().catch(() => ({}))
+        if (!refreshed.ok) throw new Error((rb as { error?: string })?.error || 'Failed to load updated recap')
+        const d = (rb as { data?: Record<string, unknown> }).data
+        if (!d || typeof d !== 'object') throw new Error('Invalid response')
+        const mapped = mapApiRowToSnapshotGridRow(d)
+        setRows((prev) => prev.map((r) => (r.id === id ? mapped : r)))
+        setDetailRow((prev) =>
+          prev && prev.id === id
+            ? {
+                ...prev,
+                payload: mapped.payload,
+                updatedAt: mapped.updatedAt,
+                periodType: mapped.periodType,
+                teamIds: mapped.teamIds,
+              }
+            : prev
+        )
+        message.success('Recap recalculated from latest data')
+      } catch (e) {
+        message.error(e instanceof Error ? e.message : 'Recalculate failed')
+      } finally {
+        setRecalculateLoadingId(null)
+      }
+    },
+    [rows]
+  )
 
   const teamLabel = useCallback(
     (ids: string[]) => {
@@ -468,6 +557,10 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
                   sections={gridSections}
                   showActionColumn
                   onViewRow={(id) => void openDetail(id)}
+                  onEditRow={(id) => void openDetail(id, { initialMode: 'edit' })}
+                  onDeleteRow={(id) => deleteRecapSnapshot(id)}
+                  onRecalculateRow={(id) => recalculateRecapSnapshot(id)}
+                  recalculateLoadingKey={recalculateLoadingId}
                 />
               )}
             </Card>
@@ -476,14 +569,14 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
       </AdminMainColumn>
 
       <Modal
-        title={detailEditing ? 'Ubah recap' : detailRow?.title || 'Recap detail'}
+        title={detailEditing ? 'Edit recap' : detailRow?.title || 'Recap detail'}
         open={detailOpen}
         onCancel={closeDetailModal}
         footer={
           detailEditing
             ? [
                 <Button key="cancel" onClick={cancelDetailEdit}>
-                  Batal
+                  Cancel
                 </Button>,
                 <Button
                   key="save"
@@ -491,15 +584,15 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
                   loading={detailSaveLoading}
                   onClick={() => void saveDetailEdit()}
                 >
-                  Simpan
+                  Save
                 </Button>,
               ]
             : [
                 <Button key="close" onClick={closeDetailModal}>
-                  Tutup
+                  Close
                 </Button>,
                 <Button key="edit" type="primary" disabled={!detailRow || detailLoading} onClick={beginDetailEdit}>
-                  Ubah judul & payload
+                  Edit title & payload
                 </Button>,
               ]
         }

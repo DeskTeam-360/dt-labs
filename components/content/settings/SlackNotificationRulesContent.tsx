@@ -367,11 +367,11 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       width: 120,
       render: (_, row) => (
         <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(row)}>
+          <Button type="primary" icon={<EditOutlined />} onClick={() => openEdit(row)}>
             Edit
           </Button>
           <Popconfirm title="Delete this rule?" onConfirm={() => remove(row.id)}>
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+            <Button type="primary" danger icon={<DeleteOutlined />}>
               Delete
             </Button>
           </Popconfirm>
@@ -394,7 +394,6 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
             </Text>
           </div>
 
-          <Card>
             <Paragraph type="secondary" style={{ marginBottom: 16 }}>
               In Slack: <Text strong>App</Text> → choose your workspace → <Text strong>Incoming Webhooks</Text> → add to a
               channel → copy the URL that starts with <Text code>https://hooks.slack.com/services/</Text>. One URL = one
@@ -415,7 +414,6 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
               dataSource={rules}
               pagination={false}
             />
-          </Card>
         </Content>
       </AdminMainColumn>
 

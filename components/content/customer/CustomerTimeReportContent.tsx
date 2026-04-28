@@ -1405,53 +1405,50 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                   No saved presets yet (optional).
                 </Text>
               )}
-            </Form>
 
-            <Divider/>
-
+            <Divider />
 
             <Row gutter={[16, 16]} style={{ marginTop: 4, marginBottom: 8 }}>
-                  <Col xs={20}>
-                   
-                    <Row gutter={[16, 16]}>
-                      <Col xs={24} lg={12}>
-                        <Form.Item name="recap_snapshot_title" label={<Text strong>Recap title</Text>} layout="horizontal">
-                          <Input placeholder="e.g. January 2026 — SEO team" maxLength={500} showCount />
-                        </Form.Item>
-                      </Col>
-                      <Col xs={24} lg={12}>
-                        <Button type="default" loading={recapSaving} onClick={() => void saveRecapSnapshot()}>
-                          {recapExistingId ? 'Update recap snapshot' : 'Save recap snapshot'}
-                        </Button>
-                      </Col>
-                    </Row>
-                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-                      <Text strong>Recap snapshot</Text> — saves company log and tracker totals for the selected teams
-                      for the current date range (
-                      {recapPeriodKind === 'month'
-                        ? 'full calendar month'
-                        : recapPeriodKind === 'week'
-                          ? 'full ISO week (Mon–Sun)'
-                          : recapPeriodKind === 'custom'
-                            ? 'custom range'
-                            : 'set end ≥ start'}
-                      ). After you click <Text strong>Load report</Text>, the table below matches what Settings →
-                      Recap snapshots would save (same period and teams). Enter a title; Save switches to Update when a
-                      row already exists for the same title, period, and teams.
-                    </Text>
-
-                    
-                    {recapPreview ? (
-                      <Card
-                        title="Preview (sama seperti Settings → Recap snapshots)"
-                        style={{ marginTop: 12 }}
-                        styles={{ body: { padding: 0 } }}
-                      >
-                        <RecapSnapshotPayloadGridTable sections={recapPreviewSections} />
-                      </Card>
-                    ) : null}
+              <Col xs={20}>
+                <Row gutter={[16, 16]}>
+                  <Col xs={24} lg={12}>
+                    <Form.Item name="recap_snapshot_title" label={<Text strong>Recap title</Text>} layout="horizontal">
+                      <Input placeholder="e.g. January 2026 — SEO team" maxLength={500} showCount />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} lg={12}>
+                    <Button type="default" loading={recapSaving} onClick={() => void saveRecapSnapshot()}>
+                      {recapExistingId ? 'Update recap snapshot' : 'Save recap snapshot'}
+                    </Button>
                   </Col>
                 </Row>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                  <Text strong>Recap snapshot</Text> — saves company log and tracker totals for the selected teams for the
+                  current date range (
+                  {recapPeriodKind === 'month'
+                    ? 'full calendar month'
+                    : recapPeriodKind === 'week'
+                      ? 'full ISO week (Mon–Sun)'
+                      : recapPeriodKind === 'custom'
+                        ? 'custom range'
+                        : 'set end ≥ start'}
+                  ). After you click <Text strong>Load report</Text>, the table below matches what Settings → Recap
+                  snapshots would save (same period and teams). Enter a title; Save switches to Update when a row already
+                  exists for the same title, period, and teams.
+                </Text>
+
+                {recapPreview ? (
+                  <Card
+                    title="Preview (sama seperti Settings → Recap snapshots)"
+                    style={{ marginTop: 12 }}
+                    styles={{ body: { padding: 0 } }}
+                  >
+                    <RecapSnapshotPayloadGridTable sections={recapPreviewSections} />
+                  </Card>
+                ) : null}
+              </Col>
+            </Row>
+            </Form>
 
             {report ? (
               <>

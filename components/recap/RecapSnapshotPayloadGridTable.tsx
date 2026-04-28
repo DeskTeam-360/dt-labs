@@ -1,7 +1,7 @@
 'use client'
 
-import { EyeOutlined } from '@ant-design/icons'
-import { Button } from 'antd'
+import { DeleteOutlined, EditOutlined, EyeOutlined, SyncOutlined } from '@ant-design/icons'
+import { Button, Popconfirm, Space } from 'antd'
 import { Fragment, useMemo } from 'react'
 
 import styles from '@/components/content/settings/RecapSnapshotsSettingsContent.module.css'
@@ -24,16 +24,28 @@ export interface RecapSnapshotPayloadGridTableProps {
   sections: RecapGridSection[]
   showActionColumn?: boolean
   onViewRow?: (rowKey: string) => void
+  onEditRow?: (rowKey: string) => void
+  onDeleteRow?: (rowKey: string) => void
+  onRecalculateRow?: (rowKey: string) => void | Promise<void>
+  /** When set and equal to row key, the recalculate button shows loading. */
+  recalculateLoadingKey?: string | null
 }
 
 export function RecapSnapshotPayloadGridTable({
   sections,
   showActionColumn = false,
   onViewRow,
+  onEditRow,
+  onDeleteRow,
+  onRecalculateRow,
+  recalculateLoadingKey,
 }: RecapSnapshotPayloadGridTableProps) {
   const allPayloads = useMemo(() => sections.flatMap((s) => s.rows.map((r) => r.payload)), [sections])
   const positionsOrdered = useMemo(() => recapCollectRolePositionsFromPayloads(allPayloads), [allPayloads])
   const taskRolePositions = useMemo(() => recapCollectTaskRolePositionsFromPayloads(allPayloads), [allPayloads])
+
+  const showActions =
+    showActionColumn && (onViewRow || onEditRow || onDeleteRow || onRecalculateRow)
 
   const colCount =
     1 +
@@ -43,7 +55,7 @@ export function RecapSnapshotPayloadGridTable({
     3 +
     1 +
     taskRolePositions.length +
-    (showActionColumn ? 1 : 0)
+    (showActions ? 1 : 0)
 
   if (sections.length === 0) return null
 
@@ -52,7 +64,7 @@ export function RecapSnapshotPayloadGridTable({
       <table className={styles.grid}>
         <thead>
           <tr>
-            <th className={`${styles.th} ${styles.thSticky}`}>Team</th>
+            <th className={`${styles.th} ${styles.thSticky}`} style={{ width: 200 }}>Team</th>
             <th className={styles.th}>Total Team</th>
             <th className={styles.th}>Total Client</th>
             <th className={styles.th}>Total Client Time{RECAP_HDR_H}</th>
@@ -81,9 +93,12 @@ export function RecapSnapshotPayloadGridTable({
                 Available Tasks - {pos}
               </th>
             ))}
-            {showActionColumn ? (
-              <th className={styles.th} style={{ width: 88 }}>
-                {' '}
+            {showActions ? (
+              <th
+                className={styles.th}
+                style={{ width: onEditRow || onDeleteRow || onRecalculateRow ? 380 : 240 }}
+              >
+                Actions
               </th>
             ) : null}
           </tr>
@@ -156,16 +171,57 @@ export function RecapSnapshotPayloadGridTable({
                         {tasksByPos.has(pos) ? Number(tasksByPos.get(pos)).toFixed(2) : '—'}
                       </td>
                     ))}
-                    {showActionColumn ? (
+                    {showActions ? (
                       <td className={styles.td}>
-                        <Button
-                          type="link"
-                          size="small"
-                          icon={<EyeOutlined />}
-                          onClick={() => onViewRow?.(row.key)}
-                        >
-                          View
-                        </Button>
+                        <Space size={0} wrap>
+                          {onViewRow ? (
+                            <Button
+                              type="link"
+                              size="small"
+                              icon={<EyeOutlined />}
+                              onClick={() => onViewRow(row.key)}
+                            >
+                              Show Raw
+                            </Button>
+                          ) : null}
+                          {onEditRow ? (
+                            <Button
+                              type="link"
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={() => onEditRow(row.key)}
+                            >
+                              Edit
+                            </Button>
+                          ) : null}
+                          {onRecalculateRow ? (
+                            <Button
+                              type="link"
+                              size="small"
+                              icon={<SyncOutlined />}
+                              loading={recalculateLoadingKey === row.key}
+                              onClick={() => {
+                                void onRecalculateRow(row.key)
+                              }}
+                            >
+                              Recalculate
+                            </Button>
+                          ) : null}
+                          {onDeleteRow ? (
+                            <Popconfirm
+                              title="Hapus recap ini?"
+                              description="Data tidak dapat dikembalikan."
+                              okText="Hapus"
+                              cancelText="Batal"
+                              okButtonProps={{ danger: true }}
+                              onConfirm={() => onDeleteRow(row.key)}
+                            >
+                              <Button type="link" danger size="small" icon={<DeleteOutlined />}>
+                                Delete
+                              </Button>
+                            </Popconfirm>
+                          ) : null}
+                        </Space>
                       </td>
                     ) : null}
                   </tr>

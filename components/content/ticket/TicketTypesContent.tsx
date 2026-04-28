@@ -256,7 +256,7 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
       fixed: 'right' as const,
       render: (_, record) => (
         <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+          <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             Edit
           </Button>
           <Popconfirm
@@ -266,7 +266,7 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
             okText="Delete"
             okButtonProps={{ danger: true }}
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+            <Button type="primary" danger icon={<DeleteOutlined />}>
               Delete
             </Button>
           </Popconfirm>
@@ -280,7 +280,7 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ margin: '24px' }}>
-          <Card>
+          
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <Title level={4} style={{ margin: 0 }}>
                 Ticket Types
@@ -298,7 +298,6 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
               tableLayout="fixed"
               scroll={{ x: 960 }}
             />
-          </Card>
 
           <Modal
             title={editingType ? 'Edit Type' : 'Add Type'}

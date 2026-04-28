@@ -38,6 +38,26 @@ interface CrawlPageRecord {
   updated_at: string
 }
 
+/** Ant Design semantic tokens — work in light/dark via ConfigProvider. Replaces fixed #fff / #fafafa blocks. */
+const crawlUi = {
+  bg: 'var(--ant-color-bg-container, #ffffff)',
+  fillTertiary: 'var(--ant-color-fill-tertiary, #f5f5f5)',
+  fillSecondary: 'var(--ant-color-fill-secondary, #fafafa)',
+  border: 'var(--ant-color-border-secondary, #f0f0f0)',
+  split: 'var(--ant-color-split, rgba(5, 5, 5, 0.06))',
+  text: 'var(--ant-color-text, rgba(0, 0, 0, 0.88))',
+  textSecondary: 'var(--ant-color-text-secondary, rgba(0, 0, 0, 0.65))',
+  textTertiary: 'var(--ant-color-text-tertiary, rgba(0, 0, 0, 0.45))',
+  errorBg: 'var(--ant-color-error-bg, #fff2f0)',
+  warningBg: 'var(--ant-color-warning-bg, #fffbe6)',
+  successBg: 'var(--ant-color-success-bg, #f6ffed)',
+  errBorderSolid: '1px solid var(--ant-color-error-border, #ffccc7)',
+  warnBorderSolid: '1px solid var(--ant-color-warning-border, #ffe58f)',
+  successBorderSolid: '1px solid var(--ant-color-success-border, #b7eb8f)',
+  neutralBorderSolid: `1px solid var(--ant-color-border-secondary, #f0f0f0)`,
+  primary: 'var(--ant-color-primary, #1677ff)',
+} as const
+
 export default function CrawlSessionDetailContent({ user: currentUser, crawlSession }: CrawlSessionDetailContentProps) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
@@ -348,9 +368,19 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                 key={analysis.type}
                 style={{
                   padding: '12px',
-                  background: analysis.status === 'error' ? '#fff1f0' : analysis.status === 'warning' ? '#fffbe6' : '#f6ffed',
+                  background:
+                    analysis.status === 'error'
+                      ? crawlUi.errorBg
+                      : analysis.status === 'warning'
+                        ? crawlUi.warningBg
+                        : crawlUi.successBg,
                   borderRadius: 4,
-                  border: analysis.status === 'error' ? '1px solid #ffccc7' : analysis.status === 'warning' ? '1px solid #ffe58f' : '1px solid #b7eb8f',
+                  border:
+                    analysis.status === 'error'
+                      ? crawlUi.errBorderSolid
+                      : analysis.status === 'warning'
+                        ? crawlUi.warnBorderSolid
+                        : crawlUi.successBorderSolid,
                 }}
               >
                 <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -361,10 +391,10 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                 </div>
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 12, color: '#666' }}>
+                    <Text style={{ fontSize: 12, color: crawlUi.textSecondary }}>
                       Length: <strong style={{ color: getProgressColor() }}>{analysis.length}</strong> / {analysis.max} chars
                     </Text>
-                    <Text style={{ fontSize: 12, color: '#666' }}>
+                    <Text style={{ fontSize: 12, color: crawlUi.textSecondary }}>
                       Min: {analysis.min} | Max: {analysis.max}
                     </Text>
                   </div>
@@ -375,7 +405,15 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                     style={{ marginBottom: 4 }}
                   />
                 </div>
-                <div style={{ marginBottom: 8, padding: '8px', background: '#fff', borderRadius: 4, border: '1px solid #e8e8e8' }}>
+                <div
+                  style={{
+                    marginBottom: 8,
+                    padding: '8px',
+                    background: crawlUi.bg,
+                    borderRadius: 4,
+                    border: crawlUi.neutralBorderSolid,
+                  }}
+                >
                   <Text style={{ fontSize: 13, wordBreak: 'break-word' }}>{analysis.value}</Text>
                 </div>
                 <Text
@@ -429,7 +467,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
   const renderMetaTags = (metaTags: any) => {
     if (!metaTags || typeof metaTags !== 'object' || Object.keys(metaTags).length === 0) {
       return (
-        <div style={{ padding: '12px', background: '#fff1f0', borderRadius: 4, border: '1px solid #ffccc7' }}>
+        <div style={{ padding: '12px', background: crawlUi.errorBg, borderRadius: 4, border: crawlUi.errBorderSolid }}>
           <Text type="danger">No meta tags found</Text>
         </div>
       )
@@ -468,9 +506,9 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   key={key}
                   style={{
                     padding: '12px',
-                    background: isEmpty && isRequired ? '#fff1f0' : '#fafafa',
+                    background: isEmpty && isRequired ? crawlUi.errorBg : crawlUi.fillSecondary,
                     borderRadius: 4,
-                    border: isEmpty && isRequired ? '1px solid #ffccc7' : '1px solid #e8e8e8',
+                    border: isEmpty && isRequired ? crawlUi.errBorderSolid : crawlUi.neutralBorderSolid,
                   }}
                 >
                   <div style={{ marginBottom: 4 }}>
@@ -483,7 +521,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   </div>
                   <Text
                     style={{
-                      color: isEmpty && isRequired ? '#ff4d4f' : '#666',
+                      color: isEmpty && isRequired ? '#ff4d4f' : crawlUi.textSecondary,
                       fontSize: 13,
                       wordBreak: 'break-word',
                     }}
@@ -501,7 +539,15 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
     return (
       <div>
         {missingRequired.length > 0 && (
-          <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fff1f0', borderRadius: 4, border: '1px solid #ffccc7' }}>
+          <div
+            style={{
+              marginBottom: 12,
+              padding: '8px 12px',
+              background: crawlUi.errorBg,
+              borderRadius: 4,
+              border: crawlUi.errBorderSolid,
+            }}
+          >
             <Text strong style={{ color: '#ff4d4f' }}>Missing Required Meta Tags ({missingRequired.length}):</Text>
             <div style={{ marginTop: 8 }}>
               {missingRequired.map((tag) => (
@@ -558,10 +604,10 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
             </div>
             <div
               style={{
-                border: '1px solid #dadde1',
+                border: crawlUi.neutralBorderSolid,
                 borderRadius: 8,
                 overflow: 'hidden',
-                background: '#fff',
+                background: crawlUi.bg,
                 maxWidth: 500,
               }}
             >
@@ -570,11 +616,11 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   style={{
                     width: '100%',
                     height: 262,
-                    background: 'var(--layout-bg)',
+                    backgroundColor: crawlUi.fillTertiary,
                     backgroundImage: `url(${image})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
-                    borderBottom: '1px solid #dadde1',
+                    borderBottom: crawlUi.neutralBorderSolid,
                   }}
                 />
               ) : (
@@ -582,13 +628,13 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   style={{
                     width: '100%',
                     height: 262,
-                    background: 'var(--layout-bg)',
-                    borderBottom: '1px solid #dadde1',
+                    background: crawlUi.fillTertiary,
+                    borderBottom: crawlUi.neutralBorderSolid,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexDirection: 'column',
-                    color: '#8a8d91',
+                    color: crawlUi.textTertiary,
                   }}
                 >
                   <div style={{ fontSize: 48, marginBottom: 8 }}>🖼️</div>
@@ -597,13 +643,28 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                 </div>
               )}
               <div style={{ padding: '12px' }}>
-                <div style={{ fontSize: 12, color: '#606770', textTransform: 'uppercase', marginBottom: 4 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: crawlUi.textSecondary,
+                    textTransform: 'uppercase',
+                    marginBottom: 4,
+                  }}
+                >
                   {domain}
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 600, color: '#1c1e21', marginBottom: 4, lineHeight: '20px' }}>
+                <div
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 600,
+                    color: crawlUi.text,
+                    marginBottom: 4,
+                    lineHeight: '20px',
+                  }}
+                >
                   {title}
                 </div>
-                <div style={{ fontSize: 14, color: '#606770', lineHeight: '20px' }}>
+                <div style={{ fontSize: 14, color: crawlUi.textSecondary, lineHeight: '20px' }}>
                   {description.length > 100 ? `${description.substring(0, 100)}...` : description}
                 </div>
               </div>
@@ -619,10 +680,10 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
             </div>
             <div
               style={{
-                border: '1px solid #e1e8ed',
+                border: crawlUi.neutralBorderSolid,
                 borderRadius: 12,
                 overflow: 'hidden',
-                background: '#fff',
+                background: crawlUi.bg,
                 maxWidth: 500,
               }}
             >
@@ -631,11 +692,11 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   style={{
                     width: '100%',
                     height: 262,
-                    background: '#f7f9fa',
+                    backgroundColor: crawlUi.fillTertiary,
                     backgroundImage: `url(${image})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
-                    borderBottom: '1px solid #e1e8ed',
+                    borderBottom: crawlUi.neutralBorderSolid,
                   }}
                 />
               ) : (
@@ -643,13 +704,13 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   style={{
                     width: '100%',
                     height: 262,
-                    background: '#f7f9fa',
-                    borderBottom: '1px solid #e1e8ed',
+                    background: crawlUi.fillTertiary,
+                    borderBottom: crawlUi.neutralBorderSolid,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexDirection: 'column',
-                    color: '#657786',
+                    color: crawlUi.textSecondary,
                   }}
                 >
                   <div style={{ fontSize: 48, marginBottom: 8 }}>🖼️</div>
@@ -658,15 +719,13 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                 </div>
               )}
               <div style={{ padding: '12px' }}>
-                <div style={{ fontSize: 15, fontWeight: 400, color: '#14171a', marginBottom: 2, lineHeight: '20px' }}>
+                <div style={{ fontSize: 15, fontWeight: 400, color: crawlUi.text, marginBottom: 2, lineHeight: '20px' }}>
                   {title}
                 </div>
-                <div style={{ fontSize: 15, color: '#657786', marginBottom: 2, lineHeight: '20px' }}>
+                <div style={{ fontSize: 15, color: crawlUi.textSecondary, marginBottom: 2, lineHeight: '20px' }}>
                   {description.length > 100 ? `${description.substring(0, 100)}...` : description}
                 </div>
-                <div style={{ fontSize: 13, color: '#657786', marginTop: 4 }}>
-                  {domain}
-                </div>
+                <div style={{ fontSize: 13, color: crawlUi.textSecondary, marginTop: 4 }}>{domain}</div>
               </div>
             </div>
           </div>
@@ -680,10 +739,10 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
             </div>
             <div
               style={{
-                border: '1px solid #e8e8e8',
+                border: crawlUi.neutralBorderSolid,
                 borderRadius: 4,
                 overflow: 'hidden',
-                background: '#fff',
+                background: crawlUi.bg,
                 maxWidth: 500,
                 padding: '12px',
               }}
@@ -694,7 +753,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                     style={{
                       width: 80,
                       height: 80,
-                      background: '#f5f5f5',
+                      backgroundColor: crawlUi.fillTertiary,
                       backgroundImage: `url(${image})`,
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
@@ -707,13 +766,13 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                     style={{
                       width: 80,
                       height: 80,
-                      background: '#f5f5f5',
+                      background: crawlUi.fillTertiary,
                       borderRadius: 4,
                       flexShrink: 0,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#999',
+                      color: crawlUi.textTertiary,
                       fontSize: 24,
                     }}
                   >
@@ -721,15 +780,15 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   </div>
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1264a3', marginBottom: 4, lineHeight: '18px' }}>
+                  <div
+                    style={{ fontSize: 14, fontWeight: 600, color: crawlUi.primary, marginBottom: 4, lineHeight: '18px' }}
+                  >
                     {title}
                   </div>
-                  <div style={{ fontSize: 13, color: '#616061', marginBottom: 4, lineHeight: '18px' }}>
+                  <div style={{ fontSize: 13, color: crawlUi.textSecondary, marginBottom: 4, lineHeight: '18px' }}>
                     {description.length > 120 ? `${description.substring(0, 120)}...` : description}
                   </div>
-                  <div style={{ fontSize: 12, color: '#616061' }}>
-                    {domain}
-                  </div>
+                  <div style={{ fontSize: 12, color: crawlUi.textSecondary }}>{domain}</div>
                 </div>
               </div>
             </div>
@@ -744,10 +803,10 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
             </div>
             <div
               style={{
-                border: '1px solid #e0e0e0',
+                border: crawlUi.neutralBorderSolid,
                 borderRadius: 4,
                 overflow: 'hidden',
-                background: '#fff',
+                background: crawlUi.bg,
                 maxWidth: 500,
               }}
             >
@@ -756,11 +815,11 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   style={{
                     width: '100%',
                     height: 200,
-                    background: '#f5f5f5',
+                    backgroundColor: crawlUi.fillTertiary,
                     backgroundImage: `url(${image})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
-                    borderBottom: '1px solid #e0e0e0',
+                    borderBottom: crawlUi.neutralBorderSolid,
                   }}
                 />
               ) : (
@@ -768,13 +827,13 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   style={{
                     width: '100%',
                     height: 200,
-                    background: '#f5f5f5',
-                    borderBottom: '1px solid #e0e0e0',
+                    background: crawlUi.fillTertiary,
+                    borderBottom: crawlUi.neutralBorderSolid,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexDirection: 'column',
-                    color: '#999',
+                    color: crawlUi.textTertiary,
                   }}
                 >
                   <div style={{ fontSize: 48, marginBottom: 8 }}>🖼️</div>
@@ -783,13 +842,15 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                 </div>
               )}
               <div style={{ padding: '12px' }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: '#000', marginBottom: 4, lineHeight: '20px' }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: crawlUi.text, marginBottom: 4, lineHeight: '20px' }}>
                   {title}
                 </div>
-                <div style={{ fontSize: 13, color: '#666', marginBottom: 4, lineHeight: '18px' }}>
+                <div style={{ fontSize: 13, color: crawlUi.textSecondary, marginBottom: 4, lineHeight: '18px' }}>
                   {description.length > 100 ? `${description.substring(0, 100)}...` : description}
                 </div>
-                <div style={{ fontSize: 12, color: '#999', textTransform: 'uppercase' }}>
+                <div
+                  style={{ fontSize: 12, color: crawlUi.textTertiary, textTransform: 'uppercase' }}
+                >
                   {domain}
                 </div>
               </div>
@@ -1271,7 +1332,15 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   {record.heading_hierarchy && Object.keys(record.heading_hierarchy).length > 0 && (
                     <div>
                       <Text strong>Headings:</Text>
-                      <div style={{ marginTop: 8, padding: '12px', background: '#fafafa', borderRadius: 4, border: '1px solid #e8e8e8' }}>
+                      <div
+                        style={{
+                          marginTop: 8,
+                          padding: '12px',
+                          background: crawlUi.fillSecondary,
+                          borderRadius: 4,
+                          border: crawlUi.neutralBorderSolid,
+                        }}
+                      >
                         {renderHeadingHierarchy(record.heading_hierarchy, 0)}
                       </div>
                     </div>
@@ -1351,7 +1420,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
-          <Card>
+          {/* <Card> */}
             <Space style={{ marginBottom: 24 }}>
               <Button
                 icon={<ArrowLeftOutlined />}
@@ -1390,7 +1459,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
             </div>
 
             <Tabs items={tabItems} />
-          </Card>
+          {/* </Card> */}
         </Content>
       </AdminMainColumn>
     </Layout>

@@ -131,9 +131,9 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
         const editHref = `/settings/message-templates/${r.id}/edit`
         const isInactive = r.status !== 'active'
         return (
-          <Space wrap size="small">
+          <Space>
             <Button
-              size="small"
+              type="primary"
               icon={<EyeOutlined />}
               disabled={isInactive}
               onClick={() => setPreviewRow(r)}
@@ -142,7 +142,6 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
             </Button>
             <Button
               type="primary"
-              size="small"
               icon={<EditOutlined />}
               disabled={isInactive}
               href={editHref}
@@ -184,7 +183,7 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ margin: 24 }}>
-          <Card>
+        
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               <Space align="center">
                 <FileTextOutlined style={{ fontSize: 22 }} />
@@ -225,7 +224,7 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
                 />
               )}
             </Space>
-          </Card>
+          
         </Content>
       </AdminMainColumn>
 

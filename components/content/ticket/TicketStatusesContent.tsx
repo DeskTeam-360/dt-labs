@@ -1,6 +1,6 @@
 'use client'
 
-import { DeleteOutlined,EditOutlined, PlusOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   Button,
   Card,
@@ -283,28 +283,30 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
     {
       title: 'Actions',
       key: 'actions',
+      width: 216,
+      fixed: 'right' as const,
       render: (_, record) => {
         const canDelete =
           record.is_deletable === true && !isLockedTicketStatusSlug(record.slug)
         return (
           <Space>
-            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+            <Button type="primary"  icon={<EditOutlined />} onClick={() => handleEdit(record)}>
               Edit
             </Button>
             {canDelete ? (
               <Popconfirm
                 title="Delete this status?"
                 description="Tickets using this status will keep the value; consider reassigning them first."
-                onConfirm={() => handleDelete(record.id)}
+                onConfirm={() => void handleDelete(record.id)}
                 okText="Delete"
                 okButtonProps={{ danger: true }}
               >
-                <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+                <Button type="primary" danger icon={<DeleteOutlined />}>
                   Delete
                 </Button>
               </Popconfirm>
             ) : (
-              <Button type="link" size="small" danger icon={<DeleteOutlined />} disabled>
+              <Button type="primary" danger icon={<DeleteOutlined />} disabled>
                 Delete
               </Button>
             )}
@@ -319,13 +321,13 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ margin: '24px' }}>
-          <Card>
+       
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <Title level={4} style={{ margin: 0 }}>
-                Ticket Statuses
+                Ticket statuses
               </Title>
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                Add Status
+                Add status
               </Button>
             </div>
             <Table
@@ -334,8 +336,9 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
               columns={columns}
               dataSource={statuses}
               pagination={false}
+              tableLayout="fixed"
+              scroll={{ x: 'max-content' }}
             />
-          </Card>
 
           <Modal
             title={editingStatus ? 'Edit Status' : 'Add Status'}
@@ -404,7 +407,14 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
                   <Button type="primary" htmlType="submit">
                     {editingStatus ? 'Update' : 'Create'}
                   </Button>
-                  <Button onClick={() => setModalVisible(false)}>Cancel</Button>
+                  <Button
+                    onClick={() => {
+                      setModalVisible(false)
+                      form.resetFields()
+                    }}
+                  >
+                    Cancel
+                  </Button>
                 </Space>
               </Form.Item>
             </Form>

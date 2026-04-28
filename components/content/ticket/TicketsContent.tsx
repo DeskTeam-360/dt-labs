@@ -147,7 +147,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         style={{
           marginRight: filterSidebarCollapsed ? 75 : 280,
           transition: 'margin-left 0.2s, margin-right 0.2s',
-          borderRadius: '16px 0 0 16px',
+          // borderRadius: '16px 0 0 16px',
           overflow: 'hidden',
         }}
       >

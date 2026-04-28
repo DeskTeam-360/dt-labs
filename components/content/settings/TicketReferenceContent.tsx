@@ -275,7 +275,6 @@ export default function TicketReferenceContent({ user: currentUser }: TicketRefe
       />
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ padding: 24, background: 'var(--layout-bg)', minHeight: '100vh' }}>
-          <Card>
             <Title level={2} style={{ marginTop: 0 }}>
               <ReadOutlined style={{ marginRight: 12 }} />
               Reference
@@ -286,7 +285,7 @@ export default function TicketReferenceContent({ user: currentUser }: TicketRefe
               under Settings → Knowledge Base.
             </Paragraph>
             <Tabs items={tabItems} />
-          </Card>
+          
         </Content>
       </AdminMainColumn>
     </Layout>

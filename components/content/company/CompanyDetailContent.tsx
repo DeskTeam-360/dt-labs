@@ -1,6 +1,16 @@
 'use client'
 
-import { CheckSquareOutlined, DeleteOutlined, EditOutlined, FileTextOutlined, GlobalOutlined, PlayCircleOutlined, PlusOutlined, TeamOutlined } from '@ant-design/icons'
+import {
+  ArrowLeftOutlined,
+  CheckSquareOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  FileTextOutlined,
+  GlobalOutlined,
+  PlayCircleOutlined,
+  PlusOutlined,
+  TeamOutlined,
+} from '@ant-design/icons'
 import { Button, Card, Col, Divider, Flex, Form, Input, InputNumber, Layout, message, Modal, Row, Select, Space, Switch, Tabs, Tag, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useEffect,useState } from 'react'
@@ -390,7 +400,7 @@ export default function CompanyDetailContent({
     {
       key: 'info',
       label: 'Company Information',
-      children: <TabInfo companyData={companyData} groupedDatas={groupedDatas} />,
+      children: <TabInfo companyData={companyData} />,
     },
     {
       key: 'users',
@@ -483,8 +493,18 @@ export default function CompanyDetailContent({
         noSidebarInset={isCustomer}
       >
         <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: '100vh' }}>
-          <Card>
-           
+          
+            {!isCustomer ? (
+              <div style={{ marginBottom: 16 }}>
+                <Button
+                  type="default"
+                  icon={<ArrowLeftOutlined />}
+                  onClick={() => router.push('/settings/companies')}
+                >
+                  Back to list
+                </Button>
+              </div>
+            ) : null}
 
             <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
               <Title level={2} style={{ margin: 0 }}>
@@ -627,7 +647,7 @@ export default function CompanyDetailContent({
                 onFinish={handleWebsiteSubmit}
                 requiredMark={false}
               >
-                <Card size="small" style={{ marginBottom: 16, background: '#f5f5f5' }}>
+                <Card size="small" style={{ marginBottom: 16,  }}>
                   <Space orientation="vertical" size="small" style={{ width: '100%' }}>
                     <Text strong>Website Information</Text>
                     <Text type="secondary" style={{ fontSize: 12 }}>
@@ -799,7 +819,7 @@ export default function CompanyDetailContent({
                 </Form.Item>
               </Form>
             </Modal>
-          </Card>
+          
         </Content>
       </AdminMainColumn>
     </Layout>

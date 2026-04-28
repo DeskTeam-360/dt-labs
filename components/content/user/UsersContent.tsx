@@ -13,7 +13,29 @@ import {
   UploadOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { Alert,Avatar, Button, Card, Col, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Row, Select, Space, Switch, Tag, Tooltip, Typography, Upload } from 'antd'
+import {
+  Alert,
+  Avatar,
+  Button,
+  Card,
+  Col,
+  Form,
+  Input,
+  InputNumber,
+  Layout,
+  message,
+  Modal,
+  Popconfirm,
+  Row,
+  Select,
+  Space,
+  Switch,
+  Tabs,
+  Tag,
+  Tooltip,
+  Typography,
+  Upload,
+} from 'antd'
 import { useRouter } from 'next/navigation'
 import { type Key,useEffect, useMemo, useState } from 'react'
 
@@ -43,6 +65,8 @@ const { Content } = Layout
 const { Title, Text } = Typography
 const { Option } = Select
 const { TextArea } = Input
+
+type UserAudienceTab = 'customer' | 'non_customer'
 
 interface UsersContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string }
@@ -84,7 +108,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [searchText, setSearchText] = useState('')
-  const [filterRole, setFilterRole] = useState<string | undefined>(undefined)
+  const [audienceTab, setAudienceTab] = useState<UserAudienceTab>('non_customer')
   const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined)
   const [form] = Form.useForm()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
@@ -108,21 +132,33 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     return users.filter((u) => {
       if (searchText.trim()) {
         const q = searchText.trim().toLowerCase()
+        const matchCompany =
+          !isCustomer && audienceTab === 'non_customer' ? false : (u.company?.name || '').toLowerCase().includes(q)
+        const matchDepartment =
+          !isCustomer && audienceTab === 'customer' ? false : (u.department || '').toLowerCase().includes(q)
+        const matchPosition =
+          !isCustomer && audienceTab === 'customer' ? false : (u.position || '').toLowerCase().includes(q)
         const matchesSearch =
           (u.first_name || '').toLowerCase().includes(q) ||
           (u.last_name || '').toLowerCase().includes(q) ||
           (u.full_name || '').toLowerCase().includes(q) ||
           (u.email || '').toLowerCase().includes(q) ||
-          (u.company?.name || '').toLowerCase().includes(q) ||
-          (u.department || '').toLowerCase().includes(q) ||
-          (u.position || '').toLowerCase().includes(q)
+          matchCompany ||
+          matchDepartment ||
+          matchPosition
         if (!matchesSearch) return false
       }
-      if (filterRole && u.role !== filterRole) return false
+      if (!isCustomer) {
+        if (audienceTab === 'customer' && u.role !== 'customer') return false
+        if (audienceTab === 'non_customer' && u.role === 'customer') return false
+      }
       if (filterStatus && u.status !== filterStatus) return false
       return true
     })
-  }, [users, searchText, filterRole, filterStatus])
+  }, [users, searchText, audienceTab, filterStatus, isCustomer])
+
+  const customerCount = useMemo(() => users.filter((u) => u.role === 'customer').length, [users])
+  const nonCustomerCount = useMemo(() => users.filter((u) => u.role !== 'customer').length, [users])
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -582,15 +618,21 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     },
   ]
 
-  const columns = useMemo(
-    () =>
-      isCustomer
-        ? baseColumns.filter(
-          (c) => !['role', 'company', 'department', 'position'].includes(String(c.key))
-        )
-        : baseColumns,
-    [isCustomer]
-  )
+  const columns = useMemo(() => {
+    if (isCustomer) {
+      return baseColumns.filter(
+        (c) => !['role', 'company', 'department', 'position'].includes(String(c.key))
+      )
+    }
+    const hideKeys = new Set<string>()
+    if (audienceTab === 'non_customer') hideKeys.add('company')
+    if (audienceTab === 'customer') {
+      hideKeys.add('department')
+      hideKeys.add('position')
+    }
+    if (hideKeys.size === 0) return baseColumns
+    return baseColumns.filter((c) => !hideKeys.has(String(c.key)))
+  }, [isCustomer, audienceTab])
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -609,7 +651,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
             </Text>
           </div>
 
-          {isCustomer ? (
+          {isCustomer ?? (
             <Alert
               type="info"
               showIcon
@@ -617,25 +659,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               message="Your company"
               description="This list includes anyone linked to your company: users with your company set as their primary company, plus members added under Companies. Customer users only see tickets for that company."
             />
-          ) : (
-            <Alert
-              type="info"
-              showIcon
-              style={{ marginBottom: 16 }}
-              message="How users relate to companies"
-              description={
-                <>
-                  <strong>User</strong> is a single sign-in (email, password, role, active/inactive).{' '}
-                  <strong>Company</strong> on a user is their <em>primary</em> company: it controls which tickets{' '}
-                  <strong>customer</strong> role users see in the portal. You can also attach people via{' '}
-                  <strong>company membership</strong> (Companies → portal users); the API merges both when listing
-                  “same company” users. Changing a customer&apos;s company moves their ticket scope—confirm when prompted.
-                </>
-              }
-            />
-          )}
+          ) }
 
-          <Card>
             {resetEmailAlert && (
               <Alert
                 type={resetEmailAlert.type}
@@ -648,12 +673,14 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               />
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
-              <Title level={4} style={{ margin: 0 }}>
-                Directory
-              </Title>
+              
               <Space wrap>
                 <Input
-                  placeholder="Search by name, email, company..."
+                  placeholder={
+                    !isCustomer && audienceTab === 'non_customer'
+                      ? 'Search by name, email, department...'
+                      : 'Search by name, email, company...'
+                  }
                   prefix={<SearchOutlined />}
                   allowClear
                   value={searchText}
@@ -663,23 +690,6 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                   }}
                   style={{ width: 260 }}
                 />
-                {!isCustomer && (
-                  <Select
-                    placeholder="Filter by Role"
-                    allowClear
-                    value={filterRole}
-                    onChange={(v) => {
-                      setFilterRole(v)
-                      setPagination((p) => ({ ...p, current: 1 }))
-                    }}
-                    style={{ width: 140 }}
-                  >
-                    <Option value="admin">Admin</Option>
-                    <Option value="manager">Manager</Option>
-                    <Option value="staff">Staff</Option>
-                    <Option value="customer">Customer</Option>
-                  </Select>
-                )}
                 <Select
                   placeholder="Filter by Status"
                   allowClear
@@ -705,12 +715,34 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               </Space>
             </div>
 
+            {!isCustomer && (
+              <Tabs
+                type="card"
+                activeKey={audienceTab}
+                onChange={(k) => {
+                  setAudienceTab(k as UserAudienceTab)
+                  setPagination((p) => ({ ...p, current: 1 }))
+                  setSelectedRowKeys([])
+                }}
+                items={[
+                  {
+                    key: 'customer',
+                    label: <span title="Portal / company-scoped login">Customer ({customerCount})</span>,
+                  },
+                  {
+                    key: 'non_customer',
+                    label: <span title="Admin, manager, staff — internal Deskteam roles">Agents & staff ({nonCustomerCount})</span>,
+                  },
+                ]}
+                style={{ marginBottom: 16 }}
+              />
+            )}
+
             {selectedRowKeys.length > 0 && (
               <div
                 style={{
                   marginBottom: 16,
                   padding: '12px 16px',
-                  background: '#e6f4ff',
                   border: '1px solid #91caff',
                   borderRadius: 8,
                   display: 'flex',
@@ -808,7 +840,6 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 }}
               />
             </div>
-          </Card>
 
           <Modal
             title={editingUser ? 'Edit User' : 'Create User'}

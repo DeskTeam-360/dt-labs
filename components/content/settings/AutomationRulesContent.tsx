@@ -253,7 +253,7 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
       width: 200,
       render: (_, record) => (
         <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+          <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             Edit
           </Button>
           <Popconfirm
@@ -262,7 +262,7 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
             okText="Delete"
             okButtonProps={{ danger: true }}
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+            <Button type="primary" danger icon={<DeleteOutlined />}>
               Delete
             </Button>
           </Popconfirm>
@@ -276,13 +276,13 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ margin: '24px' }}>
-          <Card>
+          
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <Title level={4} style={{ margin: 0 }}>
                 <ThunderboltOutlined style={{ marginRight: 8 }} />
                 Automation Rules
               </Title>
-              <Button type="dashed" icon={<PlusOutlined />} onClick={handleCreate}>
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
                 Add Rule
               </Button>
             </div>
@@ -293,7 +293,6 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
               dataSource={rules}
               pagination={{ pageSize: 20 }}
             />
-          </Card>
 
           <Modal
             title={editingRule ? 'Edit Rule' : 'Add Rule'}
