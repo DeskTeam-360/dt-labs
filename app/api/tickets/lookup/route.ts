@@ -31,12 +31,15 @@ export async function GET() {
 
     const userCompanyId = typeof userCompanyRow === 'string' ? userCompanyRow : null
     const userTeamIds = userTeamRows.map((r) => r.teamId)
+    const ticketTypesFiltered = catalog.ticketTypes
+      .filter((t) => role !== 'customer' || !t.isAgentOnly)
+      .map(({ id, title, slug, color }) => ({ id, title, slug, color }))
     const body = {
       userCompanyId,
       userTeamIds,
       teams: catalog.teams,
       users: catalog.users,
-      ticketTypes: catalog.ticketTypes,
+      ticketTypes: ticketTypesFiltered,
       ticketPriorities: catalog.ticketPriorities,
       companies: catalog.companies,
       tags: catalog.tags,

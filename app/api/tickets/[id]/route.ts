@@ -6,6 +6,7 @@ import { canDeleteTickets } from '@/lib/auth-utils'
 import { runAutomationRules } from '@/lib/automation-engine'
 import { db } from '@/lib/db'
 import {
+  projectStatuses,
   ticketAssignees,
   ticketAttachments,
   ticketAttributs,
@@ -31,6 +32,7 @@ import {
   assertTicketContactUserAllowed,
   getEffectiveCompanyIdForUser,
 } from '@/lib/ticket-contact-user'
+import { assertCustomerMayUseTicketType } from '@/lib/ticket-type-customer-access'
 
 async function triggerTicketUpdatedAutomation(ticketId: number) {
   try {
@@ -181,6 +183,65 @@ export async function PATCH(
     return NextResponse.json({ ok: true })
   }
 
+  // Quick path: project board column (project_status_id)
+  if (Object.keys(body).length === 1 && body.project_status_id !== undefined) {
+    if (role === 'customer') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const [trow] = await db
+      .select({ projectId: tickets.projectId, ticketType: tickets.ticketType })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1)
+    if (!trow?.projectId || coerceTicketType(trow.ticketType) !== 'project') {
+      return NextResponse.json({ error: 'Not a project ticket' }, { status: 400 })
+    }
+    const rawPs = body.project_status_id
+    const nextPs: number | null =
+      rawPs === null || rawPs === ''
+        ? null
+        : typeof rawPs === 'number'
+          ? rawPs
+          : parseInt(String(rawPs), 10)
+    if (nextPs !== null && Number.isNaN(nextPs)) {
+      return NextResponse.json({ error: 'Invalid project_status_id' }, { status: 400 })
+    }
+    if (nextPs !== null) {
+      const [psRow] = await db
+        .select({ id: projectStatuses.id })
+        .from(projectStatuses)
+        .where(and(eq(projectStatuses.id, nextPs), eq(projectStatuses.projectId, trow.projectId)))
+        .limit(1)
+      if (!psRow) {
+        return NextResponse.json({ error: 'Invalid project status' }, { status: 400 })
+      }
+    }
+    const [cur] = await db
+      .select({ projectStatusId: tickets.projectStatusId })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1)
+    await db
+      .update(tickets)
+      .set({ projectStatusId: nextPs, updatedAt: new Date() })
+      .where(eq(tickets.id, ticketId))
+    if (cur && (cur.projectStatusId ?? null) !== nextPs) {
+      await logTicketActivity({
+        ticketId,
+        actorUserId,
+        actorRole,
+        action: 'ticket_updated',
+        metadata: {
+          changed_keys: ['project_status_id'],
+          changes: { project_status_id: { from: cur.projectStatusId, to: nextPs } },
+        },
+      })
+    }
+    await triggerTicketUpdatedAutomation(ticketId)
+    bumpTicketDataVersion(ticketId)
+    return NextResponse.json({ ok: true })
+  }
+
   // Quick path: ticket_type (support | spam | trash) — agents only
   if (Object.keys(body).length === 1 && body.ticket_type !== undefined) {
     if (role === 'customer') {
@@ -265,6 +326,13 @@ export async function PATCH(
     attachments_delete = [],
     contact_user_id,
   } = body
+
+  if (actorRole === 'customer' && type_id !== undefined) {
+    const typeCheck = await assertCustomerMayUseTicketType(type_id ?? null)
+    if (!typeCheck.ok) {
+      return NextResponse.json({ error: typeCheck.error }, { status: 400 })
+    }
+  }
 
   const beforeSnapshot = await loadTicketActivitySnapshot(ticketId)
 

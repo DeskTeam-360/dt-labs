@@ -12,8 +12,9 @@ import {
   companyUsers,
   emailIntegrations,
   messageTemplates,
+  projects,
+  projectStatuses,
   tags,
-  teamMembers,
   teams,
   ticketAssignees,
   ticketAttachments,
@@ -35,6 +36,7 @@ import {
   assertTicketContactUserAllowed,
   getEffectiveCompanyIdForUser,
 } from '@/lib/ticket-contact-user'
+import { assertCustomerMayUseTicketType } from '@/lib/ticket-type-customer-access'
 
 const DEFAULT_LIMIT = 50
 /** Maksimum per request untuk daftar tiket (UI: 50 / 100 / 200). */
@@ -313,6 +315,7 @@ export async function GET(request: Request) {
   /**
    * Customers never see spam/trash lists (ignore `ticket_type` query).
    * Staff: junk folders via explicit `?ticket_type=spam|trash`; else main list = `support` only.
+   * Tickets with classification `project` are excluded from the main list (they live on the project board).
    */
   if (
     role !== 'customer' &&
@@ -568,6 +571,8 @@ export async function POST(request: Request) {
     attachments = [],
     created_via: bodyCreatedVia,
     contact_user_id: bodyContactUserId,
+    project_id: bodyProjectId,
+    project_status_id: bodyProjectStatusId,
   } = body
 
   /** created_via: 'portal' (admin app) | 'website' (embed/widget) | 'app' (mobile/external) - for automation conditions */
@@ -611,6 +616,59 @@ export async function POST(request: Request) {
     }
   }
 
+  let insertTicketType: 'support' | 'project' = 'support'
+  let insertProjectId: string | null = null
+  let insertProjectStatusId: number | null = null
+
+  const rawProjectId =
+    bodyProjectId != null && String(bodyProjectId).trim() !== '' ? String(bodyProjectId).trim() : null
+  if (rawProjectId) {
+    if (role === 'customer') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const [projRow] = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.id, rawProjectId))
+      .limit(1)
+    if (!projRow) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 400 })
+    }
+    insertProjectId = projRow.id
+    insertTicketType = 'project'
+
+    const psParsed =
+      bodyProjectStatusId != null && bodyProjectStatusId !== ''
+        ? parseInt(String(bodyProjectStatusId), 10)
+        : NaN
+    if (Number.isFinite(psParsed)) {
+      const [psRow] = await db
+        .select({ id: projectStatuses.id })
+        .from(projectStatuses)
+        .where(and(eq(projectStatuses.id, psParsed), eq(projectStatuses.projectId, insertProjectId)))
+        .limit(1)
+      if (!psRow) {
+        return NextResponse.json({ error: 'Invalid project_status_id' }, { status: 400 })
+      }
+      insertProjectStatusId = psRow.id
+    } else {
+      const [firstPs] = await db
+        .select({ id: projectStatuses.id })
+        .from(projectStatuses)
+        .where(eq(projectStatuses.projectId, insertProjectId))
+        .orderBy(asc(projectStatuses.sortOrder), asc(projectStatuses.id))
+        .limit(1)
+      insertProjectStatusId = firstPs?.id ?? null
+    }
+  }
+
+  if (role === 'customer') {
+    const typeCheck = await assertCustomerMayUseTicketType(type_id ?? null)
+    if (!typeCheck.ok) {
+      return NextResponse.json({ error: typeCheck.error }, { status: 400 })
+    }
+  }
+
   const [newTicket] = await db
     .insert(tickets)
     .values({
@@ -627,6 +685,9 @@ export async function POST(request: Request) {
       createdBy: authUser.id,
       contactUserId,
       createdVia,
+      ticketType: insertTicketType,
+      projectId: insertProjectId,
+      projectStatusId: insertProjectStatusId,
     })
     .returning()
 
@@ -706,26 +767,28 @@ export async function POST(request: Request) {
     }
   }
 
-  void notifySlackTicketEvent('ticket_created', {
-    id: newTicket.id,
-    title: newTicket.title,
-    status: newTicket.status,
-    teamId: newTicket.teamId ?? null,
-    priorityId: newTicket.priorityId ?? null,
-    companyId: newTicket.companyId ?? null,
-    typeId: newTicket.typeId ?? null,
-  })
-
-  try {
-    await sendRequesterTicketCreatedEmail({
-      creatorUserId: userId,
-      creatorRole: role,
-      companyId: resolvedCompanyId,
-      ticketId: newTicket.id,
-      ticketTitle: newTicket.title || 'Untitled',
+  if (insertTicketType !== 'project') {
+    void notifySlackTicketEvent('ticket_created', {
+      id: newTicket.id,
+      title: newTicket.title,
+      status: newTicket.status,
+      teamId: newTicket.teamId ?? null,
+      priorityId: newTicket.priorityId ?? null,
+      companyId: newTicket.companyId ?? null,
+      typeId: newTicket.typeId ?? null,
     })
-  } catch (mailErr) {
-    console.error('[POST ticket] requester notification email failed:', mailErr)
+
+    try {
+      await sendRequesterTicketCreatedEmail({
+        creatorUserId: userId,
+        creatorRole: role,
+        companyId: resolvedCompanyId,
+        ticketId: newTicket.id,
+        ticketTitle: newTicket.title || 'Untitled',
+      })
+    } catch (mailErr) {
+      console.error('[POST ticket] requester notification email failed:', mailErr)
+    }
   }
 
   return NextResponse.json({

@@ -39,6 +39,9 @@ export interface TicketRecord {
   company_id: string | null
   created_at: string
   updated_at: string
+  /** Populated for ticket_type project (board/API). */
+  project_id?: string | null
+  project_status_id?: number | null
   created_via?: string
   creator_name?: string
   by_label?: string

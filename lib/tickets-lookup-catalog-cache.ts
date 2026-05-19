@@ -42,7 +42,13 @@ async function loadTicketsLookupCatalog() {
       .from(users)
       .orderBy(asc(users.fullName)),
     db
-      .select({ id: ticketTypes.id, title: ticketTypes.title, slug: ticketTypes.slug, color: ticketTypes.color })
+      .select({
+        id: ticketTypes.id,
+        title: ticketTypes.title,
+        slug: ticketTypes.slug,
+        color: ticketTypes.color,
+        isAgentOnly: ticketTypes.isAgentOnly,
+      })
       .from(ticketTypes)
       .orderBy(asc(ticketTypes.sortOrder)),
     db
@@ -113,7 +119,7 @@ export function revalidateTicketsLookupCatalog() {
   revalidateTag(TICKETS_LOOKUP_CATALOG_TAG, { expire: 0 })
 }
 
-export const getTicketsLookupCatalog = unstable_cache(loadTicketsLookupCatalog, ['tickets-lookup-catalog-v1'], {
+export const getTicketsLookupCatalog = unstable_cache(loadTicketsLookupCatalog, ['tickets-lookup-catalog-v2'], {
   revalidate: catalogRevalidateSeconds(),
   tags: [TICKETS_LOOKUP_CATALOG_TAG],
 })

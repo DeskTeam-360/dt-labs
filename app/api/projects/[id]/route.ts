@@ -1,0 +1,174 @@
+import { and, asc, desc, eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
+
+import { db, projects, projectStatuses, ticketPriorities, tickets, ticketTypes } from '@/lib/db'
+import { requireProjectApiSession } from '@/lib/project-api-auth'
+
+function serializeProject(row: typeof projects.$inferSelect) {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',
+    updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : '',
+  }
+}
+
+function serializeStatus(row: typeof projectStatuses.$inferSelect) {
+  return {
+    id: row.id,
+    project_id: row.projectId,
+    title: row.title,
+    slug: row.slug,
+    color: row.color,
+    sort_order: row.sortOrder,
+  }
+}
+
+/** Ticket payload for Kanban (column id = ps-{project_status_id}). Aktivitas proyek = tiket ini saja. */
+function serializeProjectBoardTicket(
+  row: {
+    t: typeof tickets.$inferSelect
+    priority: typeof ticketPriorities.$inferSelect | null
+    type: typeof ticketTypes.$inferSelect | null
+  },
+  fallbackProjectStatusId: number | null
+) {
+  const t = row.t
+  const psId = t.projectStatusId ?? fallbackProjectStatusId
+  const statusKey = psId != null ? `ps-${psId}` : 'ps-unassigned'
+
+  return {
+    id: t.id,
+    title: t.title,
+    description: t.description,
+    short_note: t.shortNote ?? null,
+    created_by: t.createdBy ?? '',
+    contact_user_id: t.contactUserId ?? null,
+    due_date: t.dueDate ? new Date(t.dueDate).toISOString() : null,
+    status: statusKey,
+    visibility: t.visibility as 'private' | 'team' | 'specific_users' | 'public',
+    team_id: t.teamId,
+    type_id: t.typeId,
+    ticket_type: t.ticketType ?? 'project',
+    priority_id: t.priorityId,
+    company_id: t.companyId,
+    created_at: t.createdAt ? new Date(t.createdAt).toISOString() : '',
+    updated_at: t.updatedAt ? new Date(t.updatedAt).toISOString() : '',
+    type: row.type
+      ? { id: row.type.id, title: row.type.title, slug: row.type.slug, color: row.type.color ?? '#000' }
+      : null,
+    priority: row.priority
+      ? {
+          id: row.priority.id,
+          title: row.priority.title,
+          slug: row.priority.slug,
+          color: row.priority.color ?? '#000',
+        }
+      : null,
+    project_id: t.projectId,
+    project_status_id: t.projectStatusId,
+  }
+}
+
+/** GET /api/projects/[id] — project + statuses + aktivitas (board tickets) */
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireProjectApiSession()
+  if ('error' in gate) return gate.error
+
+  const { id } = await params
+  const [projectRow] = await db.select().from(projects).where(eq(projects.id, id)).limit(1)
+  if (!projectRow) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  const statusRows = await db
+    .select()
+    .from(projectStatuses)
+    .where(eq(projectStatuses.projectId, id))
+    .orderBy(asc(projectStatuses.sortOrder), asc(projectStatuses.id))
+
+  const firstStatusId = statusRows[0]?.id ?? null
+
+  const ticketJoinRows = await db
+    .select({
+      t: tickets,
+      priority: ticketPriorities,
+      type: ticketTypes,
+    })
+    .from(tickets)
+    .leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id))
+    .leftJoin(ticketTypes, eq(tickets.typeId, ticketTypes.id))
+    .where(and(eq(tickets.projectId, id), eq(tickets.ticketType, 'project')))
+    .orderBy(desc(tickets.updatedAt))
+
+  return NextResponse.json({
+    ...serializeProject(projectRow),
+    statuses: statusRows.map(serializeStatus),
+    board_tickets: ticketJoinRows.map((r) => serializeProjectBoardTicket(r, firstStatusId)),
+  })
+}
+
+/** PATCH /api/projects/[id] — title, description */
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireProjectApiSession()
+  if ('error' in gate) return gate.error
+
+  const { id } = await params
+  const [existing] = await db.select().from(projects).where(eq(projects.id, id)).limit(1)
+  if (!existing) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  const body = await request.json().catch(() => ({}))
+  const patch: Partial<typeof projects.$inferInsert> = {
+    updatedAt: new Date(),
+  }
+
+  const titleIn = body.title ?? body.name
+  if (titleIn !== undefined) {
+    const title = String(titleIn ?? '').trim()
+    if (!title) {
+      return NextResponse.json({ error: 'Title cannot be empty' }, { status: 400 })
+    }
+    patch.title = title
+  }
+  if (body.description !== undefined) {
+    patch.description =
+      body.description != null && String(body.description).trim() !== ''
+        ? String(body.description).trim()
+        : null
+  }
+
+  const [row] = await db.update(projects).set(patch).where(eq(projects.id, id)).returning()
+  if (!row) {
+    return NextResponse.json({ error: 'Update failed' }, { status: 500 })
+  }
+
+  return NextResponse.json(serializeProject(row))
+}
+
+/** DELETE /api/projects/[id] */
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireProjectApiSession()
+  if ('error' in gate) return gate.error
+
+  const { id } = await params
+  const [existing] = await db.select().from(projects).where(eq(projects.id, id)).limit(1)
+  if (!existing) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  await db
+    .update(tickets)
+    .set({
+      ticketType: 'support',
+      projectId: null,
+      projectStatusId: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(tickets.projectId, id), eq(tickets.ticketType, 'project')))
+
+  await db.delete(projects).where(eq(projects.id, id))
+  return NextResponse.json({ ok: true })
+}

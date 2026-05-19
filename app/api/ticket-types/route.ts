@@ -1,4 +1,4 @@
-import { asc } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
@@ -13,7 +13,15 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const rows = await db.select().from(ticketTypes).orderBy(asc(ticketTypes.sortOrder))
+  const role = (session.user as { role?: string }).role?.toLowerCase()
+  const rows =
+    role === 'customer'
+      ? await db
+          .select()
+          .from(ticketTypes)
+          .where(eq(ticketTypes.isAgentOnly, false))
+          .orderBy(asc(ticketTypes.sortOrder))
+      : await db.select().from(ticketTypes).orderBy(asc(ticketTypes.sortOrder))
 
   const data = rows.map((r) => ({
     id: r.id,
@@ -22,6 +30,7 @@ export async function GET() {
     description: r.description ?? '',
     color: r.color ?? '#000000',
     sort_order: r.sortOrder ?? 0,
+    is_agent_only: r.isAgentOnly ?? false,
     created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
     updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
   }))
@@ -37,7 +46,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { title, slug, color, sort_order, description } = body
+  const { title, slug, color, sort_order, description, is_agent_only } = body
 
   if (!title || !slug) {
     return NextResponse.json({ error: 'title and slug required' }, { status: 400 })
@@ -50,6 +59,7 @@ export async function POST(request: Request) {
       slug: String(slug).trim().toLowerCase().replace(/\s+/g, '_'),
       description: typeof description === 'string' ? description : '',
       color: color || '#000000',
+      isAgentOnly: Boolean(is_agent_only),
       ...(sort_order !== undefined && { sortOrder: Number(sort_order) ?? 0 }),
     })
     .returning()
@@ -66,6 +76,7 @@ export async function POST(request: Request) {
     description: inserted.description ?? '',
     color: inserted.color ?? '#000000',
     sort_order: inserted.sortOrder ?? 0,
+    is_agent_only: inserted.isAgentOnly ?? false,
     created_at: inserted.createdAt ? new Date(inserted.createdAt).toISOString() : '',
     updated_at: inserted.updatedAt ? new Date(inserted.updatedAt).toISOString() : '',
   })

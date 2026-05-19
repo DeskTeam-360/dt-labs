@@ -272,9 +272,17 @@ export default function TicketFormModal({
             <>
               <Col span={12}>
                 <Form.Item name="company_id" label="Company">
-                  <Select placeholder="Select company" allowClear>
+                  <Select placeholder="Select company" 
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  options={companies.map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                  }))}
+                  >
                     {companies.map((c) => (
-                      <Option key={c.id} value={c.id}>
+                      <Option key={c.id} value={c.id} label={c.name}>
                         {c.name}
                       </Option>
                     ))}
@@ -362,7 +370,14 @@ export default function TicketFormModal({
                     label="Team"
                     rules={[{ required: getFieldValue('visibility') === 'team', message: 'Please select team!' }]}
                   >
-                    <Select placeholder="Select Team">
+                    <Select placeholder="Select Team"
+                    showSearch
+                    optionFilterProp="label"
+                    options={selectableTeams.map((t) => ({
+                      value: t.id,
+                      label: t.name,
+                    }))}
+                    >
                       {selectableTeams.map((team) => (
                         <Option key={team.id} value={team.id}>
                           {team.name}
