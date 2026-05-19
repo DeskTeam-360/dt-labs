@@ -199,6 +199,15 @@ interface TabGeneralProps {
   onUpdateAttribute: (attributeId: string, newValue: string) => void
   onDeleteAttribute: (attributeId: string) => void
   attributesLoading: boolean
+  /** Agent: edit ticket description with explicit Save/Cancel */
+  canEditTicketDescription?: boolean
+  ticketDescriptionDraft?: string
+  onTicketDescriptionDraftChange?: (html: string) => void
+  ticketDescriptionEditing?: boolean
+  onTicketDescriptionEditingStart?: () => void
+  onTicketDescriptionEditingCancel?: () => void
+  onTicketDescriptionSave?: () => void | Promise<void>
+  ticketDescriptionSaving?: boolean
 }
 
 export default function TabGeneral({
@@ -295,11 +304,25 @@ export default function TabGeneral({
   onUpdateAttribute,
   onDeleteAttribute,
   attributesLoading,
+  canEditTicketDescription = false,
+  ticketDescriptionDraft = '',
+  onTicketDescriptionDraftChange,
+  ticketDescriptionEditing = false,
+  onTicketDescriptionEditingStart,
+  onTicketDescriptionEditingCancel,
+  onTicketDescriptionSave,
+  ticketDescriptionSaving = false,
 }: TabGeneralProps) {
   const [shortNoteInput, setShortNoteInput] = useState(shortNote ?? '')
   useEffect(() => {
     setShortNoteInput(shortNote ?? '')
   }, [shortNote])
+
+  const shortNoteDirty = useMemo(() => {
+    const a = (shortNoteInput ?? '').trim()
+    const b = (shortNote ?? '').trim()
+    return a !== b
+  }, [shortNoteInput, shortNote])
 
   const statusSelectOptions = useMemo(() => {
     const cur = ticketData?.status as string | undefined
@@ -362,12 +385,49 @@ export default function TabGeneral({
                           </Space>
                          
                         </Flex>
-                       
+                        {ticketDescriptionEditing && canEditTicketDescription ? (
+                          <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
+                            <CommentWysiwyg
+                              value={ticketDescriptionDraft}
+                              onChange={onTicketDescriptionDraftChange}
+                              ticketId={ticketData?.id}
+                              placeholder="Ticket description..."
+                              height="220px"
+                            />
+                            <Flex gap={8} wrap="wrap">
+                              <Button
+                                type="primary"
+                                loading={ticketDescriptionSaving}
+                                onClick={() => void onTicketDescriptionSave?.()}
+                              >
+                                Save description
+                              </Button>
+                              <Button onClick={onTicketDescriptionEditingCancel}>Cancel</Button>
+                            </Flex>
+                          </Space>
+                        ) : (
+                          <>
+                            {canEditTicketDescription ? (
+                              <Flex justify="flex-end" style={{ marginTop: 4 }}>
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  icon={<EditOutlined />}
+                                  onClick={onTicketDescriptionEditingStart}
+                                >
+                                  Edit description
+                                </Button>
+                              </Flex>
+                            ) : null}
                             <div
                               className="ql-editor comment-html"
-                              style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14, color: 'blue)' }}
-                              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(ticketData.description) }}
+                              style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
+                              dangerouslySetInnerHTML={{
+                                __html: sanitizeRichHtml(ticketData.description || ''),
+                              }}
                             />
+                          </>
+                        )}
                             {ticketAttachments.length > 0 && (
                               <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
                                 {ticketAttachments.map((att) => (
@@ -644,18 +704,34 @@ export default function TabGeneral({
           <Descriptions column={1} bordered>
             <Descriptions.Item label="Short Note">
               {onShortNoteChange ? (
-                <Input.TextArea
-                  value={shortNoteInput}
-                  onChange={(e) => setShortNoteInput(e.target.value)}
-                  onBlur={() => {
-                    const val = shortNoteInput.trim() || null
-                    if (val !== (shortNote ?? '')) onShortNoteChange(val)
-                  }}
-                  placeholder="Short note (optional)"
-                  rows={2}
-                  disabled={shortNoteChanging}
-                  style={{ resize: 'vertical' }}
-                />
+                <Space orientation="vertical" size="small" style={{ width: '100%' }}>
+                  <Input.TextArea
+                    value={shortNoteInput}
+                    onChange={(e) => setShortNoteInput(e.target.value)}
+                    placeholder="Short note (optional)"
+                    rows={2}
+                    disabled={shortNoteChanging}
+                    style={{ resize: 'vertical' }}
+                  />
+                  <Flex gap={8} wrap="wrap">
+                    <Button
+                      type="primary"
+                      size="small"
+                      disabled={!shortNoteDirty || shortNoteChanging}
+                      loading={shortNoteChanging}
+                      onClick={() => void onShortNoteChange(shortNoteInput.trim() || null)}
+                    >
+                      Save short note
+                    </Button>
+                    <Button
+                      size="small"
+                      disabled={!shortNoteDirty || shortNoteChanging}
+                      onClick={() => setShortNoteInput(shortNote ?? '')}
+                    >
+                      Reset
+                    </Button>
+                  </Flex>
+                </Space>
               ) : (
                 <Text>{shortNote || '—'}</Text>
               )}

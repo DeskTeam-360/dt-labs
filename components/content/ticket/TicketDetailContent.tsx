@@ -6,6 +6,7 @@ import {
     ArrowLeftOutlined,
     DeleteOutlined,
     DeleteTwoTone,
+    EditOutlined,
     FolderOutlined,
     LeftOutlined,
     RightOutlined,
@@ -212,6 +213,16 @@ export default function TicketDetailContent({
     }, [editingDescription])
     const [descriptionValue, setDescriptionValue] = useState(() => (typeof ticketData?.description === 'string' ? ticketData.description : '') || '')
     const [editModalVisible, setEditModalVisible] = useState(false)
+    const [titleEditing, setTitleEditing] = useState(false)
+    const [titleDraft, setTitleDraft] = useState('')
+    useEffect(() => {
+        if (!titleEditing && displayTicket?.title != null) {
+            setTitleDraft(String(displayTicket.title))
+        }
+    }, [displayTicket?.title, displayTicket?.id, titleEditing])
+    useEffect(() => {
+        setTitleEditing(false)
+    }, [displayTicket?.id])
     const [teams, setTeams] = useState<any[]>([])
     /** Teams the signed-in user belongs to (from /api/tickets/lookup). Team picker is limited to these. */
     const [userTeamIds, setUserTeamIds] = useState<string[]>([])
@@ -878,6 +889,35 @@ export default function TicketDetailContent({
         setEditingDescription(false)
     }
 
+    const handleSaveTitle = async () => {
+        const t = titleDraft.trim()
+        if (!t) {
+            message.warning('Please enter a title')
+            return
+        }
+        const cur = typeof displayTicket.title === 'string' ? displayTicket.title.trim() : ''
+        if (t === cur) {
+            setTitleEditing(false)
+            return
+        }
+        setLoading(true)
+        try {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: t }),
+            })
+            setDisplayTicket((prev: any) => (prev ? { ...prev, title: t } : prev))
+            setTitleEditing(false)
+            message.success('Title updated')
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Failed to update title')
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const handleShortNoteChange = async (value: string | null) => {
         setShortNoteChanging(true)
         try {
@@ -1445,8 +1485,67 @@ export default function TicketDetailContent({
                                                 </span>
                                             </Tooltip>
                                         )}
-                                        <span style={{ minWidth: 0 }}>
-                                            #{displayTicket.id} {displayTicket.title}
+                                        <span style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                            {!isCustomer && titleEditing ? (
+                                                <Flex gap={8} align="center" wrap="wrap" style={{ flex: 1, minWidth: 0 }}>
+                                                    <Text type="secondary" style={{ flexShrink: 0 }}>
+                                                        #{displayTicket.id}
+                                                    </Text>
+                                                    <Input
+                                                        value={titleDraft}
+                                                        onChange={(e) => setTitleDraft(e.target.value)}
+                                                        onPressEnter={() => void handleSaveTitle()}
+                                                        style={{ minWidth: 200, flex: '1 1 240px', maxWidth: 560 }}
+                                                        disabled={loading}
+                                                        aria-label="Ticket title"
+                                                    />
+                                                    <Button
+                                                        type="primary"
+                                                        loading={loading}
+                                                        onClick={() => void handleSaveTitle()}
+                                                    >
+                                                        Save
+                                                    </Button>
+                                                    <Button
+                                                        onClick={() => {
+                                                            setTitleDraft(
+                                                                typeof displayTicket.title === 'string'
+                                                                    ? displayTicket.title
+                                                                    : '',
+                                                            )
+                                                            setTitleEditing(false)
+                                                        }}
+                                                        disabled={loading}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                </Flex>
+                                            ) : (
+                                                <>
+                                                    <span>
+                                                        #{displayTicket.id}{' '}
+                                                        {typeof displayTicket.title === 'string'
+                                                            ? displayTicket.title
+                                                            : ''}
+                                                    </span>
+                                                    {!isCustomer && (
+                                                        <Button
+                                                            type="link"
+                                                            size="small"
+                                                            icon={<EditOutlined />}
+                                                            onClick={() => {
+                                                                setTitleDraft(
+                                                                    typeof displayTicket.title === 'string'
+                                                                        ? displayTicket.title
+                                                                        : '',
+                                                                )
+                                                                setTitleEditing(true)
+                                                            }}
+                                                            aria-label="Edit title"
+                                                        />
+                                                    )}
+                                                </>
+                                            )}
                                         </span>
                                     </Title>
                                     {displayTicket.project?.id ? (
@@ -1718,6 +1817,23 @@ export default function TicketDetailContent({
                                             onUpdateAttribute={handleUpdateAttribute}
                                             onDeleteAttribute={handleDeleteAttribute}
                                             attributesLoading={loading}
+                                            canEditTicketDescription
+                                            ticketDescriptionDraft={descriptionValue}
+                                            onTicketDescriptionDraftChange={(html) =>
+                                                setDescriptionValue(html ?? '')
+                                            }
+                                            ticketDescriptionEditing={editingDescription}
+                                            onTicketDescriptionEditingStart={() => {
+                                                setDescriptionValue(
+                                                    typeof displayTicket.description === 'string'
+                                                        ? displayTicket.description
+                                                        : '',
+                                                )
+                                                setEditingDescription(true)
+                                            }}
+                                            onTicketDescriptionEditingCancel={handleCancelEditDescription}
+                                            onTicketDescriptionSave={() => void handleUpdateDescription()}
+                                            ticketDescriptionSaving={loading}
                                         />
                                     ),
                                 },
