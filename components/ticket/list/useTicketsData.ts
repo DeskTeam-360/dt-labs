@@ -95,7 +95,6 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-/** React Query membatalkan `fetch` lama saat `queryKey` berubah / unmount — bukan kegagalan jaringan. */
 function isRequestAborted(error: unknown, signal?: AbortSignal): boolean {
   if (signal?.aborted) return true
   if (error instanceof DOMException && error.name === 'AbortError') return true
@@ -727,7 +726,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         if (searchParams.has(URL_PARAMS.ticket_type)) setFilterTicketType(parsed.filterTicketType ?? null)
       }
     } else if (canParseTicketsUrl(searchParams)) {
-      /** Hanya param UI (view / sort / order / sidebar) — tanpa mengubah filter data atau memanggil fetch. */
       let parsed = parseFiltersFromUrl(searchParams, { isCustomer })
       if (!parsed) {
         applyingFromUrlRef.current = false

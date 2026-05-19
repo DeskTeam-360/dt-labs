@@ -100,6 +100,10 @@ interface TabGeneralProps {
   statusOptions: StatusOption[]
   onStatusChange: (newStatus: string) => void | Promise<void>
   statusChanging?: boolean
+  /** Board columns for `ticket_type === 'project'` */
+  projectStatusOptions?: { id: number; title: string; slug: string; color: string }[]
+  onProjectStatusChange?: (projectStatusId: number | null) => void | Promise<void>
+  projectStatusChanging?: boolean
   typeOptions: { id: number; title: string; slug: string; color: string }[]
   onTypeChange: (typeId: number | null) => void | Promise<void>
   typeChanging?: boolean
@@ -205,6 +209,9 @@ export default function TabGeneral({
   statusOptions,
   onStatusChange,
   statusChanging = false,
+  projectStatusOptions,
+  onProjectStatusChange,
+  projectStatusChanging = false,
   typeOptions,
   onTypeChange,
   typeChanging = false,
@@ -303,6 +310,11 @@ export default function TabGeneral({
     }
     return active
   }, [statusOptions, ticketData?.status])
+
+  const useProjectBoardStatus =
+    ticketData?.ticket_type === 'project' &&
+    Array.isArray(projectStatusOptions) &&
+    projectStatusOptions.length > 0
 
   const contactCrossCompanyHint = useMemo(() => {
     if (!selectedContactUserId || !ticketData.company_id) return null
@@ -648,23 +660,46 @@ export default function TabGeneral({
                 <Text>{shortNote || '—'}</Text>
               )}
             </Descriptions.Item>
-            <Descriptions.Item label="Status">
-              <Select
-
-                value={ticketData.status ?? undefined}
-                onChange={(value) => value && onStatusChange(value)}
-                loading={statusChanging}
-                options={statusSelectOptions.map((s) => ({
-                  value: s.slug,
-                  label: (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Tag color={s.color} style={{ margin: 0 }}>{s.title}</Tag>
-                    </span>
-                  ),
-                }))}
-                style={{ minWidth: 140, width: '100%' }}
-                allowClear={false}
-              />
+            <Descriptions.Item label={useProjectBoardStatus ? 'Status proyek' : 'Status'}>
+              {useProjectBoardStatus ? (
+                <Select
+                  value={ticketData.project_status_id ?? undefined}
+                  onChange={(v) => onProjectStatusChange?.(v ?? null)}
+                  disabled={!onProjectStatusChange}
+                  loading={projectStatusChanging}
+                  options={(projectStatusOptions ?? []).map((s) => ({
+                    value: s.id,
+                    label: (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Tag color={s.color} style={{ margin: 0 }}>
+                          {s.title}
+                        </Tag>
+                      </span>
+                    ),
+                  }))}
+                  style={{ minWidth: 140, width: '100%' }}
+                  allowClear
+                  placeholder="Kolom board"
+                />
+              ) : (
+                <Select
+                  value={ticketData.status ?? undefined}
+                  onChange={(value) => value && onStatusChange(value)}
+                  loading={statusChanging}
+                  options={statusSelectOptions.map((s) => ({
+                    value: s.slug,
+                    label: (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Tag color={s.color} style={{ margin: 0 }}>
+                          {s.title}
+                        </Tag>
+                      </span>
+                    ),
+                  }))}
+                  style={{ minWidth: 140, width: '100%' }}
+                  allowClear={false}
+                />
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="Type">
               <Select
@@ -699,8 +734,13 @@ export default function TabGeneral({
                 <Select
                   value={ticketData.company_id ?? undefined}
                   onChange={(v) => onCompanyChange(v ?? null)}
-                  loading={companyChanging}
-                  options={companyOptions.map((c) => ({ value: c.id, label: c.name }))}
+                  loading={companyChanging} 
+                  options={companyOptions.map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                  }))}
+                  showSearch
+                  optionFilterProp="label"
                   style={{ minWidth: 140, width: '100%' }}
                   allowClear
                   placeholder="Select company"

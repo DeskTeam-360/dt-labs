@@ -9,6 +9,8 @@ import { db } from '@/lib/db'
 import {
   commentAttachments,
   companies,
+  projects,
+  projectStatuses,
   screenshots,
   tags,
   teams,
@@ -194,6 +196,7 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
       type: ticketTypes,
       priority: ticketPriorities,
       company: companies,
+      project: projects,
     })
     .from(tickets)
     .leftJoin(ticketCreator, eq(tickets.createdBy, ticketCreator.id))
@@ -202,6 +205,7 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     .leftJoin(ticketTypes, eq(tickets.typeId, ticketTypes.id))
     .leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id))
     .leftJoin(companies, eq(tickets.companyId, companies.id))
+    .leftJoin(projects, eq(tickets.projectId, projects.id))
     .where(eq(tickets.id, ticketId))
 
   if (!ticketRow?.ticket) return null
@@ -213,7 +217,7 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
   /** Portal customers: hide spam/trash rows even if same company */
   if (options?.companyId) {
     const cls = coerceTicketType(t.ticketType)
-    if (cls === 'spam' || cls === 'trash') return null
+    if (cls === 'spam' || cls === 'trash' || cls === 'project') return null
   }
 
   const [assigneesRows, checklistRows, attributsRows, screenshotsRows, ticketTagsRows, ccRecipientsRows] =
@@ -282,6 +286,31 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     comments_older_remaining,
   } = await fetchTicketCommentsWindow(ticketId, options, 'latest', null, TICKET_COMMENTS_PAGE_SIZE)
 
+  const ticketTypeCls = coerceTicketType(t.ticketType)
+  let project_status: { id: number; title: string; slug: string; color: string } | null = null
+  let project_statuses: Array<{ id: number; title: string; slug: string; color: string; sort_order: number }> = []
+
+  if (ticketTypeCls === 'project' && t.projectId) {
+    const psRows = await db
+      .select()
+      .from(projectStatuses)
+      .where(eq(projectStatuses.projectId, t.projectId))
+      .orderBy(asc(projectStatuses.sortOrder))
+    project_statuses = psRows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      slug: r.slug,
+      color: r.color,
+      sort_order: r.sortOrder,
+    }))
+    if (t.projectStatusId != null) {
+      const cur = psRows.find((r) => r.id === t.projectStatusId)
+      project_status = cur
+        ? { id: cur.id, title: cur.title, slug: cur.slug, color: cur.color }
+        : null
+    }
+  }
+
   const ticketData = {
     id: t.id,
     title: t.title,
@@ -294,9 +323,16 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     visibility: t.visibility,
     team_id: t.teamId,
     type_id: t.typeId,
-    ticket_type: coerceTicketType(t.ticketType),
+    ticket_type: ticketTypeCls,
     priority_id: t.priorityId,
     company_id: t.companyId,
+    project_id: t.projectId ?? null,
+    project_status_id: t.projectStatusId ?? null,
+    project: ticketRow.project
+      ? { id: ticketRow.project.id, title: ticketRow.project.title }
+      : null,
+    project_status,
+    project_statuses,
     created_at: t.createdAt ? new Date(t.createdAt).toISOString() : '',
     updated_at: t.updatedAt ? new Date(t.updatedAt).toISOString() : '',
     gmail_thread_id: t.gmailThreadId,

@@ -144,6 +144,31 @@ export const teamMembers = pgTable(
   (t) => [unique('team_members_team_id_user_id_key').on(t.teamId, t.userId)]
 )
 
+// ============ Projects (id, title, description — aktivitas = tiket project_* di tabel tickets) ============
+export const projects = pgTable('projects', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
+export const projectStatuses = pgTable(
+  'project_statuses',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 100 }).notNull(),
+    slug: varchar('slug', { length: 50 }).notNull(),
+    color: varchar('color', { length: 20 }).notNull().default('#d9d9d9'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [unique('project_statuses_project_id_slug_key').on(t.projectId, t.slug)]
+)
+
 // ============ Ticket Types, Priorities, Tags ============
 export const ticketTypes = pgTable('ticket_types', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
@@ -153,6 +178,8 @@ export const ticketTypes = pgTable('ticket_types', {
   description: text('description').default(''),
   color: varchar('color', { length: 20 }).default('#000000'),
   sortOrder: integer('sort_order').default(0),
+  /** Hidden from customer ticket forms and `/api/ticket-types` list when true. */
+  isAgentOnly: boolean('is_agent_only').notNull().default(false),
   companyId: uuid('company_id'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
@@ -215,9 +242,14 @@ export const tickets = pgTable('tickets', {
   createdVia: varchar('created_via', { length: 50 }),
   lastReadAt: ts('last_read_at'),
   typeId: integer('type_id').references(() => ticketTypes.id, { onDelete: 'restrict' }),
-  /** support | spam | trash — not `type_id` (ticket_types catalog) */
+  /** support | spam | trash | project — `project` = board card under a project; hidden from main ticket lists */
   ticketType: varchar('ticket_type', { length: 32 }).notNull().default('support'),
   companyId: uuid('company_id'),
+  /** When set with ticket_type = project, groups this ticket under a project board. */
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+  projectStatusId: integer('project_status_id').references(() => projectStatuses.id, {
+    onDelete: 'set null',
+  }),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
@@ -370,7 +402,7 @@ export const screenshots = pgTable('screenshots', {
   fileSize: bigint('file_size', { mode: 'number' }),
   mimeType: varchar('mime_type', { length: 100 }),
   ticketId: integer('ticket_id'),
-  projectId: uuid('project_id'),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
   title: varchar('title', { length: 255 }),
   description: text('description'),
   tags: text('tags').array(),

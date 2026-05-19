@@ -110,6 +110,13 @@ export function canAccessMyTeams(role: string | undefined): boolean {
   return r !== 'customer'
 }
 
+/** Projects (checklist / activities): internal users only */
+export function canAccessProjects(role: string | undefined): boolean {
+  const r = (role ?? '').toLowerCase()
+  if (!role) return false
+  return r !== 'customer'
+}
+
 /** Users: Admin only */
 export function canAccessUsers(role: string | undefined): boolean {
   return isAdmin(role)

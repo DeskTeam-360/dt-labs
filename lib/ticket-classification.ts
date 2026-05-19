@@ -1,5 +1,5 @@
 /** Row classification separate from `ticket_types` / `type_id` (bug, feature, etc.). */
-export const TICKET_TYPE_VALUES = ['support', 'spam', 'trash'] as const
+export const TICKET_TYPE_VALUES = ['support', 'spam', 'trash', 'project'] as const
 export type TicketTypeValue = (typeof TICKET_TYPE_VALUES)[number]
 
 export const DEFAULT_TICKET_TYPE: TicketTypeValue = 'support'

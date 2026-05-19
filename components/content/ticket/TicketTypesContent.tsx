@@ -3,7 +3,6 @@
 import { DeleteOutlined,EditOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   Button,
-  Card,
   Form,
   Input,
   InputNumber,
@@ -12,7 +11,9 @@ import {
   Modal,
   Popconfirm,
   Space,
+  Switch,
   Table,
+  Tag,
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -22,7 +23,7 @@ import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 
 const { Content } = Layout
-const { Title } = Typography
+const { Title, Text } = Typography
 
 interface TicketTypesContentProps {
   user: { id: string; email?: string | null; user_metadata?: { full_name?: string | null } }
@@ -44,6 +45,7 @@ interface TicketTypeRecord {
   description?: string
   color: string
   sort_order: number
+  is_agent_only?: boolean
   created_at: string
   updated_at: string
 }
@@ -120,6 +122,7 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
     form.resetFields()
     form.setFieldsValue({
       color: '#000000',
+      is_agent_only: false,
       sort_order: types.length > 0 ? Math.max(...types.map((t) => t.sort_order)) + 1 : 0,
     })
     setModalVisible(true)
@@ -133,6 +136,7 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
       color: record.color,
       sort_order: record.sort_order,
       description: record.description ?? '',
+      is_agent_only: record.is_agent_only ?? false,
     })
     setModalVisible(true)
   }
@@ -162,6 +166,7 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
         color: (values.color as string) || '#000000',
         sort_order: Number(values.sort_order) ?? 0,
         description: typeof values.description === 'string' ? values.description : '',
+        is_agent_only: Boolean(values.is_agent_only),
       }
 
       if (editingType) {
@@ -225,6 +230,15 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
           {(d ?? '').trim() || '—'}
         </Typography.Text>
       ),
+    },
+    {
+      title: 'Agents only',
+      dataIndex: 'is_agent_only',
+      key: 'is_agent_only',
+      width: 120,
+      align: 'center',
+      render: (v: boolean | undefined) =>
+        v ? <Tag color="orange">Agents only</Tag> : <Text type="secondary">—</Text>,
     },
     {
       title: 'Color',
@@ -332,11 +346,23 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
               <Form.Item name="sort_order" label="Sort order" rules={[{ required: true }]}>
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
-              <Form.Item name="description" label="Reference description">
+              <Form.Item
+                name="description"
+                label="Reference description"
+              >
                 <Input.TextArea
                   rows={3}
                   placeholder="Shown on Reference page (ticket types tab) for all users who can open tickets"
                 />
+              </Form.Item>
+              <Form.Item
+                name="is_agent_only"
+                label="Agent only?"
+                valuePropName="checked"
+                initialValue={false}
+                tooltip="If active, this type will not be shown in the customer portal (new ticket form, lookup, Reference)."
+              >
+                <Switch />
               </Form.Item>
               <Form.Item>
                 <Space>

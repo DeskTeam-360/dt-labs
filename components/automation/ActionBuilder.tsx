@@ -36,6 +36,7 @@ const VISIBILITY_OPTIONS = [
 
 const TICKET_CLASSIFICATION_OPTIONS = [
   { value: 'support', label: 'Support' },
+  { value: 'project', label: 'Project task' },
   { value: 'spam', label: 'Spam' },
   { value: 'trash', label: 'Trash' },
 ]

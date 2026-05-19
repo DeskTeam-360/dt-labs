@@ -23,7 +23,7 @@ export async function PATCH(
   }
 
   const body = await request.json()
-  const { title, slug, color, sort_order, description } = body
+  const { title, slug, color, sort_order, description, is_agent_only } = body
 
   const values: Record<string, unknown> = {}
   if (title !== undefined) values.title = String(title).trim()
@@ -31,6 +31,7 @@ export async function PATCH(
   if (color !== undefined) values.color = color || '#000000'
   if (sort_order !== undefined) values.sortOrder = Number(sort_order) ?? 0
   if (description !== undefined) values.description = typeof description === 'string' ? description : ''
+  if (is_agent_only !== undefined) values.isAgentOnly = Boolean(is_agent_only)
 
   if (Object.keys(values).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -54,6 +55,7 @@ export async function PATCH(
     description: updated.description ?? '',
     color: updated.color ?? '#000000',
     sort_order: updated.sortOrder ?? 0,
+    is_agent_only: updated.isAgentOnly ?? false,
     created_at: updated.createdAt ? new Date(updated.createdAt).toISOString() : '',
     updated_at: updated.updatedAt ? new Date(updated.updatedAt).toISOString() : '',
   })

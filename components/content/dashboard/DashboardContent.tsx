@@ -275,7 +275,6 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
         collapsed={collapsed}
         user={user}
         style={{
-          // borderRadius: '16px 0 0 16px',
           overflow: 'hidden',
         }}
       >

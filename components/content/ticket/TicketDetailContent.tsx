@@ -6,6 +6,7 @@ import {
     ArrowLeftOutlined,
     DeleteOutlined,
     DeleteTwoTone,
+    FolderOutlined,
     LeftOutlined,
     RightOutlined,
     WarningOutlined,
@@ -51,6 +52,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 import dayjs from 'dayjs'
 
 import DateDisplay from '@/components/common/DateDisplay'
+import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { TabActivity,TabGeneral, TabScreenshots, TabTimeTracker } from '@/components/ticket/detail'
@@ -225,6 +227,7 @@ export default function TicketDetailContent({
     const [newDescriptionAttachments, setNewDescriptionAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
     const [deletedDescriptionAttachmentIds, setDeletedDescriptionAttachmentIds] = useState<string[]>([])
     const [statusChanging, setStatusChanging] = useState(false)
+    const [projectStatusChanging, setProjectStatusChanging] = useState(false)
     const [typeChanging, setTypeChanging] = useState(false)
     const [priorityChanging, setPriorityChanging] = useState(false)
     const [companyChanging, setCompanyChanging] = useState(false)
@@ -911,6 +914,40 @@ export default function TicketDetailContent({
         }
     }
 
+    const handleProjectStatusChange = async (projectStatusId: number | null) => {
+        setProjectStatusChanging(true)
+        try {
+            await apiFetch(`/api/tickets/${displayTicket.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ project_status_id: projectStatusId }),
+            })
+            message.success('Kolom proyek diperbarui')
+            setDisplayTicket((prev: any) => {
+                const opts = prev.project_statuses ?? []
+                const row =
+                    projectStatusId == null ? null : opts.find((s: { id: number }) => s.id === projectStatusId)
+                return {
+                    ...prev,
+                    project_status_id: projectStatusId,
+                    project_status: row
+                        ? {
+                              id: row.id,
+                              title: row.title,
+                              slug: row.slug,
+                              color: row.color,
+                          }
+                        : null,
+                }
+            })
+            router.refresh()
+        } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : 'Gagal memperbarui kolom proyek')
+        } finally {
+            setProjectStatusChanging(false)
+        }
+    }
+
     const handleTypeChange = async (typeId: number | null) => {
         setTypeChanging(true)
         try {
@@ -1412,6 +1449,16 @@ export default function TicketDetailContent({
                                             #{displayTicket.id} {displayTicket.title}
                                         </span>
                                     </Title>
+                                    {displayTicket.project?.id ? (
+                                        <Tag icon={<FolderOutlined />}>
+                                            <SpaNavLink
+                                                href={`/projects/${displayTicket.project.id}`}
+                                                style={{ color: 'inherit' }}
+                                            >
+                                                {displayTicket.project.title}
+                                            </SpaNavLink>
+                                        </Tag>
+                                    ) : null}
                                     {isCustomer && (
                                         <Flex gap={8} wrap="wrap" align="center">
                                             <Button
@@ -1561,6 +1608,27 @@ export default function TicketDetailContent({
                                             statusOptions={allStatusesForSelect}
                                             onStatusChange={handleStatusChange}
                                             statusChanging={statusChanging}
+                                            projectStatusOptions={
+                                                displayTicket?.ticket_type === 'project' &&
+                                                Array.isArray(displayTicket?.project_statuses) &&
+                                                displayTicket.project_statuses.length > 0
+                                                    ? displayTicket.project_statuses.map(
+                                                          (s: {
+                                                              id: number
+                                                              title: string
+                                                              slug: string
+                                                              color: string
+                                                          }) => ({
+                                                              id: s.id,
+                                                              title: s.title,
+                                                              slug: s.slug,
+                                                              color: s.color,
+                                                          })
+                                                      )
+                                                    : undefined
+                                            }
+                                            onProjectStatusChange={handleProjectStatusChange}
+                                            projectStatusChanging={projectStatusChanging}
                                             typeOptions={ticketTypes}
                                             onTypeChange={handleTypeChange}
                                             typeChanging={typeChanging}
