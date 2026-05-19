@@ -5,6 +5,7 @@ import { auth } from '@/auth'
 import { canAccessTeams, canAdminTeams } from '@/lib/auth-utils'
 import { db } from '@/lib/db'
 import { teamMembers,teams, users } from '@/lib/db'
+import { normalizeTeamVisibilityBody } from '@/lib/team-type'
 import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 
 function sessionRole(session: { user?: { role?: string; id?: string } } | null) {
@@ -35,7 +36,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const values: Record<string, unknown> = {}
   if (name !== undefined) values.name = typeof name === 'string' ? name.trim() : null
-  if (type !== undefined) values.type = type && typeof type === 'string' ? type.trim() || null : null
+  if (type !== undefined) {
+    const visibility = normalizeTeamVisibilityBody(type)
+    if (!visibility) {
+      return NextResponse.json({ error: 'type must be public or private' }, { status: 400 })
+    }
+    values.type = visibility
+  }
 
   if (createdByBody !== undefined && createdByBody !== null) {
     if (typeof createdByBody !== 'string') {

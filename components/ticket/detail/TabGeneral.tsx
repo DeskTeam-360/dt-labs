@@ -92,27 +92,77 @@ interface StatusOption {
 }
 
 interface TicketAttachment { id: string; file_url: string; file_name: string; file_path?: string }
+
+/** Sidebar ticket attributes — edited locally until Save attributes */
+export interface SidebarAttributesDraft {
+  status: string
+  projectStatusId: number | null
+  typeId: number | null
+  priorityId: number | null
+  companyId: string | null
+  tagIds: string[]
+  contactUserId: string | null
+  dueDate: string | null
+  visibility: string
+  teamId: string | null
+  assigneeIds: string[]
+  /** Local short note text; persisted with Save changes */
+  shortNote: string
+}
+
+function snapshotSidebarDraft(params: {
+  ticketData: any
+  selectedTagIds: string[]
+  selectedContactUserId: string | null
+  selectedVisibility: string
+  selectedTeamId: string | null
+  selectedAssigneeIds: string[]
+  shortNoteProp: string | null | undefined
+}): SidebarAttributesDraft {
+  const {
+    ticketData,
+    selectedTagIds,
+    selectedContactUserId,
+    selectedVisibility,
+    selectedTeamId,
+    selectedAssigneeIds,
+    shortNoteProp,
+  } = params
+  return {
+    status: String(ticketData?.status ?? 'open'),
+    projectStatusId: ticketData?.project_status_id ?? null,
+    typeId: ticketData?.type_id ?? null,
+    priorityId: ticketData?.priority_id ?? null,
+    companyId: ticketData?.company_id ?? null,
+    tagIds: [...selectedTagIds],
+    contactUserId: selectedContactUserId ?? null,
+    dueDate: ticketData?.due_date ? String(ticketData.due_date) : null,
+    visibility: selectedVisibility,
+    teamId: selectedTeamId ?? null,
+    assigneeIds: selectedAssigneeIds.map(String),
+    shortNote: typeof shortNoteProp === 'string' ? shortNoteProp : '',
+  }
+}
+
+function sidebarDraftEquals(a: SidebarAttributesDraft, b: SidebarAttributesDraft): boolean {
+  const norm = (d: SidebarAttributesDraft) =>
+    JSON.stringify({
+      ...d,
+      tagIds: [...d.tagIds].slice().sort(),
+      assigneeIds: [...d.assigneeIds].slice().sort(),
+    })
+  return norm(a) === norm(b)
+}
+
 interface TabGeneralProps {
   ticketData: any
   ticketAttachments?: TicketAttachment[]
-  getStatusColor: (status: string) => string
-  getStatusLabel: (status: string) => string
   statusOptions: StatusOption[]
-  onStatusChange: (newStatus: string) => void | Promise<void>
-  statusChanging?: boolean
   /** Board columns for `ticket_type === 'project'` */
   projectStatusOptions?: { id: number; title: string; slug: string; color: string }[]
-  onProjectStatusChange?: (projectStatusId: number | null) => void | Promise<void>
-  projectStatusChanging?: boolean
   typeOptions: { id: number; title: string; slug: string; color: string }[]
-  onTypeChange: (typeId: number | null) => void | Promise<void>
-  typeChanging?: boolean
   priorityOptions: { id: number; title: string; slug: string; color: string }[]
-  onPriorityChange: (priorityId: number | null) => void | Promise<void>
-  priorityChanging?: boolean
   companyOptions: { id: string; name: string }[]
-  onCompanyChange: (companyId: string | null) => void | Promise<void>
-  companyChanging?: boolean
   /** Users who can be set as email reply contact; optional company_id for cross-company hints. */
   contactUserOptions?: Array<{
     id: string
@@ -121,32 +171,21 @@ interface TabGeneralProps {
     company_id?: string | null
   }>
   selectedContactUserId?: string | null
-  onContactChange?: (userId: string | null) => void | Promise<void>
-  contactChanging?: boolean
   tagOptions: { id: string; name: string; slug: string }[]
   selectedTagIds: string[]
-  onTagsChange: (tagIds: string[]) => void | Promise<void>
-  tagsChanging?: boolean
   /** When false, company and tags are read-only (customer view) */
   canEditCompanyAndTags?: boolean
-  onDueDateChange?: (dueDate: string | null) => void | Promise<void>
-  dueDateChanging?: boolean
   visibilityOptions: { value: string; label: string }[]
   selectedVisibility: string
-  onVisibilityChange: (visibility: string) => void | Promise<void>
-  visibilityChanging?: boolean
   teamOptions: { id: string; name: string }[]
   selectedTeamId: string | null
-  onTeamChange: (teamId: string | null) => void | Promise<void>
-  teamChanging?: boolean
   assigneeOptions: { id: string; full_name: string | null; email: string }[]
   selectedAssigneeIds: string[]
-  onAssigneesChange: (userIds: string[]) => void | Promise<void>
-  assigneesChanging?: boolean
   canEditAssignees?: boolean
-  shortNote?: string | null
-  onShortNoteChange?: (value: string | null) => void | Promise<void>
-  shortNoteChanging?: boolean
+  /** Bump after batch-save succeeds so sidebar draft resets from props */
+  sidebarBaselineTick: number
+  sidebarAttributesSaving?: boolean
+  onSaveSidebarAttributes: (draft: SidebarAttributesDraft) => Promise<void>
   totalTimeSeconds: number
   activeTimeTracker: any
   currentTime: number
@@ -213,50 +252,26 @@ interface TabGeneralProps {
 export default function TabGeneral({
   ticketData,
   ticketAttachments = [],
-  getStatusColor,
-  getStatusLabel,
   statusOptions,
-  onStatusChange,
-  statusChanging = false,
   projectStatusOptions,
-  onProjectStatusChange,
-  projectStatusChanging = false,
   typeOptions,
-  onTypeChange,
-  typeChanging = false,
   priorityOptions,
-  onPriorityChange,
-  priorityChanging = false,
   companyOptions,
-  onCompanyChange,
-  companyChanging = false,
   contactUserOptions = [],
   selectedContactUserId = null,
-  onContactChange,
-  contactChanging = false,
   tagOptions,
   selectedTagIds,
-  onTagsChange,
-  tagsChanging = false,
   canEditCompanyAndTags = true,
-  onDueDateChange,
-  dueDateChanging = false,
   visibilityOptions,
   selectedVisibility,
-  onVisibilityChange,
-  visibilityChanging = false,
   teamOptions,
   selectedTeamId,
-  onTeamChange,
-  teamChanging = false,
   assigneeOptions,
   selectedAssigneeIds,
-  onAssigneesChange,
-  assigneesChanging = false,
   canEditAssignees = true,
-  shortNote,
-  onShortNoteChange,
-  shortNoteChanging = false,
+  sidebarBaselineTick,
+  sidebarAttributesSaving = false,
+  onSaveSidebarAttributes,
   totalTimeSeconds,
   activeTimeTracker,
   currentTime,
@@ -313,26 +328,57 @@ export default function TabGeneral({
   onTicketDescriptionSave,
   ticketDescriptionSaving = false,
 }: TabGeneralProps) {
-  const [shortNoteInput, setShortNoteInput] = useState(shortNote ?? '')
-  useEffect(() => {
-    setShortNoteInput(shortNote ?? '')
-  }, [shortNote])
+  const [sidebarDraft, setSidebarDraft] = useState<SidebarAttributesDraft>(() =>
+    snapshotSidebarDraft({
+      ticketData,
+      selectedTagIds,
+      selectedContactUserId,
+      selectedVisibility,
+      selectedTeamId,
+      selectedAssigneeIds,
+      shortNoteProp: ticketData?.short_note ?? null,
+    }),
+  )
+  const [sidebarBaseline, setSidebarBaseline] = useState<SidebarAttributesDraft>(() =>
+    snapshotSidebarDraft({
+      ticketData,
+      selectedTagIds,
+      selectedContactUserId,
+      selectedVisibility,
+      selectedTeamId,
+      selectedAssigneeIds,
+      shortNoteProp: ticketData?.short_note ?? null,
+    }),
+  )
 
-  const shortNoteDirty = useMemo(() => {
-    const a = (shortNoteInput ?? '').trim()
-    const b = (shortNote ?? '').trim()
-    return a !== b
-  }, [shortNoteInput, shortNote])
+  useEffect(() => {
+    const s = snapshotSidebarDraft({
+      ticketData,
+      selectedTagIds,
+      selectedContactUserId,
+      selectedVisibility,
+      selectedTeamId,
+      selectedAssigneeIds,
+      shortNoteProp: ticketData?.short_note ?? null,
+    })
+    setSidebarBaseline(s)
+    setSidebarDraft(s)
+  }, [ticketData?.id, ticketData?.short_note, sidebarBaselineTick])
+
+  const sidebarDirty = useMemo(
+    () => !sidebarDraftEquals(sidebarDraft, sidebarBaseline),
+    [sidebarDraft, sidebarBaseline],
+  )
 
   const statusSelectOptions = useMemo(() => {
-    const cur = ticketData?.status as string | undefined
+    const cur = sidebarDraft.status as string | undefined
     const active = statusOptions.filter((s) => s.is_active !== false)
     if (cur && !active.some((s) => s.slug === cur)) {
       const row = statusOptions.find((s) => s.slug === cur)
       return row ? [...active, row] : active
     }
     return active
-  }, [statusOptions, ticketData?.status])
+  }, [statusOptions, sidebarDraft.status])
 
   const useProjectBoardStatus =
     ticketData?.ticket_type === 'project' &&
@@ -340,13 +386,13 @@ export default function TabGeneral({
     projectStatusOptions.length > 0
 
   const contactCrossCompanyHint = useMemo(() => {
-    if (!selectedContactUserId || !ticketData.company_id) return null
-    const row = contactUserOptions.find((o) => o.id === selectedContactUserId)
+    if (!sidebarDraft.contactUserId || !ticketData.company_id) return null
+    const row = contactUserOptions.find((o) => o.id === sidebarDraft.contactUserId)
     const uid = row?.company_id
     if (!uid || uid === ticketData.company_id) return null
     const otherName = companyOptions.find((c) => c.id === uid)?.name ?? 'perusahaan lain'
     return `Kontak dari ${otherName}. Setelah disimpan, Company tiket akan mengikuti perusahaan kontak (lintas perusahaan).`
-  }, [selectedContactUserId, ticketData.company_id, contactUserOptions, companyOptions])
+  }, [sidebarDraft.contactUserId, ticketData.company_id, contactUserOptions, companyOptions])
 
   const creatorId = ticketData.creator?.id ?? ticketData.created_by ?? null
   const creatorEmail = ticketData.creator?.email ?? null
@@ -701,48 +747,49 @@ export default function TabGeneral({
         </Col>
 
         <Col xs={8}>
+          <Flex justify="flex-end" gap={8} wrap="wrap" style={{ marginBottom: 12 }}>
+            <Button
+              type="primary"
+              disabled={!sidebarDirty || sidebarAttributesSaving}
+              loading={sidebarAttributesSaving}
+              onClick={() => void onSaveSidebarAttributes(sidebarDraft)}
+            >
+              Save changes
+            </Button>
+            <Button
+              disabled={!sidebarDirty || sidebarAttributesSaving}
+              onClick={() => setSidebarDraft(sidebarBaseline)}
+            >
+              Reset
+            </Button>
+          </Flex>
           <Descriptions column={1} bordered>
             <Descriptions.Item label="Short Note">
-              {onShortNoteChange ? (
-                <Space orientation="vertical" size="small" style={{ width: '100%' }}>
-                  <Input.TextArea
-                    value={shortNoteInput}
-                    onChange={(e) => setShortNoteInput(e.target.value)}
-                    placeholder="Short note (optional)"
-                    rows={2}
-                    disabled={shortNoteChanging}
-                    style={{ resize: 'vertical' }}
-                  />
-                  <Flex gap={8} wrap="wrap">
-                    <Button
-                      type="primary"
-                      size="small"
-                      disabled={!shortNoteDirty || shortNoteChanging}
-                      loading={shortNoteChanging}
-                      onClick={() => void onShortNoteChange(shortNoteInput.trim() || null)}
-                    >
-                      Save short note
-                    </Button>
-                    <Button
-                      size="small"
-                      disabled={!shortNoteDirty || shortNoteChanging}
-                      onClick={() => setShortNoteInput(shortNote ?? '')}
-                    >
-                      Reset
-                    </Button>
-                  </Flex>
-                </Space>
-              ) : (
-                <Text>{shortNote || '—'}</Text>
-              )}
+              <Input.TextArea
+                value={sidebarDraft.shortNote}
+                onChange={(e) =>
+                  setSidebarDraft((d) => ({
+                    ...d,
+                    shortNote: e.target.value,
+                  }))
+                }
+                placeholder="Short note (optional)"
+                rows={2}
+                disabled={sidebarAttributesSaving}
+                style={{ resize: 'vertical' }}
+              />
             </Descriptions.Item>
             <Descriptions.Item label={useProjectBoardStatus ? 'Status proyek' : 'Status'}>
               {useProjectBoardStatus ? (
                 <Select
-                  value={ticketData.project_status_id ?? undefined}
-                  onChange={(v) => onProjectStatusChange?.(v ?? null)}
-                  disabled={!onProjectStatusChange}
-                  loading={projectStatusChanging}
+                  value={sidebarDraft.projectStatusId ?? undefined}
+                  onChange={(v) =>
+                    setSidebarDraft((d) => ({
+                      ...d,
+                      projectStatusId: v ?? null,
+                    }))
+                  }
+                  loading={sidebarAttributesSaving}
                   options={(projectStatusOptions ?? []).map((s) => ({
                     value: s.id,
                     label: (
@@ -759,9 +806,15 @@ export default function TabGeneral({
                 />
               ) : (
                 <Select
-                  value={ticketData.status ?? undefined}
-                  onChange={(value) => value && onStatusChange(value)}
-                  loading={statusChanging}
+                  value={sidebarDraft.status ?? undefined}
+                  onChange={(value) =>
+                    value &&
+                    setSidebarDraft((d) => ({
+                      ...d,
+                      status: String(value),
+                    }))
+                  }
+                  loading={sidebarAttributesSaving}
                   options={statusSelectOptions.map((s) => ({
                     value: s.slug,
                     label: (
@@ -779,9 +832,14 @@ export default function TabGeneral({
             </Descriptions.Item>
             <Descriptions.Item label="Type">
               <Select
-                value={ticketData.type_id ?? undefined}
-                onChange={(v) => onTypeChange(v ?? null)}
-                loading={typeChanging}
+                value={sidebarDraft.typeId ?? undefined}
+                onChange={(v) =>
+                  setSidebarDraft((d) => ({
+                    ...d,
+                    typeId: v ?? null,
+                  }))
+                }
+                loading={sidebarAttributesSaving}
                 options={typeOptions.map((t) => ({
                   value: t.id,
                   label: <Tag color={t.color} style={{ margin: 0 }}>{t.title}</Tag>,
@@ -793,9 +851,14 @@ export default function TabGeneral({
             </Descriptions.Item>
             <Descriptions.Item label="Priority">
               <Select
-                value={ticketData.priority_id ?? undefined}
-                onChange={(v) => onPriorityChange(v ?? null)}
-                loading={priorityChanging}
+                value={sidebarDraft.priorityId ?? undefined}
+                onChange={(v) =>
+                  setSidebarDraft((d) => ({
+                    ...d,
+                    priorityId: v ?? null,
+                  }))
+                }
+                loading={sidebarAttributesSaving}
                 options={priorityOptions.map((p) => ({
                   value: p.id,
                   label: <Tag color={p.color} style={{ margin: 0 }}>{p.title}</Tag>,
@@ -808,9 +871,14 @@ export default function TabGeneral({
             <Descriptions.Item label="Company">
               {canEditCompanyAndTags ? (
                 <Select
-                  value={ticketData.company_id ?? undefined}
-                  onChange={(v) => onCompanyChange(v ?? null)}
-                  loading={companyChanging} 
+                  value={sidebarDraft.companyId ?? undefined}
+                  onChange={(v) =>
+                    setSidebarDraft((d) => ({
+                      ...d,
+                      companyId: v ?? null,
+                    }))
+                  }
+                  loading={sidebarAttributesSaving}
                   options={companyOptions.map((c) => ({
                     value: c.id,
                     label: c.name,
@@ -829,9 +897,14 @@ export default function TabGeneral({
               {canEditCompanyAndTags ? (
                 <Select
                   mode="multiple"
-                  value={selectedTagIds}
-                  onChange={(v) => onTagsChange(v ?? [])}
-                  loading={tagsChanging}
+                  value={sidebarDraft.tagIds}
+                  onChange={(v) =>
+                    setSidebarDraft((d) => ({
+                      ...d,
+                      tagIds: v ?? [],
+                    }))
+                  }
+                  loading={sidebarAttributesSaving}
                   options={tagOptions.map((t) => ({ value: t.id, label: t.name }))}
                   style={{ minWidth: 160, width: '100%' }}
                   placeholder="Select tags"
@@ -858,12 +931,16 @@ export default function TabGeneral({
             {canEditCompanyAndTags ? (
               <Descriptions.Item label="Contact (email replies)">
                 <Select
-                  value={selectedContactUserId ?? undefined}
+                  value={sidebarDraft.contactUserId ?? undefined}
                   allowClear
                   placeholder="Same as Created By"
-                  loading={contactChanging}
-                  disabled={!onContactChange}
-                  onChange={(v) => onContactChange?.((v as string | undefined) ?? null)}
+                  loading={sidebarAttributesSaving}
+                  onChange={(v) =>
+                    setSidebarDraft((d) => ({
+                      ...d,
+                      contactUserId: (v as string | undefined) ?? null,
+                    }))
+                  }
                   options={contactUserOptions.map((u) => ({
                     value: u.id,
                     label: u.full_name ? `${u.full_name} (${u.email})` : u.email,
@@ -902,31 +979,35 @@ export default function TabGeneral({
               )}
             </Descriptions.Item>
             <Descriptions.Item label="Due Date">
-              {onDueDateChange ? (
-                <DatePicker
-                  value={ticketData.due_date ? dayjs(ticketData.due_date) : null}
-                  onChange={(d) => onDueDateChange(d ? d.toISOString() : null)}
-                  allowClear
-                  showTime
-                  format="YYYY-MM-DD HH:mm"
-                  style={{ width: '100%' }}
-                  disabled={dueDateChanging}
-                />
-              ) : ticketData.due_date ? (
-                <Space>
-                  <ClockCircleOutlined />
-                  <DateDisplay date={ticketData.due_date} />
-                </Space>
-              ) : (
-                <Text type="secondary">No due date</Text>
-              )}
+              <DatePicker
+                value={sidebarDraft.dueDate ? dayjs(sidebarDraft.dueDate) : null}
+                onChange={(dt) =>
+                  setSidebarDraft((d) => ({
+                    ...d,
+                    dueDate: dt ? dt.toISOString() : null,
+                  }))
+                }
+                allowClear
+                showTime
+                format="YYYY-MM-DD HH:mm"
+                style={{ width: '100%' }}
+                disabled={sidebarAttributesSaving}
+              />
             </Descriptions.Item>
             <Descriptions.Item label="Visibility">
               {canEditAssignees ? (
                 <Select
-                  value={selectedVisibility}
-                  onChange={(v) => v && onVisibilityChange(v)}
-                  loading={visibilityChanging}
+                  value={sidebarDraft.visibility}
+                  onChange={(v) => {
+                    if (!v) return
+                    setSidebarDraft((d) => ({
+                      ...d,
+                      visibility: v,
+                      assigneeIds: [],
+                      teamId: v === 'team' ? d.teamId : null,
+                    }))
+                  }}
+                  loading={sidebarAttributesSaving}
                   options={visibilityOptions}
                   style={{ minWidth: 140, width: '100%' }}
                 />
@@ -934,13 +1015,20 @@ export default function TabGeneral({
                 <Text>{visibilityOptions.find((o) => o.value === ticketData.visibility)?.label ?? ticketData.visibility}</Text>
               )}
             </Descriptions.Item>
-            {selectedVisibility === 'team' || selectedVisibility === 'public' ? (
+            {sidebarDraft.visibility === 'team' || sidebarDraft.visibility === 'public' ? (
               <Descriptions.Item label="Team">
                 {canEditAssignees ? (
                   <Select
-                    value={selectedTeamId ?? undefined}
-                    onChange={(v) => onTeamChange(v ?? null)}
-                    loading={teamChanging}
+                    value={sidebarDraft.teamId ?? undefined}
+                    onChange={(teamId) =>
+                      setSidebarDraft((d) => ({
+                        ...d,
+                        teamId,
+                        visibility: teamId ? 'team' : d.visibility === 'team' ? 'private' : d.visibility,
+                        assigneeIds: [],
+                      }))
+                    }
+                    loading={sidebarAttributesSaving}
                     options={teamOptions.map((t) => ({ value: t.id, label: t.name }))}
                     style={{ minWidth: 140, width: '100%' }}
                     placeholder="Select team"
@@ -950,14 +1038,25 @@ export default function TabGeneral({
                   <Text>{ticketData.team?.name ?? '—'}</Text>
                 )}
               </Descriptions.Item>
-            ) : selectedVisibility === 'specific_users' ? (
+            ) : sidebarDraft.visibility === 'specific_users' ? (
               <Descriptions.Item label="Assignees">
                 {canEditAssignees ? (
                   <Select
                     mode="multiple"
-                    value={selectedAssigneeIds}
-                    onChange={(v) => onAssigneesChange(v ?? [])}
-                    loading={assigneesChanging}
+                    value={sidebarDraft.assigneeIds}
+                    onChange={(ids) =>
+                      setSidebarDraft((d) => {
+                        const userIds = (ids ?? []).map(String)
+                        return {
+                          ...d,
+                          assigneeIds: userIds,
+                          visibility:
+                            userIds.length > 0 ? 'specific_users' : d.visibility === 'specific_users' ? 'private' : d.visibility,
+                          teamId: userIds.length > 0 ? null : d.teamId,
+                        }
+                      })
+                    }
+                    loading={sidebarAttributesSaving}
                     options={assigneeOptions.map((u) => ({
                       value: String(u.id),
                       label: String(u.full_name || u.email || u.id || 'Unknown'),
@@ -1005,7 +1104,8 @@ export default function TabGeneral({
                 <ClockCircleOutlined />
                 <Text strong>{formatTime(totalTimeSeconds + (activeTimeTracker ? currentTime : 0))}</Text>
               </Space>
-            </Descriptions.Item>{attributes.length > 0 ? (
+            </Descriptions.Item>
+            {attributes.length > 0 ? (
                 <>{attributes.map((attr) => (
                     <Descriptions.Item
                       key={attr.id}

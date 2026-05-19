@@ -46,6 +46,11 @@ import DateDisplay from '@/components/common/DateDisplay'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { canAdminTeams } from '@/lib/auth-utils'
+import {
+  formatTeamVisibilityLabel,
+  parseTeamVisibility,
+  TEAM_VISIBILITY_OPTIONS,
+} from '@/lib/team-type'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...options, credentials: 'include' })
@@ -248,7 +253,10 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
   }
 
   const openEditModal = () => {
-    editForm.setFieldsValue({ name: teamName, type: teamType ?? undefined })
+    editForm.setFieldsValue({
+      name: teamName,
+      type: parseTeamVisibility(teamType) ?? undefined,
+    })
     setEditModalOpen(true)
   }
 
@@ -264,12 +272,13 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
       await apiFetch(`/api/teams/${team.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, type: values.type || null }),
+        body: JSON.stringify({ name, type: values.type }),
       })
       setTeamName(name)
-      setTeamType(values.type || null)
+      setTeamType(values.type)
       message.success('Team updated')
       setEditModalOpen(false)
+      router.refresh()
     } catch (e: unknown) {
       const err = e as Error & { message?: string }
       if (err?.message && !err.message.includes('validateFields')) {
@@ -596,7 +605,18 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
           </Col>
           <Col span={24}>
             <Text type="secondary">Type</Text>
-            <div>{teamType ? <Tag>{teamType}</Tag> : '-'}</div>
+            <div>
+              {(() => {
+                const label = formatTeamVisibilityLabel(teamType)
+                if (label === '—') return <span>-</span>
+                const slug = parseTeamVisibility(teamType)
+                return slug ? (
+                  <Tag color={slug === 'private' ? 'purple' : 'blue'}>{label}</Tag>
+                ) : (
+                  <Tag>{label}</Tag>
+                )
+              })()}
+            </div>
           </Col>
           <Col span={24}>
             <Text type="secondary">Created by</Text>
@@ -857,7 +877,16 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
             <Title level={3} style={{ marginTop: 0 }}>
               {teamName}
             </Title>
-            {teamType && <Tag>{teamType}</Tag>}
+            {(() => {
+              const label = formatTeamVisibilityLabel(teamType)
+              if (label === '—') return null
+              const slug = parseTeamVisibility(teamType)
+              return slug ? (
+                <Tag color={slug === 'private' ? 'purple' : 'blue'}>{label}</Tag>
+              ) : (
+                <Tag>{label}</Tag>
+              )
+            })()}
             <div style={{ marginTop: 8, marginBottom: 16 }}>
               <Text type="secondary">
                 Created by {team.creator_name} · <DateDisplay date={team.created_at} />
@@ -876,8 +905,16 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
                 <Form.Item name="name" label="Team name" rules={[{ required: true, message: 'Name is required' }]}>
                   <Input placeholder="Team name" />
                 </Form.Item>
-                <Form.Item name="type" label="Type">
-                  <Input placeholder="e.g. Engineering, Support" />
+                <Form.Item
+                  name="type"
+                  label="Type"
+                  rules={[{ required: true, message: 'Choose Public or Private' }]}
+                >
+                  <Select
+                    placeholder="Select visibility"
+                    options={[...TEAM_VISIBILITY_OPTIONS]}
+                    style={{ width: '100%' }}
+                  />
                 </Form.Item>
               </Form>
             </Modal>

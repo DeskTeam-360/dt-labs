@@ -5,6 +5,7 @@ import { auth } from '@/auth'
 import { canAccessTeams, canAdminTeams } from '@/lib/auth-utils'
 import { db } from '@/lib/db'
 import { teamMembers,teams, users } from '@/lib/db'
+import { normalizeTeamVisibilityBody } from '@/lib/team-type'
 import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
@@ -94,11 +95,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 })
   }
 
+  const visibility = normalizeTeamVisibilityBody(type)
+  if (!visibility) {
+    return NextResponse.json({ error: 'type is required and must be public or private' }, { status: 400 })
+  }
+
   const [inserted] = await db
     .insert(teams)
     .values({
       name: name.trim(),
-      type: type && typeof type === 'string' ? type.trim() || null : null,
+      type: visibility,
       createdBy: session.user.id,
     })
     .returning()

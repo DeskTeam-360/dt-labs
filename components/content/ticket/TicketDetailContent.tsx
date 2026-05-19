@@ -58,6 +58,7 @@ import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { TabActivity,TabGeneral, TabScreenshots, TabTimeTracker } from '@/components/ticket/detail'
 import CommentWysiwyg from '@/components/ticket/detail/CommentWysiwyg'
+import type { SidebarAttributesDraft } from '@/components/ticket/detail/TabGeneral'
 import TabGeneralCustomer from '@/components/ticket/detail/TabGeneralCustomer'
 import TicketPresenceBar from '@/components/ticket/TicketPresenceBar'
 import { canDeleteTickets, isAdmin, isAdminOrManager } from '@/lib/auth-utils'
@@ -238,13 +239,8 @@ export default function TicketDetailContent({
     const [newDescriptionAttachments, setNewDescriptionAttachments] = useState<{ url: string; file_name: string; file_path: string }[]>([])
     const [deletedDescriptionAttachmentIds, setDeletedDescriptionAttachmentIds] = useState<string[]>([])
     const [statusChanging, setStatusChanging] = useState(false)
-    const [projectStatusChanging, setProjectStatusChanging] = useState(false)
     const [typeChanging, setTypeChanging] = useState(false)
     const [priorityChanging, setPriorityChanging] = useState(false)
-    const [companyChanging, setCompanyChanging] = useState(false)
-    const [contactChanging, setContactChanging] = useState(false)
-    const [tagsChanging, setTagsChanging] = useState(false)
-    const [dueDateChanging, setDueDateChanging] = useState(false)
     const [form] = Form.useForm()
     const [activeTimeTracker, setActiveTimeTracker] = useState<any>(null)
     const [timeTrackerSessions, setTimeTrackerSessions] = useState<any[]>([])
@@ -253,10 +249,8 @@ export default function TicketDetailContent({
     const [statusesFromDb, setStatusesFromDb] = useState<
         { slug: string; title: string; customer_title?: string; color: string; is_active?: boolean }[]
     >([])
-    const [assigneesChanging, setAssigneesChanging] = useState(false)
-    const [teamChanging, setTeamChanging] = useState(false)
-    const [visibilityChanging, setVisibilityChanging] = useState(false)
-    const [shortNoteChanging, setShortNoteChanging] = useState(false)
+    const [sidebarBaselineTick, setSidebarBaselineTick] = useState(0)
+    const [sidebarAttributesSaving, setSidebarAttributesSaving] = useState(false)
     const [optimisticVisibility, setOptimisticVisibility] = useState<string | null>(null)
     const [optimisticAssignees, setOptimisticAssignees] = useState<string[] | null>(null)
 
@@ -918,24 +912,6 @@ export default function TicketDetailContent({
         }
     }
 
-    const handleShortNoteChange = async (value: string | null) => {
-        setShortNoteChanging(true)
-        try {
-            await apiFetch(`/api/tickets/${displayTicket.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ short_note: value }),
-            })
-            message.success('Short note updated')
-            setDisplayTicket((prev: any) => ({ ...prev, short_note: value }))
-            router.refresh()
-        } catch (err: unknown) {
-            message.error(err instanceof Error ? err.message : 'Failed to update short note')
-        } finally {
-            setShortNoteChanging(false)
-        }
-    }
-
     const handleStatusChange = async (newStatus: string) => {
         setStatusChanging(true)
         try {
@@ -954,37 +930,133 @@ export default function TicketDetailContent({
         }
     }
 
-    const handleProjectStatusChange = async (projectStatusId: number | null) => {
-        setProjectStatusChanging(true)
+    const handleSaveSidebarAttributes = async (d: SidebarAttributesDraft) => {
+        const tid = displayTicket?.id
+        if (tid == null) return
+
+        const useProjectBoard =
+            displayTicket?.ticket_type === 'project' &&
+            Array.isArray(displayTicket?.project_statuses) &&
+            displayTicket.project_statuses.length > 0
+
+        setSidebarAttributesSaving(true)
         try {
-            await apiFetch(`/api/tickets/${displayTicket.id}`, {
+            const body: Record<string, unknown> = {
+                type_id: d.typeId,
+                priority_id: d.priorityId,
+                company_id: d.companyId,
+                tag_ids: d.tagIds,
+                contact_user_id: d.contactUserId,
+                due_date: d.dueDate,
+                visibility: d.visibility,
+                team_id: d.visibility === 'team' ? d.teamId : null,
+                assignees: d.visibility === 'specific_users' ? d.assigneeIds : [],
+                short_note: d.shortNote.trim() || null,
+            }
+            if (useProjectBoard) {
+                body.project_status_id = d.projectStatusId
+            } else {
+                body.status = d.status
+            }
+
+            const res = await apiFetch<{
+                ticket_cross_company_warning?: string
+                company_id?: string | null
+            }>(`/api/tickets/${tid}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ project_status_id: projectStatusId }),
+                body: JSON.stringify(body),
             })
-            message.success('Kolom proyek diperbarui')
+
+            if (res?.ticket_cross_company_warning) {
+                message.warning(res.ticket_cross_company_warning)
+            }
+
+            setSelectedTagIds(d.tagIds)
+            setOptimisticAssignees(null)
+            setOptimisticVisibility(null)
+
+            const opts = displayTicket.project_statuses ?? []
+            const psRow =
+                useProjectBoard && d.projectStatusId != null
+                    ? opts.find((s: { id: number }) => s.id === d.projectStatusId)
+                    : null
+
+            const fromLists = [...companyCustomers, ...users] as Array<{
+                id: string
+                full_name?: string | null
+                email: string
+                avatar_url?: string | null
+            }>
+            const contactRow = d.contactUserId ? fromLists.find((u) => u.id === d.contactUserId) : null
+
+            const syncedCompanyId =
+                res && typeof res === 'object' && 'company_id' in res ? res.company_id : undefined
+
             setDisplayTicket((prev: any) => {
-                const opts = prev.project_statuses ?? []
-                const row =
-                    projectStatusId == null ? null : opts.find((s: { id: number }) => s.id === projectStatusId)
+                if (!prev) return prev
+                const nextCompanyId =
+                    syncedCompanyId !== undefined ? syncedCompanyId : (d.companyId ?? prev.company_id)
+
                 return {
                     ...prev,
-                    project_status_id: projectStatusId,
-                    project_status: row
+                    ...(useProjectBoard
                         ? {
-                              id: row.id,
-                              title: row.title,
-                              slug: row.slug,
-                              color: row.color,
+                              project_status_id: d.projectStatusId,
+                              project_status: psRow
+                                  ? {
+                                        id: psRow.id,
+                                        title: psRow.title,
+                                        slug: psRow.slug,
+                                        color: psRow.color,
+                                    }
+                                  : null,
+                          }
+                        : { status: d.status }),
+                    type_id: d.typeId,
+                    type: d.typeId != null ? ticketTypes.find((t) => t.id === d.typeId) ?? null : null,
+                    priority_id: d.priorityId,
+                    priority:
+                        d.priorityId != null ? ticketPriorities.find((p) => p.id === d.priorityId) ?? null : null,
+                    company_id: nextCompanyId,
+                    company: nextCompanyId ? companies.find((c) => c.id === nextCompanyId) ?? prev.company : null,
+                    contact_user_id: d.contactUserId,
+                    contact: contactRow
+                        ? {
+                              id: contactRow.id,
+                              full_name: contactRow.full_name ?? null,
+                              email: contactRow.email,
+                              avatar_url: contactRow.avatar_url ?? null,
                           }
                         : null,
+                    due_date: d.dueDate,
+                    visibility: d.visibility,
+                    team_id: d.visibility === 'team' ? d.teamId : null,
+                    assignees: (d.visibility === 'specific_users' ? d.assigneeIds : []).map((uid) => {
+                        const u = users.find((x: any) => String(x.id) === String(uid))
+                        return {
+                            user_id: uid,
+                            user: u
+                                ? {
+                                      id: u.id,
+                                      full_name: u.full_name ?? null,
+                                      email: u.email,
+                                      avatar_url: u.avatar_url ?? null,
+                                  }
+                                : { id: uid, full_name: null, email: '', avatar_url: null },
+                        }
+                    }),
+                    short_note: d.shortNote.trim() || null,
                 }
             })
+
+            setSidebarBaselineTick((x) => x + 1)
+            message.success('Ticket attributes saved')
             router.refresh()
-        } catch (err: unknown) {
-            message.error(err instanceof Error ? err.message : 'Gagal memperbarui kolom proyek')
+        } catch (e: unknown) {
+            message.error(e instanceof Error ? e.message : 'Failed to save ticket attributes')
         } finally {
-            setProjectStatusChanging(false)
+            setSidebarAttributesSaving(false)
         }
     }
 
@@ -1029,182 +1101,6 @@ export default function TicketDetailContent({
             message.error(err instanceof Error ? err.message : 'Failed to update priority')
         } finally {
             setPriorityChanging(false)
-        }
-    }
-
-    const handleCompanyChange = async (companyId: string | null) => {
-        setCompanyChanging(true)
-        try {
-            await apiFetch(`/api/tickets/${displayTicket.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ company_id: companyId }),
-            })
-            message.success('Company updated')
-            setDisplayTicket((prev: any) => ({
-                ...prev,
-                company_id: companyId,
-                company: companyId != null ? companies.find((c) => c.id === companyId) ?? null : null,
-            }))
-            router.refresh()
-        } catch (err: unknown) {
-            message.error(err instanceof Error ? err.message : 'Failed to update company')
-        } finally {
-            setCompanyChanging(false)
-        }
-    }
-
-    const handleContactChange = async (contactUserId: string | null) => {
-        setContactChanging(true)
-        try {
-            const res = await apiFetch<{
-                ok?: boolean
-                company_id?: string | null
-                ticket_cross_company_warning?: string
-            }>(`/api/tickets/${displayTicket.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contact_user_id: contactUserId }),
-            })
-            message.success('Contact updated')
-            if (res?.ticket_cross_company_warning) {
-                message.warning(res.ticket_cross_company_warning)
-            }
-            const fromLists = [...companyCustomers, ...users] as Array<{
-                id: string
-                full_name?: string | null
-                email: string
-                avatar_url?: string | null
-            }>
-            const row = contactUserId ? fromLists.find((u) => u.id === contactUserId) : null
-            const syncedCompanyId =
-                res && typeof res === 'object' && 'company_id' in res ? res.company_id : undefined
-            setDisplayTicket((prev: any) => ({
-                ...prev,
-                contact_user_id: contactUserId,
-                contact: row
-                    ? {
-                          id: row.id,
-                          full_name: row.full_name ?? null,
-                          email: row.email,
-                          avatar_url: row.avatar_url ?? null,
-                      }
-                    : null,
-                ...(syncedCompanyId !== undefined
-                    ? {
-                          company_id: syncedCompanyId,
-                          company: syncedCompanyId
-                              ? companies.find((c) => c.id === syncedCompanyId) ?? null
-                              : null,
-                      }
-                    : {}),
-            }))
-            router.refresh()
-        } catch (err: unknown) {
-            message.error(err instanceof Error ? err.message : 'Failed to update contact')
-        } finally {
-            setContactChanging(false)
-        }
-    }
-
-    const handleDueDateChange = async (dueDate: string | null) => {
-        setDueDateChanging(true)
-        try {
-            await apiFetch(`/api/tickets/${displayTicket.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ due_date: dueDate }),
-            })
-            message.success('Due date updated')
-            setDisplayTicket((prev: any) => ({ ...prev, due_date: dueDate }))
-            router.refresh()
-        } catch (err: unknown) {
-            message.error(err instanceof Error ? err.message : 'Failed to update due date')
-        } finally {
-            setDueDateChanging(false)
-        }
-    }
-
-    const handleVisibilityChange = async (visibility: string) => {
-        setOptimisticVisibility(visibility)
-        setVisibilityChanging(true)
-        try {
-            const payload: Record<string, unknown> = { visibility, assignees: [] }
-            if (visibility !== 'team') payload.team_id = null
-            await apiFetch(`/api/tickets/${displayTicket.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            })
-            message.success('Visibility updated')
-            router.refresh()
-        } catch (err: unknown) {
-            setOptimisticVisibility(null)
-            message.error(err instanceof Error ? err.message : 'Failed to update visibility')
-        } finally {
-            setVisibilityChanging(false)
-        }
-    }
-
-    const handleTeamChange = async (teamId: string | null) => {
-        setTeamChanging(true)
-        try {
-            await apiFetch(`/api/tickets/${displayTicket.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    team_id: teamId,
-                    visibility: teamId ? 'team' : (displayTicket.visibility === 'team' ? 'private' : displayTicket.visibility),
-                    assignees: [],
-                }),
-            })
-            message.success('Team updated')
-            router.refresh()
-        } catch (err: unknown) {
-            message.error(err instanceof Error ? err.message : 'Failed to update team')
-        } finally {
-            setTeamChanging(false)
-        }
-    }
-
-    const handleAssigneesChange = async (userIds: string[]) => {
-        setOptimisticAssignees(userIds)
-        setAssigneesChanging(true)
-        try {
-            await apiFetch(`/api/tickets/${displayTicket.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    assignees: userIds,
-                    visibility: userIds.length > 0 ? 'specific_users' : (displayTicket.visibility === 'specific_users' ? 'private' : displayTicket.visibility),
-                    team_id: userIds.length > 0 ? null : displayTicket.team_id,
-                }),
-            })
-            message.success('Assignees updated')
-            router.refresh()
-        } catch (err: unknown) {
-            setOptimisticAssignees(null)
-            message.error(err instanceof Error ? err.message : 'Failed to update assignees')
-        } finally {
-            setAssigneesChanging(false)
-        }
-    }
-
-    const handleTagsChange = async (tagIds: string[]) => {
-        setTagsChanging(true)
-        try {
-            await apiFetch(`/api/tickets/${displayTicket.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tag_ids: tagIds }),
-            })
-            setSelectedTagIds(tagIds)
-            message.success('Tags updated')
-            router.refresh()
-        } catch (err: unknown) {
-            message.error(err instanceof Error ? err.message : 'Failed to update tags')
-        } finally {
-            setTagsChanging(false)
         }
     }
 
@@ -1702,11 +1598,7 @@ export default function TicketDetailContent({
                                         <TabGeneral
                                             ticketData={displayTicket}
                                             ticketAttachments={descriptionAttachmentsFromDb}
-                                            getStatusColor={getStatusColor}
-                                            getStatusLabel={getStatusLabel}
                                             statusOptions={allStatusesForSelect}
-                                            onStatusChange={handleStatusChange}
-                                            statusChanging={statusChanging}
                                             projectStatusOptions={
                                                 displayTicket?.ticket_type === 'project' &&
                                                 Array.isArray(displayTicket?.project_statuses) &&
@@ -1722,48 +1614,35 @@ export default function TicketDetailContent({
                                                               title: s.title,
                                                               slug: s.slug,
                                                               color: s.color,
-                                                          })
+                                                          }),
                                                       )
                                                     : undefined
                                             }
-                                            onProjectStatusChange={handleProjectStatusChange}
-                                            projectStatusChanging={projectStatusChanging}
                                             typeOptions={ticketTypes}
-                                            onTypeChange={handleTypeChange}
-                                            typeChanging={typeChanging}
                                             priorityOptions={ticketPriorities}
-                                            onPriorityChange={handlePriorityChange}
-                                            priorityChanging={priorityChanging}
                                             companyOptions={companies}
-                                            onCompanyChange={handleCompanyChange}
-                                            companyChanging={companyChanging}
                                             contactUserOptions={contactUserOptionsForTicket}
                                             selectedContactUserId={displayTicket.contact_user_id ?? null}
-                                            onContactChange={handleContactChange}
-                                            contactChanging={contactChanging}
                                             tagOptions={allTags}
                                             selectedTagIds={selectedTagIds}
-                                            onTagsChange={handleTagsChange}
-                                            tagsChanging={tagsChanging}
                                             canEditCompanyAndTags
-                                            onDueDateChange={handleDueDateChange}
-                                            dueDateChanging={dueDateChanging}
                                             visibilityOptions={VISIBILITY_OPTIONS}
-                                            selectedVisibility={optimisticVisibility ?? displayTicket.visibility ?? 'private'}
-                                            onVisibilityChange={handleVisibilityChange}
-                                            visibilityChanging={visibilityChanging}
+                                            selectedVisibility={
+                                                optimisticVisibility ?? displayTicket.visibility ?? 'private'
+                                            }
                                             teamOptions={teamOptionsForTicket}
                                             selectedTeamId={displayTicket.team_id ?? null}
-                                            onTeamChange={handleTeamChange}
-                                            teamChanging={teamChanging}
                                             assigneeOptions={users}
-                                            selectedAssigneeIds={(optimisticAssignees ?? (displayTicket.assignees || []).map((a: any) => a.user_id || a.user?.id).filter(Boolean)).map((id: string) => String(id))}
-                                            onAssigneesChange={handleAssigneesChange}
-                                            assigneesChanging={assigneesChanging}
+                                            selectedAssigneeIds={(
+                                                optimisticAssignees ??
+                                                (displayTicket.assignees || [])
+                                                    .map((a: any) => a.user_id || a.user?.id)
+                                                    .filter(Boolean)
+                                            ).map((id: string) => String(id))}
                                             canEditAssignees
-                                            shortNote={displayTicket.short_note}
-                                            onShortNoteChange={handleShortNoteChange}
-                                            shortNoteChanging={shortNoteChanging}
+                                            sidebarBaselineTick={sidebarBaselineTick}
+                                            sidebarAttributesSaving={sidebarAttributesSaving}
+                                            onSaveSidebarAttributes={handleSaveSidebarAttributes}
                                             totalTimeSeconds={totalTimeSeconds}
                                             activeTimeTracker={activeTimeTracker}
                                             currentTime={currentTime}

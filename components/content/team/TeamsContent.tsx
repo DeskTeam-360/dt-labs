@@ -1,6 +1,6 @@
 'use client'
 
-import { DeleteOutlined, EyeOutlined, PlusOutlined, TeamOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined, TeamOutlined } from '@ant-design/icons'
 import {
   Button,
   Card,
@@ -13,6 +13,7 @@ import {
   Modal,
   Popconfirm,
   Row,
+  Select,
   Space,
   Table,
   Tag,
@@ -37,6 +38,11 @@ import type { ColumnsType } from 'antd/es/table'
 
 import DateDisplay from '@/components/common/DateDisplay'
 import { canAdminTeams } from '@/lib/auth-utils'
+import {
+  formatTeamVisibilityLabel,
+  parseTeamVisibility,
+  TEAM_VISIBILITY_OPTIONS,
+} from '@/lib/team-type'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -181,6 +187,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
   const handleCreate = () => {
     setEditingTeam(null)
     form.resetFields()
+    form.setFieldsValue({ type: 'public' })
     setModalVisible(true)
   }
 
@@ -188,7 +195,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
     setEditingTeam(record)
     form.setFieldsValue({
       name: record.name,
-      type: record.type || '',
+      type: parseTeamVisibility(record.type) ?? undefined,
     })
     setModalVisible(true)
   }
@@ -210,7 +217,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
         await apiFetch(`/api/teams/${editingTeam.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: values.name, type: values.type || null }),
+          body: JSON.stringify({ name: values.name, type: values.type }),
         })
         message.success('Team updated successfully')
         setModalVisible(false)
@@ -220,7 +227,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
         await apiFetch('/api/teams', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: values.name, type: values.type || null }),
+          body: JSON.stringify({ name: values.name, type: values.type }),
         })
         message.success('Team created successfully')
         setModalVisible(false)
@@ -249,7 +256,16 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
       title: 'Type',
       dataIndex: 'type',
       key: 'type',
-      render: (type: string | null) => (type ? <Tag>{type}</Tag> : <span>-</span>),
+      render: (type: string | null) => {
+        const label = formatTeamVisibilityLabel(type)
+        if (label === '—') return <span>-</span>
+        const slug = parseTeamVisibility(type)
+        return slug ? (
+          <Tag color={slug === 'private' ? 'purple' : 'blue'}>{label}</Tag>
+        ) : (
+          <Tag>{label}</Tag>
+        )
+      },
     },
     {
       title: 'Members',
@@ -292,6 +308,13 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
               Members
             </Button>
           </Tooltip> */}
+          {isAdmin && (
+            <Tooltip title="Edit team">
+              <Button type="default" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+                Edit
+              </Button>
+            </Tooltip>
+          )}
           {isAdmin && (
             <Popconfirm
               title="Delete Team"
@@ -468,8 +491,16 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
                 <Input placeholder="Team Name" />
               </Form.Item>
 
-              <Form.Item name="type" label="Type">
-                <Input placeholder="Team Type (optional)" />
+              <Form.Item
+                name="type"
+                label="Type"
+                rules={[{ required: true, message: 'Please choose Public or Private' }]}
+              >
+                <Select
+                  placeholder="Select visibility"
+                  options={[...TEAM_VISIBILITY_OPTIONS]}
+                  style={{ width: '100%' }}
+                />
               </Form.Item>
 
               <Form.Item>
