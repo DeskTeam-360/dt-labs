@@ -4,10 +4,10 @@ import { Layout } from 'antd'
 import type { CSSProperties, ReactNode } from 'react'
 
 import GlobalAnnouncementBar from '@/components/layout/GlobalAnnouncementBar'
+import type { NavbarAccountUser } from '@/components/layout/NavbarAccount'
 import TicketSearchNavbar from '@/components/layout/TicketSearchNavbar'
 
-export type AdminMainColumnUser = {
-  id: string
+export type AdminMainColumnUser = NavbarAccountUser & {
   role?: string | null
 }
 
@@ -43,11 +43,11 @@ export default function AdminMainColumn({
     <Layout style={layoutStyle} {...layoutProps}>
       <GlobalAnnouncementBar />
 
-      
-      {typeof window !== 'undefined' && !window.location.pathname.startsWith('/settings') && (
-        <TicketSearchNavbar savedFiltersUserId={!isCustomer ? user.id : undefined} />
-      )}
- 
+      <TicketSearchNavbar
+        savedFiltersUserId={!isCustomer ? user.id : undefined}
+        navbarUser={user}
+      />
+
       {children}
     </Layout>
   )

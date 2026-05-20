@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import ThemeToggle from '@/components/common/ThemeToggle'
+import NavbarAccount, { type NavbarAccountUser } from '@/components/layout/NavbarAccount'
 import TicketActivityActorAvatar from '@/components/ticket/TicketActivityActorAvatar'
 import TicketNotificationBell from '@/components/ticket/TicketNotificationBell'
 import {
@@ -63,7 +64,13 @@ type TicketPreview = {
  * Preview lists up to 5 tickets (id, title, company, priority); click opens ticket detail.
  * `savedFiltersUserId`: when set (staff/admin), shows saved filter shortcuts next to search.
  */
-export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFiltersUserId?: string | null }) {
+export default function TicketSearchNavbar({
+  savedFiltersUserId,
+  navbarUser,
+}: {
+  savedFiltersUserId?: string | null
+  navbarUser: NavbarAccountUser
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const [q, setQ] = useState('')
@@ -654,7 +661,18 @@ export default function TicketSearchNavbar({ savedFiltersUserId }: { savedFilter
           </div>
         </div>
       )}
-      
+
+      <div
+        style={{
+          marginLeft: 'auto',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          alignSelf: 'stretch',
+        }}
+      >
+        <NavbarAccount user={navbarUser} />
+      </div>
     </div>
   )
 }

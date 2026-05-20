@@ -2,30 +2,24 @@
 
 import {
   BarChartOutlined,
-    CheckSquareOutlined,
-    DashboardOutlined,
-    DeleteOutlined,
-    FolderOutlined,
-    HomeOutlined,
-    InfoCircleOutlined,
-    LockOutlined,
-    LogoutOutlined,
-    MenuFoldOutlined,
-    MenuUnfoldOutlined,
+  CheckSquareOutlined,
+  DashboardOutlined,
+  DeleteOutlined,
+  FolderOutlined,
+  InfoCircleOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   ReadOutlined,
-    SettingOutlined,
+  SettingOutlined,
   TeamOutlined,
-    UserOutlined,
-    WarningOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
-import type { MenuProps } from 'antd'
-import { Avatar, Dropdown, Layout, Menu, Typography } from 'antd'
+import { Layout, Menu } from 'antd'
 import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useMemo, useState } from 'react'
 
-import { signOutAction } from '@/app/actions/auth'
 import { shouldOpenHrefInNewTab,SpaNavLink } from '@/components/common/SpaNavLink'
 import {
   canAccessCustomerTimeReport,
@@ -37,7 +31,6 @@ import {
 } from '@/lib/auth-utils'
 
 const { Sider } = Layout
-const { Text } = Typography
 
 const SIDEBAR_BG = '#2b1252'
 
@@ -194,49 +187,6 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     [pathname, ticketsListSearch]
   )
 
-  const handleLogout = async () => {
-    await signOutAction()
-    router.push('/login')
-    router.refresh()
-  }
-
-  const accountMenuItems = [
-    {
-      key: 'profile',
-      label: (
-        <SpaNavLink
-          href="/profile"
-          style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'inherit' }}
-        >
-          <UserOutlined />
-          Edit Profile
-        </SpaNavLink>
-      ),
-    },
-    {
-      key: 'password',
-      label: (
-        <SpaNavLink
-          href="/change-password"
-          style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'inherit' }}
-        >
-          <LockOutlined />
-          Change Password
-        </SpaNavLink>
-      ),
-    },
-    {
-      type: 'divider' as const,
-    },
-    {
-      key: 'logout',
-      icon: <LogoutOutlined />,
-      label: 'Logout',
-      danger: true,
-      onClick: handleLogout,
-    },
-  ]
-
   return (
     <Sider
       trigger={null}
@@ -253,6 +203,8 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         bottom: 0,
         background: SIDEBAR_BG,
         paddingLeft: 5,
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       <div
@@ -291,100 +243,37 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         </div>
       </div>
 
-      <Menu
-        theme="dark"
-        mode="inline"
-        className="admin-sidebar-menu"
-        selectedKeys={selectedKeys}
-        openKeys={openKeys}
-        onOpenChange={setOpenKeys}
-        items={menuItems}
-        style={{
-          borderRight: 0,
-          marginTop: 16,
-          background: 'transparent',
-        }}
-        onClick={({ key, domEvent }) => {
-          if (key && typeof key === 'string' && key.startsWith('/') && !(domEvent.target as HTMLElement)?.closest('a')) {
-            if (shouldOpenHrefInNewTab(domEvent)) {
-              window.open(key, '_blank', 'noopener,noreferrer')
-            } else if (!('button' in domEvent) || domEvent.button === 0) {
-              router.push(key)
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+        <Menu
+          theme="dark"
+          mode="inline"
+          className="admin-sidebar-menu"
+          selectedKeys={selectedKeys}
+          openKeys={openKeys}
+          onOpenChange={setOpenKeys}
+          items={menuItems}
+          style={{
+            borderRight: 0,
+            marginTop: 16,
+            background: 'transparent',
+          }}
+          onClick={({ key, domEvent }) => {
+            if (
+              key &&
+              typeof key === 'string' &&
+              key.startsWith('/') &&
+              !(domEvent.target as HTMLElement)?.closest('a')
+            ) {
+              if (shouldOpenHrefInNewTab(domEvent)) {
+                window.open(key, '_blank', 'noopener,noreferrer')
+              } else if (!('button' in domEvent) || domEvent.button === 0) {
+                router.push(key)
+              }
             }
-          }
-        }}
-      />
-
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: '16px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.15)',
-          background: SIDEBAR_BG,
-        }}
-      >
-        <Dropdown
-          menu={{ items: accountMenuItems }}
-          placement="topLeft"
-          trigger={['click']}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              cursor: 'pointer',
-              padding: '8px',
-              borderRadius: '6px',
-              transition: 'background 0.3s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent'
-            }}
-          >
-            <Avatar
-              icon={<UserOutlined />}
-              src={session?.user?.image ?? user.image ?? user.user_metadata?.avatar_url}
-              size={collapsed ? 'default' : 40}
-            />
-            {!collapsed && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <Text
-                  strong
-                  style={{
-                    color: '#fff',
-                    display: 'block',
-                    fontSize: 14,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {session?.user?.name ?? user.name ?? user.user_metadata?.full_name ?? 'User'}
-                </Text>
-                <Text
-                  style={{
-                    color: 'rgba(255, 255, 255, 0.65)',
-                    display: 'block',
-                    fontSize: 12,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {user.email}
-                </Text>
-              </div>
-            )}
-          </div>
-        </Dropdown>
+          }}
+        />
       </div>
+
     </Sider>
   )
 }

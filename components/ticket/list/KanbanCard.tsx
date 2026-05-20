@@ -8,11 +8,11 @@ import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
 
 import DateDisplay from '@/components/common/DateDisplay'
+import { KANBAN_SEMANTIC_BLUE, KANBAN_SEMANTIC_GREEN, kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 import { isClosedLikeTicketStatus } from '@/lib/ticket-status-workflow'
 
 import type { StatusColumn,TicketRecord } from './types'
 import { DEFAULT_ALL_STATUS_COLUMNS } from './types'
-import { darkenColor,getVisibilityColor } from './types'
 
 const { Text } = Typography
 
@@ -96,20 +96,10 @@ export default function KanbanCard({
           >
             {ticket.priority && (
               <Tag
-                color={ticket.priority.color ? undefined : 'default'}
-                style={{
-                  fontSize: 11,
-                  margin: 0,
-                  borderRadius: 9999,
+                style={kanbanTagStyle({
+                  ...(ticket.priority.color ? { fillHex: ticket.priority.color } : { neutral: true }),
                   cursor: onFilterByPriority ? 'pointer' : undefined,
-                  ...(ticket.priority.color
-                    ? {
-                        backgroundColor: ticket.priority.color,
-                        borderColor: darkenColor(ticket.priority.color),
-                        color: '#fff',
-                      }
-                    : {}),
-                }}
+                })}
                 title={onFilterByPriority ? 'Filter by this priority' : undefined}
                 onClick={
                   onFilterByPriority
@@ -124,28 +114,36 @@ export default function KanbanCard({
               </Tag>
             )}
             {ticket.visibility !== 'team' && (
-              <Tag color={getVisibilityColor(ticket.visibility as string)} style={{ border:'1px solid', fontSize: 11, margin: 0, borderRadius: 9999 }}>
-                {ticket.visibility === 'specific_users' || ticket.visibility === 'private' ? 'Private' : ticket.visibility === 'public' ? 'Public' : (ticket.visibility as string).toUpperCase()}
+              <Tag
+                style={kanbanTagStyle({
+                  ...(ticket.visibility === 'public' ? { fillHex: KANBAN_SEMANTIC_GREEN } : { neutral: true }),
+                })}
+              >
+                {ticket.visibility === 'specific_users' || ticket.visibility === 'private'
+                  ? 'Private'
+                  : ticket.visibility === 'public'
+                    ? 'Public'
+                    : (ticket.visibility as string).toUpperCase()}
               </Tag>
             )}
-            {ticket.team_name && <Tag color="blue" style={{ border:'1px solid', fontSize: 11, margin: 0, borderRadius: 9999 }}>Team {ticket.team_name}</Tag>}
+            {ticket.team_name && (
+              <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>Team {ticket.team_name}</Tag>
+            )}
             {ticket.type && (
-              <Tag color={ticket.type.color} style={{ border:'1px solid', margin: 0, fontSize: 11, borderRadius: 9999 }}>
+              <Tag
+                style={kanbanTagStyle({
+                  ...(ticket.type.color ? { fillHex: ticket.type.color } : { neutral: true }),
+                })}
+              >
                 {ticket.type.title}
               </Tag>
             )}
             {ticket.company && (
               <Tag
-                color={ticket.company.color ? undefined : 'default'}
-                style={{
-                  margin: 0,
-                  fontSize: 11,
-                  borderRadius: 9999,
+                style={kanbanTagStyle({
+                  ...(ticket.company.color ? { fillHex: ticket.company.color } : { neutral: true }),
                   cursor: onFilterByCompany ? 'pointer' : undefined,
-                  ...(ticket.company.color
-                    ? { backgroundColor: ticket.company.color, borderColor: darkenColor(ticket.company.color), color: '#fff' }
-                    : {}),
-                }}
+                })}
                 title={onFilterByCompany ? 'Filter by this company' : undefined}
                 onClick={
                   onFilterByCompany
@@ -159,18 +157,15 @@ export default function KanbanCard({
                 {ticket.company.name}
               </Tag>
             )}
-            {ticket.tags && ticket.tags.length > 0 && (
+            {ticket.tags &&
+              ticket.tags.length > 0 &&
               ticket.tags.map((t) => (
                 <Tag
                   key={t.id}
-                  color={t.color ? undefined : 'default'}
-                  style={{
-                    margin: 0,
-                    fontSize: 11,
-                    borderRadius: 9999,
+                  style={kanbanTagStyle({
+                    ...(t.color ? { fillHex: t.color } : { neutral: true }),
                     cursor: onFilterByTag ? 'pointer' : undefined,
-                    ...(t.color ? { backgroundColor: t.color, borderColor: darkenColor(t.color), color: '#fff' } : {}),
-                  }}
+                  })}
                   title={onFilterByTag ? 'Filter by this tag' : undefined}
                   onClick={
                     onFilterByTag
@@ -183,19 +178,13 @@ export default function KanbanCard({
                 >
                   {t.name}
                 </Tag>
-              ))
-            )}
+              ))}
             {onFilterByStatus && (
               <Tag
-                style={{
-                  margin: 0,
-                  fontSize: 11,
-                  borderRadius: 9999,
-                  backgroundColor: statusColor,
-                  borderColor: darkenColor(statusColor),
-                  color: '#fff',
+                style={kanbanTagStyle({
+                  fillHex: statusColor,
                   cursor: 'pointer',
-                }}
+                })}
                 title="Filter by this status"
                 onClick={(e) => {
                   e.stopPropagation()
@@ -206,7 +195,7 @@ export default function KanbanCard({
               </Tag>
             )}
             {Number(ticket.checklist_total) > 0 && (
-              <Tag color="green" style={{ fontSize: 11, margin: 0, borderRadius: 9999 }}>
+              <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_GREEN })}>
                 Checklist: {ticket.checklist_completed}/{ticket.checklist_total}
               </Tag>
             )}
