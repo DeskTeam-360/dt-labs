@@ -44,6 +44,8 @@
   --kanban-card-muted: #8c8c8c;
   --kanban-card-divider: rgba(0, 0, 0, 0.08);
   --kanban-drag-overlay-bg: #fafafa;
+  /** Kanban card pills — border reads clearly vs chip fill */
+  --kanban-chip-border: rgba(0, 0, 0, 0.22);
   /* Ticket card view & dashboard preview rows — chips without custom color */
   --ticket-row-chip-neutral-bg: #e9ecef;
   --ticket-row-chip-neutral-fg: #495057;
@@ -117,6 +119,8 @@
   --kanban-card-muted: #a3a3a3;
   --kanban-card-divider: rgba(255, 255, 255, 0.12);
   --kanban-drag-overlay-bg: #2a2a2a;
+  /** Stronger than card border so pill outlines stay obvious on dark fills */
+  --kanban-chip-border: rgba(255, 255, 255, 0.48);
   --ticket-row-chip-neutral-bg: #3a3a46;
   --ticket-row-chip-neutral-fg: #e8e8e8;
   --customer-dash-chart-surface: #1e1e26;
