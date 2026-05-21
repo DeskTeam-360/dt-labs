@@ -10,12 +10,8 @@ import type { AutomationActions } from '@/lib/automation-actions-types'
 type ActionType =
   | 'team_id'
   | 'priority'
-  | 'priority_slug'
-  | 'type_slug'
   | 'ticket_type'
-  | 'status_slug'
   | 'tag_ids'
-  | 'visibility'
   | 'add_note'
   | 'add_checklist_items'
 
@@ -28,13 +24,6 @@ interface LookupData {
   users?: { id: string; full_name?: string; email?: string }[]
 }
 
-const VISIBILITY_OPTIONS = [
-  { value: 'private', label: 'Private' },
-  { value: 'team', label: 'Team' },
-  { value: 'specific_users', label: 'Specific Users' },
-  { value: 'public', label: 'Public' },
-]
-
 const TICKET_CLASSIFICATION_OPTIONS = [
   { value: 'support', label: 'Support' },
   { value: 'project', label: 'Project task' },
@@ -45,12 +34,8 @@ const TICKET_CLASSIFICATION_OPTIONS = [
 const ACTION_LABELS: Record<ActionType, string> = {
   team_id: 'Assign to Team',
   priority: 'Set Priority (number)',
-  priority_slug: 'Set Priority by slug (legacy)',
-  type_slug: 'Set Type',
   ticket_type: 'Set classification (spam / trash)',
-  status_slug: 'Set Status',
   tag_ids: 'Add Tags',
-  visibility: 'Set Visibility',
   add_note: 'Add Note',
   add_checklist_items: 'Add Checklist',
 }
@@ -78,12 +63,8 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
   const ORDERED_ACTION_KEYS: ActionType[] = [
     'team_id',
     'priority',
-    'priority_slug',
-    'type_slug',
     'ticket_type',
-    'status_slug',
     'tag_ids',
-    'visibility',
     'add_note',
     'add_checklist_items',
   ]
@@ -148,12 +129,8 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
     [
       'team_id',
       'priority',
-      'priority_slug',
-      'type_slug',
       'ticket_type',
-      'status_slug',
       'tag_ids',
-      'visibility',
       'add_note',
       'add_checklist_items',
     ] as ActionType[]
@@ -215,52 +192,10 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                   <Form.Item label={ACTION_LABELS.priority} style={{ marginBottom: 0 }}>
                     <InputNumber
                       min={0}
-                      placeholder="Prioritas (bilangan bulat)"
+                      placeholder="Priority (bilangan bulat)"
                       style={{ width: '100%' }}
                       value={(actions as Record<string, unknown>).priority as number | undefined}
                       onChange={(v) => update('priority', v ?? undefined)}
-                    />
-                  </Form.Item>
-                )}
-                {type === 'priority_slug' && (
-                  <Form.Item
-                    label={ACTION_LABELS.priority_slug}
-                    extra="Gunakan Priority (number) untuk aturan baru."
-                    style={{ marginBottom: 0 }}
-                  >
-                    <Select
-                      allowClear
-                      showSearch
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                      placeholder="Select priority"
-                      style={{ width: '100%' }}
-                      value={(actions as Record<string, unknown>).priority_slug}
-                      onChange={(v) => update('priority_slug', v)}
-                      options={lookup.ticketPriorities.map((p) => ({
-                        value: p.slug,
-                        label: p.title,
-                      }))}
-                    />
-                  </Form.Item>
-                )}
-                {type === 'type_slug' && (
-                  <Form.Item label={ACTION_LABELS.type_slug} style={{ marginBottom: 0 }}>
-                    <Select
-                      allowClear
-                      showSearch
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                      placeholder="Select type"
-                      style={{ width: '100%' }}
-                      value={(actions as Record<string, unknown>).type_slug}
-                      onChange={(v) => update('type_slug', v)}
-                      options={lookup.ticketTypes.map((t) => ({
-                        value: t.slug,
-                        label: t.title,
-                      }))}
                     />
                   </Form.Item>
                 )}
@@ -283,25 +218,6 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                     />
                   </Form.Item>
                 )}
-                {type === 'status_slug' && (
-                  <Form.Item label={ACTION_LABELS.status_slug} style={{ marginBottom: 0 }}>
-                    <Select
-                      allowClear
-                      showSearch
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                      placeholder="Select status"
-                      style={{ width: '100%' }}
-                      value={(actions as Record<string, unknown>).status_slug}
-                      onChange={(v) => update('status_slug', v)}
-                      options={(lookup.statuses ?? []).map((s) => ({
-                        value: s.slug,
-                        label: s.title,
-                      }))}
-                    />
-                  </Form.Item>
-                )}
                 {type === 'tag_ids' && (
                   <Form.Item label={ACTION_LABELS.tag_ids} style={{ marginBottom: 0 }}>
                     <Select
@@ -319,22 +235,6 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                         value: t.id,
                         label: t.name,
                       }))}
-                    />
-                  </Form.Item>
-                )}
-                {type === 'visibility' && (
-                  <Form.Item label={ACTION_LABELS.visibility} style={{ marginBottom: 0 }}>
-                    <Select
-                      allowClear
-                      showSearch
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                      placeholder="Select visibility"
-                      style={{ width: '100%' }}
-                      value={(actions as Record<string, unknown>).visibility}
-                      onChange={(v) => update('visibility', v)}
-                      options={VISIBILITY_OPTIONS}
                     />
                   </Form.Item>
                 )}

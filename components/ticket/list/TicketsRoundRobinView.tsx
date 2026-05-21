@@ -44,7 +44,7 @@ export default function TicketsRoundRobinView({
     byCompany.get(key)!.push(t)
   }
 
-  /** Sama seperti daftar/kanban: prioritas naik dalam satu company, dengan tie-break id. */
+  /** Sama seperti daftar/kanban: Priority naik dalam satu company, dengan tie-break id. */
   for (const [cid, arr] of byCompany) {
     byCompany.set(cid, sortTickets(arr, TICKETS_LIST_SORT_BY, TICKETS_LIST_SORT_ORDER))
   }

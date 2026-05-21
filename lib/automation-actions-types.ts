@@ -5,19 +5,19 @@
 export interface AutomationActions {
   /** Assign ticket to this team (uuid) */
   team_id?: string
-  /** Bilangan bulat prioritas tiket */
+  /** Bilangan bulat Priority tiket */
   priority?: number
-  /** @deprecated Prefer `priority`; diset ke sort_order/ref id untuk slug ini */
+  /** @deprecated UI removed; engine still applies legacy rules */
   priority_slug?: string
-  /** Set ticket type (slug) */
+  /** @deprecated UI removed; engine still applies legacy rules */
   type_slug?: string
   /** Row classification: support | spam | trash (column ticket_type, not type_id) */
   ticket_type?: string
-  /** Set ticket status (slug from ticket_statuses) */
+  /** @deprecated UI removed; engine still applies legacy rules */
   status_slug?: string
   /** Add these tags (array of tag uuids) */
   tag_ids?: string[]
-  /** Set visibility: private | team | specific_users | public */
+  /** @deprecated UI removed; engine still applies legacy rules */
   visibility?: string
   /** Add an automatic note (comment) to the ticket — tampil sebagai "Automation", tanpa pilih user */
   add_note?: string

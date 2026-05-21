@@ -8,7 +8,6 @@ import { db } from '@/lib/db'
 import {
   companies,
   tags,
-  ticketAssignees,
   ticketPriorities,
   tickets,
   ticketStatuses,
@@ -122,21 +121,24 @@ export async function GET(request: Request) {
     priority: number
     priority_label: string
     priority_color: string
-    assignee_name: string | null
-    company_name: string | null
+    creator_name: string | null
     tags: Array<{ id: string; name: string; color: string | null }>
   }> = []
 
   if (recentIds.length > 0) {
     const rows = await db
-      .select({ ticket: tickets, company: companies, statusRow: ticketStatuses })
+      .select({
+        ticket: tickets,
+        company: companies,
+        statusRow: ticketStatuses,
+        creatorFullName: users.fullName,
+        creatorEmail: users.email,
+      })
       .from(tickets)
       .leftJoin(companies, eq(tickets.companyId, companies.id))
       .leftJoin(ticketStatuses, eq(tickets.status, ticketStatuses.slug))
+      .leftJoin(users, eq(tickets.createdBy, users.id))
       .where(inArray(tickets.id, recentIds))
-    const assigneeRows = await db.select({ ticketId: ticketAssignees.ticketId, user: users }).from(ticketAssignees).leftJoin(users, eq(ticketAssignees.userId, users.id)).where(inArray(ticketAssignees.ticketId, recentIds))
-    const assigneeByTicket: Record<number, string> = {}
-    assigneeRows.forEach((r) => { assigneeByTicket[r.ticketId] = r.user?.fullName || r.user?.email || 'Unknown' })
 
     const tagRows = await db.select({ ticketId: ticketTags.ticketId, tag: tags }).from(ticketTags).leftJoin(tags, eq(ticketTags.tagId, tags.id)).where(inArray(ticketTags.ticketId, recentIds))
     const tagsByTicketId: Record<number, Array<{ id: string; name: string; color: string | null }>> = {}
@@ -165,11 +167,10 @@ export async function GET(request: Request) {
       priority: Number(r.ticket.priority ?? 0),
       priority_label: (() => {
         const pr = prioRef.get(Number(r.ticket.priority ?? 0))
-        return pr?.title ? `${pr.title} (${r.ticket.priority})` : `Prioritas ${r.ticket.priority ?? 0}`
+        return pr?.title ? `${pr.title} (${r.ticket.priority})` : `Priority ${r.ticket.priority ?? 0}`
       })(),
       priority_color: prioRef.get(Number(r.ticket.priority ?? 0))?.color ?? '#8c8c8c',
-      assignee_name: assigneeByTicket[r.ticket.id] ?? null,
-      company_name: r.company?.name ?? null,
+      creator_name: r.creatorFullName || r.creatorEmail || null,
       tags: tagsByTicketId[r.ticket.id] ?? [],
     })).sort((a, b) => (orderMap[a.id] ?? 999) - (orderMap[b.id] ?? 999))
   }

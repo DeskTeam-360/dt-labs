@@ -3,7 +3,7 @@ import type { PostgresJsDatabase, PostgresJsTransaction } from 'drizzle-orm/post
 
 import type * as schema from '@/lib/db/schema'
 import { tickets } from '@/lib/db/schema'
-import { DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
+import { coerceTicketType, DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
 
 type AppFullSchema = typeof schema
 /** Executor is `db` or a `db.transaction` `tx`, not merely `typeof db`, so callers can pass a transaction through. */
@@ -81,8 +81,25 @@ export async function compactCompanySupportPriorities(
 }
 
 /**
+ * Compute queue order after placing `ticketId` at `desiredRank` (1-based, 1 = front).
+ * Tickets that previously held ranks at or after the insert slot shift one position back (higher rank number).
+ */
+export function computeSupportQueueOrder(
+  orderedIds: number[],
+  ticketId: number,
+  desiredRank: number | 'append'
+): number[] {
+  const without = orderedIds.filter((id) => id !== ticketId)
+  const maxRank = without.length + 1
+  const rank =
+    desiredRank === 'append' ? maxRank : Math.min(Math.max(1, desiredRank), maxRank)
+  const insertAt = rank - 1
+  return [...without.slice(0, insertAt), ticketId, ...without.slice(insertAt)]
+}
+
+/**
  * Place one support ticket at `desiredRank` (1-based) within a company;
- * other tickets shift accordingly (insert / bump up or down).
+ * other open support tickets shift back (higher rank) when their slot is taken.
  */
 export async function assignCompanySupportTicketRank(
   dbTx: TicketPriorityDbExecutor,
@@ -99,15 +116,36 @@ export async function assignCompanySupportTicketRank(
   })
 
   const ids = sorted.map((r) => r.id)
-  const ix = ids.indexOf(ticketId)
-  if (ix === -1) return
-
-  const without = ids.filter((id) => id !== ticketId)
-  const maxRank = without.length + 1
-  const rank =
-    desiredRank === 'append' ? maxRank : Math.min(Math.max(1, desiredRank), maxRank)
-  const insertAt = rank - 1
-  const nextOrder = [...without.slice(0, insertAt), ticketId, ...without.slice(insertAt)]
+  const nextOrder = computeSupportQueueOrder(ids, ticketId, desiredRank)
+  if (nextOrder.length === 0) return
 
   await writeOrderedSupportPriorities(dbTx, nextOrder)
+}
+
+/** Apply queue rank for an open company support ticket (used by API + automation). */
+export async function applyCompanySupportPriorityRank(
+  dbTx: TicketPriorityDbExecutor,
+  ticketId: number,
+  rawPriority: unknown
+): Promise<boolean> {
+  const [row] = await dbTx
+    .select({
+      companyId: tickets.companyId,
+      ticketType: tickets.ticketType,
+      status: tickets.status,
+    })
+    .from(tickets)
+    .where(eq(tickets.id, ticketId))
+    .limit(1)
+  if (!row?.companyId) return false
+  if (coerceTicketType(row.ticketType) !== DEFAULT_TICKET_TYPE) return false
+  if (row.status === 'closed') return false
+
+  await assignCompanySupportTicketRank(
+    dbTx,
+    row.companyId,
+    ticketId,
+    parseCompanyTicketDesiredRank(rawPriority)
+  )
+  return true
 }

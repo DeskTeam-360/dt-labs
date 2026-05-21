@@ -65,8 +65,7 @@ interface DashboardData {
     priority: number
     priority_label: string
     priority_color: string
-    assignee_name: string | null
-    company_name: string | null
+    creator_name: string | null
     tags?: Array<{ id: string; name: string; color: string | null }>
   }>
 }
@@ -292,7 +291,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                 </Col>
                 <Col xs={24} lg={12} style={{ padding: 16, borderRadius: 8 }}>
                   <div style={{ position: 'relative', background: 'var(--customer-dash-chart-surface)', padding: 16, borderRadius: 8, height: '100%' }}>
-                    {/* Due date terdekat — semua ticket perusahaan */}
+                    {/* Closest due date — all company tickets */}
                     <div style={{ marginBottom: 16, position: 'absolute', top: 0, right: 40, background: 'var(--customer-dash-eta-banner)', padding: '8px 16px', borderRadius: '0 0 10px 10px' }}>
                       <Tooltip title={data?.last_due_ticket ? `#${data.last_due_ticket.id} ${data.last_due_ticket.title}` : undefined}>
                         <Text
@@ -300,7 +299,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                           style={{ fontWeight: 700, cursor: data?.last_due_ticket ? 'pointer' : 'default' }}
                           onClick={() => data?.last_due_ticket && router.push(`/tickets/${data.last_due_ticket!.id}`)}
                         >
-                          <ClockCircleOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Due date terdekat: {data?.last_due_date ? dayjs(data.last_due_date).format('MMM DD, YYYY') : 'N/A'}
+                          <ClockCircleOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Closest due date: {data?.last_due_date ? dayjs(data.last_due_date).format('MMM DD, YYYY') : 'N/A'}
                         </Text>
                       </Tooltip>
                     </div>
@@ -330,7 +329,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                                     flexShrink: 0,
                                   }}
                                 />
-                                <Text>Prioritas {p.priority}</Text>
+                                <Text>Priority {p.priority}</Text>
                               </div>
                               <div
                                 style={{
@@ -570,8 +569,8 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                         <Text strong style={{ flex: 1, fontSize: 16, fontWeight: 700, color: 'var(--kanban-card-title)', lineHeight: 1.4 }}>
                         #{t.id} {t.title}
                         </Text>
-                        <Text style={{ fontSize: 13, color: '#1890ff', display: 'block', }}>
-                          by {t.assignee_name || t.company_name || 'Unassigned'}
+                        <Text style={{ fontSize: 13, color: '#1890ff', display: 'block' }}>
+                          by {t.creator_name || 'Unknown'}
                         </Text>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
                           {t.due_date && (() => {

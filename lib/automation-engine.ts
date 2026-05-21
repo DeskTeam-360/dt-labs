@@ -24,7 +24,8 @@ import { AUTOMATION_NOTE_USER_ID } from './automation-constants'
 import type { OurCondition, OurConditionGroup, OurConditionLeaf } from './condition-builder-utils'
 import { bumpTicketDataVersion } from './firebase/ticket-sync-server'
 import { diffTicketSnapshots, loadTicketActivitySnapshot, logTicketActivity } from './ticket-activity-log'
-import { coerceTicketType, parseTicketType } from './ticket-classification'
+import { coerceTicketType, DEFAULT_TICKET_TYPE, parseTicketType } from './ticket-classification'
+import { applyCompanySupportPriorityRank } from './ticket-company-priority-order'
 
 function automationNoteHtmlHasText(html: string | undefined | null): boolean {
   if (!html?.trim()) return false
@@ -42,7 +43,7 @@ export interface TicketContext {
   title?: string | null
   description?: string | null
   status?: string | null
-  /** Nilai bilangan bulat prioritas tiket */
+  /** Nilai bilangan bulat Priority tiket */
   priority?: number | null
   /** @deprecated Dipetakan dari priority untuk aturan otomasi lawas */
   priority_slug?: string | null
@@ -317,19 +318,22 @@ export async function runAutomationRules(
     const actions = (rule.actions || {}) as AutomationActions
     const updates: Record<string, unknown> = {}
 
-    if (actions.priority !== undefined && actions.priority !== null && `${actions.priority}`.trim() !== '') {
-      const n = Number(actions.priority)
-      if (Number.isFinite(n)) {
-        updates.priority = Math.max(0, Math.floor(n))
-      }
+    let queuePriorityRaw: unknown | undefined
+    if (
+      actions.priority !== undefined &&
+      actions.priority !== null &&
+      `${actions.priority}`.trim() !== ''
+    ) {
+      queuePriorityRaw = actions.priority
     } else if (actions.priority_slug) {
       const [p] = await db
         .select({ sortOrder: ticketPriorities.sortOrder, id: ticketPriorities.id })
         .from(ticketPriorities)
         .where(eq(ticketPriorities.slug, String(actions.priority_slug)))
         .limit(1)
-      if (p) updates.priority = Number(p.sortOrder ?? p.id ?? 0)
+      if (p) queuePriorityRaw = p.sortOrder ?? p.id
     }
+
     if (actions.type_slug) {
       const [t] = await db
         .select({ id: ticketTypes.id })
@@ -358,15 +362,42 @@ export async function runAutomationRules(
       if (cls) updates.ticketType = cls
     }
 
+    const effectiveTicketType =
+      updates.ticketType !== undefined
+        ? coerceTicketType(updates.ticketType as string)
+        : coerceTicketType(ctx.ticket_type)
+
+    const useSupportQueueReorder = Boolean(
+      ctx.company_id &&
+        effectiveTicketType === DEFAULT_TICKET_TYPE &&
+        queuePriorityRaw !== undefined
+    )
+
+    if (queuePriorityRaw !== undefined && !useSupportQueueReorder) {
+      const n = Number(queuePriorityRaw)
+      if (Number.isFinite(n)) {
+        updates.priority = Math.max(0, Math.floor(n))
+      }
+    }
+
     const willMutateTicket =
-      Object.keys(updates).length > 0 || Boolean(actions.tag_ids?.length)
+      Object.keys(updates).length > 0 ||
+      Boolean(actions.tag_ids?.length) ||
+      useSupportQueueReorder
     const beforeAuto = willMutateTicket ? await loadTicketActivitySnapshot(ctx.id) : null
 
-    if (Object.keys(updates).length > 0) {
-      await db
-        .update(tickets)
-        .set({ ...updates, updatedAt: new Date() } as typeof tickets.$inferInsert)
-        .where(eq(tickets.id, ctx.id))
+    if (Object.keys(updates).length > 0 || useSupportQueueReorder) {
+      await db.transaction(async (tx) => {
+        if (Object.keys(updates).length > 0) {
+          await tx
+            .update(tickets)
+            .set({ ...updates, updatedAt: new Date() } as typeof tickets.$inferInsert)
+            .where(eq(tickets.id, ctx.id))
+        }
+        if (useSupportQueueReorder && queuePriorityRaw !== undefined) {
+          await applyCompanySupportPriorityRank(tx, ctx.id, queuePriorityRaw)
+        }
+      })
       requestBump()
     }
 

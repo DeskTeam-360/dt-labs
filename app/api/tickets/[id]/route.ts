@@ -577,12 +577,20 @@ export async function PATCH(
       }
 
       if (priorityRankReorder && nextCompanyResolved) {
-        await assignCompanySupportTicketRank(
-          tx,
-          nextCompanyResolved,
-          ticketId,
-          parseCompanyTicketDesiredRank(priority)
-        )
+        if (priority === null || priority === '') {
+          await tx
+            .update(tickets)
+            .set({ priority: null, updatedAt: new Date() })
+            .where(eq(tickets.id, ticketId))
+          await compactCompanySupportPriorities(tx, nextCompanyResolved, ticketId)
+        } else {
+          await assignCompanySupportTicketRank(
+            tx,
+            nextCompanyResolved,
+            ticketId,
+            parseCompanyTicketDesiredRank(priority)
+          )
+        }
       } else if (
         openingFromClosedSupport &&
         !priorityRankReorder &&

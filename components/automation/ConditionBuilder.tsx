@@ -5,7 +5,7 @@ import 'react-querybuilder/dist/query-builder.css'
 import { PlusOutlined } from '@ant-design/icons'
 import { QueryBuilderAntD } from '@react-querybuilder/antd'
 import { Button, Select } from 'antd'
-import { useEffect, useRef,useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ActionProps, VersatileSelectorProps } from 'react-querybuilder'
 import { type Field, QueryBuilder, type RuleGroupType, useValueSelector } from 'react-querybuilder'
 
@@ -71,10 +71,6 @@ export const CONDITION_FIELDS: Field[] = [
     { name: 'spam', label: 'Spam' },
     { name: 'trash', label: 'Trash' },
   ]},
-  { name: 'comment_visibility', label: 'Comment visibility (reply / note)', valueEditorType: 'select', values: [
-    { name: 'reply', label: 'Reply (thread / email)' },
-    { name: 'note', label: 'Internal note' },
-  ]},
   { name: 'comment_author_type', label: 'Comment author', valueEditorType: 'select', values: [
     { name: 'agent', label: 'Agent / staff' },
     { name: 'customer', label: 'Customer' },
@@ -87,39 +83,8 @@ interface ConditionBuilderProps {
   onChange?: (value: OurConditionGroup) => void
 }
 
-function fieldsWithTicketTypes(typeSlugs: { slug: string; title: string }[]): Field[] {
-  const typeField: Field = {
-    name: 'type',
-    label: 'Type',
-    valueEditorType: 'select',
-    values: typeSlugs.map((t) => ({ name: t.slug, label: t.title })),
-  }
-  const priorityIdx = CONDITION_FIELDS.findIndex((f) => f.name === 'priority')
-  const next = [...CONDITION_FIELDS]
-  next.splice(priorityIdx + 1, 0, typeField)
-  return next
-}
-
 export default function ConditionBuilder({ value, onChange = () => {} }: ConditionBuilderProps) {
-  const [fields, setFields] = useState<Field[]>(() => CONDITION_FIELDS)
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch('/api/tickets/lookup', { credentials: 'include' })
-        if (!res.ok || cancelled) return
-        const data = (await res.json()) as { ticketTypes?: { slug: string; title: string }[] }
-        const types = Array.isArray(data.ticketTypes) ? data.ticketTypes : []
-        if (!cancelled) setFields(fieldsWithTicketTypes(types))
-      } catch {
-        if (!cancelled) setFields(CONDITION_FIELDS)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const fields = CONDITION_FIELDS
 
   const [query, setQuery] = useState<RuleGroupType>(() => {
     const v = value as OurConditionGroup | undefined
