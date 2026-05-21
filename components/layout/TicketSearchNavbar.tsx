@@ -164,17 +164,17 @@ export default function TicketSearchNavbar({
               id?: number
               title?: string | null
               company?: { name?: string | null } | null
-              priority?: { title?: string | null; color?: string | null } | null
+              priority?: number
             }
             const companyName = r.company?.name?.trim() || null
-            const priorityTitle = r.priority?.title?.trim() || null
-            const priorityColor = r.priority?.color?.trim() || null
+            const pr = typeof r.priority === 'number' ? r.priority : Number(r.priority)
+            const priorityTitle = Number.isFinite(pr) ? `P${pr}` : null
             return {
               id: r.id ?? 0,
               title: r.title ?? '',
               companyName,
               priorityTitle,
-              priorityColor,
+              priorityColor: null,
             }
           })
           .filter((r) => r.id > 0)

@@ -34,8 +34,8 @@ import {
   DEFAULT_ALL_STATUSES,
   DEFAULT_KANBAN_COLUMNS,
   type StatusColumn,
-  type TicketSortField,
-  type TicketSortOrder,
+  TICKETS_LIST_SORT_BY,
+  TICKETS_LIST_SORT_ORDER,
 } from './types'
 
 export type TicketsDragStartHandler = (event: DragStartEvent) => void
@@ -50,7 +50,6 @@ interface StoredFilter {
   filterCompanyId?: string | null
   filterCompanyIds?: string[] | null
   filterTagIds?: string[] | null
-  filterVisibility?: string[] | null
   filterTeamId?: string | null
   filterTeamIds?: string[] | null
   filterDateRange?: [string | null, string | null] | null
@@ -58,10 +57,7 @@ interface StoredFilter {
   filterSearch?: string | null
   viewMode?: 'kanban' | 'list' | 'card' | 'roundrobin'
   filterSidebarCollapsed?: boolean
-  sortBy?: TicketSortField | null
-  sortOrder?: TicketSortOrder | null
-  filterPriorityIds?: number[] | null
-  /** Jumlah tiket per request API daftar (50 / 100 / 200). */
+  /** Number of tickets fetched per list request (50 / 100 / 200). */
   ticketsPageLimit?: number | null
 }
 
@@ -100,6 +96,12 @@ function isRequestAborted(error: unknown, signal?: AbortSignal): boolean {
   if (error instanceof DOMException && error.name === 'AbortError') return true
   if (error instanceof Error && error.name === 'AbortError') return true
   return false
+}
+
+function priorityFromFormValue(raw: unknown): number | null {
+  if (raw === undefined || raw === null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null
 }
 
 function getInitialFilterStateFromStored(stored: StoredFilter | null, isCustomer = false): ParsedUrlFilters {
@@ -146,24 +148,6 @@ function getInitialFilterStateFromStored(stored: StoredFilter | null, isCustomer
       }
       return []
     })(),
-    filterPriorityIds: (() => {
-      if (stored && 'filterPriorityIds' in stored && Array.isArray(stored.filterPriorityIds)) {
-        return (stored.filterPriorityIds as number[]).filter((n) => typeof n === 'number' && !isNaN(n))
-      }
-      if (stored?.filterPriorityIds && stored.filterPriorityIds.length) {
-        return stored.filterPriorityIds.filter((n) => typeof n === 'number' && !isNaN(n))
-      }
-      return []
-    })(),
-    filterVisibility: (() => {
-      if (stored && 'filterVisibility' in stored && Array.isArray(stored.filterVisibility)) {
-        return stored.filterVisibility.map(String).filter(Boolean)
-      }
-      if (stored?.filterVisibility && stored.filterVisibility.length) {
-        return stored.filterVisibility.map(String).filter(Boolean)
-      }
-      return []
-    })(),
     filterTeamIds: (() => {
       if (stored && 'filterTeamIds' in stored && Array.isArray(stored.filterTeamIds)) {
         return (stored.filterTeamIds as string[]).map(String).filter(Boolean)
@@ -191,8 +175,8 @@ function getInitialFilterStateFromStored(stored: StoredFilter | null, isCustomer
     filterSearch: stored?.filterSearch ?? '',
     filterSidebarCollapsed: stored?.filterSidebarCollapsed ?? true,
     viewMode: (stored?.viewMode as 'kanban' | 'list' | 'card' | 'roundrobin') || 'kanban',
-    sortBy: (stored?.sortBy as TicketSortField) || 'updated_at',
-    sortOrder: (stored?.sortOrder as TicketSortOrder) || 'desc',
+    sortBy: TICKETS_LIST_SORT_BY,
+    sortOrder: TICKETS_LIST_SORT_ORDER,
     filterTicketType: null,
   }
 }
@@ -246,9 +230,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
           if (isCustomer && vm === 'roundrobin') vm = 'kanban'
           merged = { ...merged, viewMode: vm }
         }
-        if (searchParams.has(URL_PARAMS.sort) || searchParams.has(URL_PARAMS.order)) {
-          merged = { ...merged, sortBy: parsed.sortBy, sortOrder: parsed.sortOrder }
-        }
         if (searchParams.has(URL_PARAMS.sidebar)) {
           merged = { ...merged, filterSidebarCollapsed: parsed.filterSidebarCollapsed }
         }
@@ -272,7 +253,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [ticketTypes, setTicketTypes] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
-  const [ticketPriorities, setTicketPriorities] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
   const [companies, setCompanies] = useState<Array<{ id: string; name: string; color?: string }>>([])
   const [allTags, setAllTags] = useState<Array<{ id: string; name: string; slug: string; color?: string }>>([])
   const [activeId, setActiveId] = useState<number | null>(null)
@@ -287,8 +267,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
   const [filterTypeIds, setFilterTypeIds] = useState<number[]>(initialState.filterTypeIds)
   const [filterCompanyIds, setFilterCompanyIds] = useState<string[]>(initialState.filterCompanyIds)
   const [filterTagIds, setFilterTagIds] = useState<string[]>(initialState.filterTagIds)
-  const [filterPriorityIds, setFilterPriorityIds] = useState<number[]>(initialState.filterPriorityIds ?? [])
-  const [filterVisibility, setFilterVisibilityState] = useState<string[]>(initialState.filterVisibility)
   const [filterTeamIds, setFilterTeamIds] = useState<string[]>(initialState.filterTeamIds)
   const [filterDateRange, setFilterDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(initialState.filterDateRange)
   const [filterDueDateRange, setFilterDueDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(
@@ -297,8 +275,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
   const [filterSearch, setFilterSearch] = useState(initialState.filterSearch)
   const [submitting, setSubmitting] = useState(false)
   const [filterSidebarCollapsed, setFilterSidebarCollapsed] = useState(initialState.filterSidebarCollapsed)
-  const [sortBy, setSortBy] = useState<TicketSortField>(initialState.sortBy)
-  const [sortOrder, setSortOrder] = useState<TicketSortOrder>(initialState.sortOrder)
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'card' | 'roundrobin'>(initialState.viewMode)
   const [filterTicketType, setFilterTicketType] = useState<'spam' | 'trash' | null>(
     initialState.filterTicketType ?? null
@@ -348,13 +324,11 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     filterTypeIds.length > 0 ||
     filterCompanyIds.length > 0 ||
     filterTagIds.length > 0 ||
-    filterVisibility.length > 0 ||
     filterTeamIds.length > 0 ||
     (filterDateRange != null && filterDateRange[0] != null && filterDateRange[1] != null) ||
     (filterDueDateRange != null && filterDueDateRange[0] != null && filterDueDateRange[1] != null) ||
     filterSearch.trim() !== '' ||
-    filterTicketType != null ||
-    filterPriorityIds.length > 0
+    filterTicketType != null
 
   const clearFilters = useCallback(() => {
     setFilterTicketType(null)
@@ -366,17 +340,11 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setFilterTypeIds([])
     setFilterCompanyIds([])
     setFilterTagIds([])
-    setFilterPriorityIds([])
-    setFilterVisibilityState([])
     setFilterTeamIds([])
     setFilterDateRange(null)
     setFilterDueDateRange(null)
     setFilterSearch('')
   }, [statusColumns, isCustomer, allStatuses])
-
-  const setFilterVisibility = useCallback((v: string[]) => {
-    setFilterVisibilityState(v ?? [])
-  }, [])
 
   const queryClient = useQueryClient()
 
@@ -389,8 +357,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         filterStatus,
         filterTypeIds,
         filterTagIds,
-        filterPriorityIds,
-        filterVisibility,
         filterTeamIds,
         filterDateRange,
         filterDueDateRange,
@@ -405,8 +371,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       filterStatus,
       filterTypeIds,
       filterTagIds,
-      filterPriorityIds,
-      filterVisibility,
       filterTeamIds,
       filterDateRange,
       filterDueDateRange,
@@ -429,11 +393,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       if (inJunkFolder) params.set('ticket_type', filterTicketType!)
       if (!isCustomer) {
         if (filterCompanyIds.length > 0) params.set('company_ids', filterCompanyIds.join(','))
-        if (filterVisibility.length > 0 && !inJunkFolder) params.set('visibility', filterVisibility.join(','))
         if (filterTeamIds.length > 0 && !inJunkFolder) params.set('team_ids', filterTeamIds.join(','))
       }
       if (filterTagIds.length > 0) params.set('tag_ids', filterTagIds.join(','))
-      if (filterPriorityIds.length > 0) params.set('priority_ids', filterPriorityIds.join(','))
       const customerShowsAllStatuses =
         isCustomer &&
         lookupReady &&
@@ -498,16 +460,12 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setFilterTypeIds(state.filterTypeIds)
     setFilterCompanyIds(state.filterCompanyIds)
     setFilterTagIds(state.filterTagIds)
-    setFilterPriorityIds(state.filterPriorityIds ?? [])
-    setFilterVisibilityState(state.filterVisibility)
     setFilterTeamIds(state.filterTeamIds)
     setFilterDateRange(state.filterDateRange)
     setFilterDueDateRange(state.filterDueDateRange ?? null)
     setFilterSearch(state.filterSearch)
     setFilterSidebarCollapsed(state.filterSidebarCollapsed)
     setViewMode(vm)
-    setSortBy(state.sortBy)
-    setSortOrder(state.sortOrder)
     setTicketsPageLimitState(normalizeTicketsPageLimit(stored.ticketsPageLimit))
     setDebouncedSearch(state.filterSearch)
   }, [isCustomer])
@@ -521,7 +479,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         teams: Team[]
         users: UserRecord[]
         ticketTypes: Array<{ id: number; title: string; slug: string; color: string }>
-        ticketPriorities: Array<{ id: number; title: string; slug: string; color: string }>
         companies: Array<{ id: string; name: string; color?: string }>
         tags: Array<{ id: string; name: string; slug: string; color?: string }>
         statuses: Array<TicketStatusRecord & { show_in_kanban?: boolean | null; is_active?: boolean }>
@@ -530,7 +487,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       setTeams(data.teams || [])
       setUsers(data.users || [])
       setTicketTypes(data.ticketTypes || [])
-      setTicketPriorities(data.ticketPriorities || [])
       setCompanies(data.companies || [])
       setAllTags(data.tags || [])
       setUserCompanyId(data.userCompanyId ?? null)
@@ -585,7 +541,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
             )
             lastKanbanSlugsRef.current = kanbanSlugs
           } else {
-            // Gabungkan slug kanban baru (mis. user centang Show in Kanban untuk Cancel/Archived) ke filter API.
+            // Merge newly kanban-visible slugs (e.g. user enabled Show in Kanban for Cancel/Archived) into the API filter.
             setFilterStatus((prev) => {
               let next: string[]
               if (prev.length > 0) {
@@ -687,28 +643,21 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       if (isJunkUrl) {
         applyStatusFromParsed()
         setFilterTypeIds(parsed.filterTypeIds)
-        setFilterPriorityIds(parsed.filterPriorityIds ?? [])
         setFilterCompanyIds(parsed.filterCompanyIds)
         setFilterTagIds(parsed.filterTagIds)
-        setFilterVisibilityState(parsed.filterVisibility)
         setFilterTeamIds(parsed.filterTeamIds)
         setFilterDateRange(parsed.filterDateRange)
         setFilterDueDateRange(parsed.filterDueDateRange ?? null)
         setFilterSearch(parsed.filterSearch)
         setViewMode(parsed.viewMode)
-        setSortBy(parsed.sortBy)
-        setSortOrder(parsed.sortOrder)
         setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
         setFilterTicketType(parsed.filterTicketType ?? null)
       } else {
-        /** Hanya terapkan field yang benar-benar ada di URL. Param `view` saja (tanpa `status`) dulu membuat parsed.filterStatus [] dan menimpa state → fetch ulang. */
+        /** Only apply fields actually present in the URL. `view` alone (without `status`) used to make parsed.filterStatus [] and overwrite state → unnecessary refetch. */
         if (searchParams.has(URL_PARAMS.status)) applyStatusFromParsed()
         if (searchParams.has(URL_PARAMS.type_ids)) setFilterTypeIds(parsed.filterTypeIds)
-        if (searchParams.has(URL_PARAMS.priority_ids))
-          setFilterPriorityIds(parsed.filterPriorityIds ?? [])
         if (searchParams.has(URL_PARAMS.company_ids)) setFilterCompanyIds(parsed.filterCompanyIds)
         if (searchParams.has(URL_PARAMS.tag_ids)) setFilterTagIds(parsed.filterTagIds)
-        if (searchParams.has(URL_PARAMS.visibility)) setFilterVisibilityState(parsed.filterVisibility)
         if (searchParams.has(URL_PARAMS.team_ids)) setFilterTeamIds(parsed.filterTeamIds)
         if (searchParams.has(URL_PARAMS.date_from) && searchParams.has(URL_PARAMS.date_to)) {
           setFilterDateRange(parsed.filterDateRange)
@@ -718,10 +667,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         }
         if (searchParams.has(URL_PARAMS.search)) setFilterSearch(parsed.filterSearch)
         if (searchParams.has(URL_PARAMS.view)) setViewMode(parsed.viewMode)
-        if (searchParams.has(URL_PARAMS.sort) || searchParams.has(URL_PARAMS.order)) {
-          setSortBy(parsed.sortBy)
-          setSortOrder(parsed.sortOrder)
-        }
         if (searchParams.has(URL_PARAMS.sidebar)) setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
         if (searchParams.has(URL_PARAMS.ticket_type)) setFilterTicketType(parsed.filterTicketType ?? null)
       }
@@ -741,10 +686,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         parsed = { ...parsed, filterTicketType: null }
       }
       if (searchParams.has(URL_PARAMS.view)) setViewMode(parsed.viewMode)
-      if (searchParams.has(URL_PARAMS.sort) || searchParams.has(URL_PARAMS.order)) {
-        setSortBy(parsed.sortBy)
-        setSortOrder(parsed.sortOrder)
-      }
       if (searchParams.has(URL_PARAMS.sidebar)) setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
     } else {
       const sidebarOnly = parseSidebarCollapsedFromUrl(searchParams)
@@ -761,17 +702,13 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
                 : DEFAULT_KANBAN_COLUMNS.map((c) => c.id)
         setFilterStatus(fallbackStatus)
         setFilterTypeIds([])
-        setFilterPriorityIds([])
         setFilterCompanyIds([])
         setFilterTagIds([])
-        setFilterVisibilityState([])
         setFilterTeamIds([])
         setFilterDateRange(null)
         setFilterDueDateRange(null)
         setFilterSearch('')
         setViewMode('kanban')
-        setSortBy('updated_at')
-        setSortOrder('desc')
         setFilterSidebarCollapsed(true)
         setFilterTicketType(null)
       }
@@ -791,10 +728,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     saveFiltersToStorage({
       filterStatus,
       filterTypeIds,
-      filterPriorityIds,
       filterCompanyIds,
       filterTagIds,
-      filterVisibility,
       filterTeamIds,
       filterDateRange:
         filterDateRange?.[0] && filterDateRange?.[1]
@@ -807,8 +742,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       filterSearch: filterSearch || null,
       viewMode: viewMode,
       filterSidebarCollapsed: filterSidebarCollapsed,
-      sortBy: sortBy || null,
-      sortOrder: sortOrder || null,
       ticketsPageLimit,
     })
 
@@ -822,17 +755,13 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       const qs = buildSearchStringFromFilters({
         filterStatus,
         filterTypeIds,
-        filterPriorityIds,
         filterCompanyIds,
         filterTagIds,
-        filterVisibility,
         filterTeamIds,
         filterDateRange,
         filterDueDateRange,
         filterSearch,
         viewMode,
-        sortBy,
-        sortOrder,
         filterTicketType: isCustomer ? null : filterTicketType,
       })
       const url = qs ? `${pathname}?${qs}` : pathname
@@ -848,17 +777,13 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     filterTypeIds,
     filterCompanyIds,
     filterTagIds,
-    filterVisibility,
     filterTeamIds,
     filterDateRange,
     filterDueDateRange,
     filterSearch,
     viewMode,
     filterSidebarCollapsed,
-    sortBy,
-    sortOrder,
     filterTicketType,
-    filterPriorityIds,
     isCustomer,
     ticketsPageLimit,
   ])
@@ -867,33 +792,25 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     return buildSearchStringFromFilters({
       filterStatus,
       filterTypeIds,
-      filterPriorityIds,
       filterCompanyIds,
       filterTagIds,
-      filterVisibility,
       filterTeamIds,
       filterDateRange,
       filterDueDateRange,
       filterSearch,
       viewMode,
-      sortBy,
-      sortOrder,
       filterTicketType: isCustomer ? null : filterTicketType,
     })
   }, [
     filterStatus,
     filterTypeIds,
-    filterPriorityIds,
     filterCompanyIds,
     filterTagIds,
-    filterVisibility,
     filterTeamIds,
     filterDateRange,
     filterDueDateRange,
     filterSearch,
     viewMode,
-    sortBy,
-    sortOrder,
     filterTicketType,
     isCustomer,
   ])
@@ -907,10 +824,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
 
   const filterByStatusFromChip = useCallback((slug: string) => {
     setFilterStatus([slug])
-  }, [])
-
-  const filterByPriorityFromChip = useCallback((priorityId: number) => {
-    setFilterPriorityIds([priorityId])
   }, [])
 
   const filterByTagFromChip = useCallback((tagId: string) => {
@@ -959,8 +872,21 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       newStatus = hit.status as string
     }
 
+    const prevTicket = tickets.find((t) => t.id === ticketId)
+
     queryClient.setQueryData<TicketRecord[]>(ticketsListQueryKeyRef.current, (prev) =>
-      (prev ?? []).map((t) => (t.id === ticketId ? { ...t, status: newStatus as TicketRecord['status'] } : t))
+      (prev ?? []).map((t) => {
+        if (t.id !== ticketId) return t
+        const isSupportScoped =
+          (t.ticket_type ?? 'support') === 'support' && t.company_id != null
+        const droppingFromQueue =
+          isSupportScoped && newStatus === 'closed' && t.status !== 'closed'
+        return {
+          ...t,
+          status: newStatus as TicketRecord['status'],
+          ...(droppingFromQueue ? { priority: null } : {}),
+        }
+      })
     )
 
     try {
@@ -970,6 +896,16 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         body: JSON.stringify({ status: newStatus }),
       })
       message.success('Ticket status updated successfully')
+      const prevSt = prevTicket?.status
+      const reopenOrCloseSupport =
+        prevTicket &&
+        (prevTicket.ticket_type ?? 'support') === 'support' &&
+        prevTicket.company_id &&
+        ((newStatus === 'closed' && prevSt !== 'closed') ||
+          (prevSt === 'closed' && newStatus !== 'closed'))
+      if (reopenOrCloseSupport) {
+        void invalidateTicketsList()
+      }
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to update ticket status')
       invalidateTicketsList()
@@ -984,8 +920,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setDeletedTicketAttachmentIds([])
     form.resetFields()
     const baseValues: Record<string, unknown> = {
-      status: resolveDefaultNewTicketStatusSlug(allStatuses),
-      visibility: 'public',
+      priority: 0,
     }
     if (isCustomer && userCompanyId) {
       baseValues.company_id = userCompanyId
@@ -1009,10 +944,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       description: record.description ?? '',
       short_note: record.short_note || '',
       status: record.status,
-      visibility: record.visibility,
       team_id: record.team_id,
       type_id: record.type_id ?? undefined,
-      priority_id: record.priority_id ?? undefined,
+      priority: priorityFromFormValue(record.priority),
       company_id: record.company_id ?? undefined,
       contact_user_id: record.contact_user_id ?? undefined,
       due_date: record.due_date ? dayjs(record.due_date) : null,
@@ -1106,38 +1040,38 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
   const handleSubmit = async (values: Record<string, unknown>) => {
     setSubmitting(true)
     try {
+      const customerEditing = Boolean(isCustomer && editingTicket)
+      const newTicketDefaultStatus = resolveDefaultNewTicketStatusSlug(allStatuses)
+
       const effectiveValues = { ...values }
       if (isCustomer && !editingTicket) {
-        effectiveValues.status = resolveDefaultNewTicketStatusSlug(allStatuses)
+        effectiveValues.status = newTicketDefaultStatus
         effectiveValues.visibility = 'public'
         effectiveValues.company_id = userCompanyId ?? null
       }
 
-      const customerEditing = Boolean(isCustomer && editingTicket)
-      if (!customerEditing) {
-        if (effectiveValues.visibility === 'specific_users' && selectedAssignees.length === 0) {
-          message.error('Please select at least one user for specific users visibility')
-          return
-        }
+      const teamIdNormalized =
+        typeof effectiveValues.team_id === 'string' && effectiveValues.team_id.trim() !== ''
+          ? effectiveValues.team_id
+          : null
 
-        if (effectiveValues.visibility === 'team' && !effectiveValues.team_id) {
-          message.error('Please select a team for team visibility')
-          return
-        }
-      }
-
-      const ticketPayload: Record<string, unknown> = {
+      const sharedBody: Record<string, unknown> = {
         title: effectiveValues.title,
         short_note: effectiveValues.short_note || null,
-        status: effectiveValues.status,
-        visibility: effectiveValues.visibility,
-        team_id: effectiveValues.team_id || null,
+        team_id: teamIdNormalized,
         type_id: effectiveValues.type_id ?? null,
-        priority_id: effectiveValues.priority_id ?? null,
+        priority: priorityFromFormValue(effectiveValues.priority),
         company_id: effectiveValues.company_id ?? null,
         contact_user_id: effectiveValues.contact_user_id ?? null,
         due_date: effectiveValues.due_date ? (effectiveValues.due_date as dayjs.Dayjs).toISOString() : null,
       }
+
+      const mapAssignees = (ids: string[]) =>
+        ids.map((userId) => ({
+          id: `temp-${userId}`,
+          user_id: userId,
+          user_name: users.find((u) => u.id === userId)?.full_name || users.find((u) => u.id === userId)?.email || 'Unknown',
+        }))
 
       if (editingTicket) {
         if (customerEditing) {
@@ -1145,7 +1079,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
             title: values.title,
             description: values.description ?? null,
             type_id: values.type_id ?? null,
-            priority_id: values.priority_id ?? null,
+            priority: priorityFromFormValue(values.priority),
           }
           if (newTicketAttachments.length > 0) {
             attachBody.attachments_add = newTicketAttachments.map((a) => ({
@@ -1175,8 +1109,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              ...ticketPayload,
-              assignees: values.visibility === 'specific_users' ? selectedAssignees : [],
+              ...sharedBody,
+              status: effectiveValues.status,
+              assignees: selectedAssignees,
               tag_ids: selectedTagIds,
             }),
           })
@@ -1187,38 +1122,29 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
           }
 
           const typeId = values.type_id as number | undefined
-          const priorityId = values.priority_id as number | undefined
+          const priorityVal = priorityFromFormValue(values.priority)
           const companyId =
             patchRes && typeof patchRes === 'object' && 'company_id' in patchRes
               ? patchRes.company_id
               : ((values.company_id as string | undefined) ?? null)
-          const teamId = values.team_id as string | undefined
+          const teamId = teamIdNormalized
           const updatedRecord: TicketRecord = {
             ...editingTicket,
             title: values.title as string,
             short_note: (values.short_note as string) || null,
             status: values.status as TicketRecord['status'],
-            visibility: values.visibility as TicketRecord['visibility'],
             team_id: teamId ?? null,
             type_id: typeId ?? null,
-            priority_id: priorityId ?? null,
+            priority: priorityVal,
             company_id: companyId ?? null,
             contact_user_id: (values.contact_user_id as string | undefined) ?? null,
             due_date: values.due_date ? (values.due_date as dayjs.Dayjs).toISOString() : null,
             updated_at: new Date().toISOString(),
             team_name: teamId ? teams.find((t) => t.id === teamId)?.name ?? undefined : undefined,
             type: typeId != null ? ticketTypes.find((t) => t.id === typeId) ?? null : null,
-            priority: priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null,
             company: companyId ? companies.find((c) => c.id === companyId) ?? null : null,
             tags: allTags.filter((t) => selectedTagIds.includes(t.id)),
-            assignees:
-              values.visibility === 'specific_users'
-                ? selectedAssignees.map((userId) => ({
-                    id: `temp-${userId}`,
-                    user_id: userId,
-                    user_name: users.find((u) => u.id === userId)?.full_name || users.find((u) => u.id === userId)?.email || 'Unknown',
-                  }))
-                : [],
+            assignees: mapAssignees(selectedAssignees),
           }
           queryClient.setQueryData<TicketRecord[]>(ticketsListQueryKeyRef.current, (prev) =>
             (prev ?? []).map((t) => (t.id === editingTicket.id ? updatedRecord : t))
@@ -1226,9 +1152,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         }
       } else {
         const createPayload = {
-          ...ticketPayload,
+          ...sharedBody,
+          status: newTicketDefaultStatus,
+          visibility: 'public',
           description: values.description || null,
-          assignees: values.visibility === 'specific_users' ? selectedAssignees : [],
           tag_ids: selectedTagIds,
           contact_user_id: effectiveValues.contact_user_id ?? null,
           attachments: newTicketAttachments.map((a) => ({
@@ -1255,12 +1182,12 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         }
 
         const typeId = effectiveValues.type_id as number | undefined
-        const priorityId = effectiveValues.priority_id as number | undefined
+        const priorityVal = priorityFromFormValue(effectiveValues.priority)
         const companyId =
           newTicket.company_id !== undefined
             ? newTicket.company_id
             : ((effectiveValues.company_id as string | undefined) ?? null)
-        const teamId = effectiveValues.team_id as string | undefined
+        const teamId = teamIdNormalized ?? undefined
         const newRecord: TicketRecord = {
           id: newTicket.id,
           title: effectiveValues.title as string,
@@ -1269,28 +1196,20 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
           created_by: currentUserId,
           contact_user_id: (effectiveValues.contact_user_id as string | undefined) ?? null,
           due_date: effectiveValues.due_date ? (effectiveValues.due_date as dayjs.Dayjs).toISOString() : null,
-          status: effectiveValues.status as TicketRecord['status'],
-          visibility: effectiveValues.visibility as TicketRecord['visibility'],
+          status: newTicketDefaultStatus as TicketRecord['status'],
+          visibility: 'public',
           team_id: teamId ?? null,
           type_id: typeId ?? null,
-          priority_id: priorityId ?? null,
+          priority: priorityVal,
           company_id: companyId ?? null,
           created_at: newTicket.created_at,
           updated_at: newTicket.updated_at,
           creator_name: users.find((u) => u.id === currentUserId)?.full_name || users.find((u) => u.id === currentUserId)?.email || 'Unknown',
           team_name: teamId ? teams.find((t) => t.id === teamId)?.name ?? undefined : undefined,
           type: typeId != null ? ticketTypes.find((t) => t.id === typeId) ?? null : null,
-          priority: priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null,
           company: companyId ? companies.find((c) => c.id === companyId) ?? null : null,
           tags: allTags.filter((t) => selectedTagIds.includes(t.id)),
-          assignees:
-            effectiveValues.visibility === 'specific_users'
-              ? selectedAssignees.map((userId) => ({
-                  id: `temp-${userId}`,
-                  user_id: userId,
-                  user_name: users.find((u) => u.id === userId)?.full_name || users.find((u) => u.id === userId)?.email || 'Unknown',
-                }))
-              : [],
+          assignees: [],
           checklist_completed: 0,
           checklist_total: 0,
           has_unread_replies: false,
@@ -1348,7 +1267,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     selectedTagIds,
     setSelectedTagIds,
     ticketTypes,
-    ticketPriorities,
     companies,
     allTags,
     allStatuses,
@@ -1365,10 +1283,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setFilterCompanyIds,
     filterTagIds,
     setFilterTagIds,
-    filterPriorityIds,
-    setFilterPriorityIds,
-    filterVisibility,
-    setFilterVisibility,
     filterTeamIds,
     setFilterTeamIds,
     filterDateRange,
@@ -1381,10 +1295,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setFilterSidebarCollapsed,
     viewMode,
     setViewMode,
-    sortBy,
-    setSortBy,
-    sortOrder,
-    setSortOrder,
+    sortBy: TICKETS_LIST_SORT_BY,
+    sortOrder: TICKETS_LIST_SORT_ORDER,
     hasActiveFilters,
     clearFilters,
     handleCreate,
@@ -1408,7 +1320,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     getFilterQueryString,
     filterTicketType,
     filterByStatusFromChip,
-    filterByPriorityFromChip,
     filterByTagFromChip,
     filterByCompanyFromChip,
     submitting,

@@ -1,6 +1,6 @@
 'use client'
 
-import { CommentOutlined,DeleteOutlined, EditOutlined, FieldTimeOutlined, FlagOutlined, MoreOutlined, UserOutlined } from '@ant-design/icons'
+import { CommentOutlined, DeleteOutlined, EditOutlined, FieldTimeOutlined, FlagOutlined, MoreOutlined, UserOutlined } from '@ant-design/icons'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Avatar, Button, Card, Dropdown, Flex, Modal, Tag, Tooltip, Typography } from 'antd'
@@ -11,7 +11,7 @@ import DateDisplay from '@/components/common/DateDisplay'
 import { KANBAN_SEMANTIC_BLUE, KANBAN_SEMANTIC_GREEN, kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 import { isClosedLikeTicketStatus } from '@/lib/ticket-status-workflow'
 
-import type { StatusColumn,TicketRecord } from './types'
+import type { StatusColumn, TicketRecord } from './types'
 import { DEFAULT_ALL_STATUS_COLUMNS } from './types'
 
 const { Text } = Typography
@@ -23,7 +23,6 @@ interface KanbanCardProps {
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
   onFilterByStatus?: (statusSlug: string) => void
-  onFilterByPriority?: (priorityId: number) => void
   onFilterByTag?: (tagId: string) => void
   onFilterByCompany?: (companyId: string) => void
   allStatusColumns?: StatusColumn[]
@@ -36,7 +35,6 @@ export default function KanbanCard({
   onEdit,
   onDelete,
   onFilterByStatus,
-  onFilterByPriority,
   onFilterByTag,
   onFilterByCompany,
   allStatusColumns,
@@ -94,23 +92,13 @@ export default function KanbanCard({
             style={{ flex: 1, minWidth: 0 }}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            {ticket.priority && (
+            {ticket.priority != null && ticket.priority > 0 && (
               <Tag
                 style={kanbanTagStyle({
-                  ...(ticket.priority.color ? { fillHex: ticket.priority.color } : { neutral: true }),
-                  cursor: onFilterByPriority ? 'pointer' : undefined,
+                  neutral: true,
                 })}
-                title={onFilterByPriority ? 'Filter by this priority' : undefined}
-                onClick={
-                  onFilterByPriority
-                    ? (e) => {
-                        e.stopPropagation()
-                        onFilterByPriority(ticket.priority!.id)
-                      }
-                    : undefined
-                }
               >
-                {ticket.priority.title}
+                P{ticket.priority}
               </Tag>
             )}
             {ticket.visibility !== 'team' && (

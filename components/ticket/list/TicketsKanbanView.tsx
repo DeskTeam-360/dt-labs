@@ -16,6 +16,7 @@ import { Card, Typography } from 'antd'
 
 import KanbanColumn from './KanbanColumn'
 import type { StatusColumn, TicketRecord, TicketSortField, TicketSortOrder } from './types'
+import { TICKETS_LIST_SORT_BY, TICKETS_LIST_SORT_ORDER } from './types'
 
 const { Text } = Typography
 
@@ -38,10 +39,8 @@ interface TicketsKanbanViewProps {
   canDeleteTicket?: boolean
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
-  allPriorities?: Array<{ id: number }>
   allStatusColumns?: StatusColumn[]
   onFilterByStatus?: (statusSlug: string) => void
-  onFilterByPriority?: (priorityId: number) => void
   onFilterByTag?: (tagId: string) => void
   onFilterByCompany?: (companyId: string) => void
 }
@@ -56,12 +55,10 @@ export default function TicketsKanbanView({
   onEdit,
   onDelete,
   canDeleteTicket = false,
-  sortBy = 'updated_at',
-  sortOrder = 'desc',
-  allPriorities = [],
+  sortBy = TICKETS_LIST_SORT_BY,
+  sortOrder = TICKETS_LIST_SORT_ORDER,
   allStatusColumns,
   onFilterByStatus,
-  onFilterByPriority,
   onFilterByTag,
   onFilterByCompany,
 }: TicketsKanbanViewProps) {
@@ -101,10 +98,8 @@ export default function TicketsKanbanView({
           onDelete={onDelete}
           sortBy={sortBy}
           sortOrder={sortOrder}
-          allPriorities={allPriorities}
           allStatusColumns={allStatusColumns}
           onFilterByStatus={onFilterByStatus}
-          onFilterByPriority={onFilterByPriority}
           onFilterByTag={onFilterByTag}
           onFilterByCompany={onFilterByCompany}
         />

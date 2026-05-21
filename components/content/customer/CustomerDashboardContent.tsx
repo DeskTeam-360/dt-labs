@@ -47,7 +47,7 @@ interface DashboardData {
   company_id: string | null
   my_tickets_count: number
   tickets_by_type: Array<{ type_title: string; type_id: number | null; count: number; color: string }>
-  priority_counts: Array<{ priority_id: number; priority_title: string; count: number; color: string }>
+  priority_counts: Array<{ priority: number; count: number }>
   time_by_type: Array<{ type_title: string; seconds: number; color: string }>
   total_time_seconds: number
   status_counts: Array<{ status_slug: string; status_title: string; count: number; color: string }>
@@ -64,8 +64,8 @@ interface DashboardData {
     status_title: string
     customer_title: string
     status_color: string
-    priority_id: number | null
-    priority_title: string
+    priority: number
+    priority_label: string
     priority_color: string
     assignee_name: string | null
     company_name: string | null
@@ -319,10 +319,8 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                     {(data?.priority_counts?.length ?? 0) > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         {data!.priority_counts.map((p, i) => (
-                          <div key={p.priority_id ?? i}>
+                          <div key={`prio-${p.priority}-${i}`}>
                             <div
-                              role={p.count > 0 ? 'link' : undefined}
-                              tabIndex={p.count > 0 ? 0 : undefined}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -330,29 +328,8 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                                 marginBottom: 4,
                                 gap: 8,
                                 padding: 8,
-                                cursor: p.count > 0 ? 'pointer' : 'default',
                                 borderRadius: 8,
                               }}
-                              onClick={() => {
-                                if (p.count === 0) return
-                                const qs = new URLSearchParams()
-                                qs.set('view', 'list')
-                                qs.set('priority_ids', String(p.priority_id))
-                                router.push(`/tickets?${qs.toString()}`)
-                              }}
-                              onKeyDown={
-                                p.count > 0
-                                  ? (e) => {
-                                      if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault()
-                                        const qs = new URLSearchParams()
-                                        qs.set('view', 'list')
-                                        qs.set('priority_ids', String(p.priority_id))
-                                        router.push(`/tickets?${qs.toString()}`)
-                                      }
-                                    }
-                                  : undefined
-                              }
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span
@@ -360,11 +337,11 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                                     width: 20,
                                     height: 20,
                                     borderRadius: 2,
-                                    background: p.color || '#1890ff',
+                                    background: DEFAULT_COLORS[i % DEFAULT_COLORS.length],
                                     flexShrink: 0,
                                   }}
                                 />
-                                <Text style={p.count > 0 ? { color: '#1890ff' } : undefined}>{p.priority_title}</Text>
+                                <Text>Prioritas {p.priority}</Text>
                               </div>
                               <div
                                 style={{
@@ -379,7 +356,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                                   style={{
                                     height: '100%',
                                     width: `${(p.count / maxPriority) * 100}%`,
-                                    background: p.color || '#1890ff',
+                                    background: DEFAULT_COLORS[i % DEFAULT_COLORS.length],
                                     borderRadius: 4,
                                   }}
                                 />
@@ -634,8 +611,6 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                       </Flex>
                       <Flex justify="space-between" gap={12} align="center">
                         <span
-                          role={t.priority_id != null ? 'button' : undefined}
-                          tabIndex={t.priority_id != null ? 0 : undefined}
                           style={{
                             padding: '8px 16px',
                             borderRadius: 6,
@@ -643,34 +618,12 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                             fontWeight: 600,
                             background: t.priority_color,
                             color: '#fff',
-                            cursor: t.priority_id != null ? 'pointer' : 'default',
+                            cursor: 'default',
                             outline: 'none',
                           }}
-                          title={t.priority_id != null ? 'Filter tickets by this priority' : undefined}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (t.priority_id == null) return
-                            const qs = new URLSearchParams()
-                            qs.set('view', 'list')
-                            qs.set('priority_ids', String(t.priority_id))
-                            router.push(`/tickets?${qs.toString()}`)
-                          }}
-                          onKeyDown={
-                            t.priority_id != null
-                              ? (e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    const qs = new URLSearchParams()
-                                    qs.set('view', 'list')
-                                    qs.set('priority_ids', String(t.priority_id))
-                                    router.push(`/tickets?${qs.toString()}`)
-                                  }
-                                }
-                              : undefined
-                          }
+                          title={t.priority_label}
                         >
-                          {t.priority_title}
+                          {t.priority_label}
                         </span>
                         {t.tags && t.tags.length > 0 && t.tags.map((tag) => (
                           <span

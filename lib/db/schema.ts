@@ -238,7 +238,8 @@ export const tickets = pgTable('tickets', {
   visibility: varchar('visibility', { length: 50 }).notNull().default('private'),
   teamId: uuid('team_id'),
   gmailThreadId: varchar('gmail_thread_id', { length: 255 }),
-  priorityId: integer('priority_id').references(() => ticketPriorities.id, { onDelete: 'restrict' }),
+  /** Tingkat prioritas numerik (bukan FK ke ticket_priorities). NULL when closed support (out of queue). */
+  priority: integer('priority').default(0),
   createdVia: varchar('created_via', { length: 50 }),
   lastReadAt: ts('last_read_at'),
   typeId: integer('type_id').references(() => ticketTypes.id, { onDelete: 'restrict' }),

@@ -1,11 +1,18 @@
 'use client'
 
-import { Col, Empty,Row } from 'antd'
+import { Col, Empty, Row } from 'antd'
 import { useMemo } from 'react'
 
 import CardViewCard from './CardViewCard'
-import type { StatusColumn, TicketRecord, TicketSortField, TicketSortOrder } from './types'
-import { sortTickets } from './types'
+import {
+  sortTickets,
+  type StatusColumn,
+  type TicketRecord,
+  TICKETS_LIST_SORT_BY,
+  TICKETS_LIST_SORT_ORDER,
+  type TicketSortField,
+  type TicketSortOrder,
+} from './types'
 
 interface TicketsCardViewProps {
   tickets: TicketRecord[]
@@ -15,9 +22,7 @@ interface TicketsCardViewProps {
   canDeleteTicket?: boolean
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
-  allPriorities?: Array<{ id: number }>
   onFilterByStatus?: (statusSlug: string) => void
-  onFilterByPriority?: (priorityId: number) => void
   onFilterByTag?: (tagId: string) => void
   onFilterByCompany?: (companyId: string) => void
 }
@@ -28,17 +33,15 @@ export default function TicketsCardView({
   onEdit,
   onDelete,
   canDeleteTicket = false,
-  sortBy = 'updated_at',
-  sortOrder = 'desc',
-  allPriorities = [],
+  sortBy = TICKETS_LIST_SORT_BY,
+  sortOrder = TICKETS_LIST_SORT_ORDER,
   onFilterByStatus,
-  onFilterByPriority,
   onFilterByTag,
   onFilterByCompany,
 }: TicketsCardViewProps) {
   const sortedTickets = useMemo(
-    () => sortTickets(tickets, sortBy, sortOrder, allPriorities),
-    [tickets, sortBy, sortOrder, allPriorities]
+    () => sortTickets(tickets, sortBy, sortOrder),
+    [tickets, sortBy, sortOrder]
   )
 
   if (sortedTickets.length === 0) {
@@ -60,7 +63,6 @@ export default function TicketsCardView({
             onDelete={onDelete}
             canDeleteTicket={canDeleteTicket}
             onFilterByStatus={onFilterByStatus}
-            onFilterByPriority={onFilterByPriority}
             onFilterByTag={onFilterByTag}
             onFilterByCompany={onFilterByCompany}
           />

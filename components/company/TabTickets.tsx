@@ -109,7 +109,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
   const [filterStatus, setFilterStatus] = useState<string[]>([])
   const [filterTypeId, setFilterTypeId] = useState<number | undefined>(undefined)
   const [filterSearch, setFilterSearch] = useState('')
-  /** Filter tiket by tanggal **created** (server, pakai date_from / date_to API). */
+  /** Filter tickets by **created** date (server-side via date_from / date_to API params). */
   const [filterDateRange, setFilterDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingTicket, setEditingTicket] = useState<TicketRecord | null>(null)
@@ -263,8 +263,6 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
     setSelectedTagIds([])
     form.resetFields()
     form.setFieldsValue({
-      status: resolveDefaultNewTicketStatusSlug(statuses),
-      visibility: 'public',
       company_id: companyData.id,
     })
     setModalVisible(true)
@@ -276,7 +274,6 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
       title: ticket.title,
       description: ticket.description || '',
       status: ticket.status,
-      visibility: ticket.visibility,
       type_id: ticket.type_id ?? undefined,
       priority_id: ticket.priority_id ?? undefined,
       company_id: companyData.id,
@@ -300,7 +297,9 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
     if (!currentUser) return
     setSaving(true)
     try {
-      const payload = {
+      const defaultStatusSlug = resolveDefaultNewTicketStatusSlug(statuses)
+
+      const payloadEditing: Record<string, unknown> = {
         title: values.title?.trim() || 'Untitled',
         description: values.description || null,
         status: values.status || 'open',
@@ -308,7 +307,18 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
         priority_id: values.priority_id ?? null,
         company_id: companyData.id,
         due_date: values.due_date ? values.due_date.format('YYYY-MM-DD') : null,
-        visibility: editingTicket ? (values.visibility ?? editingTicket.visibility ?? 'public') : (values.visibility ?? 'public'),
+        tag_ids: selectedTagIds,
+      }
+
+      const payloadCreate = {
+        title: values.title?.trim() || 'Untitled',
+        description: values.description || null,
+        status: defaultStatusSlug,
+        visibility: 'public',
+        type_id: values.type_id ?? null,
+        priority_id: values.priority_id ?? null,
+        company_id: companyData.id,
+        due_date: values.due_date ? values.due_date.format('YYYY-MM-DD') : null,
         tag_ids: selectedTagIds,
       }
 
@@ -316,14 +326,14 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
         await apiFetch(`/api/tickets/${editingTicket.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(payloadEditing),
         })
         message.success('Ticket updated')
       } else {
         await apiFetch('/api/tickets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(payloadCreate),
         })
         message.success('Ticket created')
       }
@@ -601,15 +611,17 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
           <Form.Item name="description" label="Description">
             <CommentWysiwyg ticketId={editingTicket?.id} placeholder="Description" height="50px" />
           </Form.Item>
-          <Form.Item name="status" label="Status" rules={[{ required: true }]}>
-            <Select>
-              {statusOptionsForModal.map((s) => (
-                <Option key={s.slug} value={s.slug}>
-                  {s.title}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+          {editingTicket ? (
+            <Form.Item name="status" label="Status" rules={[{ required: true }]}>
+              <Select>
+                {statusOptionsForModal.map((s) => (
+                  <Option key={s.slug} value={s.slug}>
+                    {s.title}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          ) : null}
           <Form.Item name="type_id" label="Type">
             <Select placeholder="Select type" allowClear>
               {types.map((t) => (

@@ -26,7 +26,6 @@ interface CardViewCardProps {
   onDelete: (id: number) => void
   /** Click priority / status / tag chips to apply list filters */
   onFilterByStatus?: (statusSlug: string) => void
-  onFilterByPriority?: (priorityId: number) => void
   onFilterByTag?: (tagId: string) => void
   onFilterByCompany?: (companyId: string) => void
 }
@@ -38,7 +37,6 @@ export default function CardViewCard({
   onEdit,
   onDelete,
   onFilterByStatus,
-  onFilterByPriority,
   onFilterByTag,
   onFilterByCompany,
 }: CardViewCardProps) {
@@ -110,29 +108,15 @@ export default function CardViewCard({
       </Flex>
       </a>
       <Flex justify="flex-end" gap={8} align="center" wrap="wrap" style={{ flexShrink: 0 }}>
-        {ticket.priority && (
-          <span
-            style={{
-              ...tagStyle,
-              background: ticket.priority.color ?? 'var(--ticket-row-chip-neutral-bg)',
-              color: ticket.priority.color ? '#fff' : 'var(--ticket-row-chip-neutral-fg)',
-              cursor: onFilterByPriority ? 'pointer' : undefined,
-            }}
-            title={onFilterByPriority ? 'Filter by this priority' : undefined}
-            role={onFilterByPriority ? 'button' : undefined}
-            onClick={
-              onFilterByPriority
-                ? (e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    onFilterByPriority(ticket.priority!.id)
-                  }
-                : undefined
-            }
-          >
-            {ticket.priority.title}
-          </span>
-        )}
+        <span
+          style={{
+            ...tagStyle,
+            background: 'var(--ticket-row-chip-neutral-bg)',
+            color: 'var(--ticket-row-chip-neutral-fg)',
+          }}
+        >
+          {ticket.priority != null && ticket.priority > 0 ? `P${ticket.priority}` : '—'}
+        </span>
         {ticket.company && (
           <span
             style={{

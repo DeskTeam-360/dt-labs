@@ -5,7 +5,9 @@
 export interface AutomationActions {
   /** Assign ticket to this team (uuid) */
   team_id?: string
-  /** Set priority (slug: urgent, high, medium, low) */
+  /** Bilangan bulat prioritas tiket */
+  priority?: number
+  /** @deprecated Prefer `priority`; diset ke sort_order/ref id untuk slug ini */
   priority_slug?: string
   /** Set ticket type (slug) */
   type_slug?: string

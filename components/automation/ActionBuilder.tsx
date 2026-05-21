@@ -1,7 +1,7 @@
 'use client'
 
 import { CloseOutlined,PlusOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Form, Input, Select, Space } from 'antd'
+import { Button, Dropdown, Form, Input, InputNumber, Select, Space } from 'antd'
 import { useEffect, useState } from 'react'
 
 import CommentWysiwyg from '@/components/ticket/detail/CommentWysiwyg'
@@ -9,6 +9,7 @@ import type { AutomationActions } from '@/lib/automation-actions-types'
 
 type ActionType =
   | 'team_id'
+  | 'priority'
   | 'priority_slug'
   | 'type_slug'
   | 'ticket_type'
@@ -43,7 +44,8 @@ const TICKET_CLASSIFICATION_OPTIONS = [
 
 const ACTION_LABELS: Record<ActionType, string> = {
   team_id: 'Assign to Team',
-  priority_slug: 'Set Priority',
+  priority: 'Set Priority (number)',
+  priority_slug: 'Set Priority by slug (legacy)',
   type_slug: 'Set Type',
   ticket_type: 'Set classification (spam / trash)',
   status_slug: 'Set Status',
@@ -71,8 +73,11 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
     fetchLookup().then(setLookup)
   }, [])
 
-  const ACTION_TYPES: ActionType[] = [
+  const actions = value && typeof value === 'object' ? value : {}
+
+  const ORDERED_ACTION_KEYS: ActionType[] = [
     'team_id',
+    'priority',
     'priority_slug',
     'type_slug',
     'ticket_type',
@@ -82,8 +87,8 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
     'add_note',
     'add_checklist_items',
   ]
-  const actions = value && typeof value === 'object' ? value : {}
-  const shownKeys = ACTION_TYPES.filter(
+
+  const shownKeys = ORDERED_ACTION_KEYS.filter(
     (k) => (actions as Record<string, unknown>)[k] !== undefined
   )
 
@@ -100,7 +105,9 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
       onChange(next as AutomationActions)
       return
     }
-    if (val === undefined || val === null || val === '') {
+    if (key === 'priority' && (val === undefined || val === null)) {
+      delete next.priority
+    } else if (val === undefined || val === null || val === '') {
       delete next[key]
       if (key === 'add_checklist_items') delete next.add_checklist_items
     } else {
@@ -119,6 +126,8 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
       ;(next as Record<string, unknown>).add_checklist_items = []
     } else if (type === 'ticket_type') {
       ;(next as Record<string, unknown>).ticket_type = 'support'
+    } else if (type === 'priority') {
+      ;(next as Record<string, unknown>).priority = 0
     } else {
       ;(next as Record<string, unknown>)[type] = ''
     }
@@ -138,6 +147,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
   const availableToAdd = (
     [
       'team_id',
+      'priority',
       'priority_slug',
       'type_slug',
       'ticket_type',
@@ -201,8 +211,23 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                     />
                   </Form.Item>
                 )}
+                {type === 'priority' && (
+                  <Form.Item label={ACTION_LABELS.priority} style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      min={0}
+                      placeholder="Prioritas (bilangan bulat)"
+                      style={{ width: '100%' }}
+                      value={(actions as Record<string, unknown>).priority as number | undefined}
+                      onChange={(v) => update('priority', v ?? undefined)}
+                    />
+                  </Form.Item>
+                )}
                 {type === 'priority_slug' && (
-                  <Form.Item label={ACTION_LABELS.priority_slug} style={{ marginBottom: 0 }}>
+                  <Form.Item
+                    label={ACTION_LABELS.priority_slug}
+                    extra="Gunakan Priority (number) untuk aturan baru."
+                    style={{ marginBottom: 0 }}
+                  >
                     <Select
                       allowClear
                       showSearch

@@ -1,6 +1,6 @@
 import type { Dayjs } from 'dayjs'
 
-/** Batas per halaman yang didukung UI daftar tiket. */
+/** Page sizes supported by the ticket list UI. */
 export const TICKETS_PAGE_LIMIT_OPTIONS = [50, 100, 200] as const
 export type TicketsPageLimit = (typeof TICKETS_PAGE_LIMIT_OPTIONS)[number]
 
@@ -17,8 +17,6 @@ export type TicketsListQueryKeyPayload = {
   filterStatus: string
   filterTypeIds: string
   filterTagIds: string
-  filterPriorityIds: string
-  filterVisibility: string
   filterTeamIds: string
   filterDateRangeKey: string
   filterDueDateRangeKey: string
@@ -33,13 +31,22 @@ function rangeKey(r: [Dayjs | null, Dayjs | null] | null): string {
 }
 
 export function buildTicketsListQueryKey(
-  ctx: Omit<TicketsListQueryKeyPayload, 'filterCompanyIds' | 'filterStatus' | 'filterTypeIds' | 'filterTagIds' | 'filterPriorityIds' | 'filterVisibility' | 'filterTeamIds' | 'filterDateRangeKey' | 'filterDueDateRangeKey' | 'debouncedSearch' | 'filterTicketType'> & {
+  ctx: Omit<
+    TicketsListQueryKeyPayload,
+    | 'filterCompanyIds'
+    | 'filterStatus'
+    | 'filterTypeIds'
+    | 'filterTagIds'
+    | 'filterTeamIds'
+    | 'filterDateRangeKey'
+    | 'filterDueDateRangeKey'
+    | 'debouncedSearch'
+    | 'filterTicketType'
+  > & {
     filterCompanyIds: string[]
     filterStatus: string[]
     filterTypeIds: number[]
     filterTagIds: string[]
-    filterPriorityIds: number[]
-    filterVisibility: string[]
     filterTeamIds: string[]
     filterDateRange: [Dayjs | null, Dayjs | null] | null
     filterDueDateRange: [Dayjs | null, Dayjs | null] | null
@@ -54,8 +61,6 @@ export function buildTicketsListQueryKey(
     filterStatus: [...ctx.filterStatus].sort().join(','),
     filterTypeIds: [...ctx.filterTypeIds].sort((a, b) => a - b).join(','),
     filterTagIds: [...ctx.filterTagIds].sort().join(','),
-    filterPriorityIds: [...ctx.filterPriorityIds].sort((a, b) => a - b).join(','),
-    filterVisibility: [...ctx.filterVisibility].sort().join(','),
     filterTeamIds: [...ctx.filterTeamIds].sort().join(','),
     filterDateRangeKey: rangeKey(ctx.filterDateRange),
     filterDueDateRangeKey: rangeKey(ctx.filterDueDateRange),

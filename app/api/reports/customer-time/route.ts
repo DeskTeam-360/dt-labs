@@ -85,15 +85,15 @@ function ticketFilterParts(
   companyIds: string[],
   statusSlugs: string[] | null,
   urgentOnly: boolean,
-  urgentPriorityId: number | null
+  urgentPriorityValue: number | null
 ) {
   const parts = [inArray(tickets.companyId, companyIds), eq(tickets.ticketType, 'support')]
   if (statusSlugs && statusSlugs.length > 0) {
     parts.push(inArray(tickets.status, statusSlugs))
   }
   if (urgentOnly) {
-    if (urgentPriorityId == null) return null
-    parts.push(eq(tickets.priorityId, urgentPriorityId))
+    if (urgentPriorityValue == null) return null
+    parts.push(eq(tickets.priority, urgentPriorityValue))
   }
   return parts
 }
@@ -160,16 +160,21 @@ export async function GET(request: Request) {
     .filter(Boolean) as { id: string; name: string | null }[]
 
   const priorityRows = await db.select().from(ticketPriorities)
-  const priorityById = new Map<number, { title: string | null; slug: string | null }>()
-  for (const p of priorityRows) {
-    priorityById.set(p.id, { title: p.title, slug: p.slug })
-  }
   const urgentPrio = priorityRows.find(
     (p) =>
       (p.slug ?? '').toLowerCase().trim() === 'urgent' ||
       (p.title ?? '').toLowerCase().trim() === 'urgent'
   )
-  const urgentPriorityId = urgentPrio?.id ?? null
+  const urgentPriorityValue =
+    urgentPrio != null ? Number(urgentPrio.sortOrder ?? urgentPrio.id) : null
+
+  /** Label referensi untuk nilai ticket.priority (bukan FK). */
+  const priorityMetaByValue = new Map<number, { title: string | null; slug: string | null }>()
+  for (const p of priorityRows) {
+    const key = Number(p.sortOrder ?? p.id)
+    if (!priorityMetaByValue.has(key))
+      priorityMetaByValue.set(key, { title: p.title, slug: p.slug })
+  }
 
   const statusSlugs = statusParam
     ? statusParam
@@ -245,7 +250,7 @@ export async function GET(request: Request) {
     ),
   })
 
-  const baseParts = ticketFilterParts(companyIds, statusSlugs, urgentOnly, urgentPriorityId)
+  const baseParts = ticketFilterParts(companyIds, statusSlugs, urgentOnly, urgentPriorityValue)
   if (baseParts === null) {
     const p = emptyTicketPayload()
     return NextResponse.json(p)
@@ -319,7 +324,7 @@ export async function GET(request: Request) {
     number,
     {
       status: string
-      priorityId: number | null
+      priority: number
       title: string
       companyId: string | null
       companyName: string | null
@@ -336,7 +341,7 @@ export async function GET(request: Request) {
     const ca = t.createdAt
     ticketMeta.set(t.id, {
       status: t.status,
-      priorityId: t.priorityId,
+      priority: t.priority ?? 0,
       title: t.title,
       companyId: cid,
       companyName: cid ? companyById.get(cid)?.name ?? null : null,
@@ -350,14 +355,19 @@ export async function GET(request: Request) {
   for (const [, v] of ticketMeta) {
     const st = (v.status ?? '').toLowerCase()
     if (st === 'completed' || st === 'resolved' || st === 'closed') completedTicketCount++
-    if (urgentPriorityId != null && v.priorityId === urgentPriorityId) urgentTicketCount++
+    if (urgentPriorityValue != null && v.priority === urgentPriorityValue) urgentTicketCount++
   }
   for (const id of ticketMeta.keys()) {
     if ((secondsByTicket.get(id) ?? 0) === 0) untouchedTicketCount++
   }
 
   const ticketList = [...ticketMeta.entries()].map(([id, v]) => {
-    const pr = v.priorityId != null ? priorityById.get(v.priorityId) : undefined
+    const pr =
+      priorityMetaByValue.get(Number(v.priority)) ??
+      ({
+        title: `Level ${v.priority}`,
+        slug: null as string | null,
+      } satisfies { title: string | null; slug: string | null })
     const createdAtIso =
       v.createdAt && !Number.isNaN(v.createdAt.getTime()) ? v.createdAt.toISOString() : null
     return {
@@ -370,7 +380,7 @@ export async function GET(request: Request) {
       created_at: createdAtIso,
       priority_title: pr?.title ?? null,
       priority_slug: pr?.slug ?? null,
-      is_urgent: urgentPriorityId != null && v.priorityId === urgentPriorityId,
+      is_urgent: urgentPriorityValue != null && v.priority === urgentPriorityValue,
       has_reported_time: (secondsByTicket.get(id) ?? 0) > 0,
     }
   })

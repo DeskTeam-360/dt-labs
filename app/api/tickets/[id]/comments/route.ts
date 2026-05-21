@@ -446,7 +446,7 @@ export async function POST(
           title: tickets.title,
           status: tickets.status,
           teamId: tickets.teamId,
-          priorityId: tickets.priorityId,
+          priority: tickets.priority,
           companyId: tickets.companyId,
           typeId: tickets.typeId,
         })
@@ -464,7 +464,7 @@ export async function POST(
           title: slackTicket.title,
           status: slackTicket.status,
           teamId: slackTicket.teamId ?? null,
-          priorityId: slackTicket.priorityId ?? null,
+          priority: slackTicket.priority,
           companyId: slackTicket.companyId ?? null,
           typeId: slackTicket.typeId ?? null,
           bodyPreview: slackPreview || undefined,

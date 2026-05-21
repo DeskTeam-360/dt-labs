@@ -6,8 +6,15 @@ import { Badge, Card, Empty, Typography } from 'antd'
 import { useMemo } from 'react'
 
 import KanbanCard from './KanbanCard'
-import type { StatusColumn, TicketRecord, TicketSortField, TicketSortOrder } from './types'
-import { sortTickets } from './types'
+import {
+  sortTickets,
+  type StatusColumn,
+  type TicketRecord,
+  TICKETS_LIST_SORT_BY,
+  TICKETS_LIST_SORT_ORDER,
+  type TicketSortField,
+  type TicketSortOrder,
+} from './types'
 
 const { Text } = Typography
 
@@ -20,10 +27,8 @@ interface KanbanColumnProps {
   onDelete: (id: number) => void
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
-  allPriorities?: Array<{ id: number }>
   allStatusColumns?: StatusColumn[]
   onFilterByStatus?: (statusSlug: string) => void
-  onFilterByPriority?: (priorityId: number) => void
   onFilterByTag?: (tagId: string) => void
   onFilterByCompany?: (companyId: string) => void
 }
@@ -35,19 +40,17 @@ export default function KanbanColumn({
   canDeleteTicket = false,
   onEdit,
   onDelete,
-  sortBy = 'updated_at',
-  sortOrder = 'desc',
-  allPriorities = [],
+  sortBy = TICKETS_LIST_SORT_BY,
+  sortOrder = TICKETS_LIST_SORT_ORDER,
   allStatusColumns,
   onFilterByStatus,
-  onFilterByPriority,
   onFilterByTag,
   onFilterByCompany,
 }: KanbanColumnProps) {
   const columnTickets = useMemo(() => {
     const filtered = tickets.filter((t) => t.status === column.id)
-    return sortTickets(filtered, sortBy, sortOrder, allPriorities)
-  }, [tickets, column.id, sortBy, sortOrder, allPriorities])
+    return sortTickets(filtered, sortBy, sortOrder)
+  }, [tickets, column.id, sortBy, sortOrder])
 
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -128,7 +131,6 @@ export default function KanbanColumn({
                   onDelete={onDelete}
                   allStatusColumns={allStatusColumns}
                   onFilterByStatus={onFilterByStatus}
-                  onFilterByPriority={onFilterByPriority}
                   onFilterByTag={onFilterByTag}
                   onFilterByCompany={onFilterByCompany}
                 />

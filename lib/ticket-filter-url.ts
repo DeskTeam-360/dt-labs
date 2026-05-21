@@ -21,18 +21,19 @@ export const URL_PARAMS = {
   sidebar: 'sidebar',
   /** Row classification: spam | trash (junk folders) */
   ticket_type: 'ticket_type',
-  priority_ids: 'priority_ids',
 } as const
 
-/** Tampilan / preferensi UI — tidak disinkronkan ke URL (kecuali junk `view=card`) agar ganti view tidak memicu `router.replace` dan re-fetch. */
+/** UI display preferences - not synced to the URL (except junk folders `view=card`) so changing view doesn't trigger `router.replace` and re-fetch. */
 const URL_UI_ONLY_KEYS = new Set<string>([
   URL_PARAMS.sidebar,
   URL_PARAMS.view,
   URL_PARAMS.sort,
   URL_PARAMS.order,
+  /** Visibility filter removed from UI; legacy param ignored so old bookmarks don't lock the query. */
+  URL_PARAMS.visibility,
 ])
 
-/** True jika URL punya param yang mempengaruhi query data tiket (bukan view/sort/order/sidebar saja). */
+/** True if the URL has params that affect the ticket list query (not view/sort/order/sidebar alone). */
 export function hasUrlFilterParams(searchParams: URLSearchParams): boolean {
   if (searchParams.has(URL_PARAMS.ticket_type)) return true
   return Array.from(Object.values(URL_PARAMS)).some(
@@ -40,7 +41,7 @@ export function hasUrlFilterParams(searchParams: URLSearchParams): boolean {
   )
 }
 
-/** Ada salah satu param tiket yang dikenal (untuk parse awal / bookmark). */
+/** True if any known ticket URL param is present (initial parse / bookmarks). */
 export function canParseTicketsUrl(searchParams: URLSearchParams): boolean {
   return Array.from(Object.values(URL_PARAMS)).some((key) => searchParams.has(key))
 }
@@ -56,7 +57,6 @@ export interface ParsedUrlFilters {
   filterTypeIds: number[]
   filterCompanyIds: string[]
   filterTagIds: string[]
-  filterVisibility: string[]
   filterTeamIds: string[]
   filterDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
   filterDueDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
@@ -66,7 +66,6 @@ export interface ParsedUrlFilters {
   sortOrder: TicketSortOrder
   filterSidebarCollapsed: boolean
   filterTicketType: 'spam' | 'trash' | null
-  filterPriorityIds: number[]
 }
 
 export function parseFiltersFromUrl(
@@ -80,15 +79,8 @@ export function parseFiltersFromUrl(
   const typeIds = split(searchParams.get(URL_PARAMS.type_ids))
     .map((x) => parseInt(x, 10))
     .filter((n) => !isNaN(n))
-  const priorityIds = split(searchParams.get(URL_PARAMS.priority_ids))
-    .map((x) => parseInt(x, 10))
-    .filter((n) => !isNaN(n))
   const companyIds = split(searchParams.get(URL_PARAMS.company_ids))
   const tagIds = split(searchParams.get(URL_PARAMS.tag_ids))
-  const visibilityRaw = split(searchParams.get(URL_PARAMS.visibility))
-  const visibility = visibilityRaw
-    .map((v) => (v === 'specific_users' ? 'private' : v))
-    .filter((v, i, arr) => arr.indexOf(v) === i)
   const teamIds = split(searchParams.get(URL_PARAMS.team_ids))
   const dateFrom = searchParams.get(URL_PARAMS.date_from)
   const dateTo = searchParams.get(URL_PARAMS.date_to)
@@ -108,14 +100,9 @@ export function parseFiltersFromUrl(
   }
   const viewRaw = searchParams.get(URL_PARAMS.view) as 'kanban' | 'list' | 'card' | 'roundrobin' | null
   const viewMode = ['kanban', 'list', 'card', 'roundrobin'].includes(viewRaw || '') ? viewRaw! : 'kanban'
-  const sortRaw = searchParams.get(URL_PARAMS.sort)
-  const sortBy = (
-    ['id', 'title', 'priority', 'due_date', 'updated_at', 'created_at', 'company'] as const
-  ).includes(sortRaw as TicketSortField)
-    ? (sortRaw as TicketSortField)
-    : 'updated_at'
-  const orderRaw = searchParams.get(URL_PARAMS.order)
-  const sortOrder: TicketSortOrder = orderRaw === 'asc' || orderRaw === 'desc' ? orderRaw : 'desc'
+  /** List order is always ascending priority per company; sort/order params are ignored. */
+  const sortBy = 'priority' as TicketSortField
+  const sortOrder = 'asc' as TicketSortOrder
   const sidebarRaw = searchParams.get(URL_PARAMS.sidebar)
   const filterSidebarCollapsed = sidebarRaw === '0' ? false : true
 
@@ -136,10 +123,8 @@ export function parseFiltersFromUrl(
           ? []
           : [],
     filterTypeIds: typeIds,
-    filterPriorityIds: priorityIds,
     filterCompanyIds: companyIds,
     filterTagIds: tagIds,
-    filterVisibility: inJunkFolder ? [] : visibility,
     filterTeamIds: teamIds,
     filterDateRange,
     filterDueDateRange,
@@ -155,17 +140,13 @@ export function parseFiltersFromUrl(
 export function buildSearchStringFromFilters(state: {
   filterStatus: string[]
   filterTypeIds: number[]
-  filterPriorityIds?: number[]
   filterCompanyIds: string[]
   filterTagIds: string[]
-  filterVisibility: string[]
   filterTeamIds: string[]
   filterDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
   filterDueDateRange: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
   filterSearch: string
   viewMode: string
-  sortBy: string
-  sortOrder: string
   filterTicketType?: 'spam' | 'trash' | null
 }): string {
   const p = new URLSearchParams()
@@ -176,11 +157,8 @@ export function buildSearchStringFromFilters(state: {
   }
   if (state.filterStatus.length > 0) p.set(URL_PARAMS.status, state.filterStatus.join(','))
   if (state.filterTypeIds.length > 0) p.set(URL_PARAMS.type_ids, state.filterTypeIds.join(','))
-  if ((state.filterPriorityIds?.length ?? 0) > 0)
-    p.set(URL_PARAMS.priority_ids, state.filterPriorityIds!.join(','))
   if (state.filterCompanyIds.length > 0) p.set(URL_PARAMS.company_ids, state.filterCompanyIds.join(','))
   if (state.filterTagIds.length > 0) p.set(URL_PARAMS.tag_ids, state.filterTagIds.join(','))
-  if (state.filterVisibility.length > 0) p.set(URL_PARAMS.visibility, state.filterVisibility.join(','))
   if (state.filterTeamIds.length > 0) p.set(URL_PARAMS.team_ids, state.filterTeamIds.join(','))
   if (state.filterDateRange?.[0] && state.filterDateRange?.[1]) {
     p.set(URL_PARAMS.date_from, state.filterDateRange[0].toISOString())
@@ -191,9 +169,7 @@ export function buildSearchStringFromFilters(state: {
     p.set(URL_PARAMS.due_date_to, state.filterDueDateRange[1].toISOString())
   }
   if (state.filterSearch.trim()) p.set(URL_PARAMS.search, state.filterSearch.trim())
-  /** viewMode tidak ditulis ke URL — localStorage + state; hindari `&view=list` memicu replace/re-parse. */
-  if (state.sortBy && state.sortBy !== 'updated_at') p.set(URL_PARAMS.sort, state.sortBy)
-  if (state.sortOrder && state.sortOrder !== 'desc') p.set(URL_PARAMS.order, state.sortOrder)
-  /** Sidebar open/closed is kept in localStorage only — syncing it to the URL triggered full URL re-parse and reset filters. */
+  /** Ticket order is not persisted in the URL - always ascending priority via the API. */
+  /** Sidebar open/closed is kept in localStorage only - syncing it to the URL triggered full URL re-parse and reset filters. */
   return p.toString()
 }
