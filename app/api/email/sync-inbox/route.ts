@@ -23,6 +23,7 @@ import {
 } from '@/lib/db'
 import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
+import { sendRequesterTicketCreatedEmail } from '@/lib/requester-new-ticket-email'
 import { uploadBuffer } from '@/lib/storage-idrive'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 
@@ -1466,7 +1467,33 @@ export async function POST(request: NextRequest) {
             },
           })
 
-          // New inbox sender (unknown email): User Activation + Password Reset templates.
+          if (creatorUserId) {
+            try {
+              const sent = await sendRequesterTicketCreatedEmail({
+                creatorUserId,
+                creatorRole: 'customer',
+                companyId: ticketCompanyId,
+                ticketId: newTicket.id,
+                ticketTitle: title,
+                requesterEmailOverride: senderEmail,
+              })
+              if (!sent && isDebug) {
+                debugLog.push({
+                  email: senderEmail,
+                  subject: title,
+                  reason: 'WARN: requester_notification_new_ticket_created not sent (see server log)',
+                })
+              }
+            } catch (mailErr) {
+              console.error(
+                '[Sync] requester new ticket email failed:',
+                senderEmail,
+                (mailErr as Error)?.message
+              )
+            }
+          }
+
+          // New inbox sender: User Activation + Password Reset templates.
           if (shouldSendActivationForNewUser && creatorUserId && createdUserTempPassword) {
             try {
               await sendNewInboxUserOnboardingEmails({
