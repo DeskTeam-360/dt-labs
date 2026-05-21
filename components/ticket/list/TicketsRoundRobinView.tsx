@@ -1,12 +1,12 @@
 'use client'
 
-import { DeleteOutlined,EditOutlined, MoreOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, MoreOutlined } from '@ant-design/icons'
 import { Button, Dropdown, Flex, Modal,Table, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useRouter } from 'next/navigation'
 
-import type { StatusColumn,TicketRecord } from './types'
-import { DEFAULT_ALL_STATUS_COLUMNS } from './types'
+import type { StatusColumn, TicketRecord } from './types'
+import { DEFAULT_ALL_STATUS_COLUMNS, sortTickets,TICKETS_LIST_SORT_BY, TICKETS_LIST_SORT_ORDER } from './types'
 
 interface RoundRobinRow {
   key: string
@@ -28,15 +28,6 @@ function getStatusColor(status: string, columns: StatusColumn[]): string {
   return col?.color ?? '#d9d9d9'
 }
 
-function sortTicketsByProgress(a: TicketRecord, b: TicketRecord, statusOrder: string[]): number {
-  const ai = statusOrder.indexOf(a.status)
-  const bi = statusOrder.indexOf(b.status)
-  const aIdx = ai === -1 ? 9999 : ai
-  const bIdx = bi === -1 ? 9999 : bi
-  if (aIdx !== bIdx) return aIdx - bIdx
-  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-}
-
 export default function TicketsRoundRobinView({
   tickets,
   statusColumns = DEFAULT_ALL_STATUS_COLUMNS,
@@ -53,12 +44,16 @@ export default function TicketsRoundRobinView({
     byCompany.get(key)!.push(t)
   }
 
-  const statusOrder = statusColumns.map((c) => c.id)
-  for (const arr of byCompany.values()) {
-    arr.sort((a, b) => sortTicketsByProgress(a, b, statusOrder))
+  /** Sama seperti daftar/kanban: prioritas naik dalam satu company, dengan tie-break id. */
+  for (const [cid, arr] of byCompany) {
+    byCompany.set(cid, sortTickets(arr, TICKETS_LIST_SORT_BY, TICKETS_LIST_SORT_ORDER))
   }
 
-  const companyIds = Array.from(byCompany.keys())
+  const companyIds = Array.from(byCompany.keys()).sort((a, b) => {
+    if (a === '__no_company__') return 1
+    if (b === '__no_company__') return -1
+    return a.localeCompare(b)
+  })
   const maxSlots = Math.max(1, ...Array.from(byCompany.values()).map((a) => a.length))
 
   const columns: ColumnsType<RoundRobinRow> = [
@@ -83,8 +78,10 @@ export default function TicketsRoundRobinView({
         const ticket = row.tickets[i]
         if (!ticket) return null
         const bgColor = getStatusColor(ticket.status, statusColumns)
-        const textColor = ticket.type?.color??'#000'
-        const priorityColor = ticket.priority?.color?'2px solid '+ticket.priority?.color:'none'
+        const textColor = ticket.type?.color ?? '#000'
+        const p = Number(ticket.priority ?? 0)
+        const priorityColor =
+          p > 0 ? `2px solid ${p <= 1 ? '#52c41a' : p <= 2 ? '#faad14' : '#ff4d4f'}` : 'none'
         return (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', }}>
             <Flex align="center" gap={4} justify="center" style={{ width: '100%' }}>

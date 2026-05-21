@@ -9,10 +9,6 @@ import {
   projectStatuses,
   ticketAssignees,
   ticketAttachments,
-  ticketAttributs,
-  ticketChecklist,
-  ticketComments,
-  ticketPriorities,
   tickets,
   ticketTags,
   ticketTypes,
@@ -27,7 +23,12 @@ import {
   loadTicketActivitySnapshot,
   logTicketActivity,
 } from '@/lib/ticket-activity-log'
-import { coerceTicketType, parseTicketType } from '@/lib/ticket-classification'
+import { coerceTicketType, DEFAULT_TICKET_TYPE, parseTicketType } from '@/lib/ticket-classification'
+import {
+  assignCompanySupportTicketRank,
+  compactCompanySupportPriorities,
+  parseCompanyTicketDesiredRank,
+} from '@/lib/ticket-company-priority-order'
 import {
   assertTicketContactUserAllowed,
   getEffectiveCompanyIdForUser,
@@ -39,11 +40,9 @@ async function triggerTicketUpdatedAutomation(ticketId: number) {
     const [row] = await db
       .select({
         t: tickets,
-        prioritySlug: ticketPriorities.slug,
         typeSlug: ticketTypes.slug,
       })
       .from(tickets)
-      .leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id))
       .leftJoin(ticketTypes, eq(tickets.typeId, ticketTypes.id))
       .where(eq(tickets.id, ticketId))
       .limit(1)
@@ -57,7 +56,7 @@ async function triggerTicketUpdatedAutomation(ticketId: number) {
       title: row.t.title,
       description: row.t.description,
       status: row.t.status,
-      priority_slug: row.prioritySlug ?? null,
+      priority: row.t.priority ?? 0,
       type_slug: row.typeSlug ?? null,
       ticket_type: coerceTicketType(row.t.ticketType),
       company_id: row.t.companyId,
@@ -69,6 +68,13 @@ async function triggerTicketUpdatedAutomation(ticketId: number) {
   } catch (err) {
     console.error('Automation rules error (ticket_updated):', err)
   }
+}
+
+/** Compare DB priority values after snapshot (supports nullable integer columns). */
+function ticketPriSnapshot(raw: unknown): number | null {
+  if (raw === null || raw === undefined) return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
 }
 
 /** PATCH /api/tickets/[id] - Update ticket (status, or full) */
@@ -95,21 +101,82 @@ export async function PATCH(
 
   // Quick path: only status update (e.g. kanban drag)
   if (Object.keys(body).length === 1 && body.status !== undefined) {
+    const nextStatus = String(body.status)
+
     const [cur] = await db
-      .select({ status: tickets.status })
+      .select({
+        status: tickets.status,
+        companyId: tickets.companyId,
+        ticketType: tickets.ticketType,
+        priority: tickets.priority,
+      })
       .from(tickets)
       .where(eq(tickets.id, ticketId))
       .limit(1)
-    await db.update(tickets).set({ status: body.status, updatedAt: new Date() }).where(eq(tickets.id, ticketId))
-    if (cur && cur.status !== body.status) {
+
+    const isSupport = coerceTicketType(cur?.ticketType) === DEFAULT_TICKET_TYPE
+    const companyId = cur?.companyId ?? null
+
+    const closingSupportQueue =
+      Boolean(
+        isSupport &&
+          companyId &&
+          nextStatus === 'closed' &&
+          cur.status !== nextStatus &&
+          cur.status !== 'closed'
+      )
+
+    const reopenSupportQueue = Boolean(isSupport && companyId && cur?.status === 'closed' && nextStatus !== 'closed')
+
+    const setPayload: { status: string; updatedAt: Date; priority?: number | null } = {
+      status: nextStatus,
+      updatedAt: new Date(),
+    }
+    if (closingSupportQueue) {
+      setPayload.priority = null
+    }
+
+    if (reopenSupportQueue && companyId) {
+      await db.transaction(async (tx) => {
+        await tx.update(tickets).set(setPayload).where(eq(tickets.id, ticketId))
+        await assignCompanySupportTicketRank(tx, companyId, ticketId, 'append')
+      })
+    } else if (closingSupportQueue && companyId) {
+      await db.transaction(async (tx) => {
+        await tx.update(tickets).set(setPayload).where(eq(tickets.id, ticketId))
+        await compactCompanySupportPriorities(tx, companyId)
+      })
+    } else {
+      await db.update(tickets).set(setPayload).where(eq(tickets.id, ticketId))
+    }
+
+    const [finalRow] = await db
+      .select({ priority: tickets.priority })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1)
+
+    const priorFromSnap = ticketPriSnapshot(cur?.priority)
+    const priToSnap = ticketPriSnapshot(finalRow?.priority)
+
+    if (cur && cur.status !== nextStatus) {
+      const changedKeys: string[] = ['status']
+      const changes: Record<string, { from: unknown; to: unknown }> = {
+        status: { from: cur.status, to: nextStatus },
+      }
+      if (priorFromSnap !== priToSnap) {
+        changedKeys.push('priority')
+        changes.priority = { from: priorFromSnap, to: priToSnap }
+      }
+
       await logTicketActivity({
         ticketId,
         actorUserId,
         actorRole,
         action: 'ticket_updated',
         metadata: {
-          changed_keys: ['status'],
-          changes: { status: { from: cur.status, to: body.status } },
+          changed_keys: changedKeys,
+          changes,
         },
       })
       try {
@@ -134,7 +201,7 @@ export async function PATCH(
           ticketTitle: meta?.title || 'Ticket',
           type: 'status_changed',
           title: 'Ticket status updated',
-          body: `"${meta?.title || 'Ticket'}": ${cur.status} → ${body.status}`,
+          body: `"${meta?.title || 'Ticket'}": ${cur.status} → ${nextStatus}`,
           actorUserId,
           actorName,
           actorRole: role ?? null,
@@ -149,7 +216,7 @@ export async function PATCH(
             title: tickets.title,
             status: tickets.status,
             teamId: tickets.teamId,
-            priorityId: tickets.priorityId,
+            priority: tickets.priority,
             companyId: tickets.companyId,
             typeId: tickets.typeId,
           })
@@ -162,7 +229,7 @@ export async function PATCH(
             title: slackRow.title,
             status: slackRow.status,
             teamId: slackRow.teamId ?? null,
-            priorityId: slackRow.priorityId ?? null,
+            priority: slackRow.priority ?? null,
             companyId: slackRow.companyId ?? null,
             typeId: slackRow.typeId ?? null,
             previousStatus: cur.status,
@@ -255,7 +322,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid ticket_type' }, { status: 400 })
     }
     const [cur] = await db
-      .select({ ticketType: tickets.ticketType })
+      .select({ ticketType: tickets.ticketType, companyId: tickets.companyId })
       .from(tickets)
       .where(eq(tickets.id, ticketId))
       .limit(1)
@@ -263,6 +330,13 @@ export async function PATCH(
       .update(tickets)
       .set({ ticketType: cls, updatedAt: new Date() })
       .where(eq(tickets.id, ticketId))
+    if (
+      cur?.companyId &&
+      coerceTicketType(cur.ticketType) === DEFAULT_TICKET_TYPE &&
+      cls !== DEFAULT_TICKET_TYPE
+    ) {
+      await compactCompanySupportPriorities(db, cur.companyId)
+    }
     if (cur && coerceTicketType(cur.ticketType) !== cls) {
       await logTicketActivity({
         ticketId,
@@ -316,7 +390,7 @@ export async function PATCH(
     visibility,
     team_id,
     type_id,
-    priority_id,
+    priority,
     company_id,
     due_date,
     assignees,
@@ -335,6 +409,19 @@ export async function PATCH(
   }
 
   const beforeSnapshot = await loadTicketActivitySnapshot(ticketId)
+
+  const [prioCtxRow] = await db
+    .select({ companyId: tickets.companyId, ticketType: tickets.ticketType })
+    .from(tickets)
+    .where(eq(tickets.id, ticketId))
+    .limit(1)
+  if (!prioCtxRow) {
+    return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  }
+
+  if (!beforeSnapshot) {
+    return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  }
 
   let companyIdUpdate: string | null | undefined = undefined
   if (company_id !== undefined) {
@@ -364,7 +451,7 @@ export async function PATCH(
         companyIdUpdate = contactEffectiveCompany
         if (curRow?.companyId && curRow.companyId !== contactEffectiveCompany) {
           ticketCrossCompanyWarning =
-            'Kontak dari perusahaan berbeda: Company tiket sudah disesuaikan ke perusahaan kontak.'
+            'Contact is from another company: ticket company was already aligned to the contact\'s company.'
         }
       }
     }
@@ -381,6 +468,57 @@ export async function PATCH(
     }
   }
 
+  const oldCompanyId = prioCtxRow.companyId ?? null
+  const oldTicketType = coerceTicketType(prioCtxRow.ticketType)
+
+  const nextCompanyResolved =
+    companyIdUpdate !== undefined ? companyIdUpdate : oldCompanyId
+
+  const nextTicketTypeResolved =
+    ticketTypeUpdate !== undefined ? ticketTypeUpdate : oldTicketType
+
+  const companyChanging = nextCompanyResolved !== oldCompanyId
+
+  const closingForSupportQueue =
+    status !== undefined &&
+    String(status) === 'closed' &&
+    beforeSnapshot.status !== 'closed' &&
+    nextTicketTypeResolved === DEFAULT_TICKET_TYPE &&
+    nextCompanyResolved != null
+
+  const openingFromClosedSupport =
+    status !== undefined &&
+    beforeSnapshot.status === 'closed' &&
+    String(status) !== 'closed' &&
+    nextTicketTypeResolved === DEFAULT_TICKET_TYPE &&
+    nextCompanyResolved != null
+
+  const priorityRankReorder =
+    priority !== undefined &&
+    !closingForSupportQueue &&
+    nextTicketTypeResolved === DEFAULT_TICKET_TYPE &&
+    nextCompanyResolved != null
+
+  const compactAfterLeavingSupport =
+    ticket_type !== undefined &&
+    actorRole !== 'customer' &&
+    oldTicketType === DEFAULT_TICKET_TYPE &&
+    nextTicketTypeResolved !== DEFAULT_TICKET_TYPE &&
+    oldCompanyId != null
+
+  const compactCompanyQueueAfterClosingSupport =
+    closingForSupportQueue &&
+    oldTicketType === DEFAULT_TICKET_TYPE &&
+    oldCompanyId != null &&
+    !companyChanging
+
+  const needsReorderTxn =
+    priorityRankReorder ||
+    companyChanging ||
+    compactAfterLeavingSupport ||
+    openingFromClosedSupport ||
+    compactCompanyQueueAfterClosingSupport
+
   const ticketUpdates: Record<string, unknown> = {
     ...(title !== undefined && { title }),
     ...(description !== undefined && { description }),
@@ -389,7 +527,18 @@ export async function PATCH(
     ...(visibility !== undefined && { visibility }),
     ...(team_id !== undefined && { teamId: team_id || null }),
     ...(type_id !== undefined && { typeId: type_id ?? null }),
-    ...(priority_id !== undefined && { priorityId: priority_id ?? null }),
+    ...(closingForSupportQueue && { priority: null }),
+    ...(priority !== undefined &&
+      !priorityRankReorder &&
+      !closingForSupportQueue && {
+        priority:
+          priority === null || priority === ''
+            ? null
+            : (() => {
+                const n = Number(priority)
+                return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null
+              })(),
+      }),
     ...(companyIdUpdate !== undefined && { companyId: companyIdUpdate }),
     ...(due_date !== undefined && { dueDate: due_date ? new Date(due_date) : null }),
     ...(ticketTypeUpdate !== undefined && { ticketType: ticketTypeUpdate }),
@@ -398,7 +547,52 @@ export async function PATCH(
         contact_user_id === null || contact_user_id === '' ? null : String(contact_user_id),
     }),
   }
-  if (Object.keys(ticketUpdates).length > 0) {
+
+  if (needsReorderTxn) {
+    await db.transaction(async (tx) => {
+      if (companyChanging && oldTicketType === DEFAULT_TICKET_TYPE && oldCompanyId != null) {
+        await compactCompanySupportPriorities(tx, oldCompanyId, ticketId)
+      }
+
+      if (Object.keys(ticketUpdates).length > 0) {
+        await tx
+          .update(tickets)
+          .set({ ...ticketUpdates, updatedAt: new Date() })
+          .where(eq(tickets.id, ticketId))
+      }
+
+      if (compactAfterLeavingSupport && oldCompanyId != null) {
+        await compactCompanySupportPriorities(tx, oldCompanyId)
+      }
+
+      if (priorityRankReorder && nextCompanyResolved) {
+        await assignCompanySupportTicketRank(
+          tx,
+          nextCompanyResolved,
+          ticketId,
+          parseCompanyTicketDesiredRank(priority)
+        )
+      } else if (
+        openingFromClosedSupport &&
+        !priorityRankReorder &&
+        nextCompanyResolved
+      ) {
+        await assignCompanySupportTicketRank(tx, nextCompanyResolved, ticketId, 'append')
+      } else if (
+        companyChanging &&
+        !openingFromClosedSupport &&
+        priority === undefined &&
+        nextTicketTypeResolved === DEFAULT_TICKET_TYPE &&
+        nextCompanyResolved
+      ) {
+        await assignCompanySupportTicketRank(tx, nextCompanyResolved, ticketId, 'append')
+      }
+
+      if (compactCompanyQueueAfterClosingSupport && oldCompanyId) {
+        await compactCompanySupportPriorities(tx, oldCompanyId)
+      }
+    })
+  } else if (Object.keys(ticketUpdates).length > 0) {
     await db
       .update(tickets)
       .set({ ...ticketUpdates, updatedAt: new Date() })
@@ -494,7 +688,7 @@ export async function PATCH(
           title: afterSnapshot.title,
           status: afterSnapshot.status,
           teamId: afterSnapshot.teamId,
-          priorityId: afterSnapshot.priorityId,
+          priority: afterSnapshot.priority,
           companyId: afterSnapshot.companyId,
           typeId: afterSnapshot.typeId,
           previousStatus: String(statusChange.from),
@@ -605,7 +799,7 @@ export async function DELETE(
   const actorUserId = session.user.id!
 
   const [cur] = await db
-    .select({ ticketType: tickets.ticketType })
+    .select({ ticketType: tickets.ticketType, companyId: tickets.companyId })
     .from(tickets)
     .where(eq(tickets.id, ticketId))
     .limit(1)
@@ -624,6 +818,10 @@ export async function DELETE(
     .update(tickets)
     .set({ ticketType: 'trash', updatedAt: new Date() })
     .where(eq(tickets.id, ticketId))
+
+  if (cur.companyId && beforeType === DEFAULT_TICKET_TYPE) {
+    await compactCompanySupportPriorities(db, cur.companyId)
+  }
 
   await logTicketActivity({
     ticketId,

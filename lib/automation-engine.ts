@@ -2,7 +2,7 @@
  * Automation rules engine: evaluate conditions and apply actions when tickets are
  * created, updated, or when a new comment/reply/note is added.
  */
-import { and, desc,eq } from 'drizzle-orm'
+import { and, desc, eq, or } from 'drizzle-orm'
 
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import { db } from '@/lib/db'
@@ -42,6 +42,9 @@ export interface TicketContext {
   title?: string | null
   description?: string | null
   status?: string | null
+  /** Nilai bilangan bulat prioritas tiket */
+  priority?: number | null
+  /** @deprecated Dipetakan dari priority untuk aturan otomasi lawas */
   priority_slug?: string | null
   /** Ticket type slug (ticket_types.slug), for conditions e.g. Type = bug */
   type_slug?: string | null
@@ -83,6 +86,47 @@ function evalLeaf(leaf: OurConditionLeaf, ctx: TicketContext): boolean {
     .replace(/\s+/g, '')
   const expectVal = leaf.value
 
+  if (field === 'priority') {
+    const act = ctx.priority
+    const actNum =
+      act === null || act === undefined || Number.isNaN(Number(act)) ? NaN : Number(act)
+    const expNum = Number(expectVal)
+
+    if (op === 'null' || op === 'isnull') {
+      return act === null || act === undefined || Number.isNaN(actNum)
+    }
+    if (op === 'notnull' || op === 'isnotnull') {
+      return act !== null && act !== undefined && !Number.isNaN(actNum)
+    }
+
+    switch (op) {
+      case '=':
+        return !Number.isNaN(actNum) && !Number.isNaN(expNum) && actNum === expNum
+      case '!=':
+        return Number.isNaN(actNum) || Number.isNaN(expNum) || actNum !== expNum
+      case 'in': {
+        const list = String(expectVal ?? '')
+          .split(',')
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => !Number.isNaN(n))
+        return list.length > 0 && !Number.isNaN(actNum) && list.includes(actNum)
+      }
+      case 'notin': {
+        const list = String(expectVal ?? '')
+          .split(',')
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => !Number.isNaN(n))
+        return list.length === 0 || Number.isNaN(actNum) || !list.includes(actNum)
+      }
+      default: {
+        const slug = (ctx.priority_slug ?? '').toLowerCase()
+        const expectStr = String(expectVal ?? '').toLowerCase()
+        if (slug) return slug === expectStr
+        return String(ctx.priority ?? '').toLowerCase() === expectStr
+      }
+    }
+  }
+
   const getRaw = (): unknown => {
     switch (field) {
       case 'subject':
@@ -90,8 +134,6 @@ function evalLeaf(leaf: OurConditionLeaf, ctx: TicketContext): boolean {
         return ctx.title ?? null
       case 'description':
         return ctx.description ?? null
-      case 'priority':
-        return ctx.priority_slug ?? null
       case 'type':
       case 'type_slug':
         return ctx.type_slug ?? null
@@ -177,11 +219,9 @@ export async function loadAutomationTicketContext(ticketId: number): Promise<Tic
   const [row] = await db
     .select({
       t: tickets,
-      prioritySlug: ticketPriorities.slug,
       typeSlug: ticketTypes.slug,
     })
     .from(tickets)
-    .leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id))
     .leftJoin(ticketTypes, eq(tickets.typeId, ticketTypes.id))
     .where(eq(tickets.id, ticketId))
     .limit(1)
@@ -190,13 +230,25 @@ export async function loadAutomationTicketContext(ticketId: number): Promise<Tic
     .select({ userId: ticketAssignees.userId })
     .from(ticketAssignees)
     .where(eq(ticketAssignees.ticketId, ticketId))
+
+  let prioritySlug: string | null = null
+  if (row.t.priority != null) {
+    const [pr] = await db
+      .select({ slug: ticketPriorities.slug })
+      .from(ticketPriorities)
+      .where(or(eq(ticketPriorities.sortOrder, row.t.priority), eq(ticketPriorities.id, row.t.priority)))
+      .limit(1)
+    prioritySlug = pr?.slug ?? null
+  }
+
   const t = row.t
   return {
     id: t.id,
     title: t.title,
     description: t.description,
     status: t.status,
-    priority_slug: row.prioritySlug ?? null,
+    priority: t.priority ?? 0,
+    priority_slug: prioritySlug,
     type_slug: row.typeSlug ?? null,
     ticket_type: coerceTicketType(t.ticketType),
     company_id: t.companyId,
@@ -265,13 +317,18 @@ export async function runAutomationRules(
     const actions = (rule.actions || {}) as AutomationActions
     const updates: Record<string, unknown> = {}
 
-    if (actions.priority_slug) {
+    if (actions.priority !== undefined && actions.priority !== null && `${actions.priority}`.trim() !== '') {
+      const n = Number(actions.priority)
+      if (Number.isFinite(n)) {
+        updates.priority = Math.max(0, Math.floor(n))
+      }
+    } else if (actions.priority_slug) {
       const [p] = await db
-        .select({ id: ticketPriorities.id })
+        .select({ sortOrder: ticketPriorities.sortOrder, id: ticketPriorities.id })
         .from(ticketPriorities)
         .where(eq(ticketPriorities.slug, String(actions.priority_slug)))
         .limit(1)
-      if (p) updates.priorityId = p.id
+      if (p) updates.priority = Number(p.sortOrder ?? p.id ?? 0)
     }
     if (actions.type_slug) {
       const [t] = await db

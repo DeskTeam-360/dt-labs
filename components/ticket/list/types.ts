@@ -35,7 +35,8 @@ export interface TicketRecord {
   type_id: number | null
   /** DB ticket_type: support | spam | trash (not ticket_types / type_id) */
   ticket_type?: string
-  priority_id: number | null
+  /** Numeric queue priority; null when out of ranking (e.g. closed support). */
+  priority: number | null
   company_id: string | null
   created_at: string
   updated_at: string
@@ -47,7 +48,6 @@ export interface TicketRecord {
   by_label?: string
   team_name?: string
   type?: { id: number; title: string; slug: string; color: string } | null
-  priority?: { id: number; title: string; slug: string; color: string } | null
   company?: { id: string; name: string; color?: string; email?: string | null } | null
   tags?: Array<{ id: string; name: string; slug: string; color?: string }>
   assignees?: Array<{ id: string; user_id: string; user_name?: string }>
@@ -154,19 +154,18 @@ export function getVisibilityColor(visibility: string): string {
 export type TicketSortField = 'id' | 'title' | 'priority' | 'due_date' | 'updated_at' | 'created_at' | 'company'
 export type TicketSortOrder = 'asc' | 'desc'
 
-/** Sort tickets by field and order. Uses allPriorities for priority field order. */
-export function sortTickets(
-  tickets: TicketRecord[],
-  sortBy: TicketSortField,
-  sortOrder: TicketSortOrder,
-  allPriorities?: Array<{ id: number }>
-): TicketRecord[] {
-  const dir = sortOrder === 'asc' ? 1 : -1
-  const getPriorityOrder = (r: TicketRecord) => {
-    if (!r.priority || !allPriorities?.length) return 999
-    const idx = allPriorities.findIndex((p) => p.id === r.priority!.id)
-    return idx >= 0 ? idx : 999
-  }
+/** Ticket list order: ascending priority — matches API and board/card/list views. */
+export const TICKETS_LIST_SORT_BY = 'priority' satisfies TicketSortField as TicketSortField
+export const TICKETS_LIST_SORT_ORDER = 'asc' satisfies TicketSortOrder as TicketSortOrder
+
+function ticketClientPriorityRank(p: TicketRecord['priority']): number {
+  if (p === null || p === undefined || p <= 0) return Number.MAX_SAFE_INTEGER
+  return p
+}
+
+/** Sort tickets by field. For priority, sort is always ascending (lower values first); null/low ranks last. */
+export function sortTickets(tickets: TicketRecord[], sortBy: TicketSortField, sortOrder: TicketSortOrder): TicketRecord[] {
+  const dir = sortBy === 'priority' ? 1 : sortOrder === 'asc' ? 1 : -1
   return [...tickets].sort((a, b) => {
     let cmp = 0
     switch (sortBy) {
@@ -177,7 +176,11 @@ export function sortTickets(
         cmp = (a.title || '').localeCompare(b.title || '')
         break
       case 'priority':
-        cmp = getPriorityOrder(a) - getPriorityOrder(b)
+        cmp = ticketClientPriorityRank(a.priority) - ticketClientPriorityRank(b.priority)
+        if (cmp === 0) {
+          cmp = String(a.company?.id ?? '').localeCompare(String(b.company?.id ?? ''))
+          if (cmp === 0) cmp = a.id - b.id
+        }
         break
       case 'due_date':
         cmp = new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()

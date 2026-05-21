@@ -19,7 +19,6 @@ import {
   ticketCcRecipients,
   ticketChecklist,
   ticketComments,
-  ticketPriorities,
   tickets,
   ticketTags,
   ticketTypes,
@@ -194,7 +193,6 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
       contact: ticketContactUser,
       team: teams,
       type: ticketTypes,
-      priority: ticketPriorities,
       company: companies,
       project: projects,
     })
@@ -203,7 +201,6 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     .leftJoin(ticketContactUser, eq(tickets.contactUserId, ticketContactUser.id))
     .leftJoin(teams, eq(tickets.teamId, teams.id))
     .leftJoin(ticketTypes, eq(tickets.typeId, ticketTypes.id))
-    .leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id))
     .leftJoin(companies, eq(tickets.companyId, companies.id))
     .leftJoin(projects, eq(tickets.projectId, projects.id))
     .where(eq(tickets.id, ticketId))
@@ -324,7 +321,7 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     team_id: t.teamId,
     type_id: t.typeId,
     ticket_type: ticketTypeCls,
-    priority_id: t.priorityId,
+    priority: t.priority ?? null,
     company_id: t.companyId,
     project_id: t.projectId ?? null,
     project_status_id: t.projectStatusId ?? null,
@@ -357,14 +354,6 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     team: ticketRow.team ? { id: ticketRow.team.id, name: ticketRow.team.name } : null,
     type: ticketRow.type
       ? { id: ticketRow.type.id, title: ticketRow.type.title, slug: ticketRow.type.slug, color: ticketRow.type.color }
-      : null,
-    priority: ticketRow.priority
-      ? {
-          id: ticketRow.priority.id,
-          title: ticketRow.priority.title,
-          slug: ticketRow.priority.slug,
-          color: ticketRow.priority.color,
-        }
       : null,
     company: ticketRow.company
       ? {

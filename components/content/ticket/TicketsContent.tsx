@@ -66,7 +66,6 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     teams,
     users,
     ticketTypes,
-    ticketPriorities,
     companies,
     allTags,
     allStatuses,
@@ -80,8 +79,6 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     setFilterCompanyIds,
     filterTagIds,
     setFilterTagIds,
-    filterVisibility,
-    setFilterVisibility,
     filterTeamIds,
     setFilterTeamIds,
     filterDateRange,
@@ -95,9 +92,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     viewMode,
     setViewMode,
     sortBy,
-    setSortBy,
     sortOrder,
-    setSortOrder,
     selectedAssignees,
     setSelectedAssignees,
     selectedTagIds,
@@ -122,14 +117,10 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     handleDragEnd,
     activeId,
     columnsToShow,
-    userTeamIds,
     lookupReady,
     getFilterQueryString,
     filterTicketType,
-    filterPriorityIds,
-    setFilterPriorityIds,
     filterByStatusFromChip,
-    filterByPriorityFromChip,
     filterByTagFromChip,
     filterByCompanyFromChip,
     submitting,
@@ -158,10 +149,6 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             onCreateClick={handleCreate}
             loading={loading}
             isCustomer={isCustomer}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onSortByChange={setSortBy}
-            onSortOrderChange={setSortOrder}
             filterSearch={filterSearch}
             onFilterSearchChange={setFilterSearch}
             filterTicketType={filterTicketType}
@@ -202,9 +189,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               canDeleteTicket={canDeleteTicket}
               sortBy={sortBy}
               sortOrder={sortOrder}
-              allPriorities={ticketPriorities}
               onFilterByStatus={filterByStatusFromChip}
-              onFilterByPriority={filterByPriorityFromChip}
               onFilterByTag={filterByTagFromChip}
               onFilterByCompany={filterByCompanyFromChip}
             />
@@ -212,7 +197,6 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             <TicketsListView
               tickets={filteredTickets}
               allStatusColumns={allStatusColumns}
-              allPriorities={ticketPriorities}
               isCustomer={isCustomer}
               filterTicketType={filterTicketType}
               onEdit={handleEdit}
@@ -221,7 +205,6 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               onBulkMoveToSpam={!isCustomer ? handleBulkMoveToSpam : undefined}
               onBulkMoveToTrash={!isCustomer && canDeleteTicket ? handleBulkMoveToTrash : undefined}
               onFilterByStatus={filterByStatusFromChip}
-              onFilterByPriority={filterByPriorityFromChip}
               onFilterByTag={filterByTagFromChip}
               onFilterByCompany={filterByCompanyFromChip}
             />
@@ -246,10 +229,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               canDeleteTicket={canDeleteTicket}
               sortBy={sortBy}
               sortOrder={sortOrder}
-              allPriorities={ticketPriorities}
               allStatusColumns={allStatusColumns}
               onFilterByStatus={filterByStatusFromChip}
-              onFilterByPriority={filterByPriorityFromChip}
               onFilterByTag={filterByTagFromChip}
               onFilterByCompany={filterByCompanyFromChip}
             />
@@ -268,11 +249,6 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         onFilterCompanyIdsChange={setFilterCompanyIds}
         filterTagIds={filterTagIds}
         onFilterTagIdsChange={setFilterTagIds}
-        filterPriorityIds={filterPriorityIds}
-        onFilterPriorityIdsChange={setFilterPriorityIds}
-        ticketPriorities={ticketPriorities}
-        filterVisibility={filterVisibility}
-        onFilterVisibilityChange={setFilterVisibility}
         filterTeamIds={filterTeamIds}
         onFilterTeamIdsChange={setFilterTeamIds}
         filterDateRange={filterDateRange}
@@ -304,10 +280,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         form={form}
         teams={teams}
         users={users}
-        currentUserId={currentUser.id}
-        userTeamIds={userTeamIds}
         ticketTypes={ticketTypes}
-        ticketPriorities={ticketPriorities}
         companies={companies}
         allTags={allTags}
         allStatuses={allStatuses}

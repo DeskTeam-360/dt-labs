@@ -21,6 +21,13 @@ function statusLabelForCustomer(slug: string | undefined | null, options: Status
   return ct || s.title
 }
 
+function formatTicketNumericPriority(p: unknown): string {
+  if (p === null || p === undefined || p === '') return '—'
+  const n = typeof p === 'number' && Number.isFinite(p) ? p : Number((p ?? NaN) as number)
+  if (!Number.isFinite(n) || n <= 0) return '—'
+  return String(Math.max(0, Math.floor(n)))
+}
+
 interface CommentAttachment {
   id: string
   file_url: string
@@ -67,9 +74,6 @@ interface TabGeneralCustomerProps {
   typeOptions: { id: number; title: string; slug: string; color: string }[]
   onTypeChange?: (typeId: number | null) => void | Promise<void>
   typeChanging?: boolean
-  priorityOptions: { id: number; title: string; slug: string; color: string }[]
-  onPriorityChange?: (priorityId: number | null) => void | Promise<void>
-  priorityChanging?: boolean
   comments: Comment[]
   currentUserId: string
   editingComment: string | null
@@ -110,9 +114,6 @@ export default function TabGeneralCustomer({
   typeOptions,
   onTypeChange,
   typeChanging = false,
-  priorityOptions,
-  onPriorityChange,
-  priorityChanging = false,
   comments,
   currentUserId,
   editingComment,
@@ -479,26 +480,7 @@ export default function TabGeneralCustomer({
             )}
           </Descriptions.Item>
           <Descriptions.Item label="Priority">
-            {onPriorityChange ? (
-              <Select
-                value={ticketData.priority_id ?? undefined}
-                onChange={(v) => onPriorityChange(v ?? null)}
-                loading={priorityChanging}
-                options={priorityOptions.map((p) => ({
-                  value: p.id,
-                  label: <Tag color={p.color} style={{ margin: 0 }}>{p.title}</Tag>,
-                }))}
-                style={{ minWidth: 140, width: '100%' }}
-                allowClear
-                placeholder="Select priority"
-              />
-            ) : (
-              <Text>
-                {ticketData.priority_id
-                  ? priorityOptions.find((p) => p.id === ticketData.priority_id)?.title ?? '—'
-                  : '—'}
-              </Text>
-            )}
+            <Text>{formatTicketNumericPriority(ticketData.priority)}</Text>
           </Descriptions.Item>
           <Descriptions.Item label="Created By">
             <TicketUserMention userId={creatorId} email={creatorEmail}>

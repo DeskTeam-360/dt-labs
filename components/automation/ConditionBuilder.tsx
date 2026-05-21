@@ -48,12 +48,7 @@ function SearchableValueSelector(props: VersatileSelectorProps) {
 export const CONDITION_FIELDS: Field[] = [
   { name: 'subject', label: 'Subject (ticket title)' },
   { name: 'description', label: 'Description' },
-  { name: 'priority', label: 'Priority', valueEditorType: 'select', values: [
-    { name: 'urgent', label: 'Urgent' },
-    { name: 'high', label: 'High' },
-    { name: 'medium', label: 'Medium' },
-    { name: 'low', label: 'Low' },
-  ]},
+  { name: 'priority', label: 'Priority (bilangan bulat)' },
   // { name: 'status', label: 'Status', valueEditorType: 'select', values: [
   //   { name: 'pending', label: 'Pending' },
   //   { name: 'open', label: 'Open' },

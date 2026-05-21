@@ -8,6 +8,7 @@ import {
   Flex,
   Form,
   Input,
+  InputNumber,
   Modal,
   Row,
   Select,
@@ -29,10 +30,7 @@ interface TicketFormModalProps {
   form: FormInstance
   teams: Team[]
   users: UserRecord[]
-  currentUserId?: string
-  userTeamIds?: string[]
   ticketTypes: Array<{ id: number; title: string; color: string }>
-  ticketPriorities: Array<{ id: number; title: string; slug: string; color: string }>
   companies: Array<{ id: string; name: string }>
   allTags: Array<{ id: string; name: string }>
   allStatuses: Array<{ slug: string; title: string; is_active?: boolean }>
@@ -61,10 +59,7 @@ export default function TicketFormModal({
   form,
   teams,
   users,
-  currentUserId,
-  userTeamIds = [],
   ticketTypes,
-  ticketPriorities,
   companies,
   allTags,
   allStatuses,
@@ -97,8 +92,6 @@ export default function TicketFormModal({
         : `ticket-files-${Math.random().toString(36).slice(2)}`
   }
   const fileInputId = fileInputIdRef.current
-  const selectableTeams = userTeamIds.length > 0 ? teams.filter((t) => userTeamIds.includes(t.id)) : []
-
   const watchedContactUserId = Form.useWatch('contact_user_id', form)
   const watchedCompanyId = Form.useWatch('company_id', form)
   const contactCompanyMismatchHint = useMemo(() => {
@@ -107,19 +100,20 @@ export default function TicketFormModal({
     const u = users.find((x) => x.id === watchedContactUserId)
     const uc = u?.company_id
     if (!uc || uc === watchedCompanyId) return null
-    const otherName = companies.find((c) => c.id === uc)?.name ?? 'perusahaan lain'
-    return `Kontak dari perusahaan berbeda (${otherName}). Company tiket akan mengikuti perusahaan kontak saat tiket dibuat (lintas perusahaan).`
+    const otherName = companies.find((c) => c.id === uc)?.name ?? 'another company'
+    return `Contact belongs to a different company (${otherName}). When the ticket is created, its company will match the contact's company (cross-company).`
   }, [showSimplifiedForm, open, watchedContactUserId, watchedCompanyId, users, companies])
 
   const statusOptionsForForm = useMemo(() => {
+    if (!editingTicket || showSimplifiedForm) return []
     const active = allStatuses.filter((s) => s.is_active !== false)
-    const cur = editingTicket?.status
+    const cur = editingTicket.status
     if (cur && !active.some((s) => s.slug === cur)) {
       const row = allStatuses.find((s) => s.slug === cur)
       return row ? [...active, row] : active
     }
     return active
-  }, [allStatuses, editingTicket?.status])
+  }, [allStatuses, editingTicket, editingTicket?.status, showSimplifiedForm])
 
   return (
     <Modal
@@ -206,7 +200,7 @@ export default function TicketFormModal({
         )}
 
         <Row gutter={24}>
-          {!showSimplifiedForm && (
+          {editingTicket && !showSimplifiedForm ? (
             <Col span={8}>
               <Form.Item name="status" label="Status" rules={[{ required: true }]}>
                 <Select>
@@ -218,8 +212,8 @@ export default function TicketFormModal({
                 </Select>
               </Form.Item>
             </Col>
-          )}
-          <Col span={showSimplifiedForm ? 12 : 8}>
+          ) : null}
+          <Col span={showSimplifiedForm ? 12 : editingTicket ? 8 : 12}>
             <Form.Item name="type_id" label="Type">
               <Select placeholder="Select type" allowClear>
                 {ticketTypes.map((t) => (
@@ -242,30 +236,18 @@ export default function TicketFormModal({
             </Form.Item>
           </Col>
 
-          <Col span={showSimplifiedForm ? 12 : 8}>
+          <Col span={showSimplifiedForm ? 12 : editingTicket ? 8 : 12}>
             <Form.Item
-              name="priority_id"
+              name="priority"
               label="Priority"
-              rules={[{ required: true, message: 'Please select priority!' }]}
+              tooltip={
+                showSimplifiedForm
+                  ? '0 or empty appends the ticket to the back of the queue (the slot is assigned automatically—we do not store 0). Other numbers define order; within one company each support ticket has a distinct priority (1, 2, 3 …).'
+                  : 'For support tickets per company: each priority number is unique (1 is first, and so on). 0 means append at the end of that company’s queue.'
+              }
+              rules={[{ required: true, message: 'Enter a priority number' }]}
             >
-              <Select placeholder="Select priority" allowClear>
-                {ticketPriorities.map((p) => (
-                  <Option key={p.id} value={p.id}>
-                    <Space>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          width: 12,
-                          height: 12,
-                          borderRadius: 2,
-                          backgroundColor: p.color,
-                        }}
-                      />
-                      {p.title}
-                    </Space>
-                  </Option>
-                ))}
-              </Select>
+              <InputNumber min={0} precision={0} placeholder="0 = end of queue; 1, 2 …" style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           {!showSimplifiedForm && (
@@ -311,6 +293,8 @@ export default function TicketFormModal({
           )}
         </Row>
 
+<Row gutter={24}>
+  <Col span={12}>
         {!showSimplifiedForm && (
           <Form.Item
             name="contact_user_id"
@@ -335,105 +319,49 @@ export default function TicketFormModal({
         {!showSimplifiedForm && contactCompanyMismatchHint ? (
           <Alert type="warning" showIcon message={contactCompanyMismatchHint} style={{ marginBottom: 16 }} />
         ) : null}
+        </Col>
+        <Col span={12}>
 
         {!showSimplifiedForm && (
           <>
-
-
-            <Form.Item name="visibility" label="Visibility" rules={[{ required: true }]}>
-              <Select
-                onChange={(value) => {
-                  if (value !== 'specific_users') {
-                    onSelectedAssigneesChange([])
-                  } else if (currentUserId && !selectedAssignees.includes(currentUserId)) {
-                    onSelectedAssigneesChange([currentUserId, ...selectedAssignees])
-                  }
-                }}
-              >
-                <Option value="public">Public</Option>
-                <Option value="team">Team</Option>
-                <Option value="specific_users">Specific Users</Option>
-
+            <Form.Item
+              name="team_id"
+              label="Team"
+              tooltip="Optional. Set when the ticket is tied to a team; newly created tickets are always public."
+            >
+              <Select placeholder="No team" allowClear showSearch optionFilterProp="label">
+                {teams.map((t) => (
+                  <Option key={t.id} value={t.id} label={t.name}>
+                    {t.name}
+                  </Option>
+                ))}
               </Select>
             </Form.Item>
 
-            <Form.Item
-              noStyle
-              shouldUpdate={(prevValues, currentValues) =>
-                prevValues.visibility !== currentValues.visibility
-              }
-            >
-              {({ getFieldValue }) =>
-                (getFieldValue('visibility') === 'team' || getFieldValue('visibility') === 'public') ? (
-                  <Form.Item
-                    name="team_id"
-                    label="Team"
-                    rules={[{ required: getFieldValue('visibility') === 'team', message: 'Please select team!' }]}
-                  >
-                    <Select placeholder="Select Team"
-                    showSearch
-                    optionFilterProp="label"
-                    options={selectableTeams.map((t) => ({
-                      value: t.id,
-                      label: t.name,
-                    }))}
-                    >
-                      {selectableTeams.map((team) => (
-                        <Option key={team.id} value={team.id}>
-                          {team.name}
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                ) : null
-              }
-            </Form.Item>
-
-            <Form.Item
-              noStyle
-              shouldUpdate={(prevValues, currentValues) =>
-                prevValues.visibility !== currentValues.visibility
-              }
-            >
-              {({ getFieldValue }) =>
-                getFieldValue('visibility') === 'specific_users' ? (
-                  <Form.Item
-                    label="Assign To Users"
-                    required
-                    validateStatus={
-                      getFieldValue('visibility') === 'specific_users' && selectedAssignees.length === 0
-                        ? 'error'
-                        : ''
-                    }
-                    help={
-                      getFieldValue('visibility') === 'specific_users' && selectedAssignees.length === 0
-                        ? 'Please select at least one user!'
-                        : ''
-                    }
-                  >
-                    <Select
-                      mode="multiple"
-                      placeholder="Select Users"
-                      value={selectedAssignees}
-                      onChange={onSelectedAssigneesChange}
-                      optionLabelProp="label"
-                    >
-                      {users
-                        .filter((u) => (u.role ?? '').toLowerCase() !== 'customer')
-                        .map((user) => (
-                          <Option key={user.id} value={user.id} label={user.full_name || user.email}>
-                            {user.full_name || user.email}
-                          </Option>
-                        ))}
-                    </Select>
-                  </Form.Item>
-                ) : null
-              }
-            </Form.Item>
-
-
+            {editingTicket ? (
+              <Form.Item label="Assignees" tooltip="Optional">
+                <Select
+                  mode="multiple"
+                  placeholder="Select users to assign"
+                  value={selectedAssignees}
+                  onChange={onSelectedAssigneesChange}
+                  optionFilterProp="label"
+                  allowClear
+                >
+                  {users
+                    .filter((u) => (u.role ?? '').toLowerCase() !== 'customer')
+                    .map((user) => (
+                      <Option key={user.id} value={user.id} label={user.full_name || user.email}>
+                        {user.full_name || user.email}
+                      </Option>
+                    ))}
+                </Select>
+              </Form.Item>
+            ) : null}
           </>
         )}
+        </Col>
+        </Row>
 
         <Form.Item>
           <Space>

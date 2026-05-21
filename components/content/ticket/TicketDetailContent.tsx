@@ -225,13 +225,11 @@ export default function TicketDetailContent({
         setTitleEditing(false)
     }, [displayTicket?.id])
     const [teams, setTeams] = useState<any[]>([])
-    /** Teams the signed-in user belongs to (from /api/tickets/lookup). Team picker is limited to these. */
+    /** Signed-in user’s team memberships (from /api/tickets/lookup); used to narrow team options for non-public tickets. */
     const [userTeamIds, setUserTeamIds] = useState<string[]>([])
     const [users, setUsers] = useState<any[]>([])
     const [companyCustomers, setCompanyCustomers] = useState<Array<{ id: string; full_name: string | null; email: string }>>([])
-    const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
     const [ticketTypes, setTicketTypes] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
-    const [ticketPriorities, setTicketPriorities] = useState<Array<{ id: number; title: string; slug: string; color: string }>>([])
     const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([])
     const [allTags, setAllTags] = useState<Array<{ id: string; name: string; slug: string }>>([])
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>(() => (Array.isArray(initialTags) ? initialTags.map((t) => t?.id).filter(Boolean) as string[] : []))
@@ -240,7 +238,6 @@ export default function TicketDetailContent({
     const [deletedDescriptionAttachmentIds, setDeletedDescriptionAttachmentIds] = useState<string[]>([])
     const [statusChanging, setStatusChanging] = useState(false)
     const [typeChanging, setTypeChanging] = useState(false)
-    const [priorityChanging, setPriorityChanging] = useState(false)
     const [form] = Form.useForm()
     const [activeTimeTracker, setActiveTimeTracker] = useState<any>(null)
     const [timeTrackerSessions, setTimeTrackerSessions] = useState<any[]>([])
@@ -251,24 +248,6 @@ export default function TicketDetailContent({
     >([])
     const [sidebarBaselineTick, setSidebarBaselineTick] = useState(0)
     const [sidebarAttributesSaving, setSidebarAttributesSaving] = useState(false)
-    const [optimisticVisibility, setOptimisticVisibility] = useState<string | null>(null)
-    const [optimisticAssignees, setOptimisticAssignees] = useState<string[] | null>(null)
-
-    // Sync optimistic assignees when server data catches up
-    useEffect(() => {
-        const serverIds = (displayTicket?.assignees || []).map((a: any) => a.user_id || a.user?.id).filter(Boolean) as string[]
-        if (optimisticAssignees && JSON.stringify([...serverIds].sort()) === JSON.stringify([...optimisticAssignees].sort())) {
-            setOptimisticAssignees(null)
-        }
-    }, [displayTicket?.assignees, optimisticAssignees])
-
-    // Sync optimistic visibility when server data catches up
-    useEffect(() => {
-        if (optimisticVisibility && displayTicket?.visibility === optimisticVisibility) {
-            setOptimisticVisibility(null)
-        }
-    }, [displayTicket?.visibility, optimisticVisibility])
-
     // Mark ticket as read when user views it
     useEffect(() => {
         if (!displayTicket?.id) return
@@ -303,13 +282,6 @@ export default function TicketDetailContent({
             return al.localeCompare(bl)
         })
     }, [users, displayTicket?.company_id])
-
-    const VISIBILITY_OPTIONS = [
-        { value: 'private', label: 'Private' },
-        { value: 'team', label: 'Team' },
-        { value: 'specific_users', label: 'Specific Users' },
-        { value: 'public', label: 'Public' },
-    ]
 
     // Default status labels/colors when DB has no ticket_statuses (matches seeded slugs)
     const DEFAULT_STATUS_MAP: Record<string, { title: string; color: string }> = {
@@ -370,7 +342,6 @@ export default function TicketDetailContent({
                     userTeamIds?: string[]
                     users: any[]
                     ticketTypes: any[]
-                    ticketPriorities: any[]
                     companies: any[]
                     tags: any[]
                 }>('/api/tickets/lookup')
@@ -378,7 +349,6 @@ export default function TicketDetailContent({
                 setUserTeamIds(Array.isArray(data?.userTeamIds) ? data.userTeamIds : [])
                 setUsers(data?.users || [])
                 setTicketTypes(data?.ticketTypes || [])
-                setTicketPriorities(data?.ticketPriorities || [])
                 setCompanies(data?.companies || [])
                 setAllTags((data?.tags || []).map((t: any) => ({ id: t.id, name: t.name, slug: t.slug })))
             } catch { /* ignore */ }
@@ -490,8 +460,6 @@ export default function TicketDetailContent({
                     typeof data.ticketData?.description === 'string' ? data.ticketData.description : '',
                 )
             }
-            setOptimisticAssignees(null)
-            setOptimisticVisibility(null)
             await refreshTimeTracking()
             try {
                 const att = await apiFetch<
@@ -604,27 +572,19 @@ export default function TicketDetailContent({
         return DEFAULT_STATUS_MAP[status]?.title || status
     }
 
-    const getVisibilityColor = (visibility: string) => {
-        const colorMap: Record<string, string> = {
-            private: 'default',
-            team: 'blue',
-            specific_users: 'lime',
-            public: 'green',
-        }
-        return colorMap[visibility] || 'default'
-    }
-
-    /** Team dropdown: only teams the current user is a member of, plus current ticket team if not in that set (read-only context). */
+    /** Team picker: public tickets can use any team; team visibility is limited to your teams. */
     const teamOptionsForTicket = useMemo(() => {
-        const mine = new Set(userTeamIds)
-        const list = (teams || []).filter((t: { id: string }) => mine.has(t.id))
-        const cur = displayTicket?.team_id as string | undefined
-        if (cur && !list.some((t: { id: string }) => t.id === cur)) {
-            const extra = teams.find((t: { id: string }) => t.id === cur)
-            if (extra) return [...list, extra]
-        }
-        return list
-    }, [teams, userTeamIds, displayTicket?.team_id])
+      const vis = displayTicket?.visibility
+      if (vis === 'public') return teams || []
+      const mine = new Set(userTeamIds)
+      const list = (teams || []).filter((t: { id: string }) => mine.has(t.id))
+      const cur = displayTicket?.team_id as string | undefined
+      if (cur && !list.some((t: { id: string }) => t.id === cur)) {
+        const extra = teams.find((t: { id: string }) => t.id === cur)
+        if (extra) return [...list, extra]
+      }
+      return list
+    }, [teams, userTeamIds, displayTicket?.team_id, displayTicket?.visibility])
 
     const handleAddChecklistItem = async () => {
         if (!newChecklistTitle.trim()) {
@@ -941,16 +901,21 @@ export default function TicketDetailContent({
 
         setSidebarAttributesSaving(true)
         try {
+            const priorityPayload = ((): number | null => {
+              if (d.priority === null || d.priority === undefined) return null
+              const n = typeof d.priority === 'number' ? d.priority : Number(d.priority)
+              if (!Number.isFinite(n)) return null
+              const floored = Math.floor(n)
+              return floored > 0 ? floored : null
+            })()
             const body: Record<string, unknown> = {
                 type_id: d.typeId,
-                priority_id: d.priorityId,
+                priority: priorityPayload,
                 company_id: d.companyId,
                 tag_ids: d.tagIds,
                 contact_user_id: d.contactUserId,
                 due_date: d.dueDate,
-                visibility: d.visibility,
-                team_id: d.visibility === 'team' ? d.teamId : null,
-                assignees: d.visibility === 'specific_users' ? d.assigneeIds : [],
+                team_id: d.teamId,
                 short_note: d.shortNote.trim() || null,
             }
             if (useProjectBoard) {
@@ -973,8 +938,6 @@ export default function TicketDetailContent({
             }
 
             setSelectedTagIds(d.tagIds)
-            setOptimisticAssignees(null)
-            setOptimisticVisibility(null)
 
             const opts = displayTicket.project_statuses ?? []
             const psRow =
@@ -1015,9 +978,7 @@ export default function TicketDetailContent({
                         : { status: d.status }),
                     type_id: d.typeId,
                     type: d.typeId != null ? ticketTypes.find((t) => t.id === d.typeId) ?? null : null,
-                    priority_id: d.priorityId,
-                    priority:
-                        d.priorityId != null ? ticketPriorities.find((p) => p.id === d.priorityId) ?? null : null,
+                    priority: priorityPayload,
                     company_id: nextCompanyId,
                     company: nextCompanyId ? companies.find((c) => c.id === nextCompanyId) ?? prev.company : null,
                     contact_user_id: d.contactUserId,
@@ -1030,22 +991,7 @@ export default function TicketDetailContent({
                           }
                         : null,
                     due_date: d.dueDate,
-                    visibility: d.visibility,
-                    team_id: d.visibility === 'team' ? d.teamId : null,
-                    assignees: (d.visibility === 'specific_users' ? d.assigneeIds : []).map((uid) => {
-                        const u = users.find((x: any) => String(x.id) === String(uid))
-                        return {
-                            user_id: uid,
-                            user: u
-                                ? {
-                                      id: u.id,
-                                      full_name: u.full_name ?? null,
-                                      email: u.email,
-                                      avatar_url: u.avatar_url ?? null,
-                                  }
-                                : { id: uid, full_name: null, email: '', avatar_url: null },
-                        }
-                    }),
+                    team_id: d.teamId,
                     short_note: d.shortNote.trim() || null,
                 }
             })
@@ -1082,30 +1028,6 @@ export default function TicketDetailContent({
         }
     }
 
-    const handlePriorityChange = async (priorityId: number | null) => {
-        setPriorityChanging(true)
-        try {
-            await apiFetch(`/api/tickets/${displayTicket.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ priority_id: priorityId }),
-            })
-            message.success('Priority updated')
-            setDisplayTicket((prev: any) => ({
-                ...prev,
-                priority_id: priorityId,
-                priority: priorityId != null ? ticketPriorities.find((p) => p.id === priorityId) ?? null : null,
-            }))
-            router.refresh()
-        } catch (err: unknown) {
-            message.error(err instanceof Error ? err.message : 'Failed to update priority')
-        } finally {
-            setPriorityChanging(false)
-        }
-    }
-
-  
-
     useEffect(() => {
         if (!displayTicket?.id) return
         const fetchDescAttachments = async () => {
@@ -1141,16 +1063,6 @@ export default function TicketDetailContent({
     const handleUpdateTicket = async (values: any) => {
         setLoading(true)
         try {
-            if (values.visibility === 'specific_users' && selectedAssignees.length === 0) {
-                message.error('Please select at least one user for specific users visibility')
-                return
-            }
-
-            if (values.visibility === 'team' && !values.team_id) {
-                message.error('Please select a team for team visibility')
-                return
-            }
-
             await apiFetch(`/api/tickets/${displayTicket.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -1158,13 +1070,9 @@ export default function TicketDetailContent({
                     title: values.title,
                     description: values.description || null,
                     status: values.status,
-                    visibility: values.visibility,
-                    team_id: values.visibility === 'team' ? values.team_id || null : null,
                     type_id: values.type_id ?? null,
-                    priority_id: values.priority_id ?? null,
                     company_id: variant !== 'customer' ? values.company_id ?? null : undefined,
                     due_date: values.due_date ? values.due_date.toISOString() : null,
-                    assignees: values.visibility === 'specific_users' ? selectedAssignees : [],
                     tag_ids: variant !== 'customer' ? selectedTagIds : undefined,
                     attachments_add: newDescriptionAttachments.map((a) => ({ file_url: a.url, file_name: a.file_name, file_path: a.file_path })),
                     attachments_delete: deletedDescriptionAttachmentIds,
@@ -1551,11 +1459,8 @@ export default function TicketDetailContent({
                                 onStatusChange={handleStatusChange}
                                 statusChanging={statusChanging}
                                 typeOptions={ticketTypes}
-                                priorityOptions={ticketPriorities}
                                 onTypeChange={handleTypeChange}
-                                onPriorityChange={handlePriorityChange}
                                 typeChanging={typeChanging}
-                                priorityChanging={priorityChanging}
                                 totalTimeSeconds={totalTimeSeconds}
                                 activeTimeTracker={activeTimeTracker}
                                 currentTime={currentTime}
@@ -1619,26 +1524,14 @@ export default function TicketDetailContent({
                                                     : undefined
                                             }
                                             typeOptions={ticketTypes}
-                                            priorityOptions={ticketPriorities}
                                             companyOptions={companies}
                                             contactUserOptions={contactUserOptionsForTicket}
                                             selectedContactUserId={displayTicket.contact_user_id ?? null}
                                             tagOptions={allTags}
                                             selectedTagIds={selectedTagIds}
                                             canEditCompanyAndTags
-                                            visibilityOptions={VISIBILITY_OPTIONS}
-                                            selectedVisibility={
-                                                optimisticVisibility ?? displayTicket.visibility ?? 'private'
-                                            }
                                             teamOptions={teamOptionsForTicket}
                                             selectedTeamId={displayTicket.team_id ?? null}
-                                            assigneeOptions={users}
-                                            selectedAssigneeIds={(
-                                                optimisticAssignees ??
-                                                (displayTicket.assignees || [])
-                                                    .map((a: any) => a.user_id || a.user?.id)
-                                                    .filter(Boolean)
-                                            ).map((id: string) => String(id))}
                                             canEditAssignees
                                             sidebarBaselineTick={sidebarBaselineTick}
                                             sidebarAttributesSaving={sidebarAttributesSaving}

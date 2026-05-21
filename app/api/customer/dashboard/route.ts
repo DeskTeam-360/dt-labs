@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     .select({
       id: tickets.id,
       typeId: tickets.typeId,
-      priorityId: tickets.priorityId,
+      priority: tickets.priority,
       status: tickets.status,
       title: tickets.title,
       dueDate: tickets.dueDate,
@@ -86,13 +86,13 @@ export async function GET(request: Request) {
 
   const allPriorities = await db.select({ id: ticketPriorities.id, slug: ticketPriorities.slug, title: ticketPriorities.title, color: ticketPriorities.color, sortOrder: ticketPriorities.sortOrder }).from(ticketPriorities).orderBy(ticketPriorities.sortOrder)
   const pCounts: Record<number, number> = {}
-  myTickets.forEach((t) => { pCounts[t.priorityId ?? 0] = (pCounts[t.priorityId ?? 0] ?? 0) + 1 })
-  const priorityCounts = allPriorities.map((p) => ({
-    priority_id: p.id,
-    priority_title: p.title,
-    count: pCounts[p.id] ?? 0,
-    color: p.color ?? '#000',
-  }))
+  myTickets.forEach((t) => {
+    const v = Number(t.priority ?? 0)
+    pCounts[v] = (pCounts[v] ?? 0) + 1
+  })
+  const priorityCounts = Object.entries(pCounts)
+    .map(([k, count]) => ({ priority: Number(k), count }))
+    .sort((a, b) => a.priority - b.priority)
 
   const myTicketIds = myTickets.map((t) => t.id)
   const timeByType: Array<{ type_title: string; seconds: number; color: string }> = []
@@ -124,23 +124,13 @@ export async function GET(request: Request) {
     color: s.color ?? '#000',
   }))
 
-  // recent_tickets: 5 tickets, urutkan priority (urgent dulu) lalu due_date (terdekat dulu)
-  // Urutan eksplisit: urgent/critical=0, high=1, medium=2, low=3. Fallback: sortOrder dari DB (rendah=tinggi).
-  const slugToRank: Record<string, number> = { urgent: 0, critical: 0, high: 1, medium: 2, low: 3 }
-  const minSortOrder = Math.min(...allPriorities.map((x) => x.sortOrder ?? 999))
-  const priorityRankMap: Record<number, number> = {}
-  allPriorities.forEach((p) => {
-    const slug = (p.slug ?? '').toLowerCase().trim()
-    const rank = slug in slugToRank ? slugToRank[slug] : ((p.sortOrder ?? 999) - minSortOrder)
-    priorityRankMap[p.id] = rank
-  })
   const sortedForRecent = [...myTickets].sort((a, b) => {
-    const pa = a.priorityId != null ? (priorityRankMap[Number(a.priorityId)] ?? 999) : 999
-    const pb = b.priorityId != null ? (priorityRankMap[Number(b.priorityId)] ?? 999) : 999
-    if (pa !== pb) return pa - pb // priority dulu (urgent=0 paling atas)
+    const pa = Number(a.priority ?? 0)
+    const pb = Number(b.priority ?? 0)
+    if (pa !== pb) return pa - pb
     const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity
-    const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
-    return da - db // due_date terdekat dulu
+    const dbTime = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
+    return da - dbTime
   })
   const recentIds = sortedForRecent.slice(0, 5).map((t) => t.id)
   let recentTickets: Array<{
@@ -152,8 +142,8 @@ export async function GET(request: Request) {
     status_title: string
     customer_title: string
     status_color: string
-    priority_id: number | null
-    priority_title: string
+    priority: number
+    priority_label: string
     priority_color: string
     assignee_name: string | null
     company_name: string | null
@@ -161,7 +151,12 @@ export async function GET(request: Request) {
   }> = []
 
   if (recentIds.length > 0) {
-    const rows = await db.select({ ticket: tickets, company: companies, priority: ticketPriorities, statusRow: ticketStatuses }).from(tickets).leftJoin(companies, eq(tickets.companyId, companies.id)).leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id)).leftJoin(ticketStatuses, eq(tickets.status, ticketStatuses.slug)).where(inArray(tickets.id, recentIds))
+    const rows = await db
+      .select({ ticket: tickets, company: companies, statusRow: ticketStatuses })
+      .from(tickets)
+      .leftJoin(companies, eq(tickets.companyId, companies.id))
+      .leftJoin(ticketStatuses, eq(tickets.status, ticketStatuses.slug))
+      .where(inArray(tickets.id, recentIds))
     const assigneeRows = await db.select({ ticketId: ticketAssignees.ticketId, user: users }).from(ticketAssignees).leftJoin(users, eq(ticketAssignees.userId, users.id)).where(inArray(ticketAssignees.ticketId, recentIds))
     const assigneeByTicket: Record<number, string> = {}
     assigneeRows.forEach((r) => { assigneeByTicket[r.ticketId] = r.user?.fullName || r.user?.email || 'Unknown' })
@@ -176,6 +171,11 @@ export async function GET(request: Request) {
 
     const orderMap: Record<number, number> = {}
     recentIds.forEach((id, i) => { orderMap[id] = i })
+    const prioRef = new Map<number, { title: string; color: string }>()
+    for (const p of allPriorities) {
+      const key = Number(p.sortOrder ?? p.id)
+      if (!prioRef.has(key)) prioRef.set(key, { title: p.title, color: p.color ?? '#000' })
+    }
     recentTickets = rows.map((r) => ({
       id: r.ticket.id,
       title: r.ticket.title,
@@ -185,9 +185,12 @@ export async function GET(request: Request) {
       status_title: r.statusRow?.customerTitle ?? r.statusRow?.title ?? r.ticket.status,
       customer_title: r.statusRow?.customerTitle ?? 'Unknown',
       status_color: r.statusRow?.color ?? '#000',
-      priority_id: r.ticket.priorityId ?? null,
-      priority_title: r.priority?.title ?? 'N/A',
-      priority_color: r.priority?.color ?? '#000',
+      priority: Number(r.ticket.priority ?? 0),
+      priority_label: (() => {
+        const pr = prioRef.get(Number(r.ticket.priority ?? 0))
+        return pr?.title ? `${pr.title} (${r.ticket.priority})` : `Prioritas ${r.ticket.priority ?? 0}`
+      })(),
+      priority_color: prioRef.get(Number(r.ticket.priority ?? 0))?.color ?? '#8c8c8c',
       assignee_name: assigneeByTicket[r.ticket.id] ?? null,
       company_name: r.company?.name ?? null,
       tags: tagsByTicketId[r.ticket.id] ?? [],
@@ -200,11 +203,9 @@ export async function GET(request: Request) {
   if (ticketsWithDue.length > 0) {
     const minDueTime = Math.min(...ticketsWithDue.map((t) => new Date(t.dueDate!).getTime()))
     const atMinDue = ticketsWithDue.filter((t) => new Date(t.dueDate!).getTime() === minDueTime)
-    const byPriority = [...atMinDue].sort((a, b) => {
-      const pa = a.priorityId != null ? (priorityRankMap[Number(a.priorityId)] ?? 999) : 999
-      const pb = b.priorityId != null ? (priorityRankMap[Number(b.priorityId)] ?? 999) : 999
-      return pa - pb
-    })
+    const byPriority = [...atMinDue].sort(
+      (a, b) => Number(a.priority ?? 0) - Number(b.priority ?? 0)
+    )
     const t0 = byPriority[0]
     if (t0) {
       lastDueDate = t0.dueDate ? new Date(t0.dueDate).toISOString() : null
@@ -216,10 +217,12 @@ export async function GET(request: Request) {
   const urgentPriority =
     allPriorities.find((p) => p.slug?.toLowerCase() === 'urgent' || p.title?.toLowerCase() === 'urgent') ??
     allPriorities.find((p) => (p.sortOrder ?? 999) === Math.min(...allPriorities.map((x) => x.sortOrder ?? 999)))
-  const urgentPriorityId = urgentPriority ? Number(urgentPriority.id) : null
-  const urgentTicketsWithDue = urgentPriorityId != null
-    ? myTickets.filter((t) => Number(t.priorityId) === urgentPriorityId && t.dueDate != null)
-    : []
+  const urgentPriorityValue =
+    urgentPriority != null ? Number(urgentPriority.sortOrder ?? urgentPriority.id) : null
+  const urgentTicketsWithDue =
+    urgentPriorityValue != null
+      ? myTickets.filter((t) => Number(t.priority) === urgentPriorityValue && t.dueDate != null)
+      : []
   let urgentDueDate: string | null = null
   let urgentDueTicket: { id: number; title: string } | null = null
   if (urgentTicketsWithDue.length > 0) {
@@ -248,14 +251,14 @@ export async function GET(request: Request) {
 
   if (debug) {
     payload._debug = {
-      urgent_priority_id: urgentPriorityId,
+      urgent_priority_value: urgentPriorityValue,
       urgent_priority_slug: urgentPriority?.slug,
       urgent_priority_title: urgentPriority?.title,
       all_priorities: allPriorities.map((p) => ({ id: p.id, slug: p.slug, title: p.title })),
       urgent_tickets_with_due_count: urgentTicketsWithDue.length,
       my_tickets_sample: myTickets.slice(0, 5).map((t) => ({
         id: t.id,
-        priorityId: t.priorityId,
+        priority: t.priority,
         dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : null,
       })),
     }

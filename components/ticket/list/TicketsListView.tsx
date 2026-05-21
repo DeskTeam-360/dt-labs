@@ -21,18 +21,15 @@ import {
 } from 'antd'
 import { useRouter } from 'next/navigation'
 import type { Key } from 'react'
-import { useEffect,useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { isClosedLikeTicketStatus } from '@/lib/ticket-status-workflow'
 
 import type { StatusColumn,TicketRecord } from './types'
 
-type PriorityOption = { id: number; title: string; slug: string; color: string; sortOrder?: number }
-
 interface TicketsListViewProps {
   tickets: TicketRecord[]
   allStatusColumns: StatusColumn[]
-  allPriorities?: PriorityOption[]
   isCustomer?: boolean
   filterTicketType?: 'spam' | 'trash' | null
   canDeleteTicket?: boolean
@@ -41,7 +38,6 @@ interface TicketsListViewProps {
   onBulkMoveToSpam?: (ids: number[]) => void | Promise<void>
   onBulkMoveToTrash?: (ids: number[]) => void | Promise<void>
   onFilterByStatus?: (statusSlug: string) => void
-  onFilterByPriority?: (priorityId: number) => void
   onFilterByTag?: (tagId: string) => void
   onFilterByCompany?: (companyId: string) => void
 }
@@ -49,7 +45,6 @@ interface TicketsListViewProps {
 export default function TicketsListView({
   tickets,
   allStatusColumns,
-  allPriorities = [],
   isCustomer = false,
   filterTicketType = null,
   canDeleteTicket = false,
@@ -58,7 +53,6 @@ export default function TicketsListView({
   onBulkMoveToSpam,
   onBulkMoveToTrash,
   onFilterByStatus,
-  onFilterByPriority,
   onFilterByTag,
   onFilterByCompany,
 }: TicketsListViewProps) {
@@ -73,12 +67,6 @@ export default function TicketsListView({
       return { ...p, current: totalPages }
     })
   }, [tickets.length, pagination.pageSize])
-
-  const getPriorityOrder = (record: TicketRecord) => {
-    if (!record.priority) return 999
-    const idx = allPriorities.findIndex((p) => p.id === record.priority!.id)
-    return idx >= 0 ? idx : 999
-  }
 
   const bulkEnabled = !isCustomer && (onBulkMoveToSpam || onBulkMoveToTrash)
   const inSpamFolder = filterTicketType === 'spam'
@@ -170,7 +158,6 @@ export default function TicketsListView({
           key: 'id',
           width: 72,
           align: 'center',
-          sorter: (a: TicketRecord, b: TicketRecord) => a.id - b.id,
           render: (id: number) => <span style={{ color: '#8c8c8c', fontWeight: 500 }}>#{id}</span>,
         },
         {
@@ -178,7 +165,6 @@ export default function TicketsListView({
           dataIndex: 'title',
           key: 'title',
           ellipsis: true,
-          sorter: (a: TicketRecord, b: TicketRecord) => (a.title || '').localeCompare(b.title || ''),
           render: (title: string, record: TicketRecord) => (
             <a
               href={`/tickets/${record.id}`}
@@ -202,7 +188,6 @@ export default function TicketsListView({
           dataIndex: ['company', 'name'],
           key: 'company',
           ellipsis: true,
-          sorter: (a: TicketRecord, b: TicketRecord) => (a.company?.name || '').localeCompare(b.company?.name || ''),
           render: (_: unknown, record: TicketRecord) =>
             record.company ? (
               <span
@@ -230,50 +215,27 @@ export default function TicketsListView({
           title: 'Priority',
           key: 'priority',
           width: 100,
-          sorter: (a: TicketRecord, b: TicketRecord) => getPriorityOrder(a) - getPriorityOrder(b),
-          render: (_: unknown, record: TicketRecord) =>
-            record.priority ? (
-              <Tag
-                style={{
-                  borderRadius: '10px',
-                  backgroundColor: record.priority.color,
-                  padding: '4px 8px',
-                  width: '60px',
-                  textAlign: 'center',
-                  fontWeight: 500,
-                  cursor: onFilterByPriority ? 'pointer' : undefined,
-                  color:
-                     (() => {
-                          // Auto-detect text color for contrast
-                          const c = record.priority.color?.replace('#', '')
-                          if (!c || c.length !== 6) return '#111'
-                          const r = parseInt(c.substr(0,2),16)
-                          const g = parseInt(c.substr(2,2),16)
-                          const b = parseInt(c.substr(4,2),16)
-                          // luminance formula
-                          const luminance = (0.299*r + 0.587*g + 0.114*b)/255
-                          return luminance > 0.7 ? '#111' : '#fff'
-                        })()
-                }}
-                title={onFilterByPriority ? 'Filter by this priority' : undefined}
-                onClick={
-                  onFilterByPriority
-                    ? (e) => {
-                        e.stopPropagation()
-                        onFilterByPriority(record.priority!.id)
-                      }
-                    : undefined
-                }
-              >
-                {record.priority.title}
-              </Tag>
-            ) : '—',
+          align: 'center',
+          render: (_: unknown, record: TicketRecord) => (
+            <Tag
+              style={{
+                borderRadius: '10px',
+                backgroundColor: '#E8E8E8',
+                padding: '4px 8px',
+                minWidth: '48px',
+                textAlign: 'center',
+                fontWeight: 500,
+                margin: 0,
+              }}
+            >
+              {record.priority != null && record.priority > 0 ? `P${record.priority}` : '—'}
+            </Tag>
+          ),
         },
         {
           title: 'Type',
           key: 'type',
           width: 120,
-          sorter: (a: TicketRecord, b: TicketRecord) => (a.type?.title || '').localeCompare(b.type?.title || ''),
           render: (_: unknown, record: TicketRecord) =>
             record.type ? <Tag style={{ borderRadius: '10px',backgroundColor: '#E8E8E8', padding: '4px 8px', minWidth:'70px', textAlign: 'center', fontWeight: 500, color: record.type.color }}>{record.type.title}</Tag> : '—',
         },
@@ -283,7 +245,6 @@ export default function TicketsListView({
           title: 'Tags',
           key: 'tags',
           width: 300,
-          sorter: (a: TicketRecord, b: TicketRecord) => (a.tags?.length || 0) - (b.tags?.length || 0),
           render: (_: unknown, record: TicketRecord) =>
             record.tags?.length ? (
               <Flex gap={4} wrap="wrap">
@@ -317,8 +278,6 @@ export default function TicketsListView({
           dataIndex: 'due_date',
           key: 'due_date',
           width: 200,
-          sorter: (a: TicketRecord, b: TicketRecord) =>
-            new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime(),
           render: (_: unknown, record: TicketRecord) =>
             record.due_date ? (
               <span
@@ -339,7 +298,6 @@ export default function TicketsListView({
           title: 'Assignees',
           key: 'assignees',
           width: 120,
-          sorter: (a: TicketRecord, b: TicketRecord) => (a.assignees?.length || 0) - (b.assignees?.length || 0),
           render: (_: unknown, record: TicketRecord) =>
             record.assignees?.length ? (
               <Avatar.Group size="small" maxCount={2}>
@@ -355,7 +313,6 @@ export default function TicketsListView({
           title: 'Status',
           dataIndex: 'status',
           key: 'status',
-          sorter: (a: TicketRecord, b: TicketRecord) => (a.status || '').localeCompare(b.status || ''),
           render: (status: string, record: TicketRecord) => {
             const col = allStatusColumns.find((c) => c.id === status)
             if (!col) return status
@@ -418,8 +375,8 @@ export default function TicketsListView({
               ) : null}
             </Space>
           ),
-        },]
-      }
+        },
+      ]}
     />
   </div>
 )

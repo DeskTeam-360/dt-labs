@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm'
+import { asc, eq, or } from 'drizzle-orm'
 
 import { db } from '@/lib/db'
 import {
@@ -42,7 +42,7 @@ export type SlackTicketPayload = {
   title: string
   status: string
   teamId: string | null
-  priorityId: number | null
+  priority: number | null
   companyId: string | null
   typeId: number | null
   previousStatus?: string
@@ -74,7 +74,8 @@ function matchesDimensions(
     if (!ticket.teamId || !team_ids.includes(ticket.teamId)) return false
   }
   if (priority_ids && priority_ids.length > 0) {
-    if (ticket.priorityId == null || !priority_ids.includes(ticket.priorityId)) return false
+    if (ticket.priority == null) return false
+    if (!priority_ids.includes(ticket.priority)) return false
   }
   if (company_ids && company_ids.length > 0) {
     if (!ticket.companyId || !company_ids.includes(ticket.companyId)) return false
@@ -182,15 +183,16 @@ async function loadLabels(ticket: SlackTicketPayload): Promise<{
       })()
     )
   }
-  if (ticket.priorityId != null) {
+  if (ticket.priority != null && ticket.priority !== undefined) {
+    const pRank = ticket.priority
     jobs.push(
       (async () => {
-        const [r] = await db
+        const [match] = await db
           .select({ title: ticketPriorities.title })
           .from(ticketPriorities)
-          .where(eq(ticketPriorities.id, ticket.priorityId!))
+          .where(or(eq(ticketPriorities.sortOrder, pRank), eq(ticketPriorities.id, pRank)))
           .limit(1)
-        if (r?.title) out.priority = r.title
+        out.priority = match?.title?.trim() ? match.title : `Level ${pRank}`
       })()
     )
   }

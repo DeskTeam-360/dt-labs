@@ -1,11 +1,9 @@
 'use client'
 
-import { AppstoreOutlined, IdcardOutlined, PlusOutlined, SearchOutlined,SortAscendingOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import { Button, Flex, Input,Segmented, Select, Typography } from 'antd'
+import { AppstoreOutlined, IdcardOutlined, PlusOutlined, SearchOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { Button, Flex, Input, Segmented, Select, Typography } from 'antd'
 
 import { TICKETS_PAGE_LIMIT_OPTIONS, type TicketsPageLimit } from '@/lib/tickets-list-query'
-
-import type { TicketSortField, TicketSortOrder } from './types'
 
 type ViewMode = 'kanban' | 'list' | 'card' | 'roundrobin'
 
@@ -16,28 +14,13 @@ interface TicketsHeaderProps {
   loading?: boolean
   /** When true, hide Round Robin view option */
   isCustomer?: boolean
-  /** Sort controls - shown when viewMode is kanban or card */
-  sortBy?: TicketSortField
-  sortOrder?: TicketSortOrder
-  onSortByChange?: (v: TicketSortField) => void
-  onSortOrderChange?: (v: TicketSortOrder) => void
   filterSearch?: string
   onFilterSearchChange?: (v: string) => void
-  /** Row classification list (staff junk folders) — spam/trash set title and hide view mode picker */
+  /** Row classification list (staff junk folders) - spam/trash set title and hide view mode picker */
   filterTicketType?: 'spam' | 'trash' | null
   ticketsPageLimit?: TicketsPageLimit
   onTicketsPageLimitChange?: (v: TicketsPageLimit) => void
 }
-
-const SORT_FIELD_OPTIONS: { value: TicketSortField; label: string }[] = [
-  { value: 'id', label: 'ID' },
-  { value: 'title', label: 'Title' },
-  { value: 'priority', label: 'Priority' },
-  { value: 'due_date', label: 'Due Date' },
-  { value: 'updated_at', label: 'Updated' },
-  { value: 'created_at', label: 'Created' },
-  // { value: 'company', label: 'Company' },
-]
 
 export default function TicketsHeader({
   viewMode,
@@ -45,10 +28,6 @@ export default function TicketsHeader({
   onCreateClick,
   loading = false,
   isCustomer = false,
-  sortBy = 'updated_at',
-  sortOrder = 'desc',
-  onSortByChange,
-  onSortOrderChange,
   filterSearch = '',
   onFilterSearchChange,
   filterTicketType = null,
@@ -64,7 +43,6 @@ export default function TicketsHeader({
     { label: <span style={{ marginRight: 8 }}><IdcardOutlined /> Card</span>, value: 'card' },
     ...(!isCustomer ? [{ label: <span style={{ marginRight: 8 }}><TeamOutlined /> Round Robin</span>, value: 'roundrobin' }] : []),
   ]
-  const showSort = (viewMode === 'kanban' || viewMode === 'card') && onSortByChange && onSortOrderChange
 
   return (
     <Flex justify="space-between" align="flex-start" gap={16} style={{ padding: 24 }} wrap="wrap">
@@ -90,7 +68,6 @@ export default function TicketsHeader({
         )}
 
         <Flex align="center" gap={16} wrap="wrap">
-     
           <Input
             placeholder="Title or description..."
             allowClear
@@ -99,37 +76,7 @@ export default function TicketsHeader({
             prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
             style={{ minWidth: 320, width: '100%', maxWidth: 400 }}
           />
-         
-          {showSort && (
-            <Flex align="center" gap={8}>
-              <SortAscendingOutlined style={{ color: '#8c8c8c' }} />
-              <Select
-                value={sortBy}
-                onChange={onSortByChange}
-                options={SORT_FIELD_OPTIONS}
-                style={{ width: 130 }}
-              />
-              <Select
-                value={sortOrder}
-                onChange={onSortOrderChange}
-                options={[
-                  { value: 'asc', label: 'Asc' },
-                  { value: 'desc', label: 'Desc' },
-                ]}
-                style={{ width: 90 }}
-              />
-              {onTicketsPageLimitChange && (
-                <Select
-                  value={ticketsPageLimit}
-                  onChange={(v) => onTicketsPageLimitChange(v as TicketsPageLimit)}
-                  options={TICKETS_PAGE_LIMIT_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
-                  style={{ width: 72 }}
-                  aria-label="Tickets per load"
-                />
-              )}
-            </Flex>
-          )}
-          {!showSort && onTicketsPageLimitChange && (
+{onTicketsPageLimitChange && (
             <Flex align="center" gap={8}>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 Load

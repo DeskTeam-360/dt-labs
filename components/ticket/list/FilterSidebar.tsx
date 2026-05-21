@@ -14,13 +14,6 @@ import type { StatusColumn } from './types'
 const { Text } = Typography
 const { Option } = Select
 
-/** Private = tickets only visible to creator or assignees (includes former specific_users). Team = only team members. Public = everyone. */
-const VISIBILITY_OPTIONS = [
-  { value: 'private', label: 'Private' },
-  { value: 'team', label: 'Team' },
-  { value: 'public', label: 'Public' },
-]
-
 interface FilterSidebarProps {
   collapsed: boolean
   onCollapsedChange: (collapsed: boolean) => void
@@ -32,11 +25,6 @@ interface FilterSidebarProps {
   onFilterCompanyIdsChange: (v: string[]) => void
   filterTagIds: string[]
   onFilterTagIdsChange: (v: string[]) => void
-  filterPriorityIds: number[]
-  onFilterPriorityIdsChange: (v: number[]) => void
-  ticketPriorities: Array<{ id: number; title: string; color: string }>
-  filterVisibility: string[]
-  onFilterVisibilityChange: (v: string[]) => void
   filterTeamIds: string[]
   onFilterTeamIdsChange: (v: string[]) => void
   filterDateRange: [Dayjs | null, Dayjs | null] | null
@@ -71,11 +59,6 @@ export default function FilterSidebar({
   onFilterCompanyIdsChange,
   filterTagIds,
   onFilterTagIdsChange,
-  filterPriorityIds,
-  onFilterPriorityIdsChange,
-  ticketPriorities,
-  filterVisibility,
-  onFilterVisibilityChange,
   filterTeamIds,
   onFilterTeamIdsChange,
   filterDateRange,
@@ -183,48 +166,17 @@ export default function FilterSidebar({
                 ))}
               </Select>
             </div>
-            <div>
-              <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Priority</Text>
-              <Select
-                mode="multiple"
-                placeholder="All priorities"
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                style={{ width: '100%' }}
-                value={filterPriorityIds}
-                onChange={(v) => onFilterPriorityIdsChange(v ?? [])}
-                maxTagCount="responsive"
-              >
-                {ticketPriorities.map((p) => (
-                  <Option key={p.id} value={p.id} label={p.title}>
-                    <Space>
-                      <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, backgroundColor: p.color }} />
-                      {p.title}
-                    </Space>
-                  </Option>
-                ))}
-              </Select>
-            </div>
             {!isCustomer && (
               <>
                 <div>
-                  <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Visibility</Text>
-                  <Select
-                    mode="multiple"
-                    placeholder="All visibility"
-                    allowClear
-                    showSearch
-                    optionFilterProp="label"
-                    style={{ width: '100%' }}
-                    value={filterVisibility}
-                    onChange={(v) => onFilterVisibilityChange(v ?? [])}
-                    options={VISIBILITY_OPTIONS}
-                    maxTagCount="responsive"
-                  />
-                </div>
-                <div>
                   <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Team</Text>
+                  <Text
+                    type="secondary"
+                    style={{ fontSize: 11, display: 'block', marginBottom: 6, color: 'rgba(255,255,255,0.45)' }}
+                  >
+                    Public tickets stay visible in the list when you filter by a team—even if you are not a member
+                    of that team.
+                  </Text>
                   <Select
                     mode="multiple"
                     placeholder="All teams"

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, lte, or } from 'drizzle-orm'
+import { and, asc, eq, gte, ilike, inArray, isNotNull, lte, or } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import { google } from 'googleapis'
 import { NextResponse } from 'next/server'
@@ -20,7 +20,6 @@ import {
   ticketAttachments,
   ticketChecklist,
   ticketComments,
-  ticketPriorities,
   tickets,
   ticketTags,
   ticketTypes,
@@ -33,13 +32,17 @@ import { getPublicUrl } from '@/lib/storage-idrive'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { coerceTicketType, DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
 import {
+  assignCompanySupportTicketRank,
+  parseCompanyTicketDesiredRank,
+} from '@/lib/ticket-company-priority-order'
+import {
   assertTicketContactUserAllowed,
   getEffectiveCompanyIdForUser,
 } from '@/lib/ticket-contact-user'
 import { assertCustomerMayUseTicketType } from '@/lib/ticket-type-customer-access'
 
 const DEFAULT_LIMIT = 50
-/** Maksimum per request untuk daftar tiket (UI: 50 / 100 / 200). */
+/** Max tickets per list request (UI: 50 / 100 / 200). */
 const MAX_LIMIT = 200
 const REQUESTER_NEW_TICKET_TEMPLATE_KEY = 'requester_notification_new_ticket_created' as const
 
@@ -260,10 +263,6 @@ export async function GET(request: Request) {
     : typeIdParam
       ? (() => { const n = parseInt(typeIdParam, 10); return isNaN(n) ? [] : [n] })()
       : []
-  const priorityIdsParam = url.searchParams.get('priority_ids')
-  const priorityIds = priorityIdsParam
-    ? priorityIdsParam.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
-    : []
   const teamIds = teamIdsParam
     ? teamIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
     : teamIdParam
@@ -272,14 +271,9 @@ export async function GET(request: Request) {
   const ticketTypeFilter = url.searchParams.get('ticket_type')?.trim().toLowerCase()
 
   /**
-   * Visibility access (agent/manager, dll.): user can only see tickets they have access to.
-   * - public: everyone
-   * - private: only creator
-   * - specific_users: only assignees (filter shows as "Private")
-   * - team: only members of ticket's team (ticket must have team_id)
-   *
-   * Admin: no visibility gate on list (still optional company / visibility sidebar filters).
-   * Customer: see every ticket for their company (no visibility gate on list).
+   * Visibility access (non-admin agents): private / team / specific_users tickets follow access rules.
+   * Public tickets are always visible. The sidebar no longer filters by `visibility`; `team_ids` still returns
+   * public tickets for that team even when the user is not a team member.
    */
   const visibilityAccess = or(
     eq(tickets.visibility, 'public'),
@@ -311,7 +305,6 @@ export async function GET(request: Request) {
   }
   if (statusSlugs.length > 0) conditions.push(inArray(tickets.status, statusSlugs))
   if (typeIds.length > 0) conditions.push(inArray(tickets.typeId, typeIds))
-  if (priorityIds.length > 0) conditions.push(inArray(tickets.priorityId, priorityIds))
   /**
    * Customers never see spam/trash lists (ignore `ticket_type` query).
    * Staff: junk folders via explicit `?ticket_type=spam|trash`; else main list = `support` only.
@@ -372,19 +365,24 @@ export async function GET(request: Request) {
       creator: users,
       team: teams,
       type: ticketTypes,
-      priority: ticketPriorities,
       company: companies,
     })
     .from(tickets)
     .leftJoin(users, eq(tickets.createdBy, users.id))
     .leftJoin(teams, eq(tickets.teamId, teams.id))
     .leftJoin(ticketTypes, eq(tickets.typeId, ticketTypes.id))
-    .leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id))
     .leftJoin(companies, eq(tickets.companyId, companies.id))
 
   const ticketsRows = whereClause
-    ? await baseQuery.where(whereClause).orderBy(desc(tickets.createdAt)).limit(limit).offset(offset)
-    : await baseQuery.orderBy(desc(tickets.createdAt)).limit(limit).offset(offset)
+    ? await baseQuery
+        .where(whereClause)
+        .orderBy(asc(tickets.companyId), asc(tickets.priority), asc(tickets.id))
+        .limit(limit)
+        .offset(offset)
+    : await baseQuery
+        .orderBy(asc(tickets.companyId), asc(tickets.priority), asc(tickets.id))
+        .limit(limit)
+        .offset(offset)
 
   const ticketIds = ticketsRows.map((r) => r.ticket.id)
 
@@ -514,7 +512,7 @@ export async function GET(request: Request) {
       team_id: t.teamId,
       type_id: t.typeId,
       ticket_type: coerceTicketType(t.ticketType),
-      priority_id: t.priorityId,
+      priority: t.priority,
       company_id: t.companyId,
       created_at: t.createdAt ? new Date(t.createdAt).toISOString() : '',
       updated_at: t.updatedAt ? new Date(t.updatedAt).toISOString() : '',
@@ -523,9 +521,6 @@ export async function GET(request: Request) {
         : null,
       team: r.team ? { id: r.team.id, name: r.team.name } : null,
       type: r.type ? { id: r.type.id, title: r.type.title, slug: r.type.slug, color: r.type.color } : null,
-      priority: r.priority
-        ? { id: r.priority.id, title: r.priority.title, slug: r.priority.slug, color: r.priority.color }
-        : null,
       company: r.company
         ? { id: r.company.id, name: r.company.name, color: r.company.color, email: r.company.email }
         : null,
@@ -563,7 +558,7 @@ export async function POST(request: Request) {
     visibility,
     team_id,
     type_id,
-    priority_id,
+    priority,
     company_id,
     due_date,
     assignees = [],
@@ -575,11 +570,21 @@ export async function POST(request: Request) {
     project_status_id: bodyProjectStatusId,
   } = body
 
+  const resolvedInsertVisibility =
+    visibility !== undefined && visibility !== null && String(visibility).trim() !== ''
+      ? String(visibility).trim()
+      : 'public'
+
   /** created_via: 'portal' (admin app) | 'website' (embed/widget) | 'app' (mobile/external) - for automation conditions */
   const createdVia = bodyCreatedVia || 'portal'
 
   const userId = authUser.id
   const role = (authUser as { role?: string }).role?.toLowerCase()
+  const numericPriorityRaw = priority !== undefined && priority !== null ? Number(priority) : 0
+  const resolvedPriority =
+    Number.isFinite(numericPriorityRaw) && !Number.isNaN(numericPriorityRaw)
+      ? Math.max(0, Math.floor(numericPriorityRaw))
+      : 0
   let resolvedCompanyId = company_id || null
   if (role === 'customer' && !resolvedCompanyId) {
     const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
@@ -610,7 +615,7 @@ export async function POST(request: Request) {
     if (contactCompany && contactCompany !== resolvedCompanyId) {
       if (companyIdBeforeContactAlign && companyIdBeforeContactAlign !== contactCompany) {
         ticketCrossCompanyWarning =
-          'Kontak dari perusahaan berbeda: Company tiket disesuaikan ke perusahaan kontak.'
+          "Contact is from another company: ticket company was aligned to the contact's company."
       }
       resolvedCompanyId = contactCompany
     }
@@ -669,36 +674,77 @@ export async function POST(request: Request) {
     }
   }
 
-  const [newTicket] = await db
-    .insert(tickets)
-    .values({
-      title: title || 'Untitled',
-      description: description || null,
-      shortNote: short_note ?? null,
-      status: status || 'open',
-      visibility: visibility || 'private',
-      teamId: team_id || null,
-      typeId: type_id ?? null,
-      priorityId: priority_id ?? null,
-      companyId: resolvedCompanyId,
-      dueDate: due_date ? new Date(due_date) : null,
-      createdBy: authUser.id,
-      contactUserId,
-      createdVia,
-      ticketType: insertTicketType,
-      projectId: insertProjectId,
-      projectStatusId: insertProjectStatusId,
-    })
-    .returning()
+  const useCompanyPriorityPool =
+    insertTicketType === DEFAULT_TICKET_TYPE && resolvedCompanyId != null
+
+  let newTicket: typeof tickets.$inferSelect | undefined
+
+  if (useCompanyPriorityPool) {
+    const desiredRank = parseCompanyTicketDesiredRank(priority)
+    try {
+      await db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(tickets)
+          .values({
+            title: title || 'Untitled',
+            description: description || null,
+            shortNote: short_note ?? null,
+            status: status || 'open',
+            visibility: resolvedInsertVisibility,
+            teamId: team_id || null,
+            typeId: type_id ?? null,
+            priority: 1,
+            companyId: resolvedCompanyId,
+            dueDate: due_date ? new Date(due_date) : null,
+            createdBy: authUser.id,
+            contactUserId,
+            createdVia,
+            ticketType: insertTicketType,
+            projectId: insertProjectId,
+            projectStatusId: insertProjectStatusId,
+          })
+          .returning()
+        if (!row) throw new Error('Failed to create ticket')
+        newTicket = row
+        await assignCompanySupportTicketRank(tx, resolvedCompanyId!, row.id, desiredRank)
+      })
+    } catch {
+      return NextResponse.json({ error: 'Failed to create ticket' }, { status: 500 })
+    }
+  } else {
+    const [row] = await db
+      .insert(tickets)
+      .values({
+        title: title || 'Untitled',
+        description: description || null,
+        shortNote: short_note ?? null,
+        status: status || 'open',
+        visibility: resolvedInsertVisibility,
+        teamId: team_id || null,
+        typeId: type_id ?? null,
+        priority: resolvedPriority,
+        companyId: resolvedCompanyId,
+        dueDate: due_date ? new Date(due_date) : null,
+        createdBy: authUser.id,
+        contactUserId,
+        createdVia,
+        ticketType: insertTicketType,
+        projectId: insertProjectId,
+        projectStatusId: insertProjectStatusId,
+      })
+      .returning()
+    newTicket = row
+  }
 
   if (!newTicket) {
     return NextResponse.json({ error: 'Failed to create ticket' }, { status: 500 })
   }
+  const ticket = newTicket
 
   if (assignees.length > 0) {
     await db.insert(ticketAssignees).values(
       assignees.map((userId: string) => ({
-        ticketId: newTicket.id,
+        ticketId: ticket.id,
         userId,
       }))
     )
@@ -707,14 +753,14 @@ export async function POST(request: Request) {
   if (tag_ids.length > 0) {
     await db.insert(ticketTags).values(
       tag_ids.map((tagId: string) => ({
-        ticketId: newTicket.id,
+        ticketId: ticket.id,
         tagId,
       }))
     )
   }
 
   try {
-    const ctx = await loadAutomationTicketContext(newTicket.id)
+    const ctx = await loadAutomationTicketContext(ticket.id)
     if (ctx) await runAutomationRules('ticket_created', ctx)
   } catch (autoErr) {
     console.error('Automation rules error:', autoErr)
@@ -723,7 +769,7 @@ export async function POST(request: Request) {
   if (attachments.length > 0) {
     await db.insert(ticketAttachments).values(
       attachments.map((a: { file_url: string; file_name: string; file_path: string }) => ({
-        ticketId: newTicket.id,
+        ticketId: ticket.id,
         fileUrl: a.file_url,
         fileName: a.file_name,
         filePath: a.file_path,
@@ -734,7 +780,7 @@ export async function POST(request: Request) {
 
   const activityRole = role === 'customer' ? 'customer' : 'agent'
   await logTicketActivity({
-    ticketId: newTicket.id,
+    ticketId: ticket.id,
     actorUserId: userId,
     actorRole: activityRole,
     action: 'ticket_created',
@@ -753,11 +799,11 @@ export async function POST(request: Request) {
       await notifyTicketUsers({
         recipientUserIds: assignees,
         excludeUserId: userId,
-        ticketId: newTicket.id,
-        ticketTitle: newTicket.title,
+        ticketId: ticket.id,
+        ticketTitle: ticket.title,
         type: 'new_ticket_assignee',
         title: 'New ticket assignment',
-        body: `You were assigned to "${newTicket.title}"`,
+        body: `You were assigned to "${ticket.title}"`,
         actorUserId: userId,
         actorName,
         actorRole: role ?? null,
@@ -769,13 +815,13 @@ export async function POST(request: Request) {
 
   if (insertTicketType !== 'project') {
     void notifySlackTicketEvent('ticket_created', {
-      id: newTicket.id,
-      title: newTicket.title,
-      status: newTicket.status,
-      teamId: newTicket.teamId ?? null,
-      priorityId: newTicket.priorityId ?? null,
-      companyId: newTicket.companyId ?? null,
-      typeId: newTicket.typeId ?? null,
+      id: ticket.id,
+      title: ticket.title,
+      status: ticket.status,
+      teamId: ticket.teamId ?? null,
+      priority: ticket.priority,
+      companyId: ticket.companyId ?? null,
+      typeId: ticket.typeId ?? null,
     })
 
     try {
@@ -783,8 +829,8 @@ export async function POST(request: Request) {
         creatorUserId: userId,
         creatorRole: role,
         companyId: resolvedCompanyId,
-        ticketId: newTicket.id,
-        ticketTitle: newTicket.title || 'Untitled',
+        ticketId: ticket.id,
+        ticketTitle: ticket.title || 'Untitled',
       })
     } catch (mailErr) {
       console.error('[POST ticket] requester notification email failed:', mailErr)
@@ -792,10 +838,10 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    id: newTicket.id,
-    created_at: newTicket.createdAt ? new Date(newTicket.createdAt).toISOString() : '',
-    updated_at: newTicket.updatedAt ? new Date(newTicket.updatedAt).toISOString() : '',
-    company_id: newTicket.companyId ?? null,
+    id: ticket.id,
+    created_at: ticket.createdAt ? new Date(ticket.createdAt).toISOString() : '',
+    updated_at: ticket.updatedAt ? new Date(ticket.updatedAt).toISOString() : '',
+    company_id: ticket.companyId ?? null,
     ...(ticketCrossCompanyWarning
       ? { ticket_cross_company_warning: ticketCrossCompanyWarning }
       : {}),

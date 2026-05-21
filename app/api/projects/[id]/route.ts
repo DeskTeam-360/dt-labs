@@ -1,7 +1,7 @@
 import { and, asc, desc, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-import { db, projects, projectStatuses, ticketPriorities, tickets, ticketTypes } from '@/lib/db'
+import { db, projects, projectStatuses, tickets, ticketTypes } from '@/lib/db'
 import { requireProjectApiSession } from '@/lib/project-api-auth'
 
 function serializeProject(row: typeof projects.$inferSelect) {
@@ -29,7 +29,6 @@ function serializeStatus(row: typeof projectStatuses.$inferSelect) {
 function serializeProjectBoardTicket(
   row: {
     t: typeof tickets.$inferSelect
-    priority: typeof ticketPriorities.$inferSelect | null
     type: typeof ticketTypes.$inferSelect | null
   },
   fallbackProjectStatusId: number | null
@@ -51,20 +50,12 @@ function serializeProjectBoardTicket(
     team_id: t.teamId,
     type_id: t.typeId,
     ticket_type: t.ticketType ?? 'project',
-    priority_id: t.priorityId,
+    priority: t.priority ?? 0,
     company_id: t.companyId,
     created_at: t.createdAt ? new Date(t.createdAt).toISOString() : '',
     updated_at: t.updatedAt ? new Date(t.updatedAt).toISOString() : '',
     type: row.type
       ? { id: row.type.id, title: row.type.title, slug: row.type.slug, color: row.type.color ?? '#000' }
-      : null,
-    priority: row.priority
-      ? {
-          id: row.priority.id,
-          title: row.priority.title,
-          slug: row.priority.slug,
-          color: row.priority.color ?? '#000',
-        }
       : null,
     project_id: t.projectId,
     project_status_id: t.projectStatusId,
@@ -93,11 +84,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const ticketJoinRows = await db
     .select({
       t: tickets,
-      priority: ticketPriorities,
       type: ticketTypes,
     })
     .from(tickets)
-    .leftJoin(ticketPriorities, eq(tickets.priorityId, ticketPriorities.id))
     .leftJoin(ticketTypes, eq(tickets.typeId, ticketTypes.id))
     .where(and(eq(tickets.projectId, id), eq(tickets.ticketType, 'project')))
     .orderBy(desc(tickets.updatedAt))

@@ -27,12 +27,14 @@ import {
   Empty,
   Flex,
   Input,
+  InputNumber,
   Popconfirm,
   Row,
   Segmented,
   Select,
   Space,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
@@ -47,6 +49,17 @@ import CommentWysiwyg from './CommentWysiwyg'
 import TicketUserMention from './TicketUserMention'
 
 const { Text, Paragraph } = Typography
+
+function ticketSidebarPriorityValue(ticketData: unknown): number | null {
+  const raw =
+    ticketData && typeof ticketData === 'object' && 'priority' in ticketData
+      ? (ticketData as { priority?: unknown }).priority
+      : undefined
+  if (raw === null || raw === undefined || raw === '') return null
+  const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.floor(n)
+}
 
 interface ChecklistItem {
   id: string
@@ -98,14 +111,13 @@ export interface SidebarAttributesDraft {
   status: string
   projectStatusId: number | null
   typeId: number | null
-  priorityId: number | null
+  /** Queue rank ≥1 within company support pool; null = unranked (e.g. closed). */
+  priority: number | null
   companyId: string | null
   tagIds: string[]
   contactUserId: string | null
   dueDate: string | null
-  visibility: string
   teamId: string | null
-  assigneeIds: string[]
   /** Local short note text; persisted with Save changes */
   shortNote: string
 }
@@ -114,32 +126,26 @@ function snapshotSidebarDraft(params: {
   ticketData: any
   selectedTagIds: string[]
   selectedContactUserId: string | null
-  selectedVisibility: string
   selectedTeamId: string | null
-  selectedAssigneeIds: string[]
   shortNoteProp: string | null | undefined
 }): SidebarAttributesDraft {
   const {
     ticketData,
     selectedTagIds,
     selectedContactUserId,
-    selectedVisibility,
     selectedTeamId,
-    selectedAssigneeIds,
     shortNoteProp,
   } = params
   return {
     status: String(ticketData?.status ?? 'open'),
     projectStatusId: ticketData?.project_status_id ?? null,
     typeId: ticketData?.type_id ?? null,
-    priorityId: ticketData?.priority_id ?? null,
+    priority: ticketSidebarPriorityValue(ticketData),
     companyId: ticketData?.company_id ?? null,
     tagIds: [...selectedTagIds],
     contactUserId: selectedContactUserId ?? null,
     dueDate: ticketData?.due_date ? String(ticketData.due_date) : null,
-    visibility: selectedVisibility,
     teamId: selectedTeamId ?? null,
-    assigneeIds: selectedAssigneeIds.map(String),
     shortNote: typeof shortNoteProp === 'string' ? shortNoteProp : '',
   }
 }
@@ -149,7 +155,6 @@ function sidebarDraftEquals(a: SidebarAttributesDraft, b: SidebarAttributesDraft
     JSON.stringify({
       ...d,
       tagIds: [...d.tagIds].slice().sort(),
-      assigneeIds: [...d.assigneeIds].slice().sort(),
     })
   return norm(a) === norm(b)
 }
@@ -161,7 +166,6 @@ interface TabGeneralProps {
   /** Board columns for `ticket_type === 'project'` */
   projectStatusOptions?: { id: number; title: string; slug: string; color: string }[]
   typeOptions: { id: number; title: string; slug: string; color: string }[]
-  priorityOptions: { id: number; title: string; slug: string; color: string }[]
   companyOptions: { id: string; name: string }[]
   /** Users who can be set as email reply contact; optional company_id for cross-company hints. */
   contactUserOptions?: Array<{
@@ -175,12 +179,8 @@ interface TabGeneralProps {
   selectedTagIds: string[]
   /** When false, company and tags are read-only (customer view) */
   canEditCompanyAndTags?: boolean
-  visibilityOptions: { value: string; label: string }[]
-  selectedVisibility: string
   teamOptions: { id: string; name: string }[]
   selectedTeamId: string | null
-  assigneeOptions: { id: string; full_name: string | null; email: string }[]
-  selectedAssigneeIds: string[]
   canEditAssignees?: boolean
   /** Bump after batch-save succeeds so sidebar draft resets from props */
   sidebarBaselineTick: number
@@ -255,19 +255,14 @@ export default function TabGeneral({
   statusOptions,
   projectStatusOptions,
   typeOptions,
-  priorityOptions,
   companyOptions,
   contactUserOptions = [],
   selectedContactUserId = null,
   tagOptions,
   selectedTagIds,
   canEditCompanyAndTags = true,
-  visibilityOptions,
-  selectedVisibility,
   teamOptions,
   selectedTeamId,
-  assigneeOptions,
-  selectedAssigneeIds,
   canEditAssignees = true,
   sidebarBaselineTick,
   sidebarAttributesSaving = false,
@@ -333,9 +328,7 @@ export default function TabGeneral({
       ticketData,
       selectedTagIds,
       selectedContactUserId,
-      selectedVisibility,
       selectedTeamId,
-      selectedAssigneeIds,
       shortNoteProp: ticketData?.short_note ?? null,
     }),
   )
@@ -344,9 +337,7 @@ export default function TabGeneral({
       ticketData,
       selectedTagIds,
       selectedContactUserId,
-      selectedVisibility,
       selectedTeamId,
-      selectedAssigneeIds,
       shortNoteProp: ticketData?.short_note ?? null,
     }),
   )
@@ -356,14 +347,12 @@ export default function TabGeneral({
       ticketData,
       selectedTagIds,
       selectedContactUserId,
-      selectedVisibility,
       selectedTeamId,
-      selectedAssigneeIds,
       shortNoteProp: ticketData?.short_note ?? null,
     })
     setSidebarBaseline(s)
     setSidebarDraft(s)
-  }, [ticketData?.id, ticketData?.short_note, sidebarBaselineTick])
+  }, [ticketData?.id, ticketData?.priority, ticketData?.short_note, sidebarBaselineTick])
 
   const sidebarDirty = useMemo(
     () => !sidebarDraftEquals(sidebarDraft, sidebarBaseline),
@@ -390,8 +379,8 @@ export default function TabGeneral({
     const row = contactUserOptions.find((o) => o.id === sidebarDraft.contactUserId)
     const uid = row?.company_id
     if (!uid || uid === ticketData.company_id) return null
-    const otherName = companyOptions.find((c) => c.id === uid)?.name ?? 'perusahaan lain'
-    return `Kontak dari ${otherName}. Setelah disimpan, Company tiket akan mengikuti perusahaan kontak (lintas perusahaan).`
+    const otherName = companyOptions.find((c) => c.id === uid)?.name ?? 'another company'
+    return `Contact is from ${otherName}. After saving, the ticket's company will match the contact's company (cross-company).`
   }, [sidebarDraft.contactUserId, ticketData.company_id, contactUserOptions, companyOptions])
 
   const creatorId = ticketData.creator?.id ?? ticketData.created_by ?? null
@@ -642,7 +631,6 @@ export default function TabGeneral({
                           resolveUser={(id) => {
                             const u =
                               nonCustomerUsers?.find((x) => x.id === id) ||
-                              assigneeOptions?.find((x) => x.id === id) ||
                               companyCustomers?.find((x) => x.id === id)
                             if (!u) return null
                             return { email: u.email, label: u.full_name || u.email }
@@ -850,23 +838,27 @@ export default function TabGeneral({
               />
             </Descriptions.Item>
             <Descriptions.Item label="Priority">
-              <Select
-                value={sidebarDraft.priorityId ?? undefined}
-                onChange={(v) =>
-                  setSidebarDraft((d) => ({
-                    ...d,
-                    priorityId: v ?? null,
-                  }))
-                }
-                loading={sidebarAttributesSaving}
-                options={priorityOptions.map((p) => ({
-                  value: p.id,
-                  label: <Tag color={p.color} style={{ margin: 0 }}>{p.title}</Tag>,
-                }))}
-                style={{ minWidth: 140, width: '100%' }}
-                allowClear
-                placeholder="Select priority"
-              />
+              <Tooltip
+                title="Integer rank within the company support queue (1 = highest). Leave empty for unranked."
+              >
+                <InputNumber
+                  min={1}
+                  precision={0}
+                  value={sidebarDraft.priority ?? undefined}
+                  onChange={(v) =>
+                    setSidebarDraft((d) => ({
+                      ...d,
+                      priority:
+                        v == null || !Number.isFinite(Number(v))
+                          ? null
+                          : Math.max(1, Math.floor(Number(v))),
+                    }))
+                  }
+                  disabled={sidebarAttributesSaving}
+                  placeholder="Rank"
+                  style={{ width: '100%', minWidth: 120 }}
+                />
+              </Tooltip>
             </Descriptions.Item>
             <Descriptions.Item label="Company">
               {canEditCompanyAndTags ? (
@@ -994,99 +986,26 @@ export default function TabGeneral({
                 disabled={sidebarAttributesSaving}
               />
             </Descriptions.Item>
-            <Descriptions.Item label="Visibility">
+            <Descriptions.Item label="Team">
               {canEditAssignees ? (
                 <Select
-                  value={sidebarDraft.visibility}
-                  onChange={(v) => {
-                    if (!v) return
+                  value={sidebarDraft.teamId ?? undefined}
+                  onChange={(teamId) =>
                     setSidebarDraft((d) => ({
                       ...d,
-                      visibility: v,
-                      assigneeIds: [],
-                      teamId: v === 'team' ? d.teamId : null,
+                      teamId: teamId ?? null,
                     }))
-                  }}
+                  }
                   loading={sidebarAttributesSaving}
-                  options={visibilityOptions}
+                  options={teamOptions.map((t) => ({ value: t.id, label: t.name }))}
                   style={{ minWidth: 140, width: '100%' }}
+                  placeholder="Select team"
+                  allowClear
                 />
               ) : (
-                <Text>{visibilityOptions.find((o) => o.value === ticketData.visibility)?.label ?? ticketData.visibility}</Text>
+                <Text>{ticketData.team?.name ?? '—'}</Text>
               )}
             </Descriptions.Item>
-            {sidebarDraft.visibility === 'team' || sidebarDraft.visibility === 'public' ? (
-              <Descriptions.Item label="Team">
-                {canEditAssignees ? (
-                  <Select
-                    value={sidebarDraft.teamId ?? undefined}
-                    onChange={(teamId) =>
-                      setSidebarDraft((d) => ({
-                        ...d,
-                        teamId,
-                        visibility: teamId ? 'team' : d.visibility === 'team' ? 'private' : d.visibility,
-                        assigneeIds: [],
-                      }))
-                    }
-                    loading={sidebarAttributesSaving}
-                    options={teamOptions.map((t) => ({ value: t.id, label: t.name }))}
-                    style={{ minWidth: 140, width: '100%' }}
-                    placeholder="Select team"
-                    allowClear
-                  />
-                ) : (
-                  <Text>{ticketData.team?.name ?? '—'}</Text>
-                )}
-              </Descriptions.Item>
-            ) : sidebarDraft.visibility === 'specific_users' ? (
-              <Descriptions.Item label="Assignees">
-                {canEditAssignees ? (
-                  <Select
-                    mode="multiple"
-                    value={sidebarDraft.assigneeIds}
-                    onChange={(ids) =>
-                      setSidebarDraft((d) => {
-                        const userIds = (ids ?? []).map(String)
-                        return {
-                          ...d,
-                          assigneeIds: userIds,
-                          visibility:
-                            userIds.length > 0 ? 'specific_users' : d.visibility === 'specific_users' ? 'private' : d.visibility,
-                          teamId: userIds.length > 0 ? null : d.teamId,
-                        }
-                      })
-                    }
-                    loading={sidebarAttributesSaving}
-                    options={assigneeOptions.map((u) => ({
-                      value: String(u.id),
-                      label: String(u.full_name || u.email || u.id || 'Unknown'),
-                    }))}
-                    style={{ minWidth: 160, width: '100%' }}
-                    placeholder="Select assignees"
-                    allowClear
-                    showSearch
-                    filterOption={(input, option) => {
-                      const label = option?.label
-                      if (label == null) return false
-                      return String(label).toLowerCase().includes(input.toLowerCase())
-                    }}
-                    optionFilterProp="label"
-                    dropdownStyle={{ maxHeight: 280 }}
-                    getPopupContainer={(node) => node.parentElement || document.body}
-                  />
-                ) : (
-                  <Space wrap size={4}>
-                    {ticketData.assignees?.length > 0 ? (
-                      ticketData.assignees.map((a: any) => (
-                        <Text key={a.id}>{a.user?.full_name || a.user?.email || '—'}</Text>
-                      ))
-                    ) : (
-                      <Text type="secondary">—</Text>
-                    )}
-                  </Space>
-                )}
-              </Descriptions.Item>
-            ) : null}
             <Descriptions.Item label="Created At">
               <Space>
                 <ClockCircleOutlined />
