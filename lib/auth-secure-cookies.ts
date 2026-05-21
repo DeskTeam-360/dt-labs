@@ -1,16 +1,16 @@
 import type { NextRequest } from 'next/server'
 
 /**
- * Harus selaras dengan nama cookie JWT Auth.js (`getToken` { secureCookie }).
+ * Must match JWT Auth.js cookie name (`getToken` { secureCookie }).
  *
  * Auth.js memilih `useSecureCookies` dari **URL request** (`url.protocol === "https:"`),
- * bukan dari `AUTH_URL` saja (@auth/core init). Kalau di VPS Anda buka `http://IP:3003`
- * tapi `.env` masih `AUTH_URL=https://...` (salinan Vercel), membaca `AUTH_URL` dulu
- * memaksa `secureCookie: true` padahal cookie sesi bernama `authjs.session-token`
- * (tanpa prefiks `__Secure-`) → selalu dianggap belum login.
+ * not just from `AUTH_URL` alone (@auth/core init). If you open `http://IP:3003`
+ * on your VPS but `.env` still has `AUTH_URL=https://...` (Vercel copy), reading `AUTH_URL` first
+ * forces `secureCookie: true` but the session cookie is named `authjs.session-token`
+ * (without `__Secure-` prefix) → always treated as not logged in.
  *
- * Urutan: override eksplisit → protokol dari request (proxy / URL) → barulah `AUTH_URL`
- * jika tidak bisa diturunkan dari request → fallback production.
+ * Order: explicit override → protocol from request (proxy / URL) → then `AUTH_URL`
+ * if not derivable from request → fallback to production.
  */
 export function authSecureCookieFromRequest(req: NextRequest): boolean {
   const explicit = process.env.AUTH_COOKIE_SECURE?.toLowerCase()

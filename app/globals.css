@@ -687,14 +687,14 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
 
 /*
  * Ticket comments & description (.comment-html = read-only Quill / email HTML).
- * - Tailwind preflight menghilangkan bullet pada ul/ol biasa.
- * - Quill v2: marker & penomoran bersarang (a., i., dll.) lewat `li > .ql-ui:before` di quill.snow.css.
- *   Jangan `display:none` pada `.ql-ui` — itu membuat tampilan beda dari mode edit.
- * - TicketDetailContent mengimpor quill.snow.css agar read-only sejajar dengan editor.
- * - HTML semantik getSemanticHTML (<ul>/<ol> tanpa data-list) tetap butuh list-style pada li (Quill set li ke none).
+ * - Tailwind preflight removes bullet on normal ul/ol.
+ * - Quill v2: marker & numbering nested (a., i., etc.) via `li > .ql-ui:before` in quill.snow.css.
+ *   Do not `display:none` on `.ql-ui` — it makes it look different from edit mode.
+ * - TicketDetailContent imports quill.snow.css to make read-only match the editor.
+ * - HTML semantic getSemanticHTML (<ul>/<ol> without data-list) still needs list-style on li (Quill sets li to none).
  */
 /*
- * `.ql-editor li { list-style-type: none }` dari Snow — untuk li non-Quill perlu override di bawah.
+ * `.ql-editor li { list-style-type: none }` from Snow — for li non-Quill needs override below.
  */
 /* Quill / rich HTML: consecutive <p> (e.g. double Enter) need vertical rhythm */
 .comment-html > p,
@@ -714,7 +714,7 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
   list-style: disc;
   list-style-position: outside;
 }
-/* Bullet tepat setelah daftar bernomor: lebih menjorok agar jelas “di bawah” langkah */
+/* Bullet right after numbered list: more indented to clearly “below” step */
 .comment-html ol:not(:has(> li[data-list])) + ul,
 .ql-editor.comment-html ol:not(:has(> li[data-list])) + ul {
   margin-left: 1.25em;
@@ -785,7 +785,7 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
 .comment-html li > p {
   margin: 0.35em 0;
 }
-/* Daftar bersarang di dalam satu item (nomor + bullet di bawahnya, atau sebaliknya) */
+/* Nested list within one item (number + bullet below, or vice versa) */
 .comment-html li > ol,
 .comment-html li > ul {
   margin-top: 0.35em;

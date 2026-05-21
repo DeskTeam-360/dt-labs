@@ -618,7 +618,7 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
               <div>
                 <Text strong>Payload (JSON)</Text>
                 <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 4 }}>
-                  Objek JSON penuh seperti yang disimpan. Salah sintaks atau bukan objek akan ditolak.
+                  Full JSON object as saved. Invalid syntax or not an object will be rejected.
                 </Text>
                 <Input.TextArea
                   value={editPayloadJson}

@@ -1439,7 +1439,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
 
                 {recapPreview ? (
                   <Card
-                    title="Preview (sama seperti Settings → Recap snapshots)"
+                    title="Preview (same as Settings → Recap snapshots)"
                     style={{ marginTop: 12 }}
                     styles={{ body: { padding: 0 } }}
                   >

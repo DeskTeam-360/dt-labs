@@ -107,7 +107,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           error: 'AccessRevoked',
         }
       }
-      /** Subjek sesi: jangan bergantung pada `session.user` yang sudah ada — Auth.js Credentials sering mengirim `user` kosong/undefined; getToken di middleware tetap melihat `id` di JWT → loop login↔dashboard. */
+      /** Session subject: do not rely on `session.user` that already exists — Auth.js Credentials often sends empty/undefined `user`; getToken in middleware still looks at `id` in JWT → loop login↔dashboard. */
       const userId =
         (typeof token.id === 'string' && token.id.length > 0 ? token.id : undefined) ??
         (typeof token.sub === 'string' && token.sub.length > 0 ? token.sub : undefined)

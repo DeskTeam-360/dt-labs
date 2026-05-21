@@ -1,5 +1,6 @@
--- Samakan pola dengan 037_project_kanban_and_project_tickets.sql (project_statuses):
--- USAGE pada schema public (seperti 044), GRANT eksplisit ke PUBLIC, lalu salin grantee dari public.companies.
+-- Migration 045 — Job types mirror grants for companies
+-- Same pattern as 037_project_kanban_and_project_tickets.sql (project_statuses):
+-- USAGE on public schema (like 044), GRANT explicitly to PUBLIC, then copy grantees from public.companies.
 
 GRANT USAGE ON SCHEMA public TO PUBLIC;
 
