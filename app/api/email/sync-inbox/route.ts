@@ -257,6 +257,52 @@ async function sendUserTemporaryPasswordEmail(params: {
   })
 }
 
+/** User Activation + Password Reset templates for customers auto-created from inbox. */
+async function sendNewInboxUserOnboardingEmails(params: {
+  gmail: any
+  fromEmail: string
+  toEmail: string
+  baseUrl: string
+  ticketId: number
+  recipientUserId: string
+  integrationActorUserId: string
+  temporaryPassword: string
+}): Promise<void> {
+  const {
+    gmail,
+    fromEmail,
+    toEmail,
+    baseUrl,
+    ticketId,
+    recipientUserId,
+    integrationActorUserId,
+    temporaryPassword,
+  } = params
+  const [recipientRow] = await db.select().from(users).where(eq(users.id, recipientUserId)).limit(1)
+  const [senderRow] = await db.select().from(users).where(eq(users.id, integrationActorUserId)).limit(1)
+  const recipientMap = userRowToMergeMap(recipientRow ?? null)
+  const senderMap = userRowToMergeMap(senderRow ?? null)
+  await sendUserActivationEmail({
+    gmail,
+    fromEmail,
+    toEmail,
+    baseUrl,
+    ticketId,
+    recipientMap,
+    senderMap,
+  })
+  await sendUserTemporaryPasswordEmail({
+    gmail,
+    fromEmail,
+    toEmail,
+    baseUrl,
+    ticketId,
+    temporaryPassword,
+    recipientMap,
+    senderMap,
+  })
+}
+
 function decodeBodyDataBase64(b64: string | undefined): Buffer | null {
   if (!b64) return null
   try {
@@ -777,6 +823,7 @@ export async function POST(request: NextRequest) {
             } catch {}
           } else {
             const displayName = parseNameFromHeader(from) || senderEmail.split('@')[0] || 'User'
+            const ccNewUserPassword = randomPassword()
             const [newUser] = await db
               .insert(users)
               .values({
@@ -784,7 +831,7 @@ export async function POST(request: NextRequest) {
                 fullName: truncateVarchar(displayName, 255),
                 companyId: ticketRow.companyId,
                 role: 'customer',
-                passwordHash: await bcrypt.hash(randomPassword(), 10),
+                passwordHash: await bcrypt.hash(ccNewUserPassword, 10),
               })
               .returning({ id: users.id })
             if (newUser) {
@@ -795,6 +842,24 @@ export async function POST(request: NextRequest) {
                   .values({ companyId: ticketRow.companyId, userId: newUser.id })
                   .onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
               } catch {}
+              try {
+                await sendNewInboxUserOnboardingEmails({
+                  gmail,
+                  fromEmail: integration.emailAddress || 'noreply@example.com',
+                  toEmail: senderEmail,
+                  baseUrl,
+                  ticketId,
+                  recipientUserId: newUser.id,
+                  integrationActorUserId: userId,
+                  temporaryPassword: ccNewUserPassword,
+                })
+              } catch (mailErr) {
+                console.error(
+                  '[Sync] activation/password email failed (cc reply):',
+                  senderEmail,
+                  (mailErr as Error)?.message
+                )
+              }
             }
           }
         }
@@ -1000,6 +1065,14 @@ export async function POST(request: NextRequest) {
               creatorUserId = inserted.id
               createdUserTempPassword = password
               shouldSendActivationForNewUser = true
+              if (company?.id) {
+                try {
+                  await db
+                    .insert(companyUsers)
+                    .values({ companyId: company.id, userId: inserted.id })
+                    .onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+                } catch {}
+              }
             }
           }
           ticketCompanyId = company?.id ?? null
@@ -1302,6 +1375,7 @@ export async function POST(request: NextRequest) {
                 } catch {}
               } else {
                 try {
+                  const ccNewPassword = randomPassword()
                   const [newCcUser] = await db
                     .insert(users)
                     .values({
@@ -1309,11 +1383,32 @@ export async function POST(request: NextRequest) {
                       fullName: truncateVarchar(ccEmail.split('@')[0] || 'User', 255),
                       companyId: ticketCompanyId,
                       role: 'customer',
-                      passwordHash: await bcrypt.hash(randomPassword(), 10),
+                      passwordHash: await bcrypt.hash(ccNewPassword, 10),
                     })
                     .returning({ id: users.id })
                   if (newCcUser) {
-                    await db.insert(companyUsers).values({ companyId: ticketCompanyId, userId: newCcUser.id }).onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+                    await db
+                      .insert(companyUsers)
+                      .values({ companyId: ticketCompanyId, userId: newCcUser.id })
+                      .onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
+                    try {
+                      await sendNewInboxUserOnboardingEmails({
+                        gmail,
+                        fromEmail: integration.emailAddress || 'noreply@example.com',
+                        toEmail: ccEmail.trim(),
+                        baseUrl,
+                        ticketId: newTicket.id,
+                        recipientUserId: newCcUser.id,
+                        integrationActorUserId: userId,
+                        temporaryPassword: ccNewPassword,
+                      })
+                    } catch (mailErr) {
+                      console.error(
+                        '[Sync] activation/password email failed (cc new ticket):',
+                        ccEmail,
+                        (mailErr as Error)?.message
+                      )
+                    }
                   }
                 } catch (e) {
                   console.error('[Sync] CC user create failed (new ticket):', ccEmail, (e as Error)?.message)
@@ -1371,30 +1466,18 @@ export async function POST(request: NextRequest) {
             },
           })
 
-          // Unknown sender (no company match) gets two emails:
-          // 1) activation info, 2) temporary password.
-          if (!ticketCompanyId && shouldSendActivationForNewUser && creatorUserId && createdUserTempPassword) {
+          // New inbox sender (unknown email): User Activation + Password Reset templates.
+          if (shouldSendActivationForNewUser && creatorUserId && createdUserTempPassword) {
             try {
-              const [recipientRow] = await db.select().from(users).where(eq(users.id, creatorUserId)).limit(1)
-              const [senderRow] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
-              await sendUserActivationEmail({
+              await sendNewInboxUserOnboardingEmails({
                 gmail,
                 fromEmail: integration.emailAddress || 'noreply@example.com',
                 toEmail: senderEmail,
                 baseUrl,
                 ticketId: newTicket.id,
-                recipientMap: userRowToMergeMap(recipientRow ?? null),
-                senderMap: userRowToMergeMap(senderRow ?? null),
-              })
-              await sendUserTemporaryPasswordEmail({
-                gmail,
-                fromEmail: integration.emailAddress || 'noreply@example.com',
-                toEmail: senderEmail,
-                baseUrl,
-                ticketId: newTicket.id,
+                recipientUserId: creatorUserId,
+                integrationActorUserId: userId,
                 temporaryPassword: createdUserTempPassword,
-                recipientMap: userRowToMergeMap(recipientRow ?? null),
-                senderMap: userRowToMergeMap(senderRow ?? null),
               })
             } catch (mailErr) {
               console.error('[Sync] activation/password email failed:', senderEmail, (mailErr as Error)?.message)
