@@ -196,11 +196,12 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       className="admin-sidebar-deskteam deskteam-app-sidebar"
       style={{
         overflow: 'hidden',
-        height: '100vh',
         position: 'fixed',
         left: 0,
         top: 0,
         bottom: 0,
+        height: undefined,
+        minHeight: '100dvh',
         background: SIDEBAR_BG,
         paddingLeft: 5,
         display: 'flex',
@@ -243,7 +244,16 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowX: 'hidden',
+          overflowY: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         <Menu
           theme="dark"
           mode="inline"
@@ -255,6 +265,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           style={{
             borderRight: 0,
             marginTop: 16,
+            marginBottom: 24,
             background: 'transparent',
           }}
           onClick={({ key, domEvent }) => {

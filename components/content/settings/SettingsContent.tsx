@@ -7,7 +7,6 @@ import {
   BellOutlined,
   CalendarOutlined,
   FileTextOutlined,
-  FlagOutlined,
   InfoCircleOutlined,
   MailOutlined,
   NotificationOutlined,
@@ -15,6 +14,7 @@ import {
   TagOutlined,
   TeamOutlined,
   ThunderboltOutlined,
+  ToolOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { Col, Layout, Row, Typography } from 'antd'
@@ -39,6 +39,7 @@ import {
   canAccessUsers,
   canManageDashboardAnnouncements,
   canManageGlobalAnnouncement,
+  isAdmin,
 } from '@/lib/auth-utils'
 
 const { Content } = Layout
@@ -158,20 +159,22 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                 </Col>
                 <Col xs={24} sm={12} md={8}>
                   <HubTile
-                    title="Ticket Priorities"
-                    description="Urgency levels and ordering"
-                    href="/settings/ticket-priorities"
-                    icon={<FlagOutlined />}
-                  />
-                </Col>
-                <Col xs={24} sm={12} md={8}>
-                  <HubTile
                     title="Tags"
                     description="Labels for organizing tickets"
                     href="/settings/tags"
                     icon={<TagOutlined />}
                   />
                 </Col>
+                {isAdmin(role) ? (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Job types"
+                      description="Work categories for the time tracker"
+                      href="/settings/job-types-catalog"
+                      icon={<ToolOutlined />}
+                    />
+                  </Col>
+                ) : null}
               </Row>
             </Section>
           )}
@@ -334,6 +337,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
               </Row>
             </Section>
           )}
+
         </Content>
       </AdminMainColumn>
     </Layout>

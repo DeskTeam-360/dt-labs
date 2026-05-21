@@ -11,12 +11,13 @@ INSERT INTO job_types (slug, title, sort_order) VALUES
   ('development', 'Development', 10),
   ('meeting', 'Meeting', 20),
   ('support', 'Support / customer care', 30),
-  ('bugfix', 'Bug fix', 40),
   ('review', 'Review / QA', 50),
-  ('documentation', 'Documentation', 60),
   ('research', 'Research / investigation', 70),
   ('admin', 'Admin / internal', 80),
-  ('other', 'Other', 999)
+  ('other', 'Other', 999),
+  ('ticket_work', 'Ticket Work', 10),
+  ('revision', 'Revision', 10),
+
 ON CONFLICT (slug) DO NOTHING;
 
 ALTER TABLE ticket_time_tracker

@@ -521,6 +521,23 @@ html.dark .ticket-thread-bubble.ticket-thread-bubble--agent-reply,
   color: #35165c !important;
 }
 
+/* Admin sidebar — penuh ke bawah viewport, hindari scrollbar ganda / gap 100vh */
+.deskteam-app-sidebar.ant-layout-sider {
+  top: 0 !important;
+  bottom: 0 !important;
+  height: auto !important;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+.deskteam-app-sidebar.ant-layout-sider > .ant-layout-sider-children {
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
 /* Admin sidebar - inline styles (menggantikan injeksi JS di AdminSidebar.tsx) */
 .admin-sidebar-deskteam .ant-menu-item-selected,
 .admin-sidebar-deskteam li.ant-menu-item-selected,
