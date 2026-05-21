@@ -26,6 +26,8 @@ import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-templ
 import { sendRequesterTicketCreatedEmail } from '@/lib/requester-new-ticket-email'
 import { uploadBuffer } from '@/lib/storage-idrive'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
+import { DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
+import { assignCompanySupportTicketRank } from '@/lib/ticket-company-priority-order'
 
 /** Parse Gmail internalDate to ISO string for created_at */
 function getEmailDateIso(msg: { internalDate?: string }): string | null {
@@ -1331,19 +1333,35 @@ export async function POST(request: NextRequest) {
           const title = truncateVarchar(subject.replace(/^(Re:\s*)+/i, '').trim() || 'New support request', 255)
           const emailDateIso = getEmailDateIso(msg)
 
-          const [newTicket] = await db
-            .insert(tickets)
-            .values({
-              title,
-              description: body || null,
-              createdBy: creatorUserId ?? null,
-              status: 'open',
-              visibility: 'public',
-              companyId: ticketCompanyId,
-              createdVia: 'email',
-              ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
+          let newTicket: { id: number } | undefined
+          try {
+            newTicket = await db.transaction(async (tx) => {
+              const [row] = await tx
+                .insert(tickets)
+                .values({
+                  title,
+                  description: body || null,
+                  createdBy: creatorUserId ?? null,
+                  status: 'open',
+                  visibility: 'public',
+                  companyId: ticketCompanyId,
+                  createdVia: 'email',
+                  ticketType: DEFAULT_TICKET_TYPE,
+                  /** NULL first; then append to end of company queue (avoids unique company_id+priority clash). */
+                  priority: ticketCompanyId ? null : 0,
+                  ...(emailDateIso && { createdAt: new Date(emailDateIso) }),
+                })
+                .returning({ id: tickets.id })
+              if (!row) return undefined
+              if (ticketCompanyId) {
+                await assignCompanySupportTicketRank(tx, ticketCompanyId, row.id, 'append')
+              }
+              return row
             })
-            .returning({ id: tickets.id })
+          } catch (e) {
+            console.error('Failed to create ticket from email:', e)
+            continue
+          }
 
           if (!newTicket) {
             console.error('Failed to create ticket from email')
