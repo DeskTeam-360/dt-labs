@@ -693,7 +693,8 @@ export async function POST(request: Request) {
             visibility: resolvedInsertVisibility,
             teamId: team_id || null,
             typeId: type_id ?? null,
-            priority: 1,
+            /** NULL first: UNIQUE (company_id, priority) for open support tickets would collide if we reused e.g. 1 before reorder. */
+            priority: null,
             companyId: resolvedCompanyId,
             dueDate: due_date ? new Date(due_date) : null,
             createdBy: authUser.id,
@@ -708,7 +709,8 @@ export async function POST(request: Request) {
         newTicket = row
         await assignCompanySupportTicketRank(tx, resolvedCompanyId!, row.id, desiredRank)
       })
-    } catch {
+    } catch (e) {
+      console.error('[POST /api/tickets] company queue create failed:', e)
       return NextResponse.json({ error: 'Failed to create ticket' }, { status: 500 })
     }
   } else {
