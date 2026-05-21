@@ -52,9 +52,7 @@ interface DashboardData {
   total_time_seconds: number
   status_counts: Array<{ status_slug: string; status_title: string; count: number; color: string }>
   last_due_date: string | null
-  urgent_due_date: string | null
   last_due_ticket?: { id: number; title: string } | null
-  urgent_due_ticket?: { id: number; title: string } | null
   recent_tickets: Array<{
     id: number
     title: string
@@ -294,28 +292,19 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                 </Col>
                 <Col xs={24} lg={12} style={{ padding: 16, borderRadius: 8 }}>
                   <div style={{ position: 'relative', background: 'var(--customer-dash-chart-surface)', padding: 16, borderRadius: 8, height: '100%' }}>
-                    {/* Last Due Date - My Ticket */}
-                    <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', position: 'absolute', top: 0, right: 40, gap: 4, background: 'var(--customer-dash-eta-banner)', padding: '8px 16px', borderRadius: '0 0 10px 10px' }}>
+                    {/* Due date terdekat — semua ticket perusahaan */}
+                    <div style={{ marginBottom: 16, position: 'absolute', top: 0, right: 40, background: 'var(--customer-dash-eta-banner)', padding: '8px 16px', borderRadius: '0 0 10px 10px' }}>
                       <Tooltip title={data?.last_due_ticket ? `#${data.last_due_ticket.id} ${data.last_due_ticket.title}` : undefined}>
                         <Text
                           type="danger"
                           style={{ fontWeight: 700, cursor: data?.last_due_ticket ? 'pointer' : 'default' }}
                           onClick={() => data?.last_due_ticket && router.push(`/tickets/${data.last_due_ticket!.id}`)}
                         >
-                          <ClockCircleOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Most Closest ETA: {data?.last_due_date ? dayjs(data.last_due_date).format('MMM DD, YYYY') : 'N/A'}
-                        </Text>
-                      </Tooltip>
-                      <Tooltip title={data?.urgent_due_ticket ? `#${data.urgent_due_ticket.id} ${data.urgent_due_ticket.title}` : undefined}>
-                        <Text
-                          type="danger"
-                          style={{ fontWeight: 700, cursor: data?.urgent_due_ticket ? 'pointer' : 'default' }}
-                          onClick={() => data?.urgent_due_ticket && router.push(`/tickets/${data.urgent_due_ticket!.id}`)}
-                        >
-                          <FlagOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Urgent ETA: {data?.urgent_due_date ? dayjs(data.urgent_due_date).format('MMM DD, YYYY') : 'N/A'}
+                          <ClockCircleOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Due date terdekat: {data?.last_due_date ? dayjs(data.last_due_date).format('MMM DD, YYYY') : 'N/A'}
                         </Text>
                       </Tooltip>
                     </div>
-                    <br /><br /><br />
+                    <br /><br />
                     {(data?.priority_counts?.length ?? 0) > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         {data!.priority_counts.map((p, i) => (

@@ -5,6 +5,7 @@
 import { and, asc, desc, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 
+import { customerCanAccessTicket } from '@/lib/customer-ticket-access'
 import { db } from '@/lib/db'
 import {
   commentAttachments,
@@ -36,8 +37,10 @@ export const TICKET_COMMENTS_PAGE_SIZE = 10
 export type TicketCommentOlderCursor = { created_at: string; id: string }
 
 export interface TicketDetailOptions {
-  /** For customer: only show ticket if company_id matches */
+  /** @deprecated Prefer customerPortal */
   companyId?: string
+  /** Portal customer: company tickets + personal tickets without company */
+  customerPortal?: { userId: string; companyId: string | null }
   /** Filter screenshots by user (both admin and customer show only current user's) */
   screenshotUserId?: string
 }
@@ -47,9 +50,13 @@ type CommentRowJoined = {
   user: typeof users.$inferSelect | null
 }
 
+function isCustomerPortalView(options?: TicketDetailOptions): boolean {
+  return !!(options?.customerPortal || options?.companyId)
+}
+
 function commentsBaseWhere(ticketId: number, options?: TicketDetailOptions) {
   const ticketScope = eq(ticketComments.ticketId, ticketId)
-  if (options?.companyId) {
+  if (isCustomerPortalView(options)) {
     return and(
       ticketScope,
       or(isNull(ticketComments.visibility), ne(ticketComments.visibility, 'note'))
@@ -208,11 +215,20 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
   if (!ticketRow?.ticket) return null
 
   const t = ticketRow.ticket
-  if (options?.companyId && t.companyId !== options.companyId) {
+  if (options?.customerPortal) {
+    const { userId, companyId } = options.customerPortal
+    if (!customerCanAccessTicket(
+      { companyId: t.companyId, contactUserId: t.contactUserId, createdBy: t.createdBy },
+      userId,
+      companyId
+    )) {
+      return null
+    }
+    const cls = coerceTicketType(t.ticketType)
+    if (cls === 'spam' || cls === 'trash' || cls === 'project') return null
+  } else if (options?.companyId && t.companyId !== options.companyId) {
     return null
-  }
-  /** Portal customers: hide spam/trash rows even if same company */
-  if (options?.companyId) {
+  } else if (options?.companyId) {
     const cls = coerceTicketType(t.ticketType)
     if (cls === 'spam' || cls === 'trash' || cls === 'project') return null
   }

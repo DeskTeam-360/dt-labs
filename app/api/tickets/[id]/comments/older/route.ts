@@ -2,8 +2,9 @@ import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { db } from '@/lib/db'
-import { companyUsers, tickets,users } from '@/lib/db'
+import { getCustomerCompanyId } from '@/lib/customer-company'
+import { customerCanAccessTicket } from '@/lib/customer-ticket-access'
+import { db, tickets } from '@/lib/db'
 import {
   fetchTicketCommentsWindow,
   TICKET_COMMENTS_PAGE_SIZE,
@@ -31,30 +32,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const role = (session.user as { role?: string }).role?.toLowerCase()
-  let customerCompanyId: string | undefined
-  if (role === 'customer' && session.user.id) {
-    const userId = session.user.id
-    const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
-    let cid = userRow?.companyId ?? null
-    if (!cid) {
-      const [cu] = await db
-        .select({ companyId: companyUsers.companyId })
-        .from(companyUsers)
-        .where(eq(companyUsers.userId, userId))
-        .limit(1)
-      cid = cu?.companyId ?? null
-    }
-    if (!cid) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-    customerCompanyId = cid
+  const userId = session.user.id!
+  let customerPortal: { userId: string; companyId: string | null } | undefined
+  if (role === 'customer') {
+    customerPortal = { userId, companyId: await getCustomerCompanyId(userId) }
   }
 
-  const [trow] = await db.select({ companyId: tickets.companyId }).from(tickets).where(eq(tickets.id, ticketId)).limit(1)
+  const [trow] = await db
+    .select({
+      companyId: tickets.companyId,
+      contactUserId: tickets.contactUserId,
+      createdBy: tickets.createdBy,
+    })
+    .from(tickets)
+    .where(eq(tickets.id, ticketId))
+    .limit(1)
   if (!trow) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
-  if (customerCompanyId && trow.companyId !== customerCompanyId) {
+  if (customerPortal && !customerCanAccessTicket(trow, customerPortal.userId, customerPortal.companyId)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -69,7 +65,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     comments_older_remaining,
   } = await fetchTicketCommentsWindow(
     ticketId,
-    customerCompanyId ? { companyId: customerCompanyId } : undefined,
+    customerPortal ? { customerPortal } : undefined,
     'older',
     olderThan,
     pageSize

@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { isAdmin } from '@/lib/auth-utils'
-import { companyUsers,db, ticketActivityLog, tickets, users } from '@/lib/db'
+import { getCustomerCompanyId } from '@/lib/customer-company'
+import { customerTicketsAccessCondition } from '@/lib/customer-ticket-access'
+import { db, ticketActivityLog, tickets, users } from '@/lib/db'
 import { TICKET_ACTIVITY_ACTIONS, type TicketActivityAction } from '@/lib/ticket-activity-actions'
 
 const DEFAULT_LIMIT = 50
@@ -48,23 +50,11 @@ export async function GET(request: Request) {
     sql`(${tickets.visibility} = 'team' AND ${tickets.teamId} IN (SELECT team_id FROM team_members WHERE user_id = ${userId}))`
   )!
 
-  let ticketFilter: ReturnType<typeof inArray> | ReturnType<typeof or> | null = null
+  let ticketFilter: SQL | null = null
 
   if (role === 'customer') {
-    const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
-    let companyId = userRow?.companyId ?? null
-    if (!companyId) {
-      const [cu] = await db
-        .select({ companyId: companyUsers.companyId })
-        .from(companyUsers)
-        .where(eq(companyUsers.userId, userId))
-        .limit(1)
-      companyId = cu?.companyId ?? null
-    }
-    if (!companyId) {
-      return NextResponse.json({ data: [], total: 0 })
-    }
-    ticketFilter = inArray(tickets.companyId, [companyId])
+    const companyId = await getCustomerCompanyId(userId)
+    ticketFilter = customerTicketsAccessCondition(userId, companyId)
   } else if (!isAdmin(role)) {
     ticketFilter = visibilityAccess
   }

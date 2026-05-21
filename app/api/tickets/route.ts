@@ -1,10 +1,11 @@
-import { and, eq, gte, ilike, inArray, isNotNull, lte, or } from 'drizzle-orm'
-import { sql } from 'drizzle-orm'
+import { and, asc, eq, gte, ilike, inArray, isNotNull, lte, or, type SQL,sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { isAdmin } from '@/lib/auth-utils'
 import { loadAutomationTicketContext, runAutomationRules } from '@/lib/automation-engine'
+import { getCustomerCompanyId } from '@/lib/customer-company'
+import { customerTicketsAccessCondition } from '@/lib/customer-ticket-access'
 import { db } from '@/lib/db'
 import {
   companies,
@@ -52,27 +53,16 @@ export async function GET(request: Request) {
   const userId = authUser.id
   const role = (authUser as { role?: string }).role?.toLowerCase()
 
-  // Customer: only tickets for the same company
-  let forcedCompanyIds: string[] = []
+  // Customer: company tickets + personal tickets without company (owner)
+  let customerCompanyId: string | null = null
   if (role === 'customer') {
-    const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
-    let companyId = userRow?.companyId ?? null
-    if (!companyId) {
-      const [cu] = await db.select({ companyId: companyUsers.companyId }).from(companyUsers).where(eq(companyUsers.userId, userId)).limit(1)
-      companyId = cu?.companyId ?? null
-    }
-    if (!companyId) {
-      return NextResponse.json([])
-    }
-    forcedCompanyIds = [companyId]
+    customerCompanyId = await getCustomerCompanyId(userId)
   }
 
   const url = new URL(request.url)
   const companyIdParam = url.searchParams.get('company_id')
   const companyIdsParam = url.searchParams.get('company_ids')
-  const companyIds = forcedCompanyIds.length > 0
-    ? forcedCompanyIds
-    : companyIdsParam
+  const companyIds = companyIdsParam
       ? companyIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
       : companyIdParam
         ? [companyIdParam.trim()]
@@ -122,8 +112,7 @@ export async function GET(request: Request) {
     sql`(${tickets.visibility} = 'team' AND ${tickets.teamId} IN (SELECT team_id FROM team_members WHERE user_id = ${userId}))`
   )!
 
-  const isCustomerList =
-    role === 'customer' && forcedCompanyIds.length > 0
+  const isCustomerList = role === 'customer'
   const isAdminList = isAdmin(role as string | undefined)
 
   /** When filter visibility=private (or old specific_users), include both - Private filter shows tickets for creator/assignees */
@@ -134,9 +123,9 @@ export async function GET(request: Request) {
     if (!visibilityFilterValues.includes('private')) visibilityFilterValues.push('private')
   }
 
-  const conditions: ReturnType<typeof eq>[] = []
+  const conditions: SQL[] = []
   if (isCustomerList) {
-    conditions.push(inArray(tickets.companyId, forcedCompanyIds))
+    conditions.push(customerTicketsAccessCondition(userId, customerCompanyId))
   } else if (isAdminList) {
     if (companyIds.length > 0) conditions.push(inArray(tickets.companyId, companyIds))
   } else {

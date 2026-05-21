@@ -3,8 +3,8 @@ import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
 import TicketDetailContentClient from '@/components/ticket/TicketDetailContentClient'
-import { db } from '@/lib/db'
-import { companyUsers, tickets, users } from '@/lib/db'
+import { getCustomerCompanyId } from '@/lib/customer-company'
+import { db, tickets } from '@/lib/db'
 import { getTicketDetail } from '@/lib/ticket-detail'
 
 export default async function TicketDetailPage({
@@ -24,24 +24,7 @@ export default async function TicketDetailPage({
   }
 
   const role = (session.user as { role?: string }).role?.toLowerCase()
-  let customerCompanyId: string | undefined
-  if (role === 'customer' && session.user.id) {
-    const userId = session.user.id
-    const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
-    let cid = userRow?.companyId ?? null
-    if (!cid) {
-      const [cu] = await db
-        .select({ companyId: companyUsers.companyId })
-        .from(companyUsers)
-        .where(eq(companyUsers.userId, userId))
-        .limit(1)
-      cid = cu?.companyId ?? null
-    }
-    if (!cid) {
-      redirect('/tickets?ticket_error=no_access')
-    }
-    customerCompanyId = cid
-  }
+  const userId = session.user.id!
 
   const [ticketExists] = await db.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)).limit(1)
   if (!ticketExists) {
@@ -49,8 +32,10 @@ export default async function TicketDetailPage({
   }
 
   const data = await getTicketDetail(ticketId, {
-    screenshotUserId: session.user.id,
-    ...(customerCompanyId ? { companyId: customerCompanyId } : {}),
+    screenshotUserId: userId,
+    ...(role === 'customer'
+      ? { customerPortal: { userId, companyId: await getCustomerCompanyId(userId) } }
+      : {}),
   })
 
   if (!data) {

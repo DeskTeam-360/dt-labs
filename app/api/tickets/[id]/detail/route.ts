@@ -1,9 +1,7 @@
-import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { db } from '@/lib/db'
-import { companyUsers,users } from '@/lib/db'
+import { getCustomerCompanyId } from '@/lib/customer-company'
 import { getTicketDetail } from '@/lib/ticket-detail'
 
 export const dynamic = 'force-dynamic'
@@ -26,29 +24,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const role = (session.user as { role?: string }).role?.toLowerCase()
-  let customerCompanyId: string | undefined
-  if (role === 'customer' && session.user.id) {
-    const userId = session.user.id
-    const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
-    let cid = userRow?.companyId ?? null
-    if (!cid) {
-      const [cu] = await db
-        .select({ companyId: companyUsers.companyId })
-        .from(companyUsers)
-        .where(eq(companyUsers.userId, userId))
-        .limit(1)
-      cid = cu?.companyId ?? null
-    }
-    if (!cid) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_CACHE_HEADERS })
-    }
-    customerCompanyId = cid
-  }
+  const userId = session.user.id!
+  const detailOptions =
+    role === 'customer'
+      ? {
+          screenshotUserId: userId,
+          customerPortal: {
+            userId,
+            companyId: await getCustomerCompanyId(userId),
+          },
+        }
+      : { screenshotUserId: userId }
 
-  const data = await getTicketDetail(ticketId, {
-    screenshotUserId: session.user.id!,
-    ...(customerCompanyId ? { companyId: customerCompanyId } : {}),
-  })
+  const data = await getTicketDetail(ticketId, detailOptions)
 
   if (!data) {
     return NextResponse.json({ error: 'Not found' }, { status: 404, headers: NO_CACHE_HEADERS })

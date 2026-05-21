@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { canDeleteTickets } from '@/lib/auth-utils'
 import { runAutomationRules } from '@/lib/automation-engine'
+import { assertCustomerMayAccessTicket } from '@/lib/customer-ticket-access'
 import { db } from '@/lib/db'
 import {
   projectStatuses,
@@ -98,6 +99,16 @@ export async function PATCH(
   const role = (session.user as { role?: string }).role?.toLowerCase()
   const actorRole: TicketActorRole = role === 'customer' ? 'customer' : 'agent'
   const actorUserId = session.user.id!
+
+  if (role === 'customer') {
+    const access = await assertCustomerMayAccessTicket(actorUserId, ticketId)
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.status === 404 ? 'Not found' : 'Forbidden' },
+        { status: access.status }
+      )
+    }
+  }
 
   // Quick path: only status update (e.g. kanban drag)
   if (Object.keys(body).length === 1 && body.status !== undefined) {

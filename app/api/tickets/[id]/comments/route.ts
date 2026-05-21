@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { runTicketCommentAutomation } from '@/lib/automation-engine'
+import { assertCustomerMayAccessTicket } from '@/lib/customer-ticket-access'
 import {
   commentAttachments,
   companyUsers,
@@ -213,6 +214,15 @@ export async function POST(
 
   const role = (authUser as { role?: string }).role?.toLowerCase()
   const isCustomer = role === 'customer'
+  if (isCustomer) {
+    const access = await assertCustomerMayAccessTicket(authUser.id, ticketId)
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.status === 404 ? 'Not found' : 'Forbidden' },
+        { status: access.status }
+      )
+    }
+  }
   const effectiveVisibility = isCustomer ? 'reply' : visibility
   const effectiveAuthorType = isCustomer ? 'customer' : author_type
   const effectiveTaggedIds = isCustomer ? [] : (Array.isArray(tagged_user_ids) ? tagged_user_ids : [])

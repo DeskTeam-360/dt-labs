@@ -1,11 +1,12 @@
-import { and,asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { getCustomerCompanyId } from '@/lib/customer-company'
+import { customerTicketsAccessCondition } from '@/lib/customer-ticket-access'
 import { db } from '@/lib/db'
 import {
   companies,
-  companyUsers,
   tags,
   ticketAssignees,
   ticketPriorities,
@@ -18,7 +19,7 @@ import {
 } from '@/lib/db'
 import { DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
 
-/** GET /api/customer/dashboard - Stats for customer dashboard. Add ?debug=1 to see why Urgent ETA might be missing. */
+/** GET /api/customer/dashboard - Stats for customer dashboard. */
 export async function GET(request: Request) {
   const session = await auth()
   const { searchParams } = new URL(request.url)
@@ -28,33 +29,9 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id
+  const companyId = await getCustomerCompanyId(userId)
 
-  // Resolve company
-  const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
-  let companyId: string | null = userRow?.companyId ?? null
-  if (!companyId) {
-    const [cu] = await db.select({ companyId: companyUsers.companyId }).from(companyUsers).where(eq(companyUsers.userId, userId)).limit(1)
-    companyId = cu?.companyId ?? null
-  }
-
-  if (!companyId) {
-    return NextResponse.json({
-      company_id: null,
-      my_tickets_count: 0,
-      tickets_by_type: [],
-      priority_counts: [],
-      time_by_type: [],
-      total_time_seconds: 0,
-      status_counts: [],
-      recent_tickets: [],
-      last_due_date: null,
-      urgent_due_date: null,
-      last_due_ticket: null,
-      urgent_due_ticket: null,
-    })
-  }
-
-  // Support tickets only for company (exclude spam/trash from portal stats)
+  // Support tickets: perusahaan + milik pribadi tanpa company (exclude spam/trash)
   const myTickets = await db
     .select({
       id: tickets.id,
@@ -66,7 +43,7 @@ export async function GET(request: Request) {
       updatedAt: tickets.updatedAt,
     })
     .from(tickets)
-    .where(and(eq(tickets.companyId, companyId), eq(tickets.ticketType, DEFAULT_TICKET_TYPE)))
+    .where(and(customerTicketsAccessCondition(userId, companyId), eq(tickets.ticketType, DEFAULT_TICKET_TYPE)))
 
   const typeIds = [...new Set(myTickets.map((t) => t.typeId).filter(Boolean))] as number[]
   const typeMap: Record<number, { title: string; color: string }> = {}
@@ -203,34 +180,10 @@ export async function GET(request: Request) {
   if (ticketsWithDue.length > 0) {
     const minDueTime = Math.min(...ticketsWithDue.map((t) => new Date(t.dueDate!).getTime()))
     const atMinDue = ticketsWithDue.filter((t) => new Date(t.dueDate!).getTime() === minDueTime)
-    const byPriority = [...atMinDue].sort(
-      (a, b) => Number(a.priority ?? 0) - Number(b.priority ?? 0)
-    )
-    const t0 = byPriority[0]
+    const t0 = [...atMinDue].sort((a, b) => a.id - b.id)[0]
     if (t0) {
       lastDueDate = t0.dueDate ? new Date(t0.dueDate).toISOString() : null
       lastDueTicket = { id: t0.id, title: t0.title ?? 'Untitled' }
-    }
-  }
-
-  // Urgent ETA: due_date terdekat dari ticket dengan prioritas urgent (match slug/title atau sortOrder tertinggi)
-  const urgentPriority =
-    allPriorities.find((p) => p.slug?.toLowerCase() === 'urgent' || p.title?.toLowerCase() === 'urgent') ??
-    allPriorities.find((p) => (p.sortOrder ?? 999) === Math.min(...allPriorities.map((x) => x.sortOrder ?? 999)))
-  const urgentPriorityValue =
-    urgentPriority != null ? Number(urgentPriority.sortOrder ?? urgentPriority.id) : null
-  const urgentTicketsWithDue =
-    urgentPriorityValue != null
-      ? myTickets.filter((t) => Number(t.priority) === urgentPriorityValue && t.dueDate != null)
-      : []
-  let urgentDueDate: string | null = null
-  let urgentDueTicket: { id: number; title: string } | null = null
-  if (urgentTicketsWithDue.length > 0) {
-    const minUrgentTime = Math.min(...urgentTicketsWithDue.map((t) => new Date(t.dueDate!).getTime()))
-    const urgentMinTicket = urgentTicketsWithDue.find((t) => new Date(t.dueDate!).getTime() === minUrgentTime)
-    if (urgentMinTicket) {
-      urgentDueDate = urgentMinTicket.dueDate ? new Date(urgentMinTicket.dueDate).toISOString() : null
-      urgentDueTicket = { id: urgentMinTicket.id, title: urgentMinTicket.title ?? 'Untitled' }
     }
   }
 
@@ -244,21 +197,14 @@ export async function GET(request: Request) {
     status_counts: statusCounts,
     recent_tickets: recentTickets,
     last_due_date: lastDueDate,
-    urgent_due_date: urgentDueDate,
     last_due_ticket: lastDueTicket,
-    urgent_due_ticket: urgentDueTicket,
   }
 
   if (debug) {
     payload._debug = {
-      urgent_priority_value: urgentPriorityValue,
-      urgent_priority_slug: urgentPriority?.slug,
-      urgent_priority_title: urgentPriority?.title,
-      all_priorities: allPriorities.map((p) => ({ id: p.id, slug: p.slug, title: p.title })),
-      urgent_tickets_with_due_count: urgentTicketsWithDue.length,
+      tickets_with_due_count: ticketsWithDue.length,
       my_tickets_sample: myTickets.slice(0, 5).map((t) => ({
         id: t.id,
-        priority: t.priority,
         dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : null,
       })),
     }
