@@ -1,4 +1,4 @@
-import { and, eq, ne } from 'drizzle-orm'
+import { and, eq, isNull, ne } from 'drizzle-orm'
 import type { PostgresJsDatabase, PostgresJsTransaction } from 'drizzle-orm/postgres-js'
 
 import type * as schema from '@/lib/db/schema'
@@ -28,6 +28,10 @@ export function parseCompanyTicketDesiredRank(raw: unknown): number | 'append' {
   return floored
 }
 
+export type SupportQueueScope =
+  | { kind: 'company'; companyId: string }
+  | { kind: 'creator'; userId: string }
+
 async function loadCompanySupportTicketRows(dbTx: TicketPriorityDbExecutor, companyId: string, omitTicketId?: number) {
   const conditions = [
     eq(tickets.companyId, companyId),
@@ -41,6 +45,48 @@ async function loadCompanySupportTicketRows(dbTx: TicketPriorityDbExecutor, comp
       omitTicketId !== undefined ? and(...conditions, ne(tickets.id, omitTicketId)) : and(...conditions)
     )
   return q
+}
+
+async function loadCreatorSupportTicketRows(
+  dbTx: TicketPriorityDbExecutor,
+  creatorUserId: string,
+  omitTicketId?: number
+) {
+  const conditions = [
+    isNull(tickets.companyId),
+    eq(tickets.createdBy, creatorUserId),
+    eq(tickets.ticketType, DEFAULT_TICKET_TYPE),
+    ne(tickets.status, 'closed'),
+  ] as const
+  return dbTx
+    .select({ id: tickets.id, priority: tickets.priority })
+    .from(tickets)
+    .where(
+      omitTicketId !== undefined ? and(...conditions, ne(tickets.id, omitTicketId)) : and(...conditions)
+    )
+}
+
+/** Open support ticket belongs to a company queue or a creator-only (no company) queue. */
+export async function resolveSupportQueueScope(
+  dbTx: TicketPriorityDbExecutor,
+  ticketId: number
+): Promise<SupportQueueScope | null> {
+  const [row] = await dbTx
+    .select({
+      companyId: tickets.companyId,
+      createdBy: tickets.createdBy,
+      ticketType: tickets.ticketType,
+      status: tickets.status,
+    })
+    .from(tickets)
+    .where(eq(tickets.id, ticketId))
+    .limit(1)
+  if (!row) return null
+  if (coerceTicketType(row.ticketType) !== DEFAULT_TICKET_TYPE) return null
+  if (row.status === 'closed') return null
+  if (row.companyId) return { kind: 'company', companyId: row.companyId }
+  if (row.createdBy) return { kind: 'creator', userId: row.createdBy }
+  return null
 }
 
 /**
@@ -122,30 +168,76 @@ export async function assignCompanySupportTicketRank(
   await writeOrderedSupportPriorities(dbTx, nextOrder)
 }
 
-/** Apply queue rank for an open company support ticket (used by API + automation). */
+/** Personal support tickets (no company): queue per creator — same insert/shift rules as company queue. */
+export async function assignCreatorSupportTicketRank(
+  dbTx: TicketPriorityDbExecutor,
+  creatorUserId: string,
+  ticketId: number,
+  desiredRank: number | 'append'
+): Promise<void> {
+  const rows = await loadCreatorSupportTicketRows(dbTx, creatorUserId)
+  const sorted = [...rows].sort((a, b) => {
+    const da = sortPriorityKey(a.priority)
+    const db = sortPriorityKey(b.priority)
+    if (da !== db) return da - db
+    return a.id - b.id
+  })
+
+  const ids = sorted.map((r) => r.id)
+  const nextOrder = computeSupportQueueOrder(ids, ticketId, desiredRank)
+  if (nextOrder.length === 0) return
+
+  await writeOrderedSupportPriorities(dbTx, nextOrder)
+}
+
+export async function compactCreatorSupportPriorities(
+  dbTx: TicketPriorityDbExecutor,
+  creatorUserId: string,
+  omitTicketId?: number
+): Promise<void> {
+  const rows = await loadCreatorSupportTicketRows(dbTx, creatorUserId, omitTicketId)
+  const sorted = [...rows].sort((a, b) => {
+    const da = sortPriorityKey(a.priority)
+    const db = sortPriorityKey(b.priority)
+    if (da !== db) return da - db
+    return a.id - b.id
+  })
+  await writeOrderedSupportPriorities(dbTx, sorted.map((r) => r.id))
+}
+
+/** Assign rank with automatic shift; works for company queue and creator-only (customer) tickets. */
+export async function assignSupportTicketPriorityRank(
+  dbTx: TicketPriorityDbExecutor,
+  ticketId: number,
+  desiredRank: number | 'append'
+): Promise<boolean> {
+  const scope = await resolveSupportQueueScope(dbTx, ticketId)
+  if (!scope) return false
+  if (scope.kind === 'company') {
+    await assignCompanySupportTicketRank(dbTx, scope.companyId, ticketId, desiredRank)
+  } else {
+    await assignCreatorSupportTicketRank(dbTx, scope.userId, ticketId, desiredRank)
+  }
+  return true
+}
+
+export async function compactSupportQueueAfterRemoval(
+  dbTx: TicketPriorityDbExecutor,
+  scope: SupportQueueScope,
+  omitTicketId?: number
+): Promise<void> {
+  if (scope.kind === 'company') {
+    await compactCompanySupportPriorities(dbTx, scope.companyId, omitTicketId)
+  } else {
+    await compactCreatorSupportPriorities(dbTx, scope.userId, omitTicketId)
+  }
+}
+
+/** Apply queue rank for an open support ticket (used by API + automation). */
 export async function applyCompanySupportPriorityRank(
   dbTx: TicketPriorityDbExecutor,
   ticketId: number,
   rawPriority: unknown
 ): Promise<boolean> {
-  const [row] = await dbTx
-    .select({
-      companyId: tickets.companyId,
-      ticketType: tickets.ticketType,
-      status: tickets.status,
-    })
-    .from(tickets)
-    .where(eq(tickets.id, ticketId))
-    .limit(1)
-  if (!row?.companyId) return false
-  if (coerceTicketType(row.ticketType) !== DEFAULT_TICKET_TYPE) return false
-  if (row.status === 'closed') return false
-
-  await assignCompanySupportTicketRank(
-    dbTx,
-    row.companyId,
-    ticketId,
-    parseCompanyTicketDesiredRank(rawPriority)
-  )
-  return true
+  return assignSupportTicketPriorityRank(dbTx, ticketId, parseCompanyTicketDesiredRank(rawPriority))
 }

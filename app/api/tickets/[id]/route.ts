@@ -26,9 +26,11 @@ import {
 } from '@/lib/ticket-activity-log'
 import { coerceTicketType, DEFAULT_TICKET_TYPE, parseTicketType } from '@/lib/ticket-classification'
 import {
-  assignCompanySupportTicketRank,
+  assignSupportTicketPriorityRank,
   compactCompanySupportPriorities,
+  compactSupportQueueAfterRemoval,
   parseCompanyTicketDesiredRank,
+  resolveSupportQueueScope,
 } from '@/lib/ticket-company-priority-order'
 import {
   assertTicketContactUserAllowed,
@@ -147,10 +149,10 @@ export async function PATCH(
       setPayload.priority = null
     }
 
-    if (reopenSupportQueue && companyId) {
+    if (reopenSupportQueue) {
       await db.transaction(async (tx) => {
         await tx.update(tickets).set(setPayload).where(eq(tickets.id, ticketId))
-        await assignCompanySupportTicketRank(tx, companyId, ticketId, 'append')
+        await assignSupportTicketPriorityRank(tx, ticketId, 'append')
       })
     } else if (closingSupportQueue && companyId) {
       await db.transaction(async (tx) => {
@@ -504,11 +506,11 @@ export async function PATCH(
     nextTicketTypeResolved === DEFAULT_TICKET_TYPE &&
     nextCompanyResolved != null
 
+  /** Company queue or creator-only queue (customer tickets without company). */
   const priorityRankReorder =
     priority !== undefined &&
     !closingForSupportQueue &&
-    nextTicketTypeResolved === DEFAULT_TICKET_TYPE &&
-    nextCompanyResolved != null
+    nextTicketTypeResolved === DEFAULT_TICKET_TYPE
 
   const compactAfterLeavingSupport =
     ticket_type !== undefined &&
@@ -576,35 +578,30 @@ export async function PATCH(
         await compactCompanySupportPriorities(tx, oldCompanyId)
       }
 
-      if (priorityRankReorder && nextCompanyResolved) {
+      if (priorityRankReorder) {
         if (priority === null || priority === '') {
+          const scope = await resolveSupportQueueScope(tx, ticketId)
           await tx
             .update(tickets)
             .set({ priority: null, updatedAt: new Date() })
             .where(eq(tickets.id, ticketId))
-          await compactCompanySupportPriorities(tx, nextCompanyResolved, ticketId)
+          if (scope) await compactSupportQueueAfterRemoval(tx, scope, ticketId)
         } else {
-          await assignCompanySupportTicketRank(
+          await assignSupportTicketPriorityRank(
             tx,
-            nextCompanyResolved,
             ticketId,
             parseCompanyTicketDesiredRank(priority)
           )
         }
-      } else if (
-        openingFromClosedSupport &&
-        !priorityRankReorder &&
-        nextCompanyResolved
-      ) {
-        await assignCompanySupportTicketRank(tx, nextCompanyResolved, ticketId, 'append')
+      } else if (openingFromClosedSupport && !priorityRankReorder) {
+        await assignSupportTicketPriorityRank(tx, ticketId, 'append')
       } else if (
         companyChanging &&
         !openingFromClosedSupport &&
         priority === undefined &&
-        nextTicketTypeResolved === DEFAULT_TICKET_TYPE &&
-        nextCompanyResolved
+        nextTicketTypeResolved === DEFAULT_TICKET_TYPE
       ) {
-        await assignCompanySupportTicketRank(tx, nextCompanyResolved, ticketId, 'append')
+        await assignSupportTicketPriorityRank(tx, ticketId, 'append')
       }
 
       if (compactCompanyQueueAfterClosingSupport && oldCompanyId) {

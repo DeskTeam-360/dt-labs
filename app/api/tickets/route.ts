@@ -31,6 +31,7 @@ import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { coerceTicketType, DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
 import {
   assignCompanySupportTicketRank,
+  assignCreatorSupportTicketRank,
   parseCompanyTicketDesiredRank,
 } from '@/lib/ticket-company-priority-order'
 import {
@@ -505,6 +506,8 @@ export async function POST(request: Request) {
 
   const useCompanyPriorityPool =
     insertTicketType === DEFAULT_TICKET_TYPE && resolvedCompanyId != null
+  const useCreatorPriorityPool =
+    insertTicketType === DEFAULT_TICKET_TYPE && !resolvedCompanyId && Boolean(authUser.id)
 
   let newTicket: typeof tickets.$inferSelect | undefined
 
@@ -540,6 +543,39 @@ export async function POST(request: Request) {
       })
     } catch (e) {
       console.error('[POST /api/tickets] company queue create failed:', e)
+      return NextResponse.json({ error: 'Failed to create ticket' }, { status: 500 })
+    }
+  } else if (useCreatorPriorityPool) {
+    const desiredRank = parseCompanyTicketDesiredRank(priority)
+    try {
+      await db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(tickets)
+          .values({
+            title: title || 'Untitled',
+            description: description || null,
+            shortNote: short_note ?? null,
+            status: status || 'open',
+            visibility: resolvedInsertVisibility,
+            teamId: team_id || null,
+            typeId: type_id ?? null,
+            priority: null,
+            companyId: null,
+            dueDate: due_date ? new Date(due_date) : null,
+            createdBy: authUser.id,
+            contactUserId,
+            createdVia,
+            ticketType: insertTicketType,
+            projectId: insertProjectId,
+            projectStatusId: insertProjectStatusId,
+          })
+          .returning()
+        if (!row) throw new Error('Failed to create ticket')
+        newTicket = row
+        await assignCreatorSupportTicketRank(tx, authUser.id, row.id, desiredRank)
+      })
+    } catch (e) {
+      console.error('[POST /api/tickets] creator queue create failed:', e)
       return NextResponse.json({ error: 'Failed to create ticket' }, { status: 500 })
     }
   } else {
