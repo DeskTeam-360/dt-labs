@@ -170,13 +170,7 @@ export default function FilterSidebar({
               <>
                 <div>
                   <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Team</Text>
-                  <Text
-                    type="secondary"
-                    style={{ fontSize: 11, display: 'block', marginBottom: 6, color: 'rgba(255,255,255,0.45)' }}
-                  >
-                    Public tickets stay visible in the list when you filter by a team—even if you are not a member
-                    of that team.
-                  </Text>
+                  
                   <Select
                     mode="multiple"
                     placeholder="All teams"

@@ -1,22 +1,16 @@
 'use client'
 
-import { ClockCircleOutlined,DeleteOutlined, EditOutlined, FlagOutlined, MoreOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Flex, Typography } from 'antd'
-import { Modal } from 'antd'
+import { ClockCircleOutlined, DeleteOutlined, EditOutlined, FlagOutlined, MoreOutlined } from '@ant-design/icons'
+import { Button, Dropdown, Flex, Modal, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
 
-import type { StatusColumn,TicketRecord } from './types'
+import { KANBAN_SEMANTIC_BLUE, KANBAN_SEMANTIC_GREEN, kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
+
+import type { StatusColumn, TicketRecord } from './types'
 import { DEFAULT_ALL_STATUS_COLUMNS } from './types'
 
 const { Text } = Typography
-
-const tagStyle = {
-  padding: '8px 16px',
-  borderRadius: 6,
-  fontSize: 12,
-  fontWeight: 600,
-} as const
 
 interface CardViewCardProps {
   ticket: TicketRecord
@@ -107,26 +101,42 @@ export default function CardViewCard({
         )}
       </Flex>
       </a>
-      <Flex justify="flex-end" gap={8} align="center" wrap="wrap" style={{ flexShrink: 0 }}>
-        <span
-          style={{
-            ...tagStyle,
-            background: 'var(--ticket-row-chip-neutral-bg)',
-            color: 'var(--ticket-row-chip-neutral-fg)',
-          }}
-        >
-          {ticket.priority != null && ticket.priority > 0 ? `P${ticket.priority}` : '—'}
-        </span>
+      <Flex justify="flex-end" gap={6} align="center" wrap="wrap" style={{ flexShrink: 0 }}>
+        {ticket.priority != null && ticket.priority > 0 && (
+          <Tag style={kanbanTagStyle({ neutral: true })}>P{ticket.priority}</Tag>
+        )}
+        {ticket.visibility !== 'team' && (
+          <Tag
+            style={kanbanTagStyle({
+              ...(ticket.visibility === 'public' ? { fillHex: KANBAN_SEMANTIC_GREEN } : { neutral: true }),
+            })}
+          >
+            {ticket.visibility === 'specific_users' || ticket.visibility === 'private'
+              ? 'Private'
+              : ticket.visibility === 'public'
+                ? 'Public'
+                : (ticket.visibility as string).toUpperCase()}
+          </Tag>
+        )}
+        {ticket.team_name && (
+          <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>Team {ticket.team_name}</Tag>
+        )}
+        {ticket.type && (
+          <Tag
+            style={kanbanTagStyle({
+              ...(ticket.type.color ? { fillHex: ticket.type.color } : { neutral: true }),
+            })}
+          >
+            {ticket.type.title}
+          </Tag>
+        )}
         {ticket.company && (
-          <span
-            style={{
-              ...tagStyle,
-              background: ticket.company.color ?? 'var(--ticket-row-chip-neutral-bg)',
-              color: ticket.company.color ? '#fff' : 'var(--ticket-row-chip-neutral-fg)',
+          <Tag
+            style={kanbanTagStyle({
+              ...(ticket.company.color ? { fillHex: ticket.company.color } : { neutral: true }),
               cursor: onFilterByCompany ? 'pointer' : undefined,
-            }}
+            })}
             title={onFilterByCompany ? 'Filter by this company' : undefined}
-            role={onFilterByCompany ? 'button' : undefined}
             onClick={
               onFilterByCompany
                 ? (e) => {
@@ -138,56 +148,52 @@ export default function CardViewCard({
             }
           >
             {ticket.company.name}
-          </span>
+          </Tag>
         )}
-        {ticket.tags?.slice(0, 3).map((tag) => (
-          <span
-            key={tag.id}
-            style={{
-              ...tagStyle,
-              background: tag.color ?? 'var(--ticket-row-chip-neutral-bg)',
-              color: tag.color ? '#fff' : 'var(--ticket-row-chip-neutral-fg)',
+        {ticket.tags?.map((t) => (
+          <Tag
+            key={t.id}
+            style={kanbanTagStyle({
+              ...(t.color ? { fillHex: t.color } : { neutral: true }),
               cursor: onFilterByTag ? 'pointer' : undefined,
-            }}
+            })}
             title={onFilterByTag ? 'Filter by this tag' : undefined}
-            role={onFilterByTag ? 'button' : undefined}
             onClick={
               onFilterByTag
                 ? (e) => {
                     e.preventDefault()
                     e.stopPropagation()
-                    onFilterByTag(tag.id)
+                    onFilterByTag(t.id)
                   }
                 : undefined
             }
           >
-            {tag.name}
-          </span>
+            {t.name}
+          </Tag>
         ))}
-        {ticket.tags && ticket.tags.length > 3 && (
-          <span style={{ ...tagStyle, background: 'var(--ticket-row-chip-neutral-bg)', color: 'var(--ticket-row-chip-neutral-fg)' }}>+{ticket.tags.length - 3}</span>
+        {onFilterByStatus ? (
+          <Tag
+            style={kanbanTagStyle({
+              fillHex: statusColor,
+              cursor: 'pointer',
+            })}
+            title="Filter by this status"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onFilterByStatus(ticket.status)
+            }}
+          >
+            {statusTitle}
+          </Tag>
+        ) : (
+          <Tag style={kanbanTagStyle({ fillHex: statusColor })}>{statusTitle}</Tag>
         )}
-        <span
-          style={{
-            ...tagStyle,
-            background: statusColor,
-            color: '#fff',
-            cursor: onFilterByStatus ? 'pointer' : undefined,
-          }}
-          title={onFilterByStatus ? 'Filter by this status' : undefined}
-          role={onFilterByStatus ? 'button' : undefined}
-          onClick={
-            onFilterByStatus
-              ? (e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  onFilterByStatus(ticket.status)
-                }
-              : undefined
-          }
-        >
-          {statusTitle}
-        </span>
+        {Number(ticket.checklist_total) > 0 && (
+          <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_GREEN })}>
+            Checklist: {ticket.checklist_completed}/{ticket.checklist_total}
+          </Tag>
+        )}
         <Dropdown
           menu={{
             items: [

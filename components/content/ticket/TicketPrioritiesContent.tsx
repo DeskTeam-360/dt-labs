@@ -318,7 +318,7 @@ export default function TicketPrioritiesContent({ user: currentUser }: TicketPri
               <Form.Item name="description" label="Reference description">
                 <Input.TextArea
                   rows={3}
-                  placeholder="Shown on Reference page (priorities tab) for all users who can open tickets"
+                  placeholder="Internal notes for this priority level (optional)"
                 />
               </Form.Item>
               <Form.Item>

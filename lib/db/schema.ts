@@ -349,6 +349,8 @@ export const ticketTimeTracker = pgTable('ticket_time_tracker', {
   durationSeconds: integer('duration_seconds'),
   /** Reporting/billable seconds; defaults to duration_seconds; admin/manager may override. */
   durationAdjustment: integer('duration_adjustment'),
+  /** Optional note; editable after session is completed. */
+  note: text('note'),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
 

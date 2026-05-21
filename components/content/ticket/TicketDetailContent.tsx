@@ -1289,9 +1289,9 @@ export default function TicketDetailContent({
                                                 </span>
                                             </Tooltip>
                                         )}
-                                        <span style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                        <span style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap' }}>
                                             {!isCustomer && titleEditing ? (
-                                                <Flex gap={8} align="center" wrap="wrap" style={{ flex: 1, minWidth: 0 }}>
+                                                <Flex gap={8} align="center" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
                                                     <Text type="secondary" style={{ flexShrink: 0 }}>
                                                         #{displayTicket.id}
                                                     </Text>
@@ -1299,7 +1299,7 @@ export default function TicketDetailContent({
                                                         value={titleDraft}
                                                         onChange={(e) => setTitleDraft(e.target.value)}
                                                         onPressEnter={() => void handleSaveTitle()}
-                                                        style={{ minWidth: 200, flex: '1 1 240px', maxWidth: 560 }}
+                                                        style={{ minWidth: 300, flex: '1 1 240px', maxWidth: 560 }}
                                                         disabled={loading}
                                                         aria-label="Ticket title"
                                                     />
@@ -1308,7 +1308,7 @@ export default function TicketDetailContent({
                                                         loading={loading}
                                                         onClick={() => void handleSaveTitle()}
                                                     >
-                                                        Save
+                                                        {loading ? 'Saving…' : 'Save'}
                                                     </Button>
                                                     <Button
                                                         onClick={() => {
@@ -1334,8 +1334,7 @@ export default function TicketDetailContent({
                                                     </span>
                                                     {!isCustomer && (
                                                         <Button
-                                                            type="link"
-                                                            size="small"
+                                                            type="primary"
                                                             icon={<EditOutlined />}
                                                             onClick={() => {
                                                                 setTitleDraft(

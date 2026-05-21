@@ -445,12 +445,11 @@ export default function TabGeneral({
                             {canEditTicketDescription ? (
                               <Flex justify="flex-end" style={{ marginTop: 4 }}>
                                 <Button
-                                  type="link"
-                                  size="small"
+                                  type="primary"
                                   icon={<EditOutlined />}
                                   onClick={onTicketDescriptionEditingStart}
                                 >
-                                  Edit description
+                                
                                 </Button>
                               </Flex>
                             ) : null}
@@ -742,7 +741,7 @@ export default function TabGeneral({
               loading={sidebarAttributesSaving}
               onClick={() => void onSaveSidebarAttributes(sidebarDraft)}
             >
-              Save changes
+              {sidebarAttributesSaving ? 'Saving…' : 'Save changes'}
             </Button>
             <Button
               disabled={!sidebarDirty || sidebarAttributesSaving}

@@ -20,8 +20,10 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect,useState } from 'react'
 
+import { KanbanTagPreview, tagPreviewFillHex } from '@/components/common/KanbanTagPreview'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 import { isLockedTicketStatusSlug } from '@/lib/ticket-status-locked-slugs'
 
 const { Content } = Layout
@@ -107,6 +109,8 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
   const [modalVisible, setModalVisible] = useState(false)
   const [editingStatus, setEditingStatus] = useState<TicketStatusRecord | null>(null)
   const [form] = Form.useForm()
+  const previewColor = Form.useWatch('color', form)
+  const previewTitle = Form.useWatch('title', form)
 
   const fetchStatuses = async () => {
     setLoading(true)
@@ -236,23 +240,14 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
       render: (v: string) => v || '—',
     },
     {
-      title: 'Color',
+      title: 'Preview',
       dataIndex: 'color',
-      key: 'color',
-      width: 150,
-      render: (color: string) => (
-        <Space>
-          <div
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: 4,
-              backgroundColor: color,
-              border: '1px solid #d9d9d9',
-            }}
-          />
-          <Typography.Text type="secondary">{color}</Typography.Text>
-        </Space>
+      key: 'preview',
+      width: 200,
+      render: (_: string, record: TicketStatusRecord) => (
+        <Tag style={kanbanTagStyle({ fillHex: tagPreviewFillHex(record.color, '#1890ff') })}>
+          {record.title}
+        </Tag>
       ),
     },
     {
@@ -375,6 +370,14 @@ export default function TicketStatusesContent({ user: currentUser }: TicketStatu
               </Form.Item>
               <Form.Item name="color" label="Color (hex)" initialValue="#1890ff">
                 <ColorPickerWithInput />
+              </Form.Item>
+              <Form.Item label="Tag preview">
+                <KanbanTagPreview
+                  colorHex={previewColor}
+                  name={previewTitle ?? undefined}
+                  fallbackHex="#1890ff"
+                  emptyLabel="Status preview"
+                />
               </Form.Item>
               <Form.Item name="show_in_kanban" label="Show in Kanban" valuePropName="checked">
                 <Switch />

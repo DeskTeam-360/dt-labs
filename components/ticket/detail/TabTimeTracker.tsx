@@ -16,6 +16,7 @@ import {
   Empty,
   Flex,
   Form,
+  Input,
   InputNumber,
   List,
   message,
@@ -114,14 +115,11 @@ export default function TabTimeTracker({
 }: TabTimeTrackerProps) {
   const ticketId = ticketData?.id as number
   const [manualOpen, setManualOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [editingSession, setEditingSession] = useState<Record<string, unknown> | null>(null)
+  const [adjustTrackerOpen, setAdjustTrackerOpen] = useState(false)
+  const [adjustTrackerSession, setAdjustTrackerSession] = useState<Record<string, unknown> | null>(null)
   const [mutating, setMutating] = useState(false)
   const [manualForm] = Form.useForm()
-  const [editForm] = Form.useForm()
-  const [adjustOpen, setAdjustOpen] = useState(false)
-  const [adjustSession, setAdjustSession] = useState<Record<string, unknown> | null>(null)
-  const [adjustForm] = Form.useForm()
+  const [adjustTrackerForm] = Form.useForm()
 
   type JobTypeOpt = { slug: string; title: string }
   const [jobTypeOptions, setJobTypeOptions] = useState<JobTypeOpt[]>([])
@@ -222,18 +220,34 @@ export default function TabTimeTracker({
     }
   }
 
-  const openEdit = (session: Record<string, unknown>) => {
-    setEditingSession(session)
-    editForm.setFieldsValue({
-      range: [dayjs(session.start_time as string), dayjs(session.stop_time as string)],
-      job_type: (session.job_type as string | null | undefined) ?? undefined,
-    })
-    setEditOpen(true)
+  const reportedSecondsFromSession = (session: Record<string, unknown>) => {
+    if (
+      session.reported_duration_seconds != null &&
+      Number.isFinite(Number(session.reported_duration_seconds))
+    ) {
+      return Number(session.reported_duration_seconds)
+    }
+    if (session.duration_adjustment != null && Number.isFinite(Number(session.duration_adjustment))) {
+      return Number(session.duration_adjustment)
+    }
+    return Number(session.duration_seconds) || 0
   }
 
-  const submitEdit = async () => {
-    if (!editingSession) throw new Error('no session')
-    const v = await editForm.validateFields()
+  const openAdjustTracker = (session: Record<string, unknown>) => {
+    setAdjustTrackerSession(session)
+    const rep = reportedSecondsFromSession(session)
+    adjustTrackerForm.setFieldsValue({
+      range: [dayjs(session.start_time as string), dayjs(session.stop_time as string)],
+      job_type: (session.job_type as string | null | undefined) ?? undefined,
+      note: (session.note as string | null | undefined) ?? '',
+      reportedMinutes: Math.round((Math.max(0, rep) / 60) * 100) / 100,
+    })
+    setAdjustTrackerOpen(true)
+  }
+
+  const submitAdjustTracker = async () => {
+    if (!adjustTrackerSession) return
+    const v = await adjustTrackerForm.validateFields()
     const [start, end] = v.range as [Dayjs, Dayjs]
     if (!start || !end || !end.isAfter(start)) {
       message.error('End must be after start')
@@ -244,65 +258,67 @@ export default function TabTimeTracker({
       message.error('Start and stop cannot be in the future (max: today, until now)')
       throw new Error('future')
     }
+
+    const origStart = dayjs(adjustTrackerSession.start_time as string)
+    const origStop = dayjs(adjustTrackerSession.stop_time as string)
+    const timesChanged = !start.isSame(origStart, 'second') || !end.isSame(origStop, 'second')
+
+    const newJobType =
+      v.job_type != null && String(v.job_type).trim() !== '' ? String(v.job_type).trim() : null
+    const origJobType = (adjustTrackerSession.job_type as string | null | undefined) ?? null
+    const jobTypeChanged = newJobType !== origJobType
+
+    const newNote = v.note != null && String(v.note).trim() !== '' ? String(v.note).trim() : null
+    const origNote =
+      (adjustTrackerSession.note as string | null | undefined)?.trim() || null
+    const noteChanged = newNote !== origNote
+
+    const origReported = reportedSecondsFromSession(adjustTrackerSession)
+    const newReportedSecs = canAdjustReportedDuration
+      ? Math.min(2147483647, Math.round(Math.max(0, Number(v.reportedMinutes) || 0) * 60))
+      : origReported
+    const reportedChanged = canAdjustReportedDuration && newReportedSecs !== origReported
+
+    const needsEntryPatch = timesChanged || jobTypeChanged || noteChanged
+
     setMutating(true)
     try {
-      await apiFetch(`/api/tickets/${ticketId}/time-tracker`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: editingSession.id,
-          start_time: start.toISOString(),
-          stop_time: end.toISOString(),
-          job_type:
-            v.job_type != null && String(v.job_type).trim() !== '' ? String(v.job_type).trim() : null,
-        }),
-      })
-      message.success('Time entry updated')
-      setEditOpen(false)
-      setEditingSession(null)
-      await onTimeTrackingChanged()
-    } catch (e) {
-      message.error(e instanceof Error ? e.message : 'Failed to update')
-      throw e
-    } finally {
-      setMutating(false)
-    }
-  }
+      if (needsEntryPatch) {
+        const payload: Record<string, unknown> = {
+          session_id: adjustTrackerSession.id,
+          job_type: newJobType,
+          note: newNote,
+        }
+        if (timesChanged) {
+          payload.start_time = start.toISOString()
+          payload.stop_time = end.toISOString()
+        }
+        await apiFetch(`/api/tickets/${ticketId}/time-tracker`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      }
 
-  const openAdjustReported = (session: Record<string, unknown>) => {
-    setAdjustSession(session)
-    let rep = 0
-    if (session.reported_duration_seconds != null && Number.isFinite(Number(session.reported_duration_seconds))) {
-      rep = Number(session.reported_duration_seconds)
-    } else if (session.duration_adjustment != null && Number.isFinite(Number(session.duration_adjustment))) {
-      rep = Number(session.duration_adjustment)
-    } else {
-      rep = Number(session.duration_seconds) || 0
-    }
-    adjustForm.setFieldsValue({
-      reportedMinutes: Math.round((Math.max(0, rep) / 60) * 100) / 100,
-    })
-    setAdjustOpen(true)
-  }
+      if (reportedChanged) {
+        await apiFetch(`/api/tickets/${ticketId}/time-tracker`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: adjustTrackerSession.id,
+            duration_adjustment: newReportedSecs,
+          }),
+        })
+      }
 
-  const submitAdjustReported = async () => {
-    if (!adjustSession) return
-    const v = await adjustForm.validateFields()
-    const mins = Math.max(0, Number(v.reportedMinutes) || 0)
-    const secs = Math.min(2147483647, Math.round(mins * 60))
-    setMutating(true)
-    try {
-      await apiFetch(`/api/tickets/${ticketId}/time-tracker`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: adjustSession.id,
-          duration_adjustment: secs,
-        }),
-      })
-      message.success('Reported duration updated')
-      setAdjustOpen(false)
-      setAdjustSession(null)
+      if (!needsEntryPatch && !reportedChanged) {
+        message.info('No changes to save')
+        throw new Error('no changes')
+      }
+
+      message.success('Tracker updated')
+      setAdjustTrackerOpen(false)
+      setAdjustTrackerSession(null)
       await onTimeTrackingChanged()
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to update')
@@ -356,7 +372,7 @@ export default function TabTimeTracker({
               Total (reported): {formatTime(totalTimeSeconds + (activeTimeTracker ? currentTime : 0))}
             </Text>
           </Space>
-          <Button type="default" size="small" icon={<PlusOutlined />} onClick={openManual}>
+          <Button type="primary"  icon={<PlusOutlined />} onClick={openManual}>
             Add manual
           </Button>
         </Flex>
@@ -435,27 +451,13 @@ export default function TabTimeTracker({
                             ...(completed
                               ? [
                                   <Button
-                                    type="link"
-                                    size="small"
-                                    key="edit"
+                                    type="primary"
+                                    key="adjust"
                                     icon={<EditOutlined />}
-                                    onClick={() => openEdit(session)}
+                                    onClick={() => openAdjustTracker(session)}
                                     disabled={mutating}
                                   >
-                                    Edit
-                                  </Button>,
-                                ]
-                              : []),
-                            ...(completed && canAdjustReportedDuration
-                              ? [
-                                  <Button
-                                    type="link"
-                                    size="small"
-                                    key="adj"
-                                    onClick={() => openAdjustReported(session)}
-                                    disabled={mutating}
-                                  >
-                                    Reported time
+                                    Adjust tracker
                                   </Button>,
                                 ]
                               : []),
@@ -471,7 +473,7 @@ export default function TabTimeTracker({
                               okText="Remove"
                               okButtonProps={{ danger: true }}
                             >
-                              <Button type="link" size="small" danger icon={<DeleteOutlined />} disabled={mutating}>
+                              <Button type="primary" danger icon={<DeleteOutlined />} disabled={mutating}>
                                 Delete
                               </Button>
                             </Popconfirm>,
@@ -531,6 +533,11 @@ export default function TabTimeTracker({
                                   </>
                                 ) : null}
                               </Text>
+                              {(session.note as string | null | undefined) ? (
+                                <Text type="secondary" style={{ fontSize: 11 }}>
+                                  Note: {String(session.note)}
+                                </Text>
+                              ) : null}
                             </>
                           ) : null}
                         </Space>
@@ -642,18 +649,29 @@ export default function TabTimeTracker({
       </Modal>
 
       <Modal
-        title="Edit time entry"
-        open={editOpen}
+        title="Adjust tracker"
+        open={adjustTrackerOpen}
         onCancel={() => {
-          setEditOpen(false)
-          setEditingSession(null)
+          setAdjustTrackerOpen(false)
+          setAdjustTrackerSession(null)
         }}
-        onOk={submitEdit}
+        onOk={submitAdjustTracker}
         confirmLoading={mutating}
         destroyOnClose
         width={560}
       >
-        <Form form={editForm} layout="vertical" style={{ marginTop: 8 }}>
+        <Form form={adjustTrackerForm} layout="vertical" style={{ marginTop: 8 }}>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+            Update tracked window, job type, and note. Changing start/stop recalculates tracked duration.
+            {canAdjustReportedDuration
+              ? ' Reported duration is used for billing and customer reports without changing tracked time.'
+              : ''}
+          </Text>
+          {adjustTrackerSession ? (
+            <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+              Current tracked: {formatTime(Number(adjustTrackerSession.duration_seconds) || 0)}
+            </Text>
+          ) : null}
           <Form.Item
             name="range"
             label="Start — Stop"
@@ -677,37 +695,23 @@ export default function TabTimeTracker({
               options={jobTypeOptions.map((o) => ({ value: o.slug, label: o.title }))}
             />
           </Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal
-        title="Adjust reported duration"
-        open={adjustOpen}
-        onCancel={() => {
-          setAdjustOpen(false)
-          setAdjustSession(null)
-        }}
-        onOk={submitAdjustReported}
-        confirmLoading={mutating}
-        destroyOnClose
-        width={480}
-      >
-        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-          This value is used for billing and customer time reports. Tracked time on the entry is unchanged.
-        </Text>
-        {adjustSession ? (
-          <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-            Tracked duration: {formatTime(Number(adjustSession.duration_seconds) || 0)}
-          </Text>
-        ) : null}
-        <Form form={adjustForm} layout="vertical">
-          <Form.Item
-            name="reportedMinutes"
-            label="Reported duration (minutes)"
-            rules={[{ required: true, message: 'Enter minutes' }]}
-          >
-            <InputNumber min={0} max={35791394} step={0.01} precision={2} style={{ width: '100%' }} />
+          <Form.Item name="note" label="Note">
+            <Input.TextArea
+              rows={3}
+              maxLength={2000}
+              showCount
+              placeholder="Optional note for this entry"
+            />
           </Form.Item>
+          {canAdjustReportedDuration ? (
+            <Form.Item
+              name="reportedMinutes"
+              label="Reported duration (minutes)"
+              rules={[{ required: true, message: 'Enter minutes' }]}
+            >
+              <InputNumber min={0} max={35791394} step={0.01} precision={2} style={{ width: '100%' }} />
+            </Form.Item>
+          ) : null}
         </Form>
       </Modal>
     </Space>

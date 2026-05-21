@@ -1127,7 +1127,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       width: 150,
       align: 'center',
       sorter: (a, b) => a.reported_seconds - b.reported_seconds,
-      defaultSortOrder: 'descend',
+      // defaultSortOrder: 'descend',
       render: (sec: number, r) => (
         <Flex vertical gap={4} align="center">
           <Text strong style={{ fontVariantNumeric: 'tabular-nums' }}>

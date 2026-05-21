@@ -1,10 +1,30 @@
 'use client'
 
-import { EditOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons'
-import { Button, Card, Layout, message, Space, Switch, Table, Tabs,Tag, Typography } from 'antd'
+import {
+  BellOutlined,
+  EditOutlined,
+  EyeOutlined,
+  FileTextOutlined,
+  MailOutlined,
+  TeamOutlined,
+} from '@ant-design/icons'
+import {
+  Alert,
+  Button,
+  Card,
+  Flex,
+  Layout,
+  message,
+  Space,
+  Switch,
+  Table,
+  Tabs,
+  Tag,
+  Typography,
+} from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo,useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { shouldOpenHrefInNewTab } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
@@ -12,10 +32,34 @@ import AdminSidebar from '@/components/layout/AdminSidebar'
 import MessageTemplatePreviewModal from '@/components/message-template/MessageTemplatePreviewModal'
 
 const { Content } = Layout
-const { Title, Text } = Typography
+const { Title, Text, Paragraph } = Typography
 
 interface MessageTemplatesContentProps {
   user: { id: string; email?: string | null; user_metadata?: { full_name?: string | null }; role?: string }
+}
+
+const GROUP_META: Record<
+  string,
+  { description: string; icon: React.ReactNode; hint?: string }
+> = {
+  'Agent Notification': {
+    icon: <TeamOutlined />,
+    description:
+      'Emails and in-app notices sent to agents and staff when tickets change — assignments, replies, SLA alerts, and internal notes.',
+    hint: 'Recipients are usually assignees, team members, or watchers.',
+  },
+  'Requester Notification': {
+    icon: <MailOutlined />,
+    description:
+      'Messages sent to customers and requesters — new ticket confirmations, agent replies, solved/closed updates, account emails, and CC copies.',
+    hint: 'Use placeholders like {{ recipient.full_name }} and {{ ticket }} for personalization.',
+  },
+  Templates: {
+    icon: <FileTextOutlined />,
+    description:
+      'Default bodies loaded in the ticket composer when an agent replies or forwards — not automatic notifications.',
+    hint: 'Keys template_agent_reply and template_agent_forward are wired in the ticket UI.',
+  },
 }
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
@@ -37,6 +81,80 @@ export interface MessageTemplateRow {
   content: string | null
   created_at: string
   updated_at: string
+}
+
+function formatUpdatedAt(iso: string | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function groupStats(rows: MessageTemplateRow[]) {
+  const withBody = rows.filter((r) => r.content?.trim()).length
+  const active = rows.filter((r) => r.status === 'active').length
+  return { total: rows.length, withBody, empty: rows.length - withBody, active, inactive: rows.length - active }
+}
+
+function GroupTabPanel({
+  group,
+  rows,
+  loading,
+  columns,
+}: {
+  group: string
+  rows: MessageTemplateRow[]
+  loading: boolean
+  columns: ColumnsType<MessageTemplateRow>
+}) {
+  const meta = GROUP_META[group]
+  const stats = useMemo(() => groupStats(rows), [rows])
+
+  return (
+    <Card size="small" styles={{ body: { padding: 16 } }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        <Alert
+          type="info"
+          showIcon
+          icon={meta?.icon ?? <BellOutlined />}
+          message={<Text strong>{group}</Text>}
+          description={
+            <Space orientation="vertical" size={4} style={{ width: '100%' }}>
+              <span>{meta?.description ?? 'Templates in this category.'}</span>
+              {meta?.hint ? (
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  {meta.hint}
+                </Text>
+              ) : null}
+            </Space>
+          }
+        />
+        <Flex wrap="wrap" gap={8}>
+          <Tag>{stats.total} templates</Tag>
+          <Tag color="success">{stats.active} active</Tag>
+          {stats.inactive > 0 ? <Tag color="default">{stats.inactive} inactive</Tag> : null}
+          <Tag color={stats.withBody > 0 ? 'processing' : 'warning'}>
+            {stats.withBody} with body · {stats.empty} empty
+          </Tag>
+        </Flex>
+        <Table<MessageTemplateRow>
+          rowKey="id"
+          loading={loading}
+          columns={columns}
+          dataSource={rows}
+          pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} in this group` }}
+          scroll={{ x: 1100 }}
+          size="middle"
+        />
+      </Space>
+    </Card>
+  )
 }
 
 export default function MessageTemplatesContent({ user: currentUser }: MessageTemplatesContentProps) {
@@ -97,85 +215,137 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
     }
   }
 
-  const columns: ColumnsType<MessageTemplateRow> = [
-    {
-      title: 'Title',
-      dataIndex: 'title',
-      key: 'title',
-      ellipsis: true,
-    },
-    
-    {
-      title: 'Content',
-      key: 'has_content',
-      width: 100,
-      render: (_: unknown, r) => (r.content && r.content.trim() ? <Tag color="green">Set</Tag> : <Tag>Empty</Tag>),
-    },
-    {
-      title: 'Active',
-      key: 'status',
-      width: 100,
-      render: (_: unknown, r) => (
-        <Switch
-          checked={r.status === 'active'}
-          disabled={r.status !== 'active'}
-          onChange={(c) => void toggleStatus(r, c)}
-        />
-      ),
-    },
-    {
-      title: 'Action',
-      key: 'actions',
-      width: 200,
-      render: (_: unknown, r) => {
-        const editHref = `/settings/message-templates/${r.id}/edit`
-        const isInactive = r.status !== 'active'
-        return (
-          <Space>
-            <Button
-              type="primary"
-              icon={<EyeOutlined />}
-              disabled={isInactive}
-              onClick={() => setPreviewRow(r)}
-            >
-              Preview
-            </Button>
-            <Button
-              type="primary"
-              icon={<EditOutlined />}
-              disabled={isInactive}
-              href={editHref}
-              onClick={(e) => {
-                if (isInactive) {
-                  e.preventDefault()
-                  return
-                }
-                if (shouldOpenHrefInNewTab(e)) return
-                if (e.button !== 0) return
-                e.preventDefault()
-                router.push(editHref)
-              }}
-            >
-              Edit
-            </Button>
+  const columns: ColumnsType<MessageTemplateRow> = useMemo(
+    () => [
+      {
+        title: 'Template',
+        key: 'template',
+        ellipsis: true,
+        render: (_: unknown, r) => (
+          <Space orientation="vertical" size={0} style={{ maxWidth: '100%' }}>
+            <Text strong>{r.title}</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {r.type.replace(/_/g, ' ')}
+            </Text>
           </Space>
-        )
+        ),
       },
-    },
-  ]
+      {
+        title: 'Key',
+        dataIndex: 'key',
+        key: 'key',
+        width: 280,
+        ellipsis: true,
+        render: (key: string) => (
+          <Typography.Text code copyable={{ text: key }} ellipsis={{ tooltip: key }} style={{ fontSize: 12 }}>
+            {key}
+          </Typography.Text>
+        ),
+      },
+      {
+        title: 'Body',
+        key: 'has_content',
+        width: 100,
+        align: 'center',
+        render: (_: unknown, r) => {
+          const len = r.content?.trim().length ?? 0
+          return len > 0 ? (
+            <Tag color="success">Set</Tag>
+          ) : (
+            <Tag color="warning">Empty</Tag>
+          )
+        },
+      },
+      {
+        title: 'Updated',
+        dataIndex: 'updated_at',
+        key: 'updated_at',
+        width: 168,
+        render: (v: string) => (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {formatUpdatedAt(v)}
+          </Text>
+        ),
+      },
+      {
+        title: 'Active',
+        key: 'status',
+        width: 88,
+        align: 'center',
+        render: (_: unknown, r) => (
+          <Switch
+            checked={r.status === 'active'}
+            onChange={(c) => void toggleStatus(r, c)}
+            checkedChildren="On"
+            unCheckedChildren="Off"
+          />
+        ),
+      },
+      {
+        title: 'Actions',
+        key: 'actions',
+        width: 200,
+        fixed: 'right' as const,
+        render: (_: unknown, r) => {
+          const editHref = `/settings/message-templates/${r.id}/edit`
+          const isInactive = r.status !== 'active'
+          return (
+            <Space>
+              <Button
+                type="link"
+                size="small"
+                icon={<EyeOutlined />}
+                disabled={isInactive}
+                onClick={() => setPreviewRow(r)}
+              >
+                Preview
+              </Button>
+              <Button
+                type="link"
+                size="small"
+                icon={<EditOutlined />}
+                disabled={isInactive}
+                href={editHref}
+                onClick={(e) => {
+                  if (isInactive) {
+                    e.preventDefault()
+                    return
+                  }
+                  if (shouldOpenHrefInNewTab(e)) return
+                  if (e.button !== 0) return
+                  e.preventDefault()
+                  router.push(editHref)
+                }}
+              >
+                Edit
+              </Button>
+            </Space>
+          )
+        },
+      },
+    ],
+    [router]
+  )
 
   const tabItems = useMemo(
     () =>
-      groupsInOrder.map((g) => ({
-        key: g,
-        label: <span title={g}>{g}</span>,
-      })),
-    [groupsInOrder],
-  )
-
-  const filteredRows = useMemo(
-    () => (resolvedGroup ? rows.filter((r) => (r.group || '—') === resolvedGroup) : []),
-    [rows, resolvedGroup],
+      groupsInOrder.map((g) => {
+        const groupRows = rows.filter((r) => (r.group || '—') === g)
+        const count = groupRows.length
+        return {
+          key: g,
+          label: (
+            <Space size={6}>
+              <span>{g}</span>
+              <Tag style={{ margin: 0 }}>{count}</Tag>
+            </Space>
+          ),
+          children: (
+            <GroupTabPanel group={g} rows={groupRows} loading={loading} columns={columns} />
+          ),
+        }
+      }),
+    [groupsInOrder, rows, loading, columns]
   )
 
   return (
@@ -183,48 +353,42 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
       <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
         <Content style={{ margin: 24 }}>
-        
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-              <Space align="center">
-                <FileTextOutlined style={{ fontSize: 22 }} />
-                <Title level={4} style={{ margin: 0 }}>
-                  Message templates
-                </Title>
-              </Space>
-              <Text type="secondary">
-                Pre-seeded templates only — edit the body on a separate page and toggle Active here. You cannot add or
-                delete rows. Use the <strong>key</strong> in code when wiring automation or email. Templates are grouped
-                by <strong>Group</strong> in the tabs below.
-              </Text>
+          <Card>
+            <Space orientation="vertical" size="large" style={{ width: '100%' }}>
+              <div>
+                <Space align="center" style={{ marginBottom: 8 }}>
+                  <FileTextOutlined style={{ fontSize: 22, color: '#1677ff' }} />
+                  <Title level={4} style={{ margin: 0 }}>
+                    Message templates
+                  </Title>
+                </Space>
+                <Paragraph type="secondary" style={{ marginBottom: 0, maxWidth: 720 }}>
+                  Pre-defined notification and composer templates. Edit the HTML body on each template&apos;s page;
+                  toggle <Text strong>Active</Text> to enable or disable sending. Rows cannot be added or deleted — use
+                  the <Text code>key</Text> column when wiring automation or email in code.
+                </Paragraph>
+              </div>
+
               {groupsInOrder.length > 0 ? (
-                <>
-                  <Tabs
-                    activeKey={resolvedGroup}
-                    onChange={setActiveGroup}
-                    items={tabItems}
-                    type="card"
-                    style={{ marginBottom: 0 }}
-                  />
+                <Tabs
+                  activeKey={resolvedGroup}
+                  onChange={setActiveGroup}
+                  items={tabItems}
+                  destroyOnHidden={false}
+                />
+              ) : (
+                <Card size="small" styles={{ body: { padding: 16 } }}>
                   <Table<MessageTemplateRow>
                     rowKey="id"
                     loading={loading}
                     columns={columns}
-                    dataSource={filteredRows}
-                    pagination={{ pageSize: 50, showSizeChanger: true }}
-                    scroll={{ x: 960 }}
+                    dataSource={[]}
+                    pagination={false}
                   />
-                </>
-              ) : (
-                <Table<MessageTemplateRow>
-                  rowKey="id"
-                  loading={loading}
-                  columns={columns}
-                  dataSource={[]}
-                  pagination={false}
-                />
+                </Card>
               )}
             </Space>
-          
+          </Card>
         </Content>
       </AdminMainColumn>
 

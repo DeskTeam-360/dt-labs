@@ -8,6 +8,20 @@ import { assertValidJobTypeSlugOrNull, loadActiveJobTypeTitleMap } from '@/lib/j
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 
 /** When body omits `job_type` key entirely, returns `undefined` so callers can skip updating the column. */
+const MAX_NOTE_LENGTH = 2000
+
+function normalizeNoteFromBodyOptional(body: Record<string, unknown>): string | null | undefined {
+  if (!Object.prototype.hasOwnProperty.call(body, 'note')) return undefined
+  const raw = body.note
+  if (raw === null || raw === undefined) return null
+  if (typeof raw !== 'string') {
+    throw new Error('note must be a string or null')
+  }
+  const s = raw.trim()
+  if (s === '') return null
+  return s.slice(0, MAX_NOTE_LENGTH)
+}
+
 async function normalizeJobTypeFromBodyOptional(
   body: Record<string, unknown>
 ): Promise<string | null | undefined> {
@@ -49,6 +63,7 @@ function mapTrackerRow(
       durationSeconds: t.durationSeconds,
       durationAdjustment: t.durationAdjustment,
     }),
+    note: t.note ?? null,
     created_at: t.createdAt,
     user: user
       ? { id: user.id, full_name: user.fullName, email: user.email, avatar_url: user.avatarUrl }
@@ -265,7 +280,7 @@ export async function POST(
 
 const MAX_DURATION = 2147483647
 
-/** PATCH — edit completed entry (own rows only). Body: { session_id, start_time, stop_time } ISO strings. Sets tracker_type to manual. */
+/** PATCH — edit completed entry. Times change sets tracker_type to manual; job_type/note-only keeps tracker_type. */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -289,6 +304,7 @@ export async function PATCH(
   const startRaw = body.start_time as string | undefined
   const stopRaw = body.stop_time as string | undefined
   const hasJobTypeKey = Object.prototype.hasOwnProperty.call(body, 'job_type')
+  const hasNoteKey = Object.prototype.hasOwnProperty.call(body, 'note')
 
   const adjustOnly =
     sessionId &&
@@ -296,19 +312,21 @@ export async function PATCH(
     startRaw === undefined &&
     stopRaw === undefined
 
-  const jobTypeOnly =
+  const metadataOnly =
     sessionId &&
-    hasJobTypeKey &&
     startRaw === undefined &&
     stopRaw === undefined &&
-    body.duration_adjustment === undefined
+    body.duration_adjustment === undefined &&
+    (hasJobTypeKey || hasNoteKey)
 
   const titleMap = await loadActiveJobTypeTitleMap()
 
-  if (jobTypeOnly) {
+  if (metadataOnly) {
     let jobTypeVal: string | null | undefined
+    let noteVal: string | null | undefined
     try {
       jobTypeVal = await normalizeJobTypeFromBodyOptional(body)
+      noteVal = normalizeNoteFromBodyOptional(body)
     } catch (e) {
       return NextResponse.json({ error: (e as Error).message }, { status: 400 })
     }
@@ -326,9 +344,16 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const metaSet: Partial<typeof ticketTimeTracker.$inferInsert> = {}
+    if (jobTypeVal !== undefined) metaSet.jobType = jobTypeVal
+    if (noteVal !== undefined) metaSet.note = noteVal
+    if (Object.keys(metaSet).length === 0) {
+      return NextResponse.json({ error: 'job_type or note is required' }, { status: 400 })
+    }
+
     const [updated] = await db
       .update(ticketTimeTracker)
-      .set({ jobType: jobTypeVal ?? null })
+      .set(metaSet)
       .where(eq(ticketTimeTracker.id, sessionId))
       .returning()
 
@@ -398,7 +423,7 @@ export async function PATCH(
     return NextResponse.json(
       {
         error:
-          'session_id, start_time, and stop_time are required (or session_id + duration_adjustment for managers, or session_id + job_type)',
+          'session_id, start_time, and stop_time are required (or session_id + duration_adjustment for managers, or session_id + job_type/note)',
       },
       { status: 400 }
     )
@@ -447,23 +472,32 @@ export async function PATCH(
   }
 
   let jobTypeVal: string | null | undefined
-  if (hasJobTypeKey) {
-    try {
-      jobTypeVal = await normalizeJobTypeFromBodyOptional(body)
-    } catch (e) {
-      return NextResponse.json({ error: (e as Error).message }, { status: 400 })
-    }
+  let noteVal: string | null | undefined
+  try {
+    if (hasJobTypeKey) jobTypeVal = await normalizeJobTypeFromBodyOptional(body)
+    if (hasNoteKey) noteVal = normalizeNoteFromBodyOptional(body)
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 400 })
   }
+
+  const timesChanged =
+    startTime.getTime() !== new Date(row.startTime).getTime() ||
+    stopTime.getTime() !== new Date(row.stopTime!).getTime()
 
   const editSet: Partial<typeof ticketTimeTracker.$inferInsert> = {
     startTime,
     stopTime,
     durationSeconds,
     durationAdjustment: durationSeconds,
-    trackerType: 'manual',
+  }
+  if (timesChanged) {
+    editSet.trackerType = 'manual'
   }
   if (jobTypeVal !== undefined) {
     editSet.jobType = jobTypeVal
+  }
+  if (noteVal !== undefined) {
+    editSet.note = noteVal
   }
 
   const [updated] = await db

@@ -1281,6 +1281,14 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                                 return formatDuration(Math.round(Number(s)))
                               },
                             },
+                            {
+                              title: 'Note',
+                              dataIndex: 'note',
+                              key: 'note',
+                              ellipsis: true,
+                              render: (note: string | null | undefined) =>
+                                note ? <Text>{note}</Text> : <Text type="secondary">—</Text>,
+                            },
                           ]}
                         />
                       </Drawer>
@@ -1372,6 +1380,14 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                                 </Text>
                               )
                             },
+                          },
+                          {
+                            title: 'Note',
+                            dataIndex: 'note',
+                            key: 'note',
+                            ellipsis: true,
+                            render: (note: string | null | undefined) =>
+                              note ? <Text>{note}</Text> : <Text type="secondary">—</Text>,
                           },
                           {
                             title: 'Created At',

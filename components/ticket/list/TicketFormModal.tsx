@@ -338,26 +338,7 @@ export default function TicketFormModal({
               </Select>
             </Form.Item>
 
-            {editingTicket ? (
-              <Form.Item label="Assignees" tooltip="Optional">
-                <Select
-                  mode="multiple"
-                  placeholder="Select users to assign"
-                  value={selectedAssignees}
-                  onChange={onSelectedAssigneesChange}
-                  optionFilterProp="label"
-                  allowClear
-                >
-                  {users
-                    .filter((u) => (u.role ?? '').toLowerCase() !== 'customer')
-                    .map((user) => (
-                      <Option key={user.id} value={user.id} label={user.full_name || user.email}>
-                        {user.full_name || user.email}
-                      </Option>
-                    ))}
-                </Select>
-              </Form.Item>
-            ) : null}
+           
           </>
         )}
         </Col>

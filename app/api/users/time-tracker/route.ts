@@ -74,6 +74,7 @@ export async function GET(request: Request) {
       durationSeconds: r.tracker.durationSeconds,
       durationAdjustment: r.tracker.durationAdjustment,
     }),
+    note: r.tracker.note ?? null,
     created_at: r.tracker.createdAt ? new Date(r.tracker.createdAt).toISOString() : null,
     ticket:
       r.joinedTicketId != null

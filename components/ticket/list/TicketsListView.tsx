@@ -5,13 +5,10 @@ import {
   EditOutlined,
   InboxOutlined,
   MoreOutlined,
-  UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
 import {
-  Avatar,
   Button,
-  Dropdown,
   Flex,
   Modal,
   Space,
@@ -21,11 +18,17 @@ import {
 } from 'antd'
 import { useRouter } from 'next/navigation'
 import type { Key } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
+import { KANBAN_SEMANTIC_BLUE, kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 import { isClosedLikeTicketStatus } from '@/lib/ticket-status-workflow'
 
-import type { StatusColumn,TicketRecord } from './types'
+import type { StatusColumn, TicketRecord, TicketSortField, TicketSortOrder } from './types'
+import {
+  sortTickets,
+  TICKETS_LIST_SORT_BY,
+  TICKETS_LIST_SORT_ORDER,
+} from './types'
 
 interface TicketsListViewProps {
   tickets: TicketRecord[]
@@ -40,6 +43,8 @@ interface TicketsListViewProps {
   onFilterByStatus?: (statusSlug: string) => void
   onFilterByTag?: (tagId: string) => void
   onFilterByCompany?: (companyId: string) => void
+  sortBy?: TicketSortField
+  sortOrder?: TicketSortOrder
 }
 
 export default function TicketsListView({
@@ -55,18 +60,25 @@ export default function TicketsListView({
   onFilterByStatus,
   onFilterByTag,
   onFilterByCompany,
+  sortBy = TICKETS_LIST_SORT_BY,
+  sortOrder = TICKETS_LIST_SORT_ORDER,
 }: TicketsListViewProps) {
   const router = useRouter()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 15 })
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
 
+  const sortedTickets = useMemo(
+    () => sortTickets(tickets, sortBy, sortOrder),
+    [tickets, sortBy, sortOrder]
+  )
+
   useEffect(() => {
     setPagination((p) => {
-      const totalPages = Math.max(1, Math.ceil(tickets.length / p.pageSize))
+      const totalPages = Math.max(1, Math.ceil(sortedTickets.length / p.pageSize))
       if (p.current <= totalPages) return p
       return { ...p, current: totalPages }
     })
-  }, [tickets.length, pagination.pageSize])
+  }, [sortedTickets.length, pagination.pageSize])
 
   const bulkEnabled = !isCustomer && (onBulkMoveToSpam || onBulkMoveToTrash)
   const inSpamFolder = filterTicketType === 'spam'
@@ -127,7 +139,7 @@ export default function TicketsListView({
       ) : null}
     <Table
       rowKey="id"
-      dataSource={tickets}
+      dataSource={sortedTickets}
       scroll={{ x: 'max-content' }}
       style={{ width: '100%', paddingRight: 24, paddingLeft: 24 }}
       rowSelection={
@@ -142,7 +154,7 @@ export default function TicketsListView({
       pagination={{
         current: pagination.current,
         pageSize: pagination.pageSize,
-        total: tickets.length,
+        total: sortedTickets.length,
         showSizeChanger: true,
         pageSizeOptions: ['10', '15', '20', '50'],
         showTotal: (t) => `Total ${t} tickets`,
@@ -235,27 +247,34 @@ export default function TicketsListView({
         {
           title: 'Type',
           key: 'type',
-          width: 120,
+          width: 140,
           render: (_: unknown, record: TicketRecord) =>
-            record.type ? <Tag style={{ borderRadius: '10px',backgroundColor: '#E8E8E8', padding: '4px 8px', minWidth:'70px', textAlign: 'center', fontWeight: 500, color: record.type.color }}>{record.type.title}</Tag> : '—',
+            record.type ? (
+              <Tag
+                style={kanbanTagStyle({
+                  ...(record.type.color ? { fillHex: record.type.color } : { neutral: true }),
+                })}
+              >
+                {record.type.title}
+              </Tag>
+            ) : (
+              '—'
+            ),
         },
-       
-        
         {
           title: 'Tags',
           key: 'tags',
           width: 300,
           render: (_: unknown, record: TicketRecord) =>
             record.tags?.length ? (
-              <Flex gap={4} wrap="wrap">
-                {record.tags.slice(0, 3).map((t) => (
+              <Flex gap={6} wrap="wrap">
+                {record.tags.map((t) => (
                   <Tag
                     key={t.id}
-                    color={t.color ? undefined : 'default'}
-                    style={{
-                      ...(t.color ? { backgroundColor: t.color, borderColor: t.color, color: '#fff' } : {}),
+                    style={kanbanTagStyle({
+                      ...(t.color ? { fillHex: t.color } : { neutral: true }),
                       cursor: onFilterByTag ? 'pointer' : undefined,
-                    }}
+                    })}
                     title={onFilterByTag ? 'Filter by this tag' : undefined}
                     onClick={
                       onFilterByTag
@@ -269,9 +288,10 @@ export default function TicketsListView({
                     {t.name}
                   </Tag>
                 ))}
-                {record.tags.length > 3 && <span style={{ fontSize: 12, color: '#8c8c8c' }}>+{record.tags.length - 3}</span>}
               </Flex>
-            ) : '—',
+            ) : (
+              '—'
+            ),
         },
         {
           title: 'Due date',
@@ -295,19 +315,16 @@ export default function TicketsListView({
             ) : '—',
         },
         {
-          title: 'Assignees',
-          key: 'assignees',
-          width: 120,
+          title: 'Team',
+          key: 'team',
+          width: 160,
+          ellipsis: true,
           render: (_: unknown, record: TicketRecord) =>
-            record.assignees?.length ? (
-              <Avatar.Group size="small" maxCount={2}>
-                {record.assignees.map((a) => (
-                  <Tooltip key={a.id} title={a.user_name}>
-                    <Avatar size="small" icon={<UserOutlined />} />
-                  </Tooltip>
-                ))}
-              </Avatar.Group>
-            ) : '—',
+            record.team_name ? (
+              <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>Team {record.team_name}</Tag>
+            ) : (
+              '—'
+            ),
         },
         {
           title: 'Status',

@@ -202,6 +202,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               onEdit={handleEdit}
               onDelete={handleDelete}
               canDeleteTicket={canDeleteTicket}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
               onBulkMoveToSpam={!isCustomer ? handleBulkMoveToSpam : undefined}
               onBulkMoveToTrash={!isCustomer && canDeleteTicket ? handleBulkMoveToTrash : undefined}
               onFilterByStatus={filterByStatusFromChip}

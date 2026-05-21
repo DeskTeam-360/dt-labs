@@ -19,8 +19,10 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect,useState } from 'react'
 
+import { KanbanTagPreview, tagPreviewFillHex } from '@/components/common/KanbanTagPreview'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -100,6 +102,8 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
   const [modalVisible, setModalVisible] = useState(false)
   const [editingType, setEditingType] = useState<TicketTypeRecord | null>(null)
   const [form] = Form.useForm()
+  const previewColor = Form.useWatch('color', form)
+  const previewTitle = Form.useWatch('title', form)
 
   const fetchTypes = async () => {
     setLoading(true)
@@ -241,26 +245,12 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
         v ? <Tag color="orange">Agents only</Tag> : <Text type="secondary">—</Text>,
     },
     {
-      title: 'Color',
+      title: 'Preview',
       dataIndex: 'color',
-      key: 'color',
-      width: 112,
-      render: (color: string) => (
-        <Space size={6} style={{ maxWidth: '100%' }}>
-          <div
-            style={{
-              width: 22,
-              height: 22,
-              flexShrink: 0,
-              borderRadius: 4,
-              backgroundColor: color,
-              border: '1px solid #d9d9d9',
-            }}
-          />
-          <Typography.Text type="secondary" ellipsis={{ tooltip: color }} style={{ maxWidth: 72 }}>
-            {color}
-          </Typography.Text>
-        </Space>
+      key: 'preview',
+      width: 200,
+      render: (_: string, record: TicketTypeRecord) => (
+        <Tag style={kanbanTagStyle({ fillHex: tagPreviewFillHex(record.color) })}>{record.title}</Tag>
       ),
     },
     {
@@ -342,6 +332,13 @@ export default function TicketTypesContent({ user: currentUser }: TicketTypesCon
               </Form.Item>
               <Form.Item name="color" label="Color (hex)" initialValue="#000000">
                 <ColorPickerWithInput />
+              </Form.Item>
+              <Form.Item label="Tag preview">
+                <KanbanTagPreview
+                  colorHex={previewColor}
+                  name={previewTitle ?? undefined}
+                  emptyLabel="Type preview"
+                />
               </Form.Item>
               <Form.Item name="sort_order" label="Sort order" rules={[{ required: true }]}>
                 <InputNumber min={0} style={{ width: '100%' }} />

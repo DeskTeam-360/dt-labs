@@ -17,43 +17,13 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect,useState } from 'react'
 
+import { KanbanTagPreview, tagPreviewFillHex } from '@/components/common/KanbanTagPreview'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
-import { kanbanTagStyle, normalizeAccentHex } from '@/lib/kanban-tag-chip-style'
+import { kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 
 const { Content } = Layout
-const { Title, Text } = Typography
-
-function tagPreviewFillHex(hex: unknown): string {
-  if (typeof hex !== 'string') return '#000000'
-  const trimmed = hex.trim()
-  if (!trimmed) return '#000000'
-  const accent = normalizeAccentHex(trimmed)
-  const body = accent.replace(/^#/, '')
-  if (/^[0-9A-Fa-f]{6}$/.test(body)) return `#${body}`
-  return '#000000'
-}
-
-function KanbanTagPreview({ name, colorHex }: { name?: string; colorHex?: unknown }) {
-  const label = (name ?? '').trim() || 'Tag preview'
-  return (
-    <div
-      style={{
-        padding: 12,
-        borderRadius: 12,
-        maxWidth: 320,
-        background: 'var(--kanban-card-bg)',
-        border: '1px solid var(--kanban-card-border)',
-        boxShadow: 'var(--kanban-card-shadow, none)',
-      }}
-    >
-      <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12 }}>
-        Preview (same as Kanban ticket card chips)
-      </Text>
-      <Tag style={kanbanTagStyle({ fillHex: tagPreviewFillHex(colorHex) })}>{label}</Tag>
-    </div>
-  )
-}
+const { Title } = Typography
 
 interface TagsContentProps {
   user: { id: string; email?: string | null; user_metadata?: { full_name?: string | null } }
@@ -228,17 +198,12 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
       ),
     },
     {
-      title: 'Color / preview',
+      title: 'Preview',
       dataIndex: 'color',
-      key: 'color',
-      width: 220,
+      key: 'preview',
+      width: 200,
       render: (_: string, record: TagRecord) => (
-        <Space align="center" wrap size="middle">
-          <Tag style={kanbanTagStyle({ fillHex: tagPreviewFillHex(record.color) })}>{record.name}</Tag>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }} copyable>
-            {record.color || '#000000'}
-          </Typography.Text>
-        </Space>
+        <Tag style={kanbanTagStyle({ fillHex: tagPreviewFillHex(record.color) })}>{record.name}</Tag>
       ),
     },
     {
@@ -318,8 +283,12 @@ export default function TagsContent({ user: currentUser }: TagsContentProps) {
               <Form.Item name="color" label="Color (hex)" initialValue="#000000">
                 <ColorPickerWithInput />
               </Form.Item>
-              <Form.Item label="Kanban preview">
-                <KanbanTagPreview colorHex={previewColor} name={previewName ?? undefined} />
+              <Form.Item label="Tag preview">
+                <KanbanTagPreview
+                  colorHex={previewColor}
+                  name={previewName ?? undefined}
+                  emptyLabel="Tag preview"
+                />
               </Form.Item>
               <Form.Item>
                 <Space>
