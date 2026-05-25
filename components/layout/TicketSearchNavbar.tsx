@@ -3,7 +3,7 @@
 import 'dayjs/locale/en'
 
 import { CloseOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icons'
-import { Input, Spin, Tooltip, Typography } from 'antd'
+import { Input, Spin, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { usePathname, useRouter } from 'next/navigation'
@@ -423,8 +423,91 @@ export default function TicketSearchNavbar({
         )}
       </div>
 
+      {savedFiltersUserId && savedPresets.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            alignSelf: 'stretch',
+            gap: 8,
+            flex: 1,
+            minWidth: 0,
+            maxWidth: 480,
+          }}
+        >
+          <Text style={{ fontSize: 11, flexShrink: 0, textTransform: 'uppercase', letterSpacing: 0.03, color: 'var(--ticket-nav-muted)' }}>
+            My Filters
+          </Text>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              overflowX: 'auto',
+              flex: 1,
+              minWidth: 0,
+              scrollbarWidth: 'thin',
+            }}
+          >
+            {savedPresets.map((p) => (
+              <span
+                key={p.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  flexShrink: 0,
+                  background: 'var(--ticket-nav-filter-bg)',
+                  border: '1px solid var(--ticket-nav-filter-border)',
+                  borderRadius: 6,
+                  padding: '2px 2px 2px 8px',
+                  fontSize: 13,
+                }}
+              >
+                <SpaNavLink
+                  href={p.query ? `/tickets?${p.query}` : '/tickets'}
+                  title={p.name}
+                  style={{
+                    color: 'var(--ticket-nav-filter-link)',
+                    maxWidth: 160,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {p.name}
+                </SpaNavLink>
+                <button
+                  type="button"
+                  aria-label={`Remove ${p.name}`}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (savedFiltersUserId) removeSavedTicketFilterPreset(savedFiltersUserId, p.id)
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                    borderRadius: 4,
+                    color: 'var(--ticket-nav-muted)',
+                    lineHeight: 1,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <CloseOutlined style={{ fontSize: 10 }} />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div
         style={{
+          marginLeft: 'auto',
           flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
@@ -434,21 +517,19 @@ export default function TicketSearchNavbar({
       >
         <ThemeToggle variant="ticketNav" placement="bottomRight" />
         <TicketNotificationBell />
-      </div>
 
-      <div
-        ref={historyWrapRef}
-        style={{
-          position: 'relative',
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          alignSelf: 'stretch',
-        }}
-        onMouseEnter={openHistory}
-        onMouseLeave={scheduleCloseHistory}
-      >
-        {/* <Tooltip title="Ticket activity history"> */}
+        <div
+          ref={historyWrapRef}
+          style={{
+            position: 'relative',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            alignSelf: 'stretch',
+          }}
+          onMouseEnter={openHistory}
+          onMouseLeave={scheduleCloseHistory}
+        >
           <button
             type="button"
             aria-label="Ticket activity history"
@@ -469,8 +550,7 @@ export default function TicketSearchNavbar({
           >
             <HistoryOutlined style={{ fontSize: 18 }} />
           </button>
-        {/* </Tooltip> */}
-        {historyOpen && (
+          {historyOpen && (
           <div
             role="menu"
             style={{
@@ -577,100 +657,9 @@ export default function TicketSearchNavbar({
               </SpaNavLink>
             </div>
           </div>
-        )}
-      </div>
-
-      {savedFiltersUserId && savedPresets.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            alignSelf: 'stretch',
-            gap: 8,
-            flex: 1,
-            minWidth: 0,
-            maxWidth: 480,
-          }}
-        >
-          <Text style={{ fontSize: 11, flexShrink: 0, textTransform: 'uppercase', letterSpacing: 0.03, color: 'var(--ticket-nav-muted)' }}>
-            My Filters
-          </Text>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              overflowX: 'auto',
-              flex: 1,
-              minWidth: 0,
-              scrollbarWidth: 'thin',
-            }}
-          >
-            {savedPresets.map((p) => (
-              <span
-                key={p.id}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 2,
-                  flexShrink: 0,
-                  background: 'var(--ticket-nav-filter-bg)',
-                  border: '1px solid var(--ticket-nav-filter-border)',
-                  borderRadius: 6,
-                  padding: '2px 2px 2px 8px',
-                  fontSize: 13,
-                }}
-              >
-                <SpaNavLink
-                  href={p.query ? `/tickets?${p.query}` : '/tickets'}
-                  title={p.name}
-                  style={{
-                    color: 'var(--ticket-nav-filter-link)',
-                    maxWidth: 160,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {p.name}
-                </SpaNavLink>
-                <button
-                  type="button"
-                  aria-label={`Remove ${p.name}`}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    if (savedFiltersUserId) removeSavedTicketFilterPreset(savedFiltersUserId, p.id)
-                  }}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    padding: '4px 6px',
-                    borderRadius: 4,
-                    color: 'var(--ticket-nav-muted)',
-                    lineHeight: 1,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                  }}
-                >
-                  <CloseOutlined style={{ fontSize: 10 }} />
-                </button>
-              </span>
-            ))}
-          </div>
+          )}
         </div>
-      )}
 
-      <div
-        style={{
-          marginLeft: 'auto',
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          alignSelf: 'stretch',
-        }}
-      >
         <NavbarAccount user={navbarUser} />
       </div>
     </div>

@@ -9,7 +9,7 @@ import {
   PlusOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Col, Dropdown, Flex, Layout, message, Modal, Row, Select, Space, Spin, Tooltip,Typography } from 'antd'
+import { Button, Card, Col, Dropdown, Flex, Layout, message, Modal, Row, Select, Space, Spin, Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react'
@@ -23,6 +23,7 @@ import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { canDeleteTickets } from '@/lib/auth-utils'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
+import { kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 
 const { Title, Text } = Typography
 
@@ -62,9 +63,7 @@ interface DashboardData {
     status_title: string
     customer_title: string
     status_color: string
-    priority: number
-    priority_label: string
-    priority_color: string
+    priority: number | null
     creator_name: string | null
     tags?: Array<{ id: string; name: string; color: string | null }>
   }>
@@ -598,49 +597,24 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                         </div>
                       </Flex>
                       <Flex justify="space-between" gap={12} align="center">
-                        <span
-                          style={{
-                            padding: '8px 16px',
-                            borderRadius: 6,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            background: t.priority_color,
-                            color: '#fff',
-                            cursor: 'default',
-                            outline: 'none',
-                          }}
-                          title={t.priority_label}
-                        >
-                          {t.priority_label}
-                        </span>
-                        {t.tags && t.tags.length > 0 && t.tags.map((tag) => (
-                          <span
+                        {t.priority != null && t.priority > 0 && (
+                          <Tag style={kanbanTagStyle({ neutral: true })}>P{t.priority}</Tag>
+                        )}
+                        {t.tags?.map((tag) => (
+                          <Tag
                             key={tag.id}
-                            style={{
-                              padding: '8px 16px',
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 600,
-                              background: tag.color || 'var(--ticket-row-chip-neutral-bg)',
-                              color: tag.color ? '#fff' : 'var(--ticket-row-chip-neutral-fg)',
-                            }}
+                            style={kanbanTagStyle({
+                              ...(tag.color ? { fillHex: tag.color } : { neutral: true }),
+                            })}
                           >
                             {tag.name}
-                          </span>
+                          </Tag>
                         ))}
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          style={{
-                            padding: '8px 16px',
-                            borderRadius: 6,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            background: t.status_color,
-                            color: '#fff',
+                        <Tag
+                          style={kanbanTagStyle({
+                            fillHex: t.status_color,
                             cursor: 'pointer',
-                            outline: 'none',
-                          }}
+                          })}
                           title="Filter tickets by this status"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -650,20 +624,9 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                             qs.set('status', t.status_slug)
                             router.push(`/tickets?${qs.toString()}`)
                           }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              if (!t.status_slug) return
-                              const qs = new URLSearchParams()
-                              qs.set('view', 'list')
-                              qs.set('status', t.status_slug)
-                              router.push(`/tickets?${qs.toString()}`)
-                            }
-                          }}
                         >
                           {t.customer_title ?? t.status_title}
-                        </span>
+                        </Tag>
                         <Dropdown
                           menu={{
                             items: [

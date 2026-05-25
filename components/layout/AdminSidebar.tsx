@@ -93,15 +93,15 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       icon: <DashboardOutlined />,
       label: linkLabel('/dashboard', 'Dashboard'),
     },
-    ...(canAccessProjects(role)
-      ? [
-          {
-            key: '/projects',
-            icon: <FolderOutlined />,
-            label: linkLabel('/projects', 'Projects'),
-          },
-        ]
-      : []),
+    // ...(canAccessProjects(role)
+    //   ? [
+    //       {
+    //         key: '/projects',
+    //         icon: <FolderOutlined />,
+    //         label: linkLabel('/projects', 'Projects'),
+    //       },
+    //     ]
+    //   : []),
     ...(isCustomer
       ? [
           {
