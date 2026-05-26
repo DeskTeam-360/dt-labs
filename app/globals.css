@@ -835,6 +835,44 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
   touch-action: pan-x;
 }
 
+/* Settings: tag/type/status chip preview — always show light + dark Kanban card surfaces */
+.kanban-tag-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-width: 100%;
+}
+.kanban-tag-preview-panel--light,
+.kanban-tag-preview-panel--dark {
+  flex: 1 1 140px;
+  min-width: 140px;
+  max-width: 200px;
+  padding: 12px;
+  border-radius: 12px;
+}
+.kanban-tag-preview-panel--light {
+  background: #fafafa;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.kanban-tag-preview-panel--dark {
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+.kanban-tag-preview-panel__label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.kanban-tag-preview-panel--light .kanban-tag-preview-panel__label {
+  color: rgba(0, 0, 0, 0.45);
+}
+.kanban-tag-preview-panel--dark .kanban-tag-preview-panel__label {
+  color: #a3a3a3;
+}
+
 /* Kanban: Ant Design Card can inject default light surfaces over inline styles */
 .tickets-kanban-board .kanban-column-card.ant-card {
   background: var(--kanban-column-bg) !important;

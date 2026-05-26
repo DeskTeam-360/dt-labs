@@ -375,7 +375,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                 suffix="this month"
                 prefix={<FileTextOutlined />}
                 
-                styles={{ content:{color: '#fa8c16'} }}
+                styles={{ content:{color: '#fa8c16', fontSize: 18} }}
               />
                <Text type="secondary" style={{ fontSize: 12 }}>Last Month Tickets: {trackerStats.lastMonthTickets}</Text>
             </Card>

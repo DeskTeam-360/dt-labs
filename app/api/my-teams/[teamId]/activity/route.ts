@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { canAccessMyTeams } from '@/lib/auth-utils'
-import { db, teamMembers, tickets, ticketTimeTracker, ticketTypes, users } from '@/lib/db'
+import { db, teamMembers, tickets, ticketTimeTracker, users } from '@/lib/db'
+import { loadActiveJobTypeTitleMap } from '@/lib/job-types-db'
 import { accumulateSession, roundHourly, type SessionLike } from '@/lib/my-teams-activity-aggregate'
 import { localYmd, validateMyTeamsActivityDayWindow } from '@/lib/my-teams-date'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
@@ -80,16 +81,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
   }
 
   const now = new Date()
+  const jobTypeTitleMap = await loadActiveJobTypeTitleMap()
+
   const rows = await db
     .select({
       tracker: ticketTimeTracker,
       ticket: tickets,
-      ticketType: ticketTypes,
       user: users,
     })
     .from(ticketTimeTracker)
     .leftJoin(tickets, eq(ticketTimeTracker.ticketId, tickets.id))
-    .leftJoin(ticketTypes, eq(tickets.typeId, ticketTypes.id))
     .leftJoin(users, eq(ticketTimeTracker.userId, users.id))
     .where(
       and(
@@ -111,8 +112,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
     user_name: string
     ticket_id: number
     ticket_title: string | null
-    ticket_type_title: string | null
-    ticket_type_color: string | null
+    job_type: string | null
+    job_type_title: string | null
     start_time: string
     stop_time: string | null
     reported_duration_seconds: number | null
@@ -144,8 +145,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
         user_name: r.user?.fullName || r.user?.email || 'Unknown',
         ticket_id: t.ticketId,
         ticket_title: r.ticket?.title ?? null,
-        ticket_type_title: r.ticketType?.title ?? null,
-        ticket_type_color: r.ticketType?.color ?? null,
+        job_type: t.jobType ?? null,
+        job_type_title: t.jobType ? jobTypeTitleMap.get(t.jobType) ?? t.jobType : null,
         start_time: startTime.toISOString(),
         stop_time: stopTime ? stopTime.toISOString() : null,
         reported_duration_seconds: rep ?? 0,

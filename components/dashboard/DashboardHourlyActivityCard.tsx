@@ -52,9 +52,8 @@ export default function DashboardHourlyActivityCard({
       title={
         <Space wrap>
           <ClockCircleOutlined />
-          <span>Daily activity by hour</span>
+          <span>My Daily activity by hour</span>
           <Text type="secondary" style={{ fontSize: 12, fontWeight: 'normal' }}>
-            Minutes worked vs distinct tickets overlapping each hour (local time)
           </Text>
         </Space>
       }

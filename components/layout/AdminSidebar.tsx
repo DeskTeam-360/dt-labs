@@ -212,6 +212,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         style={{
           height: 64,
           display: 'flex',
+          margin: '0 20px',
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'space-between',
           padding: collapsed ? '0 16px' : '0 24px',

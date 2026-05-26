@@ -1635,11 +1635,11 @@ export default function TicketDetailContent({
                                     label: 'Activity log',
                                     children: <TabActivity ticketId={displayTicket.id} />,
                                 },
-                                {
-                                    key: 'screenshots',
-                                    label: `Screenshots (${screenshots.length})`,
-                                    children: <TabScreenshots screenshots={screenshots} />,
-                                },
+                                // {
+                                //     key: 'screenshots',
+                                //     label: `Screenshots (${screenshots.length})`,
+                                //     children: <TabScreenshots screenshots={screenshots} />,
+                                // },
                             ]}
                         />
                         )}

@@ -36,7 +36,11 @@ import {
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
-import { isValidMyTeamsActivityDateYmd, localTodayYesterday } from '@/lib/my-teams-date'
+import {
+  isValidMyTeamsActivityDateYmd,
+  localDayBoundsFromYmd,
+  localTodayYesterday,
+} from '@/lib/my-teams-date'
 import { getUserDepartmentAccentColor, getUserPositionAccentColor } from '@/lib/user-work-dropdowns'
 
 dayjs.extend(customParseFormat)
@@ -70,8 +74,8 @@ type SessionRow = {
   user_name: string
   ticket_id: number
   ticket_title: string | null
-  ticket_type_title?: string | null
-  ticket_type_color?: string | null
+  job_type?: string | null
+  job_type_title?: string | null
   start_time: string
   stop_time: string | null
   reported_duration_seconds: number | null
@@ -129,13 +133,12 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
   }, [])
 
   const buildActivityQuery = useCallback((date: string, memberId?: string) => {
-    const start = dayjs(date, 'YYYY-MM-DD').startOf('day')
-    const end = dayjs(date, 'YYYY-MM-DD').endOf('day')
-    const qs = new URLSearchParams({
-      date,
-      day_start: start.toISOString(),
-      day_end: end.toISOString(),
-    })
+    const bounds = localDayBoundsFromYmd(date)
+    const qs = new URLSearchParams({ date })
+    if (bounds) {
+      qs.set('day_start', bounds.start.toISOString())
+      qs.set('day_end', bounds.end.toISOString())
+    }
     if (memberId) qs.set('member_id', memberId)
     return qs
   }, [])
@@ -285,26 +288,16 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
       ),
     },
     {
-      title: 'Type',
-      key: 'ticket_type',
+      title: 'Job Type',
+      key: 'job_type',
       width: 130,
-      render: (_, row) => {
-        const title = row.ticket_type_title
-        const color = row.ticket_type_color
-        if (!title) return <Text type="secondary">—</Text>
-        return (
-          <Tag
-            style={{
-              margin: 0,
-              ...(color
-                ? { backgroundColor: color, borderColor: color, color: '#fff' }
-                : {}),
-            }}
-          >
-            {title}
-          </Tag>
-        )
-      },
+      ellipsis: true,
+      render: (_, row) =>
+        row.job_type_title || row.job_type ? (
+          <Text ellipsis>{row.job_type_title || row.job_type}</Text>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
     },
     {
       title: 'Start',
@@ -504,7 +497,7 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
               )
             }
             placement="right"
-            width={720}
+            width={1080}
             open={drawerOpen}
             onClose={() => {
               setDrawerOpen(false)

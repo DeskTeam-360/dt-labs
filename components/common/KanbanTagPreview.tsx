@@ -1,10 +1,8 @@
 'use client'
 
-import { Tag, Typography } from 'antd'
+import { Tag } from 'antd'
 
 import { kanbanTagStyle, normalizeAccentHex } from '@/lib/kanban-tag-chip-style'
-
-const { Text } = Typography
 
 export function tagPreviewFillHex(hex: unknown, fallback = '#000000'): string {
   if (typeof hex !== 'string') return fallback
@@ -15,6 +13,19 @@ export function tagPreviewFillHex(hex: unknown, fallback = '#000000'): string {
   if (/^[0-9A-Fa-f]{6}$/.test(body)) return `#${body}`
   return fallback
 }
+
+const PREVIEW_PANELS = [
+  {
+    key: 'light',
+    className: 'kanban-tag-preview-panel--light',
+    label: 'Light card',
+  },
+  {
+    key: 'dark',
+    className: 'kanban-tag-preview-panel--dark',
+    label: 'Dark card',
+  },
+] as const
 
 export function KanbanTagPreview({
   name,
@@ -28,21 +39,17 @@ export function KanbanTagPreview({
   emptyLabel?: string
 }) {
   const label = (name ?? '').trim() || emptyLabel
+  const fillHex = tagPreviewFillHex(colorHex, fallbackHex)
+  const chipStyle = kanbanTagStyle({ fillHex })
+
   return (
-    <div
-      style={{
-        padding: 12,
-        borderRadius: 12,
-        maxWidth: 320,
-        background: 'var(--kanban-card-bg)',
-        border: '1px solid var(--kanban-card-border)',
-        boxShadow: 'var(--kanban-card-shadow, none)',
-      }}
-    >
-      <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12 }}>
-        Preview (same as Kanban ticket card chips)
-      </Text>
-      <Tag style={kanbanTagStyle({ fillHex: tagPreviewFillHex(colorHex, fallbackHex) })}>{label}</Tag>
+    <div className="kanban-tag-preview-row">
+      {PREVIEW_PANELS.map((panel) => (
+        <div key={panel.key} className={panel.className}>
+          <span className="kanban-tag-preview-panel__label">{panel.label}</span>
+          <Tag style={chipStyle}>{label}</Tag>
+        </div>
+      ))}
     </div>
   )
 }
