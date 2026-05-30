@@ -2,7 +2,6 @@
 
 import {
   ArrowLeftOutlined,
-  CheckCircleOutlined,
   ClockCircleOutlined,
   CommentOutlined,
   DeleteOutlined,
@@ -19,8 +18,6 @@ import {
   Alert,
   Avatar,
   Button,
-  Card,
-  Checkbox,
   Col,
   DatePicker,
   Descriptions,
@@ -43,6 +40,7 @@ import { useEffect, useMemo,useState } from 'react'
 import DateDisplay from '@/components/common/DateDisplay'
 import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
+import CommentAiSummaryTrigger from './CommentAiSummaryTrigger'
 import CommentComposer from './CommentComposer'
 import CommentTaggedCcLines from './CommentTaggedCcLines'
 import CommentWysiwyg from './CommentWysiwyg'
@@ -59,15 +57,6 @@ function ticketSidebarPriorityValue(ticketData: unknown): number | null {
   const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : Number(raw)
   if (!Number.isFinite(n) || n <= 0) return null
   return Math.floor(n)
-}
-
-interface ChecklistItem {
-  id: string
-  ticket_id: number
-  title: string
-  is_completed: boolean
-  order_index: number
-  created_at: string
 }
 
 interface CommentAttachment { id: string; file_url: string; file_name: string }
@@ -190,14 +179,6 @@ interface TabGeneralProps {
   activeTimeTracker: any
   currentTime: number
   formatTime: (seconds: number) => string
-  checklistItems: ChecklistItem[]
-  totalChecklistCount: number
-  completedChecklistCount: number
-  newChecklistTitle: string
-  onNewChecklistTitleChange: (v: string) => void
-  onAddChecklistItem: () => void
-  onToggleChecklistItem: (itemId: string, isCompleted: boolean) => void
-  onDeleteChecklistItem: (itemId: string) => void
   comments: Comment[]
   currentUserId: string
   editingComment: string | null
@@ -213,8 +194,15 @@ interface TabGeneralProps {
   onAddComment: (
     commentText: string,
     attachments: { url: string; file_name: string; file_path: string }[],
-    extra?: { taggedUserIds?: string[]; ccEmails?: string[]; bccEmails?: string[] }
+    extra?: {
+      taggedUserIds?: string[]
+      ccEmails?: string[]
+      bccEmails?: string[]
+      summaryAsNote?: boolean
+    }
   ) => Promise<void>
+  onAddChecklistItemsBulk?: (titles: string[]) => Promise<void>
+  onAddAiSummaryComment?: (html: string) => Promise<void>
   addCommentLoading?: boolean
   commentsHasOlder?: boolean
   commentsOlderRemaining?: number
@@ -247,6 +235,7 @@ interface TabGeneralProps {
   onTicketDescriptionEditingCancel?: () => void
   onTicketDescriptionSave?: () => void | Promise<void>
   ticketDescriptionSaving?: boolean
+  onApplyAiSummaryToDescription?: (html: string) => Promise<void>
 }
 
 export default function TabGeneral({
@@ -271,14 +260,6 @@ export default function TabGeneral({
   activeTimeTracker,
   currentTime,
   formatTime,
-  checklistItems,
-  totalChecklistCount,
-  completedChecklistCount,
-  newChecklistTitle,
-  onNewChecklistTitleChange,
-  onAddChecklistItem,
-  onToggleChecklistItem,
-  onDeleteChecklistItem,
   comments,
   currentUserId,
   editingComment,
@@ -292,6 +273,8 @@ export default function TabGeneral({
   onRemoveCommentAttachment,
   removingCommentAttachmentKey = null,
   onAddComment,
+  onAddChecklistItemsBulk,
+  onAddAiSummaryComment,
   addCommentLoading = false,
   commentsHasOlder = false,
   commentsOlderRemaining = 0,
@@ -322,6 +305,7 @@ export default function TabGeneral({
   onTicketDescriptionEditingCancel,
   onTicketDescriptionSave,
   ticketDescriptionSaving = false,
+  onApplyAiSummaryToDescription,
 }: TabGeneralProps) {
   const [sidebarDraft, setSidebarDraft] = useState<SidebarAttributesDraft>(() =>
     snapshotSidebarDraft({
@@ -398,7 +382,7 @@ export default function TabGeneral({
 
   return (
     <Space orientation="vertical" style={{ width: '100%' }} size="middle">
-      <Row gutter={[24, 24]}>
+      <Row gutter={[24, 24]} align="top">
       <Col xs={16}>
 
 
@@ -407,18 +391,41 @@ export default function TabGeneral({
                         <Avatar style={{ cursor: creatorId ? 'pointer' : undefined }} icon={<UserOutlined />} src={ticketData.creator?.avatar_url} />
                       </TicketUserMention>
                       <Flex vertical style={{ flex: 1, minWidth: 0 }}>
-                        <Flex justify="space-between" align="center" wrap="wrap" gap="small">
-                          <Space>
-                            <TicketUserMention userId={creatorId} email={creatorEmail}>
-                              <Text strong style={{ cursor: creatorId ? 'pointer' : undefined }}>
-                                {creatorLabel}
-                              </Text>
-                            </TicketUserMention>
-                            <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}>
-                              <DateDisplay date={ticketData.created_at} />
+                        <Flex justify="space-between" align="flex-start" wrap="wrap" gap="small">
+                          <Flex vertical gap={2} style={{ minWidth: 0 }}>
+                            {ticketData.company_id ? (
+                              <>
+                                <Text strong>
+                                  {ticketData.company?.name ||
+                                    companyOptions.find((c) => c.id === ticketData.company_id)?.name ||
+                                    '—'}
+                                </Text>
+                                <Text
+                                  type="secondary"
+                                  style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}
+                                >
+                                  Created By 
+                                <TicketUserMention userId={creatorId} email={creatorEmail} className="ml-1">
+                                  <Text
+                                    style={{ cursor: creatorId ? 'pointer' : undefined, color: 'var(--ticket-thread-text)' }}
+                                  >
+                                    {createdByPersonLabel}
+                                  </Text>
+                                </TicketUserMention>
+                                <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)', marginLeft: 4 }}>
+                               Created At: <DateDisplay date={ticketData.created_at} />
                             </Text>
-                          </Space>
-                         
+                                </Text>
+                              </>
+                            ) : (
+                              <TicketUserMention userId={creatorId} email={creatorEmail}>
+                                <Text strong style={{ cursor: creatorId ? 'pointer' : undefined }}>
+                                  {creatorLabel}
+                                </Text>
+                              </TicketUserMention>
+                            )}
+                            
+                          </Flex>
                         </Flex>
                         {ticketDescriptionEditing && canEditTicketDescription ? (
                           <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
@@ -443,14 +450,23 @@ export default function TabGeneral({
                         ) : (
                           <>
                             {canEditTicketDescription ? (
-                              <Flex justify="flex-end" style={{ marginTop: 4 }}>
+                              <Flex justify="flex-end" gap={8} style={{ marginTop: 4 }}>
+                                {onApplyAiSummaryToDescription && ticketData?.id ? (
+                                  <CommentAiSummaryTrigger
+                                    ticketId={ticketData.id}
+                                    summarizeAnchor={{ type: 'description' }}
+                                    size="middle"
+                                    tooltip="Summarize description + up to 3 creator comments (English)"
+                                    disabled={ticketDescriptionSaving}
+                                    onApplyToDescription={onApplyAiSummaryToDescription}
+                                  />
+                                ) : null}
                                 <Button
                                   type="primary"
                                   icon={<EditOutlined />}
                                   onClick={onTicketDescriptionEditingStart}
-                                >
-                                
-                                </Button>
+                                  aria-label="Edit description"
+                                />
                               </Flex>
                             ) : null}
                             <div
@@ -593,31 +609,37 @@ export default function TabGeneral({
                           </Space>
                           {!isAutomation && !isCustomer && comment.user_id === currentUserId && editingComment !== comment.id && (
                             <Space>
-                              
+                              {showNoteOption && onAddAiSummaryComment && ticketData?.id ? (
+                                <CommentAiSummaryTrigger
+                                  ticketId={ticketData.id}
+                                  summarizeAnchor={{ type: 'comment', commentId: comment.id }}
+                                  size="middle"
+                                  tooltip="Summarize this comment + 3 above/below (English)"
+                                  addCommentLoading={addCommentLoading}
+                                  disabled={addCommentLoading}
+                                  onAddComment={onAddAiSummaryComment}
+                                  onAddChecklistItems={onAddChecklistItemsBulk}
+                                />
+                              ) : null}
                               {canDeleteComment(comment.created_at) && (
                                 <>
-                                <Button
-                                icon={<EditOutlined />}
-                                size="middle"
-                                onClick={() => {
-                                  onEditComment(comment.id, comment.comment)
-                                }}
-                              />
-                              <Popconfirm
-                                  title="Delete comment"
-                                  description="Are you sure?"
-                                  onConfirm={() => onDeleteComment(comment.id)}
-                                  okText="Yes"
-                                  cancelText="No"
-                                >
                                   <Button
-                                    danger
-                                    icon={<DeleteOutlined />}
+                                    icon={<EditOutlined />}
                                     size="middle"
+                                    onClick={() => {
+                                      onEditComment(comment.id, comment.comment)
+                                    }}
                                   />
-                                </Popconfirm>
+                                  <Popconfirm
+                                    title="Delete comment"
+                                    description="Are you sure?"
+                                    onConfirm={() => onDeleteComment(comment.id)}
+                                    okText="Yes"
+                                    cancelText="No"
+                                  >
+                                    <Button danger icon={<DeleteOutlined />} size="middle" />
+                                  </Popconfirm>
                                 </>
-                                
                               )}
                             </Space>
                           )}
@@ -733,7 +755,8 @@ export default function TabGeneral({
           {/* </Card> */}
         </Col>
 
-        <Col xs={8}>
+        <Col xs={8} className="ticket-detail-sidebar-sticky">
+          <div >
           <Flex justify="flex-end" gap={8} wrap="wrap" style={{ marginBottom: 12 }}>
             <Button
               type="primary"
@@ -750,7 +773,7 @@ export default function TabGeneral({
               Reset
             </Button>
           </Flex>
-          <Descriptions column={1} bordered>
+          <Descriptions column={1} bordered style={{ maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
             <Descriptions.Item label="Short Note">
               <Input.TextArea
                 value={sidebarDraft.shortNote}
@@ -909,16 +932,6 @@ export default function TabGeneral({
                 </Text>
               )}
             </Descriptions.Item>
-            {ticketData.company_id ? (
-              <Descriptions.Item label="Created By">
-                <TicketUserMention userId={creatorId} email={creatorEmail}>
-                  <Space style={{ cursor: creatorId ? 'pointer' : undefined }}>
-                    <UserOutlined />
-                    <Text>{createdByPersonLabel}</Text>
-                  </Space>
-                </TicketUserMention>
-              </Descriptions.Item>
-            ) : null}
             {canEditCompanyAndTags ? (
               <Descriptions.Item label="Contact (email replies)">
                 <Select
@@ -1005,7 +1018,7 @@ export default function TabGeneral({
                 <Text>{ticketData.team?.name ?? '—'}</Text>
               )}
             </Descriptions.Item>
-            <Descriptions.Item label="Created At">
+            {/* <Descriptions.Item label="Created At">
               <Space>
                 <ClockCircleOutlined />
                 <DateDisplay date={ticketData.created_at} />
@@ -1016,7 +1029,7 @@ export default function TabGeneral({
                 <ClockCircleOutlined />
                 <DateDisplay date={ticketData.updated_at} />
               </Space>
-            </Descriptions.Item>
+            </Descriptions.Item> */}
             <Descriptions.Item label="Total Time Tracked">
               <Space>
                 <ClockCircleOutlined />
@@ -1122,79 +1135,7 @@ export default function TabGeneral({
             </Flex>
           </Descriptions.Item>
           </Descriptions>
-          <br />
-
-          <Card
-            title={
-              <Space>
-                <CheckCircleOutlined />
-                <Text strong>Checklist</Text>
-                {totalChecklistCount > 0 && (
-                  <Text type="secondary">
-                    ({completedChecklistCount}/{totalChecklistCount})
-                  </Text>
-                )}
-              </Space>
-            }
-            size="small"
-          >
-            <Space orientation="vertical" style={{ width: '100%' }} size="middle">
-              {checklistItems.length > 0 ? (
-                <Flex vertical gap="small">
-                  {checklistItems.map((item: ChecklistItem) => (
-                    <Flex
-                      key={item.id}
-                      align="center"
-                      justify="space-between"
-                      style={{
-                        padding: '8px 0',
-                        textDecoration: item.is_completed ? 'line-through' : 'none',
-                        opacity: item.is_completed ? 0.6 : 1,
-                      }}
-                    >
-                      <Checkbox
-                        checked={item.is_completed}
-                        onChange={() => onToggleChecklistItem(item.id, item.is_completed)}
-                      >
-                        <Text>{item.title}</Text>
-                      </Checkbox>
-                      <Popconfirm
-                        title="Delete checklist item"
-                        description="Are you sure?"
-                        onConfirm={() => onDeleteChecklistItem(item.id)}
-                        okText="Yes"
-                        cancelText="No"
-                      >
-                        <Button
-                          danger
-                          icon={<DeleteOutlined />}
-                          size="middle"
-                        />
-                      </Popconfirm>
-                    </Flex>
-                  ))}
-                </Flex>
-              ) : (
-                <Empty description="No checklist items" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-              )}
-              <Flex gap="small" align="center" style={{ width: '100%' }}>
-                <Input
-                  placeholder="Add checklist item..."
-                  value={newChecklistTitle}
-                  onChange={(e) => onNewChecklistTitleChange(e.target.value)}
-                  onPressEnter={onAddChecklistItem}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={onAddChecklistItem}
-                >
-                  Add
-                </Button>
-              </Flex>
-            </Space>
-          </Card>
+          </div>
         </Col>
    
         

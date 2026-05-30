@@ -1,4 +1,4 @@
-import { drizzle } from 'drizzle-orm/postgres-js'
+import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
 import * as schema from './schema'
@@ -21,17 +21,35 @@ const isServerless = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTI
 const POOL_MAX_CAP = 5
 
 const envPool = Number(process.env.DATABASE_POOL_MAX)
-const defaultPoolMax = isServerless ? 1 : POOL_MAX_CAP
+const defaultPoolMax = isServerless ? 1 : process.env.NODE_ENV === 'development' ? 2 : POOL_MAX_CAP
 const poolMax =
   Number.isFinite(envPool) && envPool > 0
     ? Math.min(POOL_MAX_CAP, Math.max(1, envPool))
     : defaultPoolMax
 
-const client = postgres(connectionString, {
-  prepare: false,
-  max: poolMax,
-  // Return slots to the DB when a lambda goes quiet between invocations.
-  ...(isServerless ? { idle_timeout: 20, max_lifetime: 60 * 30 } : {}),
-})
+type Schema = typeof schema
 
-export const db = drizzle(client, { schema })
+const globalForDb = globalThis as typeof globalThis & {
+  __deskteamPostgres?: ReturnType<typeof postgres>
+  __deskteamDrizzle?: PostgresJsDatabase<Schema>
+}
+
+function createPostgresClient() {
+  return postgres(connectionString, {
+    prepare: false,
+    max: poolMax,
+    idle_timeout: isServerless ? 20 : 30,
+    max_lifetime: isServerless ? 60 * 30 : 60 * 10,
+  })
+}
+
+/** Reuse one client in dev — HMR otherwise opens new pools until Postgres rejects connections (53300). */
+const client = globalForDb.__deskteamPostgres ?? createPostgresClient()
+if (process.env.NODE_ENV !== 'production') {
+  globalForDb.__deskteamPostgres = client
+}
+
+export const db = globalForDb.__deskteamDrizzle ?? drizzle(client, { schema })
+if (process.env.NODE_ENV !== 'production') {
+  globalForDb.__deskteamDrizzle = db
+}

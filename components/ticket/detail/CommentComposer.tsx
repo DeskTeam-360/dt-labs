@@ -1,7 +1,14 @@
 'use client'
 
-import { CommentOutlined, DeleteOutlined, PaperClipOutlined, PlusOutlined, SendOutlined, UserAddOutlined } from '@ant-design/icons'
-import { Button, Flex, message,Select } from 'antd'
+import {
+  CommentOutlined,
+  DeleteOutlined,
+  PaperClipOutlined,
+  PlusOutlined,
+  SendOutlined,
+  UserAddOutlined,
+} from '@ant-design/icons'
+import { Button, Flex, message, Select } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { uploadTicketFile } from '@/utils/storage'
@@ -12,6 +19,8 @@ export type CommentExtra = {
   taggedUserIds?: string[]
   ccEmails?: string[]
   bccEmails?: string[]
+  /** AI summary posts as internal note (agent UI). */
+  summaryAsNote?: boolean
 }
 
 interface NonCustomerUser {
@@ -341,7 +350,7 @@ export default function CommentComposer({
         />
         </div>
         
-        <Flex gap={8}>
+        <Flex gap={8} wrap="wrap">
         <Button
           icon={<PaperClipOutlined />}
           onClick={() => document.getElementById('comment-files-input')?.click()}

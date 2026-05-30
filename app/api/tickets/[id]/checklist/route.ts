@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db, ticketChecklist } from '@/lib/db'
 import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
+import { mapChecklistItemToDto } from '@/lib/ticket-checklist-map'
 
 /** POST /api/tickets/[id]/checklist - Add checklist item */
 export async function POST(
@@ -40,12 +41,5 @@ export async function POST(
 
   bumpTicketDataVersion(ticketId)
 
-  return NextResponse.json({
-    id: row.id,
-    ticket_id: row.ticketId,
-    title: row.title,
-    is_completed: row.isCompleted,
-    order_index: row.orderIndex ?? 0,
-    created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',
-  })
+  return NextResponse.json(mapChecklistItemToDto(row))
 }

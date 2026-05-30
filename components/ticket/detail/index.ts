@@ -1,6 +1,7 @@
 export { default as TabActivity } from './TabActivity'
 export { default as TabAssignees } from './TabAssignees'
 export { default as TabAttributes } from './TabAttributes'
+export { default as TabChecklist } from './TabChecklist'
 export { default as TabGeneral } from './TabGeneral'
 export { default as TabScreenshots } from './TabScreenshots'
 export { default as TabTimeTracker } from './TabTimeTracker'

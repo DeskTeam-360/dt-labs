@@ -270,9 +270,14 @@ export const ticketAssignees = pgTable(
 export const ticketChecklist = pgTable('ticket_checklist', {
   id: uuid('id').primaryKey().defaultRandom(),
   ticketId: integer('ticket_id').notNull(),
-  title: varchar('title', { length: 255 }).notNull(),
+  title: text('title').notNull(),
   isCompleted: boolean('is_completed').default(false),
   orderIndex: integer('order_index').default(0),
+  completedAt: ts('completed_at'),
+  completedByUserId: uuid('completed_by_user_id').references(() => users.id, {
+    onDelete: 'set null',
+  }),
+  completionNote: text('completion_note'),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
 

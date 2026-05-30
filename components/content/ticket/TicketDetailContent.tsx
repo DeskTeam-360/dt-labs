@@ -56,7 +56,7 @@ import DateDisplay from '@/components/common/DateDisplay'
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
-import { TabActivity,TabGeneral, TabScreenshots, TabTimeTracker } from '@/components/ticket/detail'
+import { TabActivity, TabChecklist, TabGeneral, TabScreenshots, TabTimeTracker } from '@/components/ticket/detail'
 import CommentWysiwyg from '@/components/ticket/detail/CommentWysiwyg'
 import type { SidebarAttributesDraft } from '@/components/ticket/detail/TabGeneral'
 import TabGeneralCustomer from '@/components/ticket/detail/TabGeneralCustomer'
@@ -110,6 +110,10 @@ interface ChecklistItem {
     is_completed: boolean
     order_index: number
     created_at: string
+    completed_at: string | null
+    completed_by_user_id: string | null
+    completed_by_name: string | null
+    completion_note: string | null
 }
 
 interface CommentAttachment {
@@ -586,6 +590,24 @@ export default function TicketDetailContent({
       return list
     }, [teams, userTeamIds, displayTicket?.team_id, displayTicket?.visibility])
 
+    const addChecklistItemByTitle = async (
+        title: string,
+        orderIndex: number,
+        options?: { silent?: boolean }
+    ) => {
+        const trimmed = title.trim()
+        if (!trimmed) return null
+        const data = await apiFetch<any>(`/api/tickets/${displayTicket.id}/checklist`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: trimmed, order_index: orderIndex }),
+        })
+        const row = { ...data, order_index: data.order_index ?? orderIndex }
+        setChecklistItems((prev) => [...prev, row])
+        if (!options?.silent) message.success('Checklist item added')
+        return row
+    }
+
     const handleAddChecklistItem = async () => {
         if (!newChecklistTitle.trim()) {
             message.warning('Please enter a checklist item title')
@@ -593,15 +615,10 @@ export default function TicketDetailContent({
         }
         setLoading(true)
         try {
-            const maxOrder = checklistItems.length > 0 ? Math.max(...checklistItems.map((item) => item.order_index)) : -1
-            const data = await apiFetch<any>(`/api/tickets/${displayTicket.id}/checklist`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: newChecklistTitle.trim(), order_index: maxOrder + 1 }),
-            })
-            setChecklistItems([...checklistItems, { ...data, order_index: data.order_index ?? 0 }])
+            const maxOrder =
+                checklistItems.length > 0 ? Math.max(...checklistItems.map((item) => item.order_index)) : -1
+            await addChecklistItemByTitle(newChecklistTitle, maxOrder + 1)
             setNewChecklistTitle('')
-            message.success('Checklist item added')
         } catch (err: any) {
             message.error(err?.message || 'Failed to add checklist item')
         } finally {
@@ -609,16 +626,63 @@ export default function TicketDetailContent({
         }
     }
 
-    const handleToggleChecklistItem = async (itemId: string, currentStatus: boolean) => {
+    const handleAddChecklistItemsBulk = async (titles: string[]) => {
+        const unique = [...new Set(titles.map((t) => t.trim()).filter(Boolean))]
+        if (unique.length === 0) return
+        setLoading(true)
         try {
-            await apiFetch(`/api/tickets/${displayTicket.id}/checklist/${itemId}`, {
+            let maxOrder =
+                checklistItems.length > 0 ? Math.max(...checklistItems.map((item) => item.order_index)) : -1
+            for (const title of unique) {
+                maxOrder += 1
+                await addChecklistItemByTitle(title, maxOrder, { silent: true })
+            }
+            message.success(`${unique.length} checklist item(s) added`)
+        } catch (err: any) {
+            message.error(err?.message || 'Failed to add checklist items')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const patchChecklistItem = async (
+        itemId: string,
+        body: { is_completed?: boolean; completion_note?: string }
+    ) => {
+        const updated = await apiFetch<ChecklistItem>(
+            `/api/tickets/${displayTicket.id}/checklist/${itemId}`,
+            {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_completed: !currentStatus }),
-            })
-            setChecklistItems(checklistItems.map((item) => (item.id === itemId ? { ...item, is_completed: !currentStatus } : item)))
+                body: JSON.stringify(body),
+            }
+        )
+        setChecklistItems((prev) =>
+            prev.map((item) => (item.id === itemId ? { ...item, ...updated } : item))
+        )
+    }
+
+    const handleCompleteChecklistItem = async (itemId: string) => {
+        try {
+            await patchChecklistItem(itemId, { is_completed: true })
+        } catch (err: any) {
+            message.error(err?.message || 'Failed to complete checklist item')
+        }
+    }
+
+    const handleUncompleteChecklistItem = async (itemId: string) => {
+        try {
+            await patchChecklistItem(itemId, { is_completed: false })
         } catch (err: any) {
             message.error(err?.message || 'Failed to update checklist item')
+        }
+    }
+
+    const handleUpdateChecklistNote = async (itemId: string, completionNote: string) => {
+        try {
+            await patchChecklistItem(itemId, { completion_note: completionNote })
+        } catch (err: any) {
+            message.error(err?.message || 'Failed to save note')
         }
     }
 
@@ -635,19 +699,30 @@ export default function TicketDetailContent({
     const handleAddComment = async (
         commentText: string,
         attachments: { url: string; file_name: string; file_path: string }[],
-        extra?: { taggedUserIds?: string[]; ccEmails?: string[]; bccEmails?: string[] }
+        extra?: {
+            taggedUserIds?: string[]
+            ccEmails?: string[]
+            bccEmails?: string[]
+            summaryAsNote?: boolean
+        }
     ) => {
         if (!commentText.trim() && attachments.length === 0) {
             message.warning('Please enter a comment or attach files')
             return
         }
-        if (variant === 'admin' && (commentVisibility !== 'note' && commentVisibility !== 'reply')) {
+        if (
+            variant === 'admin' &&
+            !extra?.summaryAsNote &&
+            commentVisibility !== 'note' &&
+            commentVisibility !== 'reply'
+        ) {
             message.warning('Choose Add note or Reply first')
             return
         }
         setLoading(true)
         try {
-            const visibility = variant === 'customer' ? 'reply' : commentVisibility
+            const visibility =
+                variant === 'customer' ? 'reply' : extra?.summaryAsNote ? 'note' : commentVisibility
             const author_type = variant === 'customer' ? 'customer' : 'agent'
             const payload: Record<string, unknown> = {
                 comment: (commentText || '').trim(),
@@ -665,7 +740,7 @@ export default function TicketDetailContent({
             })
             setComments((prev) => [...prev, { ...data, comment_attachments: data.comment_attachments || [] }])
             message.success('Comment added')
-            if (variant === 'admin') setCommentVisibility(null)
+            if (variant === 'admin' && !extra?.summaryAsNote) setCommentVisibility(null)
 
             const replyRecipientEmail =
                 (typeof displayTicket.contact?.email === 'string' && displayTicket.contact.email.trim()) ||
@@ -704,6 +779,10 @@ export default function TicketDetailContent({
         } finally {
             setLoading(false)
         }
+    }
+
+    const handleAddAiSummaryComment = async (html: string) => {
+        await handleAddComment(html, [], { summaryAsNote: true })
     }
 
     const handleUpdateComment = async (commentId: string) => {
@@ -1539,14 +1618,6 @@ export default function TicketDetailContent({
                                             activeTimeTracker={activeTimeTracker}
                                             currentTime={currentTime}
                                             formatTime={formatTime}
-                                            checklistItems={checklistItems}
-                                            totalChecklistCount={totalChecklistCount}
-                                            completedChecklistCount={completedChecklistCount}
-                                            newChecklistTitle={newChecklistTitle}
-                                            onNewChecklistTitleChange={setNewChecklistTitle}
-                                            onAddChecklistItem={handleAddChecklistItem}
-                                            onToggleChecklistItem={handleToggleChecklistItem}
-                                            onDeleteChecklistItem={handleDeleteChecklistItem}
                                             comments={comments}
                                             currentUserId={currentUser.id}
                                             editingComment={editingComment}
@@ -1566,6 +1637,8 @@ export default function TicketDetailContent({
                                             onRemoveCommentAttachment={handleRemoveCommentAttachment}
                                             removingCommentAttachmentKey={removingCommentAttachmentKey}
                                             onAddComment={handleAddComment}
+                                            onAddChecklistItemsBulk={handleAddChecklistItemsBulk}
+                                            onAddAiSummaryComment={handleAddAiSummaryComment}
                                             addCommentLoading={loading}
                                             commentsHasOlder={commentsHasOlder}
                                             commentsOlderRemaining={commentsOlderRemaining}
@@ -1605,6 +1678,31 @@ export default function TicketDetailContent({
                                             onTicketDescriptionEditingCancel={handleCancelEditDescription}
                                             onTicketDescriptionSave={() => void handleUpdateDescription()}
                                             ticketDescriptionSaving={loading}
+                                            onApplyAiSummaryToDescription={async (html) => {
+                                                setDescriptionValue(html)
+                                                setEditingDescription(true)
+                                            }}
+                                        />
+                                    ),
+                                },
+                                {
+                                    key: 'checklist',
+                                    label:
+                                        totalChecklistCount > 0
+                                            ? `Checklist (${completedChecklistCount}/${totalChecklistCount})`
+                                            : 'Checklist',
+                                    children: (
+                                        <TabChecklist
+                                            checklistItems={checklistItems}
+                                            totalChecklistCount={totalChecklistCount}
+                                            completedChecklistCount={completedChecklistCount}
+                                            newChecklistTitle={newChecklistTitle}
+                                            onNewChecklistTitleChange={setNewChecklistTitle}
+                                            onAddChecklistItem={handleAddChecklistItem}
+                                            onCompleteChecklistItem={handleCompleteChecklistItem}
+                                            onUncompleteChecklistItem={handleUncompleteChecklistItem}
+                                            onUpdateChecklistNote={handleUpdateChecklistNote}
+                                            onDeleteChecklistItem={handleDeleteChecklistItem}
                                         />
                                     ),
                                 },

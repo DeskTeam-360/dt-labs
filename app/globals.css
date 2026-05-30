@@ -1024,3 +1024,10 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
   width: 100%;
   max-width: 100%;
 }
+
+/* Ticket detail — General tab attribute sidebar */
+.ticket-detail-sidebar-sticky {
+  position: sticky;
+  top: 70px;
+  align-self: flex-start;
+}

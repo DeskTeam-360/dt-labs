@@ -26,6 +26,7 @@ import {
   users,
 } from '@/lib/db'
 import { getPublicUrl } from '@/lib/storage-idrive'
+import { mapChecklistItemToDto } from '@/lib/ticket-checklist-map'
 import { coerceTicketType } from '@/lib/ticket-classification'
 
 const ticketCreator = alias(users, 'ticket_creator')
@@ -247,8 +248,12 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
       (async () => {
         try {
           return await db
-            .select()
+            .select({
+              item: ticketChecklist,
+              completedBy: users,
+            })
             .from(ticketChecklist)
+            .leftJoin(users, eq(ticketChecklist.completedByUserId, users.id))
             .where(eq(ticketChecklist.ticketId, ticketId))
             .orderBy(asc(ticketChecklist.orderIndex))
         } catch {
@@ -393,14 +398,9 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     })),
   }
 
-  const checklistItems = checklistRows.map((r) => ({
-    id: r.id,
-    ticket_id: r.ticketId,
-    title: r.title,
-    is_completed: r.isCompleted,
-    order_index: r.orderIndex ?? 0,
-    created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
-  }))
+  const checklistItems = checklistRows.map((r) =>
+    mapChecklistItemToDto(r.item, r.completedBy ?? undefined)
+  )
 
   const attributes = attributsRows.map((r) => ({
     id: r.id,
