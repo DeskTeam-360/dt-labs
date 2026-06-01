@@ -9,6 +9,39 @@ function trunc(s: string): string {
   return t.length <= MAX_VAL_LEN ? t : t.slice(0, MAX_VAL_LEN) + '…'
 }
 
+function formatScalarLabel(v: unknown, fieldKey?: string): string {
+  if (v === null || v === undefined || v === '') return 'None'
+  if (fieldKey === 'status' || fieldKey === 'visibility' || fieldKey === 'ticketType') {
+    const s = String(v)
+    return trunc(
+      s
+        .split(/[_-]+/)
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' '),
+    )
+  }
+  return str(v)
+}
+
+const TICKET_FIELD_LABELS: Record<string, string> = {
+  status: 'Status',
+  project_status_id: 'Project status',
+  priority: 'Priority',
+  teamId: 'Team',
+  typeId: 'Type',
+  title: 'Title',
+  description: 'Description',
+  shortNote: 'Short note',
+  visibility: 'Visibility',
+  ticketType: 'Ticket type',
+  companyId: 'Company',
+  contactUserId: 'Contact',
+  dueDateIso: 'Due date',
+  assignee_ids: 'Assignees',
+  tag_ids: 'Tags',
+}
+
 function str(v: unknown): string {
   if (v === null || v === undefined) return '—'
   if (typeof v === 'string') return trunc(v.replace(/\s+/g, ' '))
@@ -50,10 +83,11 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
       for (const [key, val] of Object.entries(changes)) {
         if (val && typeof val === 'object' && 'from' in val && 'to' in val) {
           const ft = val as { from: unknown; to: unknown }
+          const label = TICKET_FIELD_LABELS[key] ?? key
           if (key === 'teamId') {
-            parts.push(`Team: ${formatTeamRef(ft.from)} → ${formatTeamRef(ft.to)}`)
+            parts.push(`${label}: ${formatTeamRef(ft.from)} → ${formatTeamRef(ft.to)}`)
           } else {
-            parts.push(`${key}: ${str(ft.from)} → ${str(ft.to)}`)
+            parts.push(`${label}: ${formatScalarLabel(ft.from, key)} → ${formatScalarLabel(ft.to, key)}`)
           }
         }
       }

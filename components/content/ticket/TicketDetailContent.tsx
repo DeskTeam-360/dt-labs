@@ -252,6 +252,8 @@ export default function TicketDetailContent({
     >([])
     const [sidebarBaselineTick, setSidebarBaselineTick] = useState(0)
     const [sidebarAttributesSaving, setSidebarAttributesSaving] = useState(false)
+    const [activityRefreshKey, setActivityRefreshKey] = useState(0)
+    const bumpActivityRefresh = useCallback(() => setActivityRefreshKey((k) => k + 1), [])
     // Mark ticket as read when user views it
     useEffect(() => {
         if (!displayTicket?.id) return
@@ -473,10 +475,11 @@ export default function TicketDetailContent({
             } catch {
                 /* ignore */
             }
+            bumpActivityRefresh()
         } catch (e) {
             console.error('[ticket live sync] refetch failed', e)
         }
-    }, [variant])
+    }, [variant, bumpActivityRefresh])
 
     // User opened this ticket → onSnapshot on ticket_data_sync/{id}; version bump → mergeDetailFromServer.
     useTicketDetailLiveSync(displayTicket?.id, mergeDetailFromServer)
@@ -961,6 +964,7 @@ export default function TicketDetailContent({
             })
             message.success('Status updated')
             setDisplayTicket((prev: any) => ({ ...prev, status: newStatus }))
+            bumpActivityRefresh()
             router.refresh()
         } catch (err: unknown) {
             message.error(err instanceof Error ? err.message : 'Failed to update status')
@@ -1077,6 +1081,7 @@ export default function TicketDetailContent({
 
             setSidebarBaselineTick((x) => x + 1)
             message.success('Ticket attributes saved')
+            bumpActivityRefresh()
             router.refresh()
         } catch (e: unknown) {
             message.error(e instanceof Error ? e.message : 'Failed to save ticket attributes')
@@ -1731,7 +1736,12 @@ export default function TicketDetailContent({
                                 {
                                     key: 'activity',
                                     label: 'Activity log',
-                                    children: <TabActivity ticketId={displayTicket.id} />,
+                                    children: (
+                                        <TabActivity
+                                            ticketId={displayTicket.id}
+                                            refreshKey={activityRefreshKey}
+                                        />
+                                    ),
                                 },
                                 // {
                                 //     key: 'screenshots',

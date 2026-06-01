@@ -15,8 +15,19 @@ const ACTION_LABELS: Record<string, string> = {
  * Display labels for `ticket_activity_log.action`.
  * Customer comments show as "Customer Reply" instead of "Comment added".
  */
-export function formatTicketActivityAction(action: string, actorRole?: string | null): string {
+export function formatTicketActivityAction(
+  action: string,
+  actorRole?: string | null,
+  metadata?: unknown
+): string {
   if (action === 'comment_added' && actorRole === 'customer') return 'Customer Reply'
+  if (action === 'ticket_updated' && metadata && typeof metadata === 'object') {
+    const keys = (metadata as Record<string, unknown>).changed_keys
+    if (Array.isArray(keys) && keys.length === 1) {
+      if (keys[0] === 'status') return 'Status changed'
+      if (keys[0] === 'project_status_id') return 'Project status changed'
+    }
+  }
   return ACTION_LABELS[action] ?? action
 }
 

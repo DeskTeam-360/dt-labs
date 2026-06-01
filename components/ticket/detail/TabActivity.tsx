@@ -30,7 +30,14 @@ export type TicketActivityEntry = {
   actor: { name: string | null; email: string | null; avatar_url?: string | null } | null
 }
 
-export default function TabActivity({ ticketId }: { ticketId: number }) {
+export default function TabActivity({
+  ticketId,
+  refreshKey = 0,
+}: {
+  ticketId: number
+  /** Bump after ticket edits so new rows (e.g. status → ticket_updated) appear without reload. */
+  refreshKey?: number
+}) {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<TicketActivityEntry[]>([])
 
@@ -52,7 +59,7 @@ export default function TabActivity({ ticketId }: { ticketId: number }) {
     return () => {
       cancelled = true
     }
-  }, [ticketId])
+  }, [ticketId, refreshKey])
 
   return (
     <Table<TicketActivityEntry>
@@ -123,7 +130,7 @@ export default function TabActivity({ ticketId }: { ticketId: number }) {
           title: 'Activity',
           dataIndex: 'action',
           width: 180,
-          render: (_: string, r) => formatTicketActivityAction(r.action, r.actor_role),
+          render: (_: string, r) => formatTicketActivityAction(r.action, r.actor_role, r.metadata),
         },
         {
           title: 'Details',
