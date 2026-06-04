@@ -1,3 +1,5 @@
+import { getAiChatConfig } from '@/lib/ai-chat-config'
+
 function decodeBasicHtmlEntities(text: string): string {
   return text
     .replace(/&nbsp;/gi, ' ')
@@ -221,15 +223,10 @@ export function parseSummaryItemsFromOpenAiContent(raw: string): string[] {
   return parseAiSummarizeFromOpenAiContent(raw).summary
 }
 
-export async function requestOpenAiLocalizedSummary(prompt: string): Promise<AiSummarizeResult> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not configured')
-  }
+export async function requestAiLocalizedSummary(prompt: string): Promise<AiSummarizeResult> {
+  const { provider, apiKey, baseUrl, model } = getAiChatConfig()
 
-  const model = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini'
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -252,7 +249,8 @@ export async function requestOpenAiLocalizedSummary(prompt: string): Promise<AiS
 
   if (!res.ok) {
     const errBody = await res.text().catch(() => '')
-    throw new Error(errBody || `OpenAI request failed (${res.status})`)
+    const label = provider === 'codex' ? 'Codex' : 'OpenAI'
+    throw new Error(errBody || `${label} request failed (${res.status})`)
   }
 
   const data = (await res.json()) as {
@@ -266,9 +264,14 @@ export async function requestOpenAiLocalizedSummary(prompt: string): Promise<AiS
   return result
 }
 
+/** @deprecated Use requestAiLocalizedSummary */
+export async function requestOpenAiLocalizedSummary(prompt: string): Promise<AiSummarizeResult> {
+  return requestAiLocalizedSummary(prompt)
+}
+
 /** @deprecated Use requestOpenAiLocalizedSummary */
 export async function requestOpenAiCommentSummary(prompt: string): Promise<string[]> {
-  const result = await requestOpenAiLocalizedSummary(prompt)
+  const result = await requestAiLocalizedSummary(prompt)
   return result.summary.length > 0 ? result.summary : result.checklist
 }
 

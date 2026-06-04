@@ -2,6 +2,7 @@ import { and, asc, eq, isNull, ne, or } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { isAiApiKeyConfigError } from '@/lib/ai-chat-config'
 import { assertCustomerMayAccessTicket } from '@/lib/customer-ticket-access'
 import { db, ticketComments, tickets, users } from '@/lib/db'
 import {
@@ -15,7 +16,7 @@ import {
 import {
   buildLocalizedSummarizePrompt,
   parseSummarizeAnchorBody,
-  requestOpenAiLocalizedSummary,
+  requestAiLocalizedSummary,
   sliceCommentsForSummarize,
   stripHtmlForPrompt,
   type SummarizeAnchorRequest,
@@ -211,7 +212,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   try {
-    const result = await requestOpenAiLocalizedSummary(
+    const result = await requestAiLocalizedSummary(
       buildLocalizedSummarizePrompt(built.promptCtx)
     )
     const row = await saveTicketAiSummary({
@@ -225,7 +226,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Summary failed'
     console.error('[comments/summarize]', err)
-    const status = msg.includes('OPENAI_API_KEY') ? 503 : 502
+    const status = isAiApiKeyConfigError(msg) ? 503 : 502
     return NextResponse.json({ error: msg }, { status })
   }
 }
