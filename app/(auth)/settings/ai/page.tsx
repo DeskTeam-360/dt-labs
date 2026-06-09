@@ -2,8 +2,8 @@ import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
 import AiIntegrationContent from '@/components/content/settings/AiIntegrationContent'
-import { canAccessAiSettings } from '@/lib/auth-utils'
 import { getAiChatPublicConfig } from '@/lib/ai-chat-config'
+import { canAccessAiSettings } from '@/lib/auth-utils'
 
 async function fetchCodexModels(baseUrl: string): Promise<string[]> {
   try {
