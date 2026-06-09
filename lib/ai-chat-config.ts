@@ -9,7 +9,7 @@ export type AiChatConfig = {
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1'
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini'
-const DEFAULT_CODEX_MODEL = 'gpt-5-codex'
+const DEFAULT_CODEX_MODEL = 'gpt-5.4'
 
 function trimEnv(name: string): string {
   return process.env[name]?.trim() ?? ''
@@ -67,4 +67,104 @@ export function isAiApiKeyConfigError(message: string): boolean {
     message.includes('OPENAI_API_KEY is not configured') ||
     message.includes('CODEX_BASE_URL is not configured')
   )
+}
+
+export type AiChatPublicConfig = {
+  provider: AiChatProvider
+  providerLabel: string
+  model: string
+  baseUrl: string
+  apiKeyConfigured: boolean
+  configured: boolean
+  configError?: string
+  envVars: {
+    provider: string
+    model: string
+    baseUrl: string
+    apiKey: string
+  }
+}
+
+export function getAiProviderLabel(provider: AiChatProvider): string {
+  return provider === 'codex' ? 'Codex (ChatGPT Pro)' : 'OpenAI Platform'
+}
+
+export function getAiChatPublicConfig(): AiChatPublicConfig {
+  const provider = getAiChatProvider()
+
+  if (provider === 'codex') {
+    const baseUrl = ensureOpenAiV1BaseUrl(trimEnv('CODEX_BASE_URL'))
+    const model = trimEnv('CODEX_MODEL') || DEFAULT_CODEX_MODEL
+    const apiKeyConfigured = true
+
+    if (!baseUrl) {
+      return {
+        provider,
+        providerLabel: getAiProviderLabel(provider),
+        model,
+        baseUrl: '',
+        apiKeyConfigured: false,
+        configured: false,
+        configError: 'CODEX_BASE_URL is not configured',
+        envVars: {
+          provider: 'AI_PROVIDER',
+          model: 'CODEX_MODEL',
+          baseUrl: 'CODEX_BASE_URL',
+          apiKey: 'CODEX_API_KEY',
+        },
+      }
+    }
+
+    return {
+      provider,
+      providerLabel: getAiProviderLabel(provider),
+      model,
+      baseUrl,
+      apiKeyConfigured,
+      configured: true,
+      envVars: {
+        provider: 'AI_PROVIDER',
+        model: 'CODEX_MODEL',
+        baseUrl: 'CODEX_BASE_URL',
+        apiKey: 'CODEX_API_KEY',
+      },
+    }
+  }
+
+  const apiKey = trimEnv('OPENAI_API_KEY')
+  const baseUrl = ensureOpenAiV1BaseUrl(trimEnv('OPENAI_BASE_URL') || DEFAULT_OPENAI_BASE_URL)
+  const model = trimEnv('OPENAI_MODEL') || DEFAULT_OPENAI_MODEL
+
+  if (!apiKey) {
+    return {
+      provider,
+      providerLabel: getAiProviderLabel(provider),
+      model,
+      baseUrl,
+      apiKeyConfigured: false,
+      configured: false,
+      configError: 'OPENAI_API_KEY is not configured',
+      envVars: {
+        provider: 'AI_PROVIDER',
+        model: 'OPENAI_MODEL',
+        baseUrl: 'OPENAI_BASE_URL',
+        apiKey: 'OPENAI_API_KEY',
+      },
+    }
+  }
+
+  return {
+    provider,
+    providerLabel: getAiProviderLabel(provider),
+    model,
+    baseUrl,
+    apiKeyConfigured: true,
+    configured: true,
+    envVars: {
+      provider: 'AI_PROVIDER',
+      model: 'OPENAI_MODEL',
+      baseUrl: 'OPENAI_BASE_URL',
+      apiKey: 'OPENAI_API_KEY',
+    },
+  }
 }

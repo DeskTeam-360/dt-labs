@@ -127,6 +127,11 @@ export function canAccessMessageTemplates(role: string | undefined): boolean {
   return isAdmin(role)
 }
 
+/** AI provider settings (read-only env info): Admin only */
+export function canAccessAiSettings(role: string | undefined): boolean {
+  return isAdmin(role)
+}
+
 /** Settings hub (/settings): any configured admin area the role can open */
 export function canAccessSettingsHub(role: string | undefined): boolean {
   const r = (role ?? '').toLowerCase()
@@ -145,7 +150,8 @@ export function canAccessSettingsHub(role: string | undefined): boolean {
     canAccessTeams(role) ||
     canAccessCompanyLog(role) ||
     canAccessRecapSnapshots(role) ||
-    canAccessCustomerWeeklyRecap(role)
+    canAccessCustomerWeeklyRecap(role) ||
+    canAccessAiSettings(role)
   )
 }
 

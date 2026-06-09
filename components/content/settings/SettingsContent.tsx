@@ -10,6 +10,7 @@ import {
   InfoCircleOutlined,
   MailOutlined,
   NotificationOutlined,
+  RobotOutlined,
   SettingOutlined,
   TagOutlined,
   TeamOutlined,
@@ -25,6 +26,7 @@ import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import {
+  canAccessAiSettings,
   canAccessAutomationRules,
   canAccessCompanies,
   canAccessCompanyLog,
@@ -271,9 +273,20 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
             canManageDashboardAnnouncements(role) ||
             canAccessCompanyLog(role) ||
             canAccessRecapSnapshots(role) ||
-            canAccessCustomerWeeklyRecap(role)) && (
+            canAccessCustomerWeeklyRecap(role) ||
+            canAccessAiSettings(role)) && (
             <Section heading="General">
               <Row gutter={[16, 16]}>
+                {canAccessAiSettings(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="AI Integration"
+                      description="Provider Codex/OpenAI dan model aktif"
+                      href="/settings/ai"
+                      icon={<RobotOutlined />}
+                    />
+                  </Col>
+                )}
                 {canAccessKnowledgeBase(role) && (
                   <Col xs={24} sm={12} md={8}>
                     <HubTile
