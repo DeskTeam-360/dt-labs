@@ -12,10 +12,10 @@
   /* Top ticket search bar (TicketSearchNavbar) */
   --ticket-nav-bg: #ffffff;
   --ticket-nav-border: #f0f0f0;
-  --ticket-nav-brand: #2b1252;
+  --ticket-nav-brand: #16324A;
   --ticket-nav-icon-btn-bg: #ffffff;
   --ticket-nav-icon-btn-border: #d9d9d9;
-  --ticket-nav-icon-btn-color: #2b1252;
+  --ticket-nav-icon-btn-color: #16324A;
   --ticket-nav-icon-hover-bg: #fafafa;
   --ticket-nav-panel-bg: #ffffff;
   --ticket-nav-panel-border: #f0f0f0;
@@ -24,8 +24,8 @@
   --ticket-nav-text: #262626;
   --ticket-nav-text-secondary: #595959;
   --ticket-nav-filter-bg: #f5f0ff;
-  --ticket-nav-filter-border: #d3adf7;
-  --ticket-nav-filter-link: #2b1252;
+  --ticket-nav-filter-border: #64BCE9;
+  --ticket-nav-filter-link: #16324A;
   --ticket-nav-shadow: rgba(0, 0, 0, 0.12);
   /* Global announcement marquee (under top nav) */
   --global-announcement-bg: #fff7e6;

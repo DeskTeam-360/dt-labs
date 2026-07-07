@@ -223,7 +223,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         {!collapsed && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
             <Image
-              src="/deskteam360-logo-white%201.png"
+              src="/efectiveseo-logo.png"
               alt="DeskTeam360"
               height={36}
               width={1000}
