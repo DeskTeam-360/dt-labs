@@ -18,7 +18,7 @@ import { Layout, Menu } from 'antd'
 import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { shouldOpenHrefInNewTab,SpaNavLink } from '@/components/common/SpaNavLink'
 import {
@@ -80,6 +80,18 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
   const pathname = usePathname()
   const ticketsListSearch = useSearchParams().toString()
   const [openKeys, setOpenKeys] = useState<string[]>([])
+  const [appName, setAppName] = useState<string>(process.env.NEXT_PUBLIC_APP_NAME ?? 'DeskTeam360')
+  const [appLogoUrl, setAppLogoUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/app-settings')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.app_name) setAppName(d.app_name)
+        setAppLogoUrl(d.app_logo_url ?? null)
+      })
+      .catch(() => {})
+  }, [])
 
   const linkLabel = (path: string, text: string) => (
     <SpaNavLink href={path} title={text} className="admin-sidebar-menu-link" onClick={(e) => e.stopPropagation()}>
@@ -222,13 +234,22 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       >
         {!collapsed && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
-            <Image
-              src="/deskteam360-logo-white%201.png"
-              alt="DeskTeam360"
-              height={36}
-              width={1000}
-              style={{ flexShrink: 0, objectFit: 'contain', width: '100%', height: '100%' }}
-            />
+            {appLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={appLogoUrl}
+                alt={appName}
+                style={{ flexShrink: 0, objectFit: 'contain', width: '100%', height: 36, maxHeight: 36 }}
+              />
+            ) : (
+              <Image
+                src="/deskteam360-logo-white%201.png"
+                alt={appName}
+                height={36}
+                width={1000}
+                style={{ flexShrink: 0, objectFit: 'contain', width: '100%', height: '100%' }}
+              />
+            )}
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>

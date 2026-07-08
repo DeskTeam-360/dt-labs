@@ -2,9 +2,9 @@ import { eq } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { maskApiKey } from '@/lib/ai-settings-utils'
 import { canAccessAiSettings } from '@/lib/auth-utils'
 import { aiSettings, db } from '@/lib/db'
-import { maskApiKey } from '@/lib/ai-settings-utils'
 
 const PLACEHOLDER = '***'
 

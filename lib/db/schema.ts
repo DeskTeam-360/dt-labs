@@ -817,3 +817,11 @@ export const dashboardAnnouncements = pgTable('dashboard_announcements', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
   createdBy: uuid('created_by'),
 })
+
+// ============ App Settings ============
+/** Global app branding settings stored as key-value pairs. */
+export const appSettings = pgTable('app_settings', {
+  key: varchar('key', { length: 64 }).primaryKey(),
+  value: text('value'),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})

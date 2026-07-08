@@ -7,6 +7,7 @@ import {
   BellOutlined,
   CalendarOutlined,
   FileTextOutlined,
+  GlobalOutlined,
   InfoCircleOutlined,
   MailOutlined,
   NotificationOutlined,
@@ -284,6 +285,21 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
+              </Row>
+            </Section>
+          )}
+
+          {isAdmin(role) && (
+            <Section heading="App">
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12} md={8}>
+                  <HubTile
+                    title="App Branding"
+                    description="App name, logo, and favicon"
+                    href="/settings/app-branding"
+                    icon={<GlobalOutlined />}
+                  />
+                </Col>
               </Row>
             </Section>
           )}

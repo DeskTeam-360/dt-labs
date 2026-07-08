@@ -19,6 +19,7 @@ import {
   Form,
   Input,
   Layout,
+  message,
   Modal,
   Popconfirm,
   Select,
@@ -27,7 +28,6 @@ import {
   Tag,
   Tooltip,
   Typography,
-  message,
 } from 'antd'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
