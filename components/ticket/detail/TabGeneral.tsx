@@ -311,7 +311,7 @@ export default function TabGeneral({
   onApplyAiSummaryToDescription,
   currentUserRole,
 }: TabGeneralProps) {
-  const canAccessTicketSummary = ['administrator', 'manager'].includes((currentUserRole ?? '').toLowerCase())
+  const canAccessTicketSummary = ['admin', 'manager'].includes((currentUserRole ?? '').toLowerCase())
   const [sidebarDraft, setSidebarDraft] = useState<SidebarAttributesDraft>(() =>
     snapshotSidebarDraft({
       ticketData,
