@@ -333,6 +333,7 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     id: t.id,
     title: t.title,
     description: t.description,
+    original_description: t.originalDescription ?? null,
     short_note: t.shortNote ?? null,
     created_by: t.createdBy,
     contact_user_id: t.contactUserId ?? null,

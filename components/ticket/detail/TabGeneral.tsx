@@ -50,6 +50,48 @@ import TicketUserMention from './TicketUserMention'
 
 const { Text, Paragraph } = Typography
 
+function OriginalDescriptionCollapse({ ticketData }: { ticketData: unknown }) {
+  const [open, setOpen] = useState(false)
+  const orig =
+    ticketData && typeof ticketData === 'object' && 'original_description' in ticketData
+      ? (ticketData as { original_description?: string | null }).original_description
+      : null
+  if (!orig) return null
+  return (
+    <div style={{ marginTop: 12 }}>
+      <Button
+        type="link"
+        size="small"
+        style={{ padding: 0, fontSize: 12 }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? 'Sembunyikan konten asli email' : 'Lihat konten asli email'}
+      </Button>
+      {open && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: '10px 14px',
+            borderLeft: '3px solid var(--ant-color-border)',
+            background: 'var(--ant-color-bg-layout)',
+            borderRadius: 4,
+            opacity: 0.85,
+          }}
+        >
+          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 6 }}>
+            Konten asli (sebelum diedit)
+          </Text>
+          <div
+            className="ql-editor comment-html"
+            style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 13 }}
+            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(orig) }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ticketSidebarPriorityValue(ticketData: unknown): number | null {
   const raw =
     ticketData && typeof ticketData === 'object' && 'priority' in ticketData
@@ -443,7 +485,7 @@ export default function TabGeneral({
                                 <CommentAiSummaryTrigger
                                   ticketId={ticketData.id}
                                   summarizeAnchor={{ type: 'description' }}
-                                  size="small"
+                              
                                   disabled={ticketDescriptionSaving}
                                   onApplyToDescription={onApplyAiSummaryToDescription}
                                   tooltip="Summarize description (AI)"
@@ -453,7 +495,6 @@ export default function TabGeneral({
                                 <CommentAiSummaryTrigger
                                   ticketId={ticketData.id}
                                   summarizeAnchor={{ type: 'ticket' }}
-                                  size="small"
                                   addCommentLoading={addCommentLoading}
                                   disabled={addCommentLoading || ticketDescriptionSaving}
                                   onAddComment={onAddAiSummaryComment}
@@ -465,7 +506,6 @@ export default function TabGeneral({
                               {canEditTicketDescription ? (
                                 <Button
                                   type="primary"
-                                  size="small"
                                   icon={<EditOutlined />}
                                   onClick={onTicketDescriptionEditingStart}
                                   aria-label="Edit description"
@@ -503,6 +543,7 @@ export default function TabGeneral({
                                 __html: sanitizeRichHtml(ticketData.description || ''),
                               }}
                             />
+                            <OriginalDescriptionCollapse ticketData={ticketData} />
                           </>
                         )}
                             {ticketAttachments.length > 0 && (

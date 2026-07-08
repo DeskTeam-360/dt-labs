@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     ticket_priority,
     team_id,
     company_id,
-    assignee_ids,
+
     ticket_type_id,
     contact_user_id,
     visibility = 'public',
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       ticketPriority: ticket_priority || null,
       teamId: team_id ?? null,
       companyId: company_id ?? null,
-      assigneeIds: assignee_ids ?? [],
+
       ticketTypeId: ticket_type_id ?? null,
       contactUserId: contact_user_id ?? null,
       visibility,

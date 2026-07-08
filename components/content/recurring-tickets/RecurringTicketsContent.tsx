@@ -26,23 +26,16 @@ import {
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
-import isSameOrAfter from 'dayjs/plugin/isSameOrAfter'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useState } from 'react'
-
-dayjs.extend(relativeTime)
-dayjs.extend(isSameOrAfter)
-
-function alreadyRanToday(lastRunAt: string | null): boolean {
-  if (!lastRunAt) return false
-  return dayjs(lastRunAt).isSame(dayjs(), 'day')
-}
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 
 import RecurringTicketForm from './RecurringTicketForm'
 import RecurringTicketRunsDrawer from './RecurringTicketRunsDrawer'
+
+dayjs.extend(relativeTime)
 
 const { Title, Text } = Typography
 
@@ -65,7 +58,7 @@ export interface RecurringTicketRow {
   ticketPriority: number | null
   teamId: string | null
   companyId: string | null
-  assigneeIds: string[]
+
   ticketTypeId: number | null
   contactUserId: string | null
   visibility: string
@@ -273,13 +266,12 @@ export default function RecurringTicketsContent({ user }: Props) {
       key: 'actions',
       render: (_: unknown, row: RecurringTicketRow) => (
         <Space>
-          <Tooltip title={alreadyRanToday(row.lastRunAt) ? 'Already created a ticket today' : 'Run now — create ticket immediately'}>
+          <Tooltip title="Run now — create ticket immediately">
             <Button
               size="small"
               type="primary"
               icon={<ThunderboltOutlined />}
               loading={running === row.id}
-              disabled={alreadyRanToday(row.lastRunAt)}
               onClick={() => handleRunNow(row)}
             />
           </Tooltip>

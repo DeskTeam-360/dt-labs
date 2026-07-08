@@ -88,7 +88,7 @@ export async function PATCH(
   if (body.ticket_priority !== undefined) updates.ticketPriority = body.ticket_priority || null
   if (body.team_id !== undefined) updates.teamId = body.team_id ?? null
   if (body.company_id !== undefined) updates.companyId = body.company_id ?? null
-  if (body.assignee_ids !== undefined) updates.assigneeIds = body.assignee_ids ?? []
+
   if (body.ticket_type_id !== undefined) updates.ticketTypeId = body.ticket_type_id ?? null
   if (body.contact_user_id !== undefined) updates.contactUserId = body.contact_user_id ?? null
   if (body.visibility !== undefined) updates.visibility = body.visibility

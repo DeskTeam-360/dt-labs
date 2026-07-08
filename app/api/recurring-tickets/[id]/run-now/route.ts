@@ -3,8 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { canAccessRecurringTickets } from '@/lib/auth-utils'
-import { db, recurringTicketRuns, recurringTickets, ticketAssignees, tickets } from '@/lib/db'
+import { db, recurringTicketRuns, recurringTickets, tickets } from '@/lib/db'
 import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
+import { assignCompanySupportTicketRank, assignCreatorSupportTicketRank, parseCompanyTicketDesiredRank, resolveSupportQueueScope } from '@/lib/ticket-company-priority-order'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -40,11 +41,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     if (!newTicket) throw new Error('Failed to insert ticket')
 
-    const assigneeIds = (rule.assigneeIds as string[] | null) ?? []
-    if (assigneeIds.length > 0) {
-      await db.insert(ticketAssignees).values(
-        assigneeIds.map((userId) => ({ ticketId: newTicket.id, userId }))
-      )
+    // Assign company support queue rank (append to end if priority=0/null)
+    const desiredRank = parseCompanyTicketDesiredRank(rule.ticketPriority ?? 0)
+    const scope = await resolveSupportQueueScope(db, newTicket.id)
+    if (scope) {
+      if (scope.kind === 'company') {
+        await assignCompanySupportTicketRank(db, scope.companyId, newTicket.id, desiredRank)
+      } else {
+        await assignCreatorSupportTicketRank(db, scope.userId, newTicket.id, desiredRank)
+      }
     }
 
     const schedule = {

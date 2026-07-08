@@ -229,6 +229,8 @@ export const tickets = pgTable('tickets', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
+  /** Immutable copy of description before first edit — set once, never overwritten. */
+  originalDescription: text('original_description'),
   shortNote: text('short_note'),
   createdBy: uuid('created_by'),
   /** Customer-facing email reply recipient when set; otherwise use createdBy. */

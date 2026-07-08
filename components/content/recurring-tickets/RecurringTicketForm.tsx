@@ -58,7 +58,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
   // Options loaded from API
   const [companies, setCompanies] = useState<OptionItem[]>([])
   const [teams, setTeams] = useState<OptionItem[]>([])
-  const [agents, setAgents] = useState<OptionItem[]>([])
+
   const [ticketTypes, setTicketTypes] = useState<OptionItem[]>([])
   const [statuses, setStatuses] = useState<OptionItem[]>([])
   const [contacts, setContacts] = useState<OptionItem[]>([])
@@ -69,17 +69,13 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
     Promise.all([
       fetch('/api/companies').then(r => r.json()).catch(() => ({ data: [] })),
       fetch('/api/teams').then(r => r.json()).catch(() => ({ data: [] })),
-      fetch('/api/users?role=agent&limit=200').then(r => r.json()).catch(() => ({ data: [] })),
+
       fetch('/api/ticket-types').then(r => r.json()).catch(() => ({ data: [] })),
       fetch('/api/ticket-statuses').then(r => r.json()).catch(() => ({ data: [] })),
       fetch('/api/users?limit=500').then(r => r.json()).catch(() => ({ data: [] })),
-    ]).then(([comp, team, usr, types, sts, allUsr]) => {
+    ]).then(([comp, team, types, sts, allUsr]) => {
       setCompanies((comp.data ?? comp ?? []).map((c: { id: string; name: string }) => ({ label: c.name, value: c.id })))
       setTeams((team.data ?? team ?? []).map((t: { id: string; name: string }) => ({ label: t.name, value: t.id })))
-      setAgents((usr.data ?? usr ?? []).map((u: { id: string; name?: string; email?: string; firstName?: string; lastName?: string }) => ({
-        label: u.name ?? (`${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || (u.email ?? u.id)),
-        value: u.id,
-      })))
       const typesArr = Array.isArray(types) ? types : (types.data ?? [])
       setTicketTypes(typesArr.map((t: { id: number | string; title?: string; name?: string; slug?: string }) => ({ label: t.title ?? t.name ?? t.slug ?? String(t.id), value: t.id })))
       const stsArr = Array.isArray(sts) ? sts : (sts.data ?? [])
@@ -109,7 +105,6 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         visibility: initialValues.visibility ?? 'public',
         company_id: initialValues.companyId ?? null,
         team_id: initialValues.teamId ?? null,
-        assignee_ids: initialValues.assigneeIds ?? [],
         ticket_type_id: initialValues.ticketTypeId ?? null,
         contact_user_id: initialValues.contactUserId ?? null,
       })
@@ -125,7 +120,6 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         ticket_status: 'open',
         ticket_priority: null,
         visibility: 'public',
-        assignee_ids: [],
       })
     }
   }, [initialValues, form])
@@ -149,7 +143,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         visibility: values.visibility ?? 'public',
         company_id: values.company_id || null,
         team_id: values.team_id || null,
-        assignee_ids: values.assignee_ids ?? [],
+
         ticket_type_id: values.ticket_type_id || null,
         contact_user_id: values.contact_user_id || null,
       }
@@ -277,11 +271,6 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
             </Form.Item>
           </Col>
         </Row>
-
-        <Form.Item name="assignee_ids" label="Assignees">
-          <Select mode="multiple" allowClear showSearch placeholder="Select agents"
-            optionFilterProp="label" options={agents} />
-        </Form.Item>
 
         <Form.Item name="contact_user_id" label="Contact (email replies)"
           tooltip="User who will receive email replies for tickets created by this rule">

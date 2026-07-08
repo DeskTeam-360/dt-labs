@@ -7,8 +7,9 @@
 import { and, eq, isNotNull, lte } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 
-import { db, recurringTicketRuns, recurringTickets, ticketAssignees, tickets } from '@/lib/db'
+import { db, recurringTicketRuns, recurringTickets, tickets } from '@/lib/db'
 import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
+import { assignCompanySupportTicketRank, assignCreatorSupportTicketRank, parseCompanyTicketDesiredRank, resolveSupportQueueScope } from '@/lib/ticket-company-priority-order'
 
 function cronAuth(req: NextRequest): boolean {
   const secret = process.env.SYNC_INBOX_CRON_SECRET
@@ -68,12 +69,15 @@ export async function POST(req: NextRequest) {
 
       if (!newTicket) throw new Error('Failed to insert ticket')
 
-      // Assign agents
-      const assigneeIds = (rule.assigneeIds as string[] | null) ?? []
-      if (assigneeIds.length > 0) {
-        await db.insert(ticketAssignees).values(
-          assigneeIds.map((userId) => ({ ticketId: newTicket.id, userId }))
-        )
+      // Assign company support queue rank (append to end if priority=0/null)
+      const desiredRank = parseCompanyTicketDesiredRank(rule.ticketPriority ?? 0)
+      const scope = await resolveSupportQueueScope(db, newTicket.id)
+      if (scope) {
+        if (scope.kind === 'company') {
+          await assignCompanySupportTicketRank(db, scope.companyId, newTicket.id, desiredRank)
+        } else {
+          await assignCreatorSupportTicketRank(db, scope.userId, newTicket.id, desiredRank)
+        }
       }
 
       // Compute next run
