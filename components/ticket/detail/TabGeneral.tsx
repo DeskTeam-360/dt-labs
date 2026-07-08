@@ -436,8 +436,43 @@ export default function TabGeneral({
                                 Created At: <DateDisplay date={ticketData.created_at} />
                               </Text>
                             </Text>
-                            
                           </Flex>
+                          {ticketData?.id && !ticketDescriptionEditing && (onApplyAiSummaryToDescription || (canAccessTicketSummary && onAddAiSummaryComment) || canEditTicketDescription) ? (
+                            <Flex gap={6} align="center" style={{ flexShrink: 0 }}>
+                              {onApplyAiSummaryToDescription ? (
+                                <CommentAiSummaryTrigger
+                                  ticketId={ticketData.id}
+                                  summarizeAnchor={{ type: 'description' }}
+                                  size="small"
+                                  disabled={ticketDescriptionSaving}
+                                  onApplyToDescription={onApplyAiSummaryToDescription}
+                                  tooltip="Summarize description (AI)"
+                                />
+                              ) : null}
+                              {canAccessTicketSummary && showNoteOption && onAddAiSummaryComment ? (
+                                <CommentAiSummaryTrigger
+                                  ticketId={ticketData.id}
+                                  summarizeAnchor={{ type: 'ticket' }}
+                                  size="small"
+                                  addCommentLoading={addCommentLoading}
+                                  disabled={addCommentLoading || ticketDescriptionSaving}
+                                  onAddComment={onAddAiSummaryComment}
+                                  onAddChecklistItems={onAddChecklistItemsBulk}
+                                  tooltip="Summarize full ticket — last 100 messages (Admin/Manager)"
+                                  variant="ticket"
+                                />
+                              ) : null}
+                              {canEditTicketDescription ? (
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  icon={<EditOutlined />}
+                                  onClick={onTicketDescriptionEditingStart}
+                                  aria-label="Edit description"
+                                />
+                              ) : null}
+                            </Flex>
+                          ) : null}
                         </Flex>
                         {ticketDescriptionEditing && canEditTicketDescription ? (
                           <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
@@ -461,50 +496,6 @@ export default function TabGeneral({
                           </Space>
                         ) : (
                           <>
-                            {ticketData?.id && (onApplyAiSummaryToDescription || (canAccessTicketSummary && onAddAiSummaryComment)) ? (
-                              <Flex justify="flex-end" gap={8} style={{ marginTop: 4 }} align="center">
-                                {onApplyAiSummaryToDescription ? (
-                                  <CommentAiSummaryTrigger
-                                    ticketId={ticketData.id}
-                                    summarizeAnchor={{ type: 'description' }}
-                                    size="middle"
-                                    disabled={ticketDescriptionSaving}
-                                    onApplyToDescription={onApplyAiSummaryToDescription}
-                                    tooltip="Summarize description (AI)"
-                                  />
-                                ) : null}
-                                {canAccessTicketSummary && showNoteOption && onAddAiSummaryComment ? (
-                                  <CommentAiSummaryTrigger
-                                    ticketId={ticketData.id}
-                                    summarizeAnchor={{ type: 'ticket' }}
-                                    size="middle"
-                                    addCommentLoading={addCommentLoading}
-                                    disabled={addCommentLoading || ticketDescriptionSaving}
-                                    onAddComment={onAddAiSummaryComment}
-                                    onAddChecklistItems={onAddChecklistItemsBulk}
-                                    tooltip="Summarize full ticket — last 100 messages (Admin/Manager)"
-                                    variant="ticket"
-                                  />
-                                ) : null}
-                                {canEditTicketDescription ? (
-                                  <Button
-                                    type="primary"
-                                    icon={<EditOutlined />}
-                                    onClick={onTicketDescriptionEditingStart}
-                                    aria-label="Edit description"
-                                  />
-                                ) : null}
-                              </Flex>
-                            ) : canEditTicketDescription ? (
-                              <Flex justify="flex-end" gap={8} style={{ marginTop: 4 }}>
-                                <Button
-                                  type="primary"
-                                  icon={<EditOutlined />}
-                                  onClick={onTicketDescriptionEditingStart}
-                                  aria-label="Edit description"
-                                />
-                              </Flex>
-                            ) : null}
                             <div
                               className="ql-editor comment-html"
                               style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
