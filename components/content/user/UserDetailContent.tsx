@@ -1210,7 +1210,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         width={720}
                         open={entryTimesDrawerTicketId != null}
                         onClose={() => setEntryTimesDrawerTicketId(null)}
-                        destroyOnClose={false}
+                        destroyOnHidden={false}
                       >
                         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
                           Sorted by when the entry was saved (newest first). Start and stop reflect the tracked work window.

@@ -1,4 +1,6 @@
 import { getAiChatConfig } from '@/lib/ai-chat-config'
+export { linkifyAiOutputItems, linkifyPlainTextForHtml, summaryItemsToCommentHtml } from '@/lib/ticket-comment-utils'
+export type { AiSummarizeResult, LocalizedSummarizeComment, LocalizedSummarizeContext,SummarizeAnchorRequest } from '@/lib/ticket-summarize-types'
 
 function decodeBasicHtmlEntities(text: string): string {
   return text
@@ -45,29 +47,8 @@ export function stripHtmlForPrompt(html: string): string {
 /** Max comments sent to OpenAI (oldest-first slice when over limit). */
 export const SUMMARIZE_MAX_COMMENTS = 80
 
-export type SummarizeAnchorRequest =
-  | { type: 'description' }
-  | { type: 'ticket' }
-  | { type: 'comment'; commentId: string }
-
-export type LocalizedSummarizeComment = {
-  id: string
-  isFocal: boolean
-  author: string
-  authorType: string
-  visibility: string
-  createdAt: string
-  body: string
-}
-
-export type LocalizedSummarizeContext = {
-  ticketTitle: string
-  anchor: 'description' | 'ticket' | 'comment'
-  focalAuthor: string
-  focalAuthorType: string
-  ticketDescription?: string
-  comments: LocalizedSummarizeComment[]
-}
+// Types moved to lib/ticket-summarize-types.ts (re-exported above)
+import type { LocalizedSummarizeComment, LocalizedSummarizeContext,SummarizeAnchorRequest } from '@/lib/ticket-summarize-types'
 
 /** Slice ordered comments: focal + `before` above + `after` below. */
 export function pickCommentWindow<T extends { id: string }>(
@@ -184,10 +165,7 @@ Rules:
 - Focus on status, blockers, customer asks, and next steps.`
 }
 
-export type AiSummarizeResult = {
-  summary: string[]
-  checklist: string[]
-}
+import type { AiSummarizeResult } from '@/lib/ticket-summarize-types'
 
 function normalizeSummaryStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return []
@@ -224,7 +202,7 @@ export function parseSummaryItemsFromOpenAiContent(raw: string): string[] {
 }
 
 export async function requestAiLocalizedSummary(prompt: string): Promise<AiSummarizeResult> {
-  const { provider, apiKey, baseUrl, model } = getAiChatConfig()
+  const { provider, apiKey, baseUrl, model } = await getAiChatConfig()
 
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
@@ -273,37 +251,6 @@ export async function requestOpenAiLocalizedSummary(prompt: string): Promise<AiS
 export async function requestOpenAiCommentSummary(prompt: string): Promise<string[]> {
   const result = await requestAiLocalizedSummary(prompt)
   return result.summary.length > 0 ? result.summary : result.checklist
-}
-
-const URL_IN_PLAIN_TEXT = /https?:\/\/[^\s<>"')]+/gi
-
-function escapeHtmlText(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-/** Turn bare http(s) URLs in plain text into clickable anchor tags (safe for rich HTML fields). */
-export function linkifyPlainTextForHtml(text: string): string {
-  const raw = String(text || '').trim()
-  if (!raw) return ''
-  if (/<a\s[^>]*href\s*=/i.test(raw)) return raw
-
-  return escapeHtmlText(raw).replace(URL_IN_PLAIN_TEXT, (url) => {
-    const href = url.replace(/&quot;/g, '"')
-    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>`
-  })
-}
-
-export function linkifyAiOutputItems(items: string[]): string[] {
-  return items.map((t) => linkifyPlainTextForHtml(t))
-}
-
-export function summaryItemsToCommentHtml(items: string[]): string {
-  const lis = linkifyAiOutputItems(items).map((t) => `<li>${t}</li>`).join('')
-  return `<p><strong>AI Summary</strong></p><ul>${lis}</ul>`
 }
 
 export function parseSummarizeAnchorBody(body: unknown): SummarizeAnchorRequest {

@@ -10,7 +10,9 @@ import {
   MessageOutlined,
   PaperClipOutlined,
   PlusOutlined,
+  RobotOutlined,
   SendOutlined,
+  SyncOutlined,
   ThunderboltOutlined,
   UserOutlined,
 } from '@ant-design/icons'
@@ -369,16 +371,20 @@ export default function TabGeneral({
 
   const creatorId = ticketData.creator?.id ?? ticketData.created_by ?? null
   const creatorEmail = ticketData.creator?.email ?? null
+  const isAutomationCreated = ticketData.created_via === 'recurring' || ticketData.created_via === 'automation'
+  const automationLabel = ticketData.created_via === 'recurring' ? 'Recurring Ticket' : 'Automation'
   /** Thread header: company + person when both exist (portal context). */
-  const creatorLabel =
-    [ticketData.company?.name, ticketData.creator?.full_name || ticketData.creator?.email].filter(Boolean).join(' · ') ||
-    ticketData.creator?.full_name ||
-    ticketData.creator?.email ||
-    ticketData.company?.name ||
-    'Unknown'
+  const creatorLabel = isAutomationCreated
+    ? [ticketData.company?.name, automationLabel].filter(Boolean).join(' · ') || automationLabel
+    : [ticketData.company?.name, ticketData.creator?.full_name || ticketData.creator?.email].filter(Boolean).join(' · ') ||
+      ticketData.creator?.full_name ||
+      ticketData.creator?.email ||
+      ticketData.company?.name ||
+      'Unknown'
   /** Sidebar "Created By": person under company ticket only (company has its own row). */
-  const createdByPersonLabel =
-    ticketData.creator?.full_name || ticketData.creator?.email || '—'
+  const createdByPersonLabel = isAutomationCreated
+    ? automationLabel
+    : ticketData.creator?.full_name || ticketData.creator?.email || '—'
 
   return (
     <Space orientation="vertical" style={{ width: '100%' }} size="middle">
@@ -387,24 +393,34 @@ export default function TabGeneral({
 
 
       <Flex gap="middle" align="flex-start" style={{ padding: 10, marginBottom: 10, borderBottom: '1px solid var(--ticket-thread-divider)' }}>
-                      <TicketUserMention userId={creatorId} email={creatorEmail}>
-                        <Avatar style={{ cursor: creatorId ? 'pointer' : undefined }} icon={<UserOutlined />} src={ticketData.creator?.avatar_url} />
-                      </TicketUserMention>
+                      {(ticketData.created_via === 'recurring' || ticketData.created_via === 'automation') ? (
+                        <Avatar
+                          style={{ backgroundColor: '#722ed1', flexShrink: 0 }}
+                          icon={ticketData.created_via === 'recurring' ? <SyncOutlined /> : <RobotOutlined />}
+                        />
+                      ) : (
+                        <TicketUserMention userId={creatorId} email={creatorEmail}>
+                          <Avatar style={{ cursor: creatorId ? 'pointer' : undefined }} icon={<UserOutlined />} src={ticketData.creator?.avatar_url} />
+                        </TicketUserMention>
+                      )}
                       <Flex vertical style={{ flex: 1, minWidth: 0 }}>
                         <Flex justify="space-between" align="flex-start" wrap="wrap" gap="small">
                           <Flex vertical gap={2} style={{ minWidth: 0, flex: 1 }}>
-                            {ticketData.company_id ? (
-                              <>
-                                <Text strong>
-                                  {ticketData.company?.name ||
-                                    companyOptions.find((c) => c.id === ticketData.company_id)?.name ||
-                                    '—'}
-                                </Text>
-                                <Text
-                                  type="secondary"
-                                  style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}
-                                >
-                                  Created By 
+                            {ticketData.company_id && (
+                              <Text strong>
+                                {ticketData.company?.name ||
+                                  companyOptions.find((c) => c.id === ticketData.company_id)?.name ||
+                                  '—'}
+                              </Text>
+                            )}
+                            <Text
+                              type="secondary"
+                              style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}
+                            >
+                              Created By{' '}
+                              {isAutomationCreated ? (
+                                <Text style={{ color: '#722ed1', fontWeight: 500 }}>{createdByPersonLabel}</Text>
+                              ) : (
                                 <TicketUserMention userId={creatorId} email={creatorEmail} className="ml-1">
                                   <Text
                                     style={{ cursor: creatorId ? 'pointer' : undefined, color: 'var(--ticket-thread-text)' }}
@@ -412,18 +428,11 @@ export default function TabGeneral({
                                     {createdByPersonLabel}
                                   </Text>
                                 </TicketUserMention>
-                                <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)', marginLeft: 4 }}>
-                               Created At: <DateDisplay date={ticketData.created_at} />
+                              )}
+                              <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)', marginLeft: 4 }}>
+                                Created At: <DateDisplay date={ticketData.created_at} />
+                              </Text>
                             </Text>
-                                </Text>
-                              </>
-                            ) : (
-                              <TicketUserMention userId={creatorId} email={creatorEmail}>
-                                <Text strong style={{ cursor: creatorId ? 'pointer' : undefined }}>
-                                  {creatorLabel}
-                                </Text>
-                              </TicketUserMention>
-                            )}
                             
                           </Flex>
                           {showNoteOption && onAddAiSummaryComment && ticketData?.id ? (

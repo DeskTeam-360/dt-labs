@@ -16,6 +16,7 @@ import {
   TeamOutlined,
   ThunderboltOutlined,
   ToolOutlined,
+  UnorderedListOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { Col, Layout, Row, Typography } from 'antd'
@@ -35,6 +36,7 @@ import {
   canAccessKnowledgeBase,
   canAccessMessageTemplates,
   canAccessRecapSnapshots,
+  canAccessRecurringTickets,
   canAccessSlackNotifications,
   canAccessTeams,
   canAccessTicketAttributes,
@@ -227,6 +229,24 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
+                {canAccessRecurringTickets(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Recurring Tickets"
+                      description="Auto-create tickets on a schedule"
+                      href="/settings/recurring-tickets"
+                      icon={<CalendarOutlined />}
+                    />
+                  </Col>
+                )}
+                <Col xs={24} sm={12} md={8}>
+                  <HubTile
+                    title="Feature Access"
+                    description="Role-based access overview for all features"
+                    href="/settings/feature-access"
+                    icon={<UnorderedListOutlined />}
+                  />
+                </Col>
               </Row>
             </Section>
           )}

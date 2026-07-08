@@ -5,7 +5,7 @@ import { Button, Tooltip } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
 import { summarizeAnchorSearchParams } from '@/lib/ticket-ai-summary-anchor'
-import type { SummarizeAnchorRequest } from '@/lib/ticket-comment-summarize'
+import type { SummarizeAnchorRequest } from '@/lib/ticket-summarize-types'
 
 import CommentAiSummaryModal from './CommentAiSummaryModal'
 

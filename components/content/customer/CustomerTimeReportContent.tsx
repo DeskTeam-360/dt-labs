@@ -1628,7 +1628,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                     setWorkersTicket(null)
                     setWorkersSessions([])
                   }}
-                  destroyOnClose
+                  destroyOnHidden
                   extra={
                     workersTicket ? (
                       <SpaNavLink href={`/tickets/${workersTicket.id}`}>Open ticket</SpaNavLink>

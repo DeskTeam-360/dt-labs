@@ -1,3 +1,7 @@
+import { eq } from 'drizzle-orm'
+
+import { aiSettings, db } from '@/lib/db'
+
 export type AiChatProvider = 'openai' | 'codex'
 
 export type AiChatConfig = {
@@ -19,9 +23,9 @@ function normalizeBaseUrl(url: string): string {
   return url.replace(/\/+$/, '')
 }
 
-/** Ensure OpenAI-compatible base URL ends with /v1 */
 function ensureOpenAiV1BaseUrl(url: string): string {
   const normalized = normalizeBaseUrl(url)
+  if (!normalized) return ''
   if (normalized.endsWith('/v1')) return normalized
   return `${normalized}/v1`
 }
@@ -32,38 +36,51 @@ export function parseAiChatProvider(raw: string): AiChatProvider {
   return 'openai'
 }
 
-export function getAiChatProvider(): AiChatProvider {
-  return parseAiChatProvider(trimEnv('AI_PROVIDER') || 'openai')
+/** Load the active AI config row from DB. Returns null if none is active. */
+export async function getAiSettingsFromDb() {
+  try {
+    const [row] = await db
+      .select()
+      .from(aiSettings)
+      .where(eq(aiSettings.isActive, true))
+      .limit(1)
+    return row ?? null
+  } catch {
+    return null
+  }
 }
 
-export function getAiChatConfig(): AiChatConfig {
-  const provider = getAiChatProvider()
+/** Get AI chat config — active DB row takes priority over env vars. */
+export async function getAiChatConfig(): Promise<AiChatConfig> {
+  const dbRow = await getAiSettingsFromDb()
+
+  const provider = parseAiChatProvider(
+    dbRow?.provider || trimEnv('AI_PROVIDER') || 'openai'
+  )
 
   if (provider === 'codex') {
-    const apiKey = trimEnv('CODEX_API_KEY') || 'dummy'
-    const baseUrl = ensureOpenAiV1BaseUrl(trimEnv('CODEX_BASE_URL'))
-    const model = trimEnv('CODEX_MODEL') || DEFAULT_CODEX_MODEL
+    const apiKey = dbRow?.codexApiKey?.trim() || trimEnv('CODEX_API_KEY') || 'dummy'
+    const rawBase = dbRow?.codexBaseUrl?.trim() || trimEnv('CODEX_BASE_URL') || ''
+    const baseUrl = ensureOpenAiV1BaseUrl(rawBase)
+    const model = dbRow?.codexModel?.trim() || trimEnv('CODEX_MODEL') || DEFAULT_CODEX_MODEL
 
-    if (!baseUrl) {
-      throw new Error('CODEX_BASE_URL is not configured')
-    }
-
+    if (!baseUrl) throw new Error('Codex base URL is not configured')
     return { provider, apiKey, baseUrl, model }
   }
 
-  const apiKey = trimEnv('OPENAI_API_KEY')
-  const baseUrl = ensureOpenAiV1BaseUrl(trimEnv('OPENAI_BASE_URL') || DEFAULT_OPENAI_BASE_URL)
-  const model = trimEnv('OPENAI_MODEL') || DEFAULT_OPENAI_MODEL
+  const apiKey = dbRow?.openaiApiKey?.trim() || trimEnv('OPENAI_API_KEY')
+  const rawBase = dbRow?.openaiBaseUrl?.trim() || trimEnv('OPENAI_BASE_URL') || DEFAULT_OPENAI_BASE_URL
+  const baseUrl = ensureOpenAiV1BaseUrl(rawBase)
+  const model = dbRow?.openaiModel?.trim() || trimEnv('OPENAI_MODEL') || DEFAULT_OPENAI_MODEL
 
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not configured')
-  }
-
+  if (!apiKey) throw new Error('OpenAI API key is not configured')
   return { provider, apiKey, baseUrl, model }
 }
 
 export function isAiApiKeyConfigError(message: string): boolean {
   return (
+    message.includes('OpenAI API key is not configured') ||
+    message.includes('Codex base URL is not configured') ||
     message.includes('OPENAI_API_KEY is not configured') ||
     message.includes('CODEX_BASE_URL is not configured')
   )
@@ -77,94 +94,48 @@ export type AiChatPublicConfig = {
   apiKeyConfigured: boolean
   configured: boolean
   configError?: string
-  envVars: {
-    provider: string
-    model: string
-    baseUrl: string
-    apiKey: string
-  }
+  source: 'database' | 'env'
 }
 
 export function getAiProviderLabel(provider: AiChatProvider): string {
   return provider === 'codex' ? 'Codex (ChatGPT Pro)' : 'OpenAI Platform'
 }
 
-export function getAiChatPublicConfig(): AiChatPublicConfig {
-  const provider = getAiChatProvider()
+export async function getAiChatPublicConfig(): Promise<AiChatPublicConfig> {
+  const dbRow = await getAiSettingsFromDb()
+  const source: 'database' | 'env' = dbRow ? 'database' : 'env'
+
+  const provider = parseAiChatProvider(
+    dbRow?.provider || trimEnv('AI_PROVIDER') || 'openai'
+  )
 
   if (provider === 'codex') {
-    const baseUrl = ensureOpenAiV1BaseUrl(trimEnv('CODEX_BASE_URL'))
-    const model = trimEnv('CODEX_MODEL') || DEFAULT_CODEX_MODEL
-    const apiKeyConfigured = true
+    const rawBase = dbRow?.codexBaseUrl?.trim() || trimEnv('CODEX_BASE_URL') || ''
+    const baseUrl = ensureOpenAiV1BaseUrl(rawBase)
+    const model = dbRow?.codexModel?.trim() || trimEnv('CODEX_MODEL') || DEFAULT_CODEX_MODEL
+    const apiKeyConfigured = !!(dbRow?.codexApiKey?.trim() || trimEnv('CODEX_API_KEY'))
 
     if (!baseUrl) {
       return {
-        provider,
-        providerLabel: getAiProviderLabel(provider),
-        model,
-        baseUrl: '',
-        apiKeyConfigured: false,
-        configured: false,
-        configError: 'CODEX_BASE_URL is not configured',
-        envVars: {
-          provider: 'AI_PROVIDER',
-          model: 'CODEX_MODEL',
-          baseUrl: 'CODEX_BASE_URL',
-          apiKey: 'CODEX_API_KEY',
-        },
+        provider, providerLabel: getAiProviderLabel(provider),
+        model, baseUrl: '', apiKeyConfigured: false, configured: false,
+        configError: 'Codex base URL is not configured', source,
       }
     }
-
-    return {
-      provider,
-      providerLabel: getAiProviderLabel(provider),
-      model,
-      baseUrl,
-      apiKeyConfigured,
-      configured: true,
-      envVars: {
-        provider: 'AI_PROVIDER',
-        model: 'CODEX_MODEL',
-        baseUrl: 'CODEX_BASE_URL',
-        apiKey: 'CODEX_API_KEY',
-      },
-    }
+    return { provider, providerLabel: getAiProviderLabel(provider), model, baseUrl, apiKeyConfigured, configured: true, source }
   }
 
-  const apiKey = trimEnv('OPENAI_API_KEY')
-  const baseUrl = ensureOpenAiV1BaseUrl(trimEnv('OPENAI_BASE_URL') || DEFAULT_OPENAI_BASE_URL)
-  const model = trimEnv('OPENAI_MODEL') || DEFAULT_OPENAI_MODEL
+  const apiKey = dbRow?.openaiApiKey?.trim() || trimEnv('OPENAI_API_KEY')
+  const rawBase = dbRow?.openaiBaseUrl?.trim() || trimEnv('OPENAI_BASE_URL') || DEFAULT_OPENAI_BASE_URL
+  const baseUrl = ensureOpenAiV1BaseUrl(rawBase)
+  const model = dbRow?.openaiModel?.trim() || trimEnv('OPENAI_MODEL') || DEFAULT_OPENAI_MODEL
 
   if (!apiKey) {
     return {
-      provider,
-      providerLabel: getAiProviderLabel(provider),
-      model,
-      baseUrl,
-      apiKeyConfigured: false,
-      configured: false,
-      configError: 'OPENAI_API_KEY is not configured',
-      envVars: {
-        provider: 'AI_PROVIDER',
-        model: 'OPENAI_MODEL',
-        baseUrl: 'OPENAI_BASE_URL',
-        apiKey: 'OPENAI_API_KEY',
-      },
+      provider, providerLabel: getAiProviderLabel(provider),
+      model, baseUrl, apiKeyConfigured: false, configured: false,
+      configError: 'OpenAI API key is not configured', source,
     }
   }
-
-  return {
-    provider,
-    providerLabel: getAiProviderLabel(provider),
-    model,
-    baseUrl,
-    apiKeyConfigured: true,
-    configured: true,
-    envVars: {
-      provider: 'AI_PROVIDER',
-      model: 'OPENAI_MODEL',
-      baseUrl: 'OPENAI_BASE_URL',
-      apiKey: 'OPENAI_API_KEY',
-    },
-  }
+  return { provider, providerLabel: getAiProviderLabel(provider), model, baseUrl, apiKeyConfigured: true, configured: true, source }
 }
