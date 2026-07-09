@@ -78,6 +78,7 @@ export interface MessageTemplateRow {
   title: string
   key: string
   status: string
+  email_subject: string | null
   content: string | null
   created_at: string
   updated_at: string

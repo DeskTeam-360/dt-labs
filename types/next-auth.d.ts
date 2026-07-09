@@ -9,6 +9,7 @@ declare module 'next-auth' {
     name?: string | null
     image?: string | null
     role?: string
+    mustChangePassword?: boolean
   }
 
   interface Session extends DefaultSession {
@@ -30,5 +31,6 @@ declare module 'next-auth/jwt' {
     picture?: string
     error?: 'AccessRevoked'
     userCheckedAt?: number
+    mustChangePassword?: boolean
   }
 }

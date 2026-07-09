@@ -132,7 +132,7 @@ export async function sendRequesterTicketCreatedEmail(
   const ticketUrl = `${safeBase}/tickets/${ticketId}`
 
   const [tpl] = await db
-    .select({ content: messageTemplates.content })
+    .select({ content: messageTemplates.content, emailSubject: messageTemplates.emailSubject })
     .from(messageTemplates)
     .where(
       and(
@@ -151,7 +151,7 @@ export async function sendRequesterTicketCreatedEmail(
 
   const senderMap = userRowToMergeMap(creatorUser ?? null)
   const rawTpl = tpl.content?.trim() ?? ''
-  const subject = `Ticket #${ticketId} has been created`
+  const subject = tpl.emailSubject?.trim() || `Ticket #${ticketId} has been created`
   const subjectMime = encodeSubjectHeader(subject)
 
   for (const recipient of recipientEntries) {

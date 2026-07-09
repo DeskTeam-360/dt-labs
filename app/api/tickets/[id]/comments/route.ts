@@ -56,8 +56,9 @@ async function sendAgentRequesterRepliesEmail(params: {
   actorUserId: string
   ticketTitle: string
   bodyPreview: string
+  replyHtml?: string
 }) {
-  const { ticketId, actorUserId, ticketTitle, bodyPreview } = params
+  const { ticketId, actorUserId, ticketTitle, bodyPreview, replyHtml } = params
 
   const [ticketRow] = await db
     .select({ teamId: tickets.teamId })
@@ -83,7 +84,7 @@ async function sendAgentRequesterRepliesEmail(params: {
   const senderMap = userRowToMergeMap(senderUser ?? null)
 
   const [tpl] = await db
-    .select({ content: messageTemplates.content, status: messageTemplates.status })
+    .select({ content: messageTemplates.content, status: messageTemplates.status, emailSubject: messageTemplates.emailSubject })
     .from(messageTemplates)
     .where(eq(messageTemplates.key, AGENT_REQUESTER_REPLIES_TEMPLATE_KEY))
     .limit(1)
@@ -92,7 +93,8 @@ async function sendAgentRequesterRepliesEmail(params: {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
   const safeBase = baseUrl.replace(/\/$/, '')
   const ticketUrl = `${safeBase}/tickets/${ticketId}`
-  const subject = `Requester replied on Ticket #${ticketId}`
+  const defaultSubject = `Requester replied on Ticket #${ticketId}`
+  const subject = tpl.emailSubject?.trim() || defaultSubject
   const subjectMime = encodeSubjectHeader(subject)
 
   const clientId = process.env.GOOGLE_CLIENT_ID
@@ -146,6 +148,10 @@ async function sendAgentRequesterRepliesEmail(params: {
           ticketId: String(ticketId),
           recipient: recipientMap,
           sender: senderMap,
+          extra: {
+            reply_content: replyHtml ?? bodyPreview,
+            reply_preview: bodyPreview,
+          },
           useDomMerge: false,
         })
       : ''
@@ -501,6 +507,7 @@ export async function POST(
         actorUserId: authUser.id,
         ticketTitle: ticketForMail?.title || 'Ticket',
         bodyPreview: mailPreview,
+        replyHtml: comment || undefined,
       })
     } catch (err) {
       console.error('[comments] team email notify:', err)

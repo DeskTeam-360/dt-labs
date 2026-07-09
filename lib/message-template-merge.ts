@@ -128,7 +128,7 @@ function applyPlaceholderReplacements(html: string, ctx: ReplaceContext): string
   })
 }
 
-function makeContext(origin: string, ticketId: string, recipient: Record<string, string>, sender: Record<string, string>) {
+function makeContext(origin: string, ticketId: string, recipient: Record<string, string>, sender: Record<string, string>, extra?: Record<string, string>) {
   const ticketUrl = `${origin.replace(/\/$/, '')}/tickets/${ticketId}`
   const officialKeys = new Set(allMessageTemplatePlaceholderKeys().map((k) => k.toLowerCase()))
 
@@ -150,8 +150,22 @@ function makeContext(origin: string, ticketId: string, recipient: Record<string,
     return null
   }
 
+  const buttonStyle = 'display:inline-block;padding:10px 20px;background:#1677ff;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px'
+
   const replaceBareRecipient = (key: string): string | null => {
     if (key.includes('.')) return null
+    // Render button placeholders as styled <a> tags
+    if (key === 'login_button') {
+      const url = extra?.login_url ?? ''
+      const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      return `<a href="${safe}" target="_blank" rel="noopener noreferrer" style="${buttonStyle}">Login</a>`
+    }
+    if (key === 'change_password_button') {
+      const url = extra?.change_password_url ?? ''
+      const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      return `<a href="${safe}" target="_blank" rel="noopener noreferrer" style="${buttonStyle}">Change Password</a>`
+    }
+    if (extra && Object.prototype.hasOwnProperty.call(extra, key)) return extra[key]!
     if (Object.prototype.hasOwnProperty.call(recipient, key)) return recipient[key]!
     return null
   }
@@ -164,6 +178,8 @@ export type MergeMessageTemplateHtmlOptions = {
   ticketId: string
   recipient: Record<string, string>
   sender: Record<string, string>
+  /** Extra flat key→value pairs merged after recipient/sender/ticket (e.g. temporary_password). */
+  extra?: Record<string, string>
   /** When true (browser), normalize split placeholders via DOMParser. */
   useDomMerge?: boolean
 }
@@ -172,9 +188,9 @@ export type MergeMessageTemplateHtmlOptions = {
 export function mergeMessageTemplateHtml(html: string, options: MergeMessageTemplateHtmlOptions): string {
   if (html == null || !String(html).trim()) return ''
 
-  const { origin, ticketId, recipient, sender } = options
+  const { origin, ticketId, recipient, sender, extra } = options
   const useDom = options.useDomMerge ?? (typeof document !== 'undefined')
-  const ctx = makeContext(origin, ticketId, recipient, sender)
+  const ctx = makeContext(origin, ticketId, recipient, sender, extra)
 
   let working = normalizeMergeSource(html)
 

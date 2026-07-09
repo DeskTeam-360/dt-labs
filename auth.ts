@@ -30,6 +30,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id
         token.email = user.email ?? undefined
         token.role = (user as { role?: string }).role
+        token.mustChangePassword = (user as { mustChangePassword?: boolean }).mustChangePassword ?? false
         token.userCheckedAt = 0
       }
 
@@ -68,6 +69,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           userCheckedAt: now,
           name: nextName,
           picture: refresh.avatarUrl || undefined,
+          mustChangePassword: refresh.mustChangePassword,
         }
       }
 

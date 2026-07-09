@@ -20,6 +20,7 @@ export async function authorizeWithCredentials(credentials: Record<'email' | 'pa
         avatarUrl: users.avatarUrl,
         role: users.role,
         status: users.status,
+        mustChangePassword: users.mustChangePassword,
       })
       .from(users)
       .where(eq(users.email, email))
@@ -51,6 +52,7 @@ export async function authorizeWithCredentials(credentials: Record<'email' | 'pa
       name: user.fullName || user.email,
       image: user.avatarUrl || undefined,
       role: user.role,
+      mustChangePassword: user.mustChangePassword ?? false,
     }
   } catch (err) {
     console.error('[Auth] authorize error:', err)

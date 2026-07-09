@@ -53,6 +53,7 @@ export async function fetchUserJwtRefreshData(userId: string): Promise<{
   active: boolean
   fullName: string | null
   avatarUrl: string | null
+  mustChangePassword: boolean
 }> {
   try {
     const [row] = await db
@@ -61,14 +62,15 @@ export async function fetchUserJwtRefreshData(userId: string): Promise<{
         deletedAt: users.deletedAt,
         fullName: users.fullName,
         avatarUrl: users.avatarUrl,
+        mustChangePassword: users.mustChangePassword,
       })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1)
     if (!row || !userRowAllowsSession(row)) {
-      return { active: false, fullName: null, avatarUrl: null }
+      return { active: false, fullName: null, avatarUrl: null, mustChangePassword: false }
     }
-    return { active: true, fullName: row.fullName, avatarUrl: row.avatarUrl }
+    return { active: true, fullName: row.fullName, avatarUrl: row.avatarUrl, mustChangePassword: row.mustChangePassword ?? false }
   } catch (err) {
     if (!missingUsersDeletedAtColumn(err)) throw err
     const [row] = await db
@@ -81,8 +83,8 @@ export async function fetchUserJwtRefreshData(userId: string): Promise<{
       .where(eq(users.id, userId))
       .limit(1)
     if (row === undefined || !userRowAllowsSession({ status: row.status, deletedAt: null })) {
-      return { active: false, fullName: null, avatarUrl: null }
+      return { active: false, fullName: null, avatarUrl: null, mustChangePassword: false }
     }
-    return { active: true, fullName: row.fullName, avatarUrl: row.avatarUrl }
+    return { active: true, fullName: row.fullName, avatarUrl: row.avatarUrl, mustChangePassword: false }
   }
 }

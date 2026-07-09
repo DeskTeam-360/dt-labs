@@ -1,7 +1,7 @@
 'use client'
 
 import { ArrowLeftOutlined, EyeOutlined,SaveOutlined } from '@ant-design/icons'
-import { Button, Card, Layout, message, Space, Spin,Typography } from 'antd'
+import { Button, Card, Input, Layout, message, Space, Spin,Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useCallback,useEffect, useState } from 'react'
 
@@ -38,6 +38,7 @@ export default function MessageTemplateEditContent({
   const [collapsed, setCollapsed] = useState(false)
   const [row, setRow] = useState<MessageTemplateRow | null>(null)
   const [content, setContent] = useState('')
+  const [emailSubject, setEmailSubject] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -48,6 +49,7 @@ export default function MessageTemplateEditContent({
       const data = await apiFetch<MessageTemplateRow>(`/api/message-templates/${templateId}`)
       setRow(data)
       setContent(data.content ?? '')
+      setEmailSubject(data.email_subject ?? '')
     } catch (e: unknown) {
       message.error((e as Error).message || 'Failed to load template')
       setRow(null)
@@ -70,7 +72,10 @@ export default function MessageTemplateEditContent({
       const updated = await apiFetch<MessageTemplateRow>(`/api/message-templates/${templateId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: content.trim() ? content : null }),
+        body: JSON.stringify({
+          content: content.trim() ? content : null,
+          email_subject: emailSubject.trim() || null,
+        }),
       })
       setRow(updated)
       message.success('Template saved')
@@ -129,7 +134,23 @@ export default function MessageTemplateEditContent({
                     </Text>
                   )}
 
-                  <div style={{ marginTop: 20, paddingBottom: 20 }}>
+                  <div style={{ marginTop: 20 }}>
+                    <Text strong style={{ display: 'block', marginBottom: 8 }}>
+                      Email Subject
+                    </Text>
+                    <Input
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      placeholder="Leave empty to use the default subject"
+                      disabled={row.status !== 'active'}
+                      style={{ marginBottom: 4 }}
+                    />
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Supports merge fields e.g. <code>{'{{ recipient.full_name }}'}</code>, <code>{'{{ ticket_id }}'}</code>
+                    </Text>
+                  </div>
+
+                  <div style={{ paddingBottom: 20 }}>
                     <Text strong style={{ display: 'block', marginBottom: 8 }}>
                       Body (rich text)
                     </Text>

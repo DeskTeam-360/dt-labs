@@ -74,6 +74,21 @@ export const MESSAGE_TEMPLATE_SENDER_PLACEHOLDERS: MessageTemplatePlaceholderDef
   { key: s('updated_at'), description: 'Sender user row updated at (formatted when merged)' },
 ]
 
+/** Reply/note context (for agent/requester notification templates that include comment body). */
+export const MESSAGE_TEMPLATE_REPLY_PLACEHOLDERS: MessageTemplatePlaceholderDef[] = [
+  { key: 'reply_content', description: 'Full HTML body of the reply or note that triggered this notification' },
+  { key: 'reply_preview', description: 'Plain-text preview of the reply (first ~300 characters, no HTML)' },
+]
+
+/** Password reset context (for requester_notification_password_reset template). */
+export const MESSAGE_TEMPLATE_PASSWORD_RESET_PLACEHOLDERS: MessageTemplatePlaceholderDef[] = [
+  { key: 'temporary_password', description: 'Temporary password generated for the user' },
+  { key: 'login_url', description: 'Direct link to the login page (plain URL)' },
+  { key: 'change_password_url', description: 'Direct link to the change-password page (plain URL)' },
+  { key: 'login_button', description: 'Login button — renders as a styled HTML button linking to the login page' },
+  { key: 'change_password_button', description: 'Change password button — renders as a styled HTML button linking to the change-password page' },
+]
+
 /** Ticket context (when a ticket exists for the notification). */
 export const MESSAGE_TEMPLATE_TICKET_PLACEHOLDERS: MessageTemplatePlaceholderDef[] = [
   {
@@ -91,11 +106,13 @@ export function wrapPlaceholderKey(key: string): string {
   return `{{ ${key} }}`
 }
 
-/** All keys for validation / replacement order (recipient, sender, ticket). */
+/** All keys for validation / replacement order. */
 export function allMessageTemplatePlaceholderKeys(): string[] {
   return [
     ...MESSAGE_TEMPLATE_RECIPIENT_PLACEHOLDERS.map((p) => p.key),
     ...MESSAGE_TEMPLATE_SENDER_PLACEHOLDERS.map((p) => p.key),
     ...MESSAGE_TEMPLATE_TICKET_PLACEHOLDERS.map((p) => p.key),
+    ...MESSAGE_TEMPLATE_REPLY_PLACEHOLDERS.map((p) => p.key),
+    ...MESSAGE_TEMPLATE_PASSWORD_RESET_PLACEHOLDERS.map((p) => p.key),
   ]
 }

@@ -2,6 +2,7 @@
 
 import { LockOutlined,UserOutlined } from '@ant-design/icons'
 import { Alert,Button, Card, Form, Input, message, Typography } from 'antd'
+import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { useEffect,useState } from 'react'
 
@@ -166,7 +167,7 @@ export default function LoginPage() {
             />
           </Form.Item>
 
-          <Form.Item>
+          <Form.Item style={{ marginBottom: 8 }}>
             <Button
               type="primary"
               htmlType="submit"
@@ -178,7 +179,15 @@ export default function LoginPage() {
             </Button>
           </Form.Item>
 
-      
+          <div style={{ textAlign: 'right' }}>
+            <Link href="/forgot-password">
+              <Button type="link" style={{ padding: 0, fontSize: 13 }}>
+                Forgot password?
+              </Button>
+            </Link>
+          </div>
+
+
 
           {dbError && !dbError.ok && (
             <Alert

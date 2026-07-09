@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { companies, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
+import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 import {
   actorRoleFromSession,
   logSystemActivity,
@@ -41,7 +42,7 @@ async function sendCustomerResetPasswordEmail(params: {
   }
 
   const [tpl] = await db
-    .select({ status: messageTemplates.status })
+    .select({ status: messageTemplates.status, content: messageTemplates.content })
     .from(messageTemplates)
     .where(eq(messageTemplates.key, 'requester_notification_password_reset'))
     .limit(1)
@@ -98,12 +99,38 @@ async function sendCustomerResetPasswordEmail(params: {
   const changePasswordUrl = `${safeBaseUrl}/change-password`
   const subject = 'Your portal password has been reset'
   const subjectMime = encodeSubjectHeader(subject)
-  const bodyHtml =
+
+  // Fetch recipient user row for merge maps
+  const [recipientUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, params.toEmail))
+    .limit(1)
+
+  const recipientMap = userRowToMergeMap(recipientUser ?? null)
+
+  const fallbackHtml =
     `<p>Hello,</p>` +
     `<p>An admin has reset your portal password.</p>` +
     `<p><strong>Temporary password:</strong> <code>${params.temporaryPassword}</code></p>` +
     `<p>Please sign in at <a href="${loginUrl}">${loginUrl}</a> and change your password immediately at <a href="${changePasswordUrl}">${changePasswordUrl}</a>.</p>` +
     `<p>If you did not expect this reset, please contact your administrator right away.</p>`
+
+  const rawTpl = tpl.content?.trim() ?? ''
+  const bodyHtml = rawTpl
+    ? mergeMessageTemplateHtml(rawTpl, {
+        origin: safeBaseUrl,
+        ticketId: '',
+        recipient: recipientMap,
+        sender: recipientMap,
+        extra: {
+          temporary_password: params.temporaryPassword,
+          login_url: loginUrl,
+          change_password_url: changePasswordUrl,
+        },
+        useDomMerge: false,
+      })
+    : fallbackHtml
 
   const rawEmail = [
     `From: ${fromEmail}`,
@@ -212,7 +239,7 @@ export async function PATCH(
     const passwordHash = await bcrypt.hash(temporaryPassword, 10)
     await db
       .update(users)
-      .set({ passwordHash, updatedAt: new Date() })
+      .set({ passwordHash, mustChangePassword: true, updatedAt: new Date() })
       .where(eq(users.id, id))
     await sendCustomerResetPasswordEmail({
       toEmail: targetUser.email,
