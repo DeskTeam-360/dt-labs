@@ -52,9 +52,11 @@ export default function ChangePasswordContent({ user }: ChangePasswordContentPro
         }),
       })
 
-      message.success('Password changed successfully!')
+      message.success('Password changed successfully! Redirecting…')
       form.resetFields()
       await updateSession()
+      // Small delay so the new JWT cookie is written before navigation
+      await new Promise((r) => setTimeout(r, 500))
       window.location.href = '/dashboard'
     } catch (error) {
       message.error((error as Error).message || 'An error occurred while changing password')
