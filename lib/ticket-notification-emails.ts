@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { google } from 'googleapis'
 
 import {
+  companies,
   db,
   emailIntegrations,
   messageTemplates,
@@ -10,6 +11,12 @@ import {
   users,
 } from '@/lib/db'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
+
+async function fetchCompanyName(companyId: string | null | undefined): Promise<string | null> {
+  if (!companyId) return null
+  const [row] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1)
+  return row?.name ?? null
+}
 
 function encodeSubjectHeader(subject: string): string {
   if (/^[\x01-\x7F]*$/.test(subject)) return subject
@@ -101,7 +108,7 @@ export async function sendAgentClosesTicketEmail(params: {
   if (!tpl || tpl.status !== 'active') return
 
   const [ticketRow] = await db
-    .select({ createdBy: tickets.createdBy })
+    .select({ createdBy: tickets.createdBy, companyId: tickets.companyId })
     .from(tickets)
     .where(eq(tickets.id, ticketId))
     .limit(1)
@@ -111,13 +118,14 @@ export async function sendAgentClosesTicketEmail(params: {
   if (!recipient?.email) return
 
   const [agent] = await db.select().from(users).where(eq(users.id, agentUserId)).limit(1)
+  const companyName = await fetchCompanyName(ticketRow.companyId)
 
   const sender = await getGmailSender()
   if (!sender) return
 
   const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '')
   const ticketUrl = `${baseUrl}/tickets/${ticketId}`
-  const recipientMap = userRowToMergeMap(recipient)
+  const recipientMap = userRowToMergeMap(recipient, companyName)
   const senderMap = userRowToMergeMap(agent ?? null)
   const rawTpl = tpl.content?.trim() ?? ''
   const subject = tpl.emailSubject?.trim() || `Ticket #${ticketId} has been closed`
@@ -164,17 +172,19 @@ export async function sendNewTicketAgentNotificationEmail(params: {
   if (recipients.length === 0) return
 
   const [creator] = await db.select().from(users).where(eq(users.id, creatorUserId)).limit(1)
+  const creatorCompanyName = await fetchCompanyName(creator?.companyId)
   const sender = await getGmailSender()
   if (!sender) return
 
   const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '')
   const ticketUrl = `${baseUrl}/tickets/${ticketId}`
-  const senderMap = userRowToMergeMap(creator ?? null)
+  const senderMap = userRowToMergeMap(creator ?? null, creatorCompanyName)
   const rawTpl = tpl.content?.trim() ?? ''
   const subject = tpl.emailSubject?.trim() || `New ticket #${ticketId} assigned to your team`
 
   for (const recipient of recipients) {
-    const recipientMap = userRowToMergeMap(recipient)
+    const recipientCompanyName = await fetchCompanyName(recipient.companyId)
+    const recipientMap = userRowToMergeMap(recipient, recipientCompanyName)
     const bodyHtml = rawTpl
       ? mergeMessageTemplateHtml(rawTpl, { origin: baseUrl, ticketId: String(ticketId), recipient: recipientMap, sender: senderMap, useDomMerge: false })
       : `<p>Hello ${recipientMap.full_name !== '—' ? recipientMap.full_name : ''},</p>` +
@@ -225,17 +235,19 @@ export async function sendNoteAddedNotificationEmail(params: {
   if (recipients.length === 0) return
 
   const [actor] = await db.select().from(users).where(eq(users.id, actorUserId)).limit(1)
+  const actorCompanyName = await fetchCompanyName(actor?.companyId)
   const sender = await getGmailSender()
   if (!sender) return
 
   const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '')
   const ticketUrl = `${baseUrl}/tickets/${ticketId}`
-  const senderMap = userRowToMergeMap(actor ?? null)
+  const senderMap = userRowToMergeMap(actor ?? null, actorCompanyName)
   const rawTpl = tpl.content?.trim() ?? ''
   const subject = tpl.emailSubject?.trim() || `Note added on Ticket #${ticketId}`
 
   for (const recipient of recipients) {
-    const recipientMap = userRowToMergeMap(recipient)
+    const recipientCompanyName = await fetchCompanyName(recipient.companyId)
+    const recipientMap = userRowToMergeMap(recipient, recipientCompanyName)
     const bodyHtml = rawTpl
       ? mergeMessageTemplateHtml(rawTpl, {
           origin: baseUrl,

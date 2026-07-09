@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { google } from 'googleapis'
 import { NextResponse } from 'next/server'
 
-import { db, emailIntegrations, messageTemplates, users } from '@/lib/db'
+import { companies, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 
 function encodeSubjectHeader(subject: string): string {
@@ -116,7 +116,12 @@ async function sendResetEmail(params: {
   const changePasswordUrl = `${safeBase}/change-password`
 
   const [recipientUser] = await db.select().from(users).where(eq(users.id, params.recipientUserId)).limit(1)
-  const recipientMap = userRowToMergeMap(recipientUser ?? null)
+  let recipientCompanyName: string | null = null
+  if (recipientUser?.companyId) {
+    const [companyRow] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, recipientUser.companyId)).limit(1)
+    recipientCompanyName = companyRow?.name ?? null
+  }
+  const recipientMap = userRowToMergeMap(recipientUser ?? null, recipientCompanyName)
 
   const subject = tpl.emailSubject?.trim() || 'Your DeskTeam360 password has been reset'
   const subjectMime = encodeSubjectHeader(subject)

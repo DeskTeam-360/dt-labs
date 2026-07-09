@@ -44,6 +44,7 @@ export const MESSAGE_TEMPLATE_RECIPIENT_PLACEHOLDERS: MessageTemplatePlaceholder
   { key: r('locale'), description: 'Recipient locale' },
   { key: r('is_email_verified'), description: 'Recipient email verified flag' },
   { key: r('company_id'), description: 'Recipient company UUID (if linked)' },
+  { key: r('company_name'), description: 'Recipient company name (if linked)' },
   { key: r('last_login_at'), description: 'Recipient last login (formatted when merged)' },
   { key: r('last_active_at'), description: 'Recipient last activity (formatted when merged)' },
   { key: r('created_at'), description: 'Recipient user row created at (formatted when merged)' },

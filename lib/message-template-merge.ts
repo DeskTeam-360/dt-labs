@@ -14,29 +14,14 @@ function fmtTs(v: Date | string | null | undefined): string {
 }
 
 /** Map a `users` row to flat keys used in `{{ recipient.* }}` / `{{ sender.* }}` (and bare `{{ email }}` → recipient). */
-export function userRowToMergeMap(row: typeof users.$inferSelect | null): Record<string, string> {
+export function userRowToMergeMap(row: typeof users.$inferSelect | null, companyName?: string | null): Record<string, string> {
   if (!row) {
     return {
-      first_name: '—',
-      last_name: '—',
-      full_name: '—',
-      email: '—',
-      user_id: '—',
-      avatar_url: '—',
-      role: '—',
-      status: '—',
-      phone: '—',
-      department: '—',
-      position: '—',
-      bio: '—',
-      timezone: '—',
-      locale: '—',
-      is_email_verified: '—',
-      company_id: '—',
-      last_login_at: '—',
-      last_active_at: '—',
-      created_at: '—',
-      updated_at: '—',
+      first_name: '—', last_name: '—', full_name: '—', email: '—', user_id: '—',
+      avatar_url: '—', role: '—', status: '—', phone: '—', department: '—',
+      position: '—', bio: '—', timezone: '—', locale: '—', is_email_verified: '—',
+      company_id: '—', company_name: '—',
+      last_login_at: '—', last_active_at: '—', created_at: '—', updated_at: '—',
     }
   }
   const fn = row.firstName?.trim() || ''
@@ -59,6 +44,7 @@ export function userRowToMergeMap(row: typeof users.$inferSelect | null): Record
     locale: row.locale?.trim() || '—',
     is_email_verified: row.isEmailVerified === true ? 'true' : row.isEmailVerified === false ? 'false' : '—',
     company_id: row.companyId ?? '—',
+    company_name: companyName?.trim() || '—',
     last_login_at: fmtTs(row.lastLoginAt),
     last_active_at: fmtTs(row.lastActiveAt),
     created_at: fmtTs(row.createdAt),
