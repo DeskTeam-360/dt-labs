@@ -147,17 +147,7 @@ function makeContext(origin: string, ticketId: string, recipient: Record<string,
       const field = key.slice('sender.'.length)
       return sender[field] ?? null
     }
-    // Extra keys (e.g. temporary_password, reply_content) are official placeholders
-    // but resolved from the extra map passed at call time
-    if (extra && Object.prototype.hasOwnProperty.call(extra, key)) return extra[key]!
-    return null
-  }
-
-  const buttonStyle = 'display:inline-block;padding:10px 20px;background:#1677ff;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px'
-
-  const replaceBareRecipient = (key: string): string | null => {
-    if (key.includes('.')) return null
-    // Render button placeholders as styled <a> tags
+    const buttonStyle = 'display:inline-block;padding:10px 20px;background:#1677ff;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px'
     if (key === 'login_button') {
       const url = extra?.login_url ?? ''
       const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -168,6 +158,14 @@ function makeContext(origin: string, ticketId: string, recipient: Record<string,
       const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
       return `<a href="${safe}" target="_blank" rel="noopener noreferrer" style="${buttonStyle}">Change Password</a>`
     }
+    // Extra keys (e.g. temporary_password, reply_content) are official placeholders
+    // but resolved from the extra map passed at call time
+    if (extra && Object.prototype.hasOwnProperty.call(extra, key)) return extra[key]!
+    return null
+  }
+
+  const replaceBareRecipient = (key: string): string | null => {
+    if (key.includes('.')) return null
     if (extra && Object.prototype.hasOwnProperty.call(extra, key)) return extra[key]!
     if (Object.prototype.hasOwnProperty.call(recipient, key)) return recipient[key]!
     return null

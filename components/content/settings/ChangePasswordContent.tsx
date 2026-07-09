@@ -2,6 +2,7 @@
 
 import { LockOutlined } from '@ant-design/icons'
 import { Button, Card, Form, Input, Layout, message,Typography } from 'antd'
+import { useSession } from 'next-auth/react'
 import { useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
@@ -24,6 +25,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export default function ChangePasswordContent({ user }: ChangePasswordContentProps) {
+  const { update: updateSession } = useSession()
   const [collapsed, setCollapsed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
@@ -52,6 +54,8 @@ export default function ChangePasswordContent({ user }: ChangePasswordContentPro
 
       message.success('Password changed successfully!')
       form.resetFields()
+      await updateSession()
+      window.location.href = '/dashboard'
     } catch (error) {
       message.error((error as Error).message || 'An error occurred while changing password')
     } finally {
