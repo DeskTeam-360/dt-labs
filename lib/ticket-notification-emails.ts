@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { google } from 'googleapis'
 
+import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
 import {
   companies,
   db,
@@ -75,10 +76,10 @@ async function getGmailSender(): Promise<GmailSender | null> {
   }
 }
 
-async function sendRawEmail(sender: GmailSender, to: string, subject: string, bodyHtml: string) {
+async function sendRawEmail(sender: GmailSender, to: string, subject: string, bodyHtml: string, fromHeader?: string) {
   const subjectMime = encodeSubjectHeader(subject)
   const rawEmail = [
-    `From: ${sender.fromEmail}`,
+    `From: ${fromHeader ?? sender.fromEmail}`,
     `To: ${to}`,
     `Subject: ${subjectMime}`,
     'MIME-Version: 1.0',
@@ -120,11 +121,12 @@ export async function sendAgentClosesTicketEmail(params: {
   const [agent] = await db.select().from(users).where(eq(users.id, agentUserId)).limit(1)
   const companyName = await fetchCompanyName(ticketRow.companyId)
 
-  const sender = await getGmailSender()
-  if (!sender) return
+  const [gmailSender, appSettings] = await Promise.all([getGmailSender(), getAppSettings()])
+  if (!gmailSender) return
 
   const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '')
   const ticketUrl = `${baseUrl}/tickets/${ticketId}`
+  const fromHeader = formatFromHeader(appSettings.email_sender_name, gmailSender.fromEmail)
   const recipientMap = userRowToMergeMap(recipient, companyName)
   const senderMap = userRowToMergeMap(agent ?? null)
   const rawTpl = tpl.content?.trim() ?? ''
@@ -136,7 +138,7 @@ export async function sendAgentClosesTicketEmail(params: {
       `<p>Your ticket <strong>#${ticketId}: ${ticketTitle}</strong> has been closed.</p>` +
       `<p>View ticket: <a href="${ticketUrl}">${ticketUrl}</a></p>`
 
-  await sendRawEmail(sender, recipient.email, subject, bodyHtml)
+  await sendRawEmail(gmailSender, recipient.email, subject, bodyHtml, fromHeader)
 }
 
 /**
@@ -173,11 +175,12 @@ export async function sendNewTicketAgentNotificationEmail(params: {
 
   const [creator] = await db.select().from(users).where(eq(users.id, creatorUserId)).limit(1)
   const creatorCompanyName = await fetchCompanyName(creator?.companyId)
-  const sender = await getGmailSender()
-  if (!sender) return
+  const [gmailSender, appSettings] = await Promise.all([getGmailSender(), getAppSettings()])
+  if (!gmailSender) return
 
   const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '')
   const ticketUrl = `${baseUrl}/tickets/${ticketId}`
+  const fromHeader = formatFromHeader(appSettings.email_sender_name, gmailSender.fromEmail)
   const senderMap = userRowToMergeMap(creator ?? null, creatorCompanyName)
   const rawTpl = tpl.content?.trim() ?? ''
   const subject = tpl.emailSubject?.trim() || `New ticket #${ticketId} assigned to your team`
@@ -190,7 +193,7 @@ export async function sendNewTicketAgentNotificationEmail(params: {
       : `<p>Hello ${recipientMap.full_name !== '—' ? recipientMap.full_name : ''},</p>` +
         `<p>A new ticket has been submitted: <strong>#${ticketId}: ${ticketTitle}</strong></p>` +
         `<p>View ticket: <a href="${ticketUrl}">${ticketUrl}</a></p>`
-    await sendRawEmail(sender, recipient.email, subject, bodyHtml)
+    await sendRawEmail(gmailSender, recipient.email, subject, bodyHtml, fromHeader)
   }
 }
 
@@ -236,11 +239,12 @@ export async function sendNoteAddedNotificationEmail(params: {
 
   const [actor] = await db.select().from(users).where(eq(users.id, actorUserId)).limit(1)
   const actorCompanyName = await fetchCompanyName(actor?.companyId)
-  const sender = await getGmailSender()
-  if (!sender) return
+  const [gmailSender, appSettings] = await Promise.all([getGmailSender(), getAppSettings()])
+  if (!gmailSender) return
 
   const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '')
   const ticketUrl = `${baseUrl}/tickets/${ticketId}`
+  const fromHeader = formatFromHeader(appSettings.email_sender_name, gmailSender.fromEmail)
   const senderMap = userRowToMergeMap(actor ?? null, actorCompanyName)
   const rawTpl = tpl.content?.trim() ?? ''
   const subject = tpl.emailSubject?.trim() || `Note added on Ticket #${ticketId}`
@@ -261,6 +265,6 @@ export async function sendNoteAddedNotificationEmail(params: {
         `<p>A note was added on <strong>Ticket #${ticketId}: ${ticketTitle}</strong></p>` +
         `<p>${notePreview || '(attachment)'}</p>` +
         `<p>View ticket: <a href="${ticketUrl}">${ticketUrl}</a></p>`
-    await sendRawEmail(sender, recipient.email, subject, bodyHtml)
+    await sendRawEmail(gmailSender, recipient.email, subject, bodyHtml, fromHeader)
   }
 }

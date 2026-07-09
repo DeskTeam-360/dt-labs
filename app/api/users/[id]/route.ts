@@ -5,6 +5,7 @@ import { google } from 'googleapis'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
 import { companies, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 import {
@@ -94,6 +95,8 @@ async function sendCustomerResetPasswordEmail(params: {
 
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
   const fromEmail = integration.emailAddress || 'noreply@example.com'
+  const appSettings = await getAppSettings()
+  const fromHeader = formatFromHeader(appSettings.email_sender_name, fromEmail)
   const safeBaseUrl = baseUrl.replace(/\/$/, '')
   const loginUrl = `${safeBaseUrl}/login`
   const changePasswordUrl = `${safeBaseUrl}/change-password`
@@ -133,7 +136,7 @@ async function sendCustomerResetPasswordEmail(params: {
     : fallbackHtml
 
   const rawEmail = [
-    `From: ${fromEmail}`,
+    `From: ${fromHeader}`,
     `To: ${params.toEmail}`,
     `Subject: ${subjectMime}`,
     'MIME-Version: 1.0',

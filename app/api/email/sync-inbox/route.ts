@@ -4,6 +4,7 @@ import { google } from 'googleapis'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
 import { loadAutomationTicketContext, runAutomationRules, runTicketCommentAutomation } from '@/lib/automation-engine'
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import {
@@ -175,8 +176,10 @@ async function sendUserActivationEmail(params: {
   const bodyHtml = mergedTpl || fallbackHtml
   const subject = `Activate your portal account (Ticket #${ticketId})`
   const subjectMime = encodeSubjectHeader(subject)
+  const appSettings = await getAppSettings()
+  const fromHeader = formatFromHeader(appSettings.email_sender_name, fromEmail)
   const rawEmail = [
-    `From: ${fromEmail}`,
+    `From: ${fromHeader}`,
     `To: ${toEmail}`,
     `Subject: ${subjectMime}`,
     'MIME-Version: 1.0',
@@ -243,8 +246,10 @@ async function sendUserTemporaryPasswordEmail(params: {
   const bodyHtml = (mergedTpl || fallbackHtml) + securityBlock
   const subject = `Your temporary password (Ticket #${ticketId})`
   const subjectMime = encodeSubjectHeader(subject)
+  const appSettings2 = await getAppSettings()
+  const fromHeader2 = formatFromHeader(appSettings2.email_sender_name, fromEmail)
   const rawEmail = [
-    `From: ${fromEmail}`,
+    `From: ${fromHeader2}`,
     `To: ${toEmail}`,
     `Subject: ${subjectMime}`,
     'MIME-Version: 1.0',

@@ -19,7 +19,7 @@ export async function PUT(req: NextRequest) {
   }
 
   const body = await req.json() as Partial<AppSettingsMap>
-  const allowed: (keyof AppSettingsMap)[] = ['app_name', 'app_logo_url', 'app_favicon_url']
+  const allowed: (keyof AppSettingsMap)[] = ['app_name', 'app_logo_url', 'app_favicon_url', 'email_sender_name']
 
   for (const key of allowed) {
     if (key in body) {

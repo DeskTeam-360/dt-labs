@@ -19,6 +19,7 @@ interface BrandingForm {
   app_name: string
   app_logo_url: string
   app_favicon_url: string
+  email_sender_name: string
 }
 
 export default function AppBrandingContent({ user }: Props) {
@@ -39,6 +40,7 @@ export default function AppBrandingContent({ user }: Props) {
           app_name: data.app_name ?? '',
           app_logo_url: data.app_logo_url ?? '',
           app_favicon_url: data.app_favicon_url ?? '',
+          email_sender_name: data.email_sender_name ?? '',
         })
       })
       .catch(() => messageApi.error('Failed to load settings'))
@@ -55,6 +57,7 @@ export default function AppBrandingContent({ user }: Props) {
           app_name: values.app_name || null,
           app_logo_url: values.app_logo_url || null,
           app_favicon_url: values.app_favicon_url || null,
+          email_sender_name: values.email_sender_name || null,
         }),
       })
       if (!res.ok) throw new Error('Failed')
@@ -135,6 +138,14 @@ export default function AppBrandingContent({ user }: Props) {
                 <Text type="secondary" style={{ fontSize: 12 }}>Favicon preview (32×32)</Text>
               </Space>
             )}
+
+            <Form.Item
+              name="email_sender_name"
+              label="Email Sender Name"
+              tooltip='Display name shown in outgoing emails, e.g. "DeskTeam360 Support". If empty, only the email address is shown.'
+            >
+              <Input placeholder="DeskTeam360 Support" maxLength={64} />
+            </Form.Item>
 
             <Form.Item style={{ marginTop: 8 }}>
               <Button type="primary" htmlType="submit" loading={saving}>

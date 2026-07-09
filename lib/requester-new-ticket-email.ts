@@ -1,6 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm'
 import { google } from 'googleapis'
 
+import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
 import { companies, companyUsers, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 
@@ -128,6 +129,8 @@ export async function sendRequesterTicketCreatedEmail(
 
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
   const fromEmail = integration.emailAddress || 'noreply@example.com'
+  const appSettings = await getAppSettings()
+  const fromHeader = formatFromHeader(appSettings.email_sender_name, fromEmail)
   const safeBase = baseUrl.replace(/\/$/, '')
   const ticketUrl = `${safeBase}/tickets/${ticketId}`
 
@@ -179,7 +182,7 @@ export async function sendRequesterTicketCreatedEmail(
 
     const bodyHtml = mergedTpl || fallbackHtml
     const rawEmail = [
-      `From: ${fromEmail}`,
+      `From: ${fromHeader}`,
       `To: ${recipient.email}`,
       `Subject: ${subjectMime}`,
       'MIME-Version: 1.0',
