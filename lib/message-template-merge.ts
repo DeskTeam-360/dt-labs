@@ -147,6 +147,9 @@ function makeContext(origin: string, ticketId: string, recipient: Record<string,
       const field = key.slice('sender.'.length)
       return sender[field] ?? null
     }
+    // Extra keys (e.g. temporary_password, reply_content) are official placeholders
+    // but resolved from the extra map passed at call time
+    if (extra && Object.prototype.hasOwnProperty.call(extra, key)) return extra[key]!
     return null
   }
 
