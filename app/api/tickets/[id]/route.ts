@@ -36,7 +36,7 @@ import {
   assertTicketContactUserAllowed,
   getEffectiveCompanyIdForUser,
 } from '@/lib/ticket-contact-user'
-import { sendAgentClosesTicketEmail } from '@/lib/ticket-notification-emails'
+import { sendAgentClosesTicketEmail, sendTicketAssignedEmail } from '@/lib/ticket-notification-emails'
 import { assertCustomerMayUseTicketType } from '@/lib/ticket-type-customer-access'
 
 async function triggerTicketUpdatedAutomation(ticketId: number) {
@@ -784,6 +784,16 @@ export async function PATCH(
             })
           } catch (e) {
             console.error('[PATCH ticket assignees] notify:', e)
+          }
+          try {
+            await sendTicketAssignedEmail({
+              ticketId,
+              ticketTitle: afterSnapshot.title,
+              assignedUserIds: added,
+              actorUserId,
+            })
+          } catch (e) {
+            console.error('[PATCH ticket assignees] email:', e)
           }
         }
       }
