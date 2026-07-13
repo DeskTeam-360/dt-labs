@@ -22,6 +22,7 @@ export async function middleware(req: NextRequest) {
 
   const accessRevoked = token?.error === 'AccessRevoked'
   const isLoggedIn = !!token && !accessRevoked && !!(token as { id?: string }).id
+  const mustChangePassword = !!token?.mustChangePassword
 
   if (req.nextUrl.pathname.startsWith('/dashboard')) {
     if (!isLoggedIn) {
@@ -33,10 +34,14 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
+  if (isLoggedIn && mustChangePassword && req.nextUrl.pathname !== '/change-password' && req.nextUrl.pathname !== '/forgot-password') {
+    return NextResponse.redirect(new URL('/change-password', req.url))
+  }
+
   return NextResponse.next()
 }
 
 /** Hanya halaman yang butuh redirect auth — mengurangi invokasi middleware di Vercel. */
 export const config = {
-  matcher: ['/login', '/dashboard/:path*'],
+  matcher: ['/login', '/dashboard/:path*', '/tickets/:path*', '/settings/:path*', '/change-password'],
 }

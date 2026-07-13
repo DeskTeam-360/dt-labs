@@ -132,6 +132,11 @@ export function canAccessAiSettings(role: string | undefined): boolean {
   return isAdmin(role)
 }
 
+/** Recurring tickets (auto-create on schedule): Admin & Manager */
+export function canAccessRecurringTickets(role: string | undefined): boolean {
+  return isAdminOrManager(role)
+}
+
 /** Settings hub (/settings): any configured admin area the role can open */
 export function canAccessSettingsHub(role: string | undefined): boolean {
   const r = (role ?? '').toLowerCase()
@@ -151,7 +156,8 @@ export function canAccessSettingsHub(role: string | undefined): boolean {
     canAccessCompanyLog(role) ||
     canAccessRecapSnapshots(role) ||
     canAccessCustomerWeeklyRecap(role) ||
-    canAccessAiSettings(role)
+    canAccessAiSettings(role) ||
+    canAccessRecurringTickets(role)
   )
 }
 

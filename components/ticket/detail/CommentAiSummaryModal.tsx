@@ -5,11 +5,8 @@ import dayjs from 'dayjs'
 import { useCallback, useState } from 'react'
 
 import { summarizeAnchorSearchParams } from '@/lib/ticket-ai-summary-anchor'
-import {
-  linkifyAiOutputItems,
-  type SummarizeAnchorRequest,
-  summaryItemsToCommentHtml,
-} from '@/lib/ticket-comment-summarize'
+import { linkifyAiOutputItems, summaryItemsToCommentHtml } from '@/lib/ticket-comment-utils'
+import type { SummarizeAnchorRequest } from '@/lib/ticket-summarize-types'
 
 const { Text } = Typography
 
@@ -222,7 +219,7 @@ export default function CommentAiSummaryModal({
       afterOpenChange={handleAfterOpen}
       width={880}
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
-      destroyOnClose
+      destroyOnHidden
       footer={
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' }}>
           <Button onClick={onClose} disabled={busy}>

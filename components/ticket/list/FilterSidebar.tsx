@@ -105,7 +105,7 @@ export default function FilterSidebar({
           display: 'flex',
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'space-between',
-          // padding: collapsed ? '0 16px' : '0 16px 0 20px',
+          padding: collapsed ? '0 16px' : '0 12px 0 20px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
         }}
       >

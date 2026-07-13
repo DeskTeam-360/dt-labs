@@ -5,6 +5,8 @@ import {
   EditOutlined,
   InboxOutlined,
   MoreOutlined,
+  RobotOutlined,
+  SyncOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
 import {
@@ -192,6 +194,12 @@ export default function TicketsListView({
                 <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
               )}
               {title && title.length > 50 ? title.slice(0, 50) + '...' : title}
+              {record.created_via === 'recurring' && (
+                <SyncOutlined title="Created by recurring ticket" style={{ fontSize: 11, color: '#722ed1', marginLeft: 6, verticalAlign: 'middle' }} />
+              )}
+              {record.created_via === 'automation' && (
+                <RobotOutlined title="Created by automation" style={{ fontSize: 11, color: '#722ed1', marginLeft: 6, verticalAlign: 'middle' }} />
+              )}
             </a>
           ),
         },

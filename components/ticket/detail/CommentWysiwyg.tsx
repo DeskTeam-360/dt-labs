@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useRef,useState } from 'react'
 
 import { useTheme } from '@/components/providers/ThemeProvider'
-import { registerCommentWysiwygQuill } from '@/lib/comment-wysiwyg-quill-register'
 import { linkifyRichHtml } from '@/lib/linkify-rich-html'
 import { uploadTicketImage } from '@/utils/storage'
 
@@ -132,8 +131,10 @@ export default function CommentWysiwyg({
   }), [])
 
   useEffect(() => {
-    registerCommentWysiwygQuill()
-    setMounted(true)
+    import('@/lib/comment-wysiwyg-quill-register').then(({ registerCommentWysiwygQuill }) => {
+      registerCommentWysiwygQuill()
+      setMounted(true)
+    })
   }, [])
 
   /** After paste, linkify bare URLs in the editor HTML. */

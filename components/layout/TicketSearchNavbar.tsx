@@ -44,7 +44,7 @@ type ActivityPeekRow = {
 const NAV_HEIGHT = 56
 /** Match Ant Design `large` controls so search + history icon align on one line. */
 const NAV_CONTROL_SIZE = 'large' as const
-const TITLE = process.env.NEXT_PUBLIC_APP_NAME || 'Deskteam360'
+const DEFAULT_TITLE = process.env.NEXT_PUBLIC_APP_NAME || 'Deskteam360'
 const PREVIEW_MIN_CHARS = 2
 const PREVIEW_LIMIT = 5
 const DEBOUNCE_MS = 300
@@ -88,6 +88,14 @@ export default function TicketSearchNavbar({
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyRows, setHistoryRows] = useState<ActivityPeekRow[]>([])
+  const [appTitle, setAppTitle] = useState(DEFAULT_TITLE)
+
+  useEffect(() => {
+    fetch('/api/app-settings')
+      .then((r) => r.json())
+      .then((d) => { if (d?.app_name) setAppTitle(d.app_name) })
+      .catch(() => {})
+  }, [])
 
   const loadHistoryPeek = useCallback(async () => {
     setHistoryLoading(true)
@@ -274,7 +282,7 @@ export default function TicketSearchNavbar({
             lineHeight: 1,
           }}
         >
-          {TITLE}
+          {appTitle}
         </SpaNavLink>
       </div>
 

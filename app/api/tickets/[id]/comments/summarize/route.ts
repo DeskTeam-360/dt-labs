@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { isAiApiKeyConfigError } from '@/lib/ai-chat-config'
+import { isAdminOrManager } from '@/lib/auth-utils'
 import { assertCustomerMayAccessTicket } from '@/lib/customer-ticket-access'
 import { db, ticketComments, tickets, users } from '@/lib/db'
 import {
@@ -165,6 +166,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'anchor query required' }, { status: 400 })
   }
 
+  if (anchor.type === 'ticket' && !isAdminOrManager(role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const row = await getTicketAiSummary(ticketId, anchor)
   if (!row) {
     return NextResponse.json({ error: 'No saved summary for this anchor' }, { status: 404 })
@@ -197,6 +202,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const body = await request.json().catch(() => ({}))
   const anchor = parseSummarizeAnchorBody(body)
+
+  if (anchor.type === 'ticket' && !isAdminOrManager(role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const existing = await getTicketAiSummary(ticketId, anchor)
   if (existing) {

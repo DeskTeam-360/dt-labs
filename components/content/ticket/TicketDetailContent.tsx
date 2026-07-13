@@ -742,7 +742,11 @@ export default function TicketDetailContent({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             })
-            setComments((prev) => [...prev, { ...data, comment_attachments: data.comment_attachments || [] }])
+            setComments((prev) =>
+              prev.some((c) => c.id === data.id)
+                ? prev
+                : [...prev, { ...data, comment_attachments: data.comment_attachments || [] }]
+            )
             message.success('Comment added')
             if (variant === 'admin' && !extra?.summaryAsNote) setCommentVisibility(null)
 
@@ -1656,6 +1660,7 @@ export default function TicketDetailContent({
                                             commentVisibility={commentVisibility}
                                             onCommentVisibilityChange={setCommentVisibility}
                                             showNoteOption
+                                            currentUserRole={currentUser.role}
                                             nonCustomerUsers={users.filter((u: any) => (u?.role ?? '')?.toLowerCase() !== 'customer')}
                                             companyCustomers={companyCustomers}
                                             attributes={attributes}

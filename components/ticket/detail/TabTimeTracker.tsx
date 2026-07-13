@@ -558,7 +558,7 @@ export default function TabTimeTracker({
         onCancel={() => setManualOpen(false)}
         onOk={submitManual}
         confirmLoading={mutating}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={manualForm} layout="vertical" style={{ marginTop: 8 }}>
           <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
@@ -656,7 +656,7 @@ export default function TabTimeTracker({
         }}
         onOk={submitAdjustTracker}
         confirmLoading={mutating}
-        destroyOnClose
+        destroyOnHidden
         width={560}
       >
         <Form form={adjustTrackerForm} layout="vertical" style={{ marginTop: 8 }}>

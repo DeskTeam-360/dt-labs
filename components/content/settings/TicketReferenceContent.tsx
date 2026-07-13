@@ -252,6 +252,19 @@ export default function TicketReferenceContent({ user: currentUser }: TicketRefe
 
   const tabItems = [
     {
+      key: 'faq',
+      label: 'FAQs',
+      children: loading ? (
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <Spin />
+        </div>
+      ) : knowledgeArticles.length === 0 ? (
+        <Empty description="No published FAQ entries for your role" />
+      ) : (
+        <FaqGlossaryAccordion articles={sortedFaqArticles} />
+      ),
+    },
+    {
       key: 'types',
       label: 'Ticket types',
       children: loading ? (
@@ -286,19 +299,6 @@ export default function TicketReferenceContent({ user: currentUser }: TicketRefe
         ))
       ),
     },
-    {
-      key: 'faq',
-      label: 'FAQs',
-      children: loading ? (
-        <div style={{ textAlign: 'center', padding: 40 }}>
-          <Spin />
-        </div>
-      ) : knowledgeArticles.length === 0 ? (
-        <Empty description="No published FAQ entries for your role" />
-      ) : (
-        <FaqGlossaryAccordion articles={sortedFaqArticles} />
-      ),
-    },
   ]
 
   return (
@@ -320,7 +320,7 @@ export default function TicketReferenceContent({ user: currentUser }: TicketRefe
               Settings → Knowledge Base.
             </Paragraph>
             <Tabs items={tabItems} />
-          
+
         </Content>
       </AdminMainColumn>
     </Layout>

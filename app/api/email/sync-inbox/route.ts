@@ -4,6 +4,7 @@ import { google } from 'googleapis'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
 import { loadAutomationTicketContext, runAutomationRules, runTicketCommentAutomation } from '@/lib/automation-engine'
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import {
@@ -28,6 +29,7 @@ import { uploadBuffer } from '@/lib/storage-idrive'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
 import { assignCompanySupportTicketRank } from '@/lib/ticket-company-priority-order'
+import { sendNewTicketAgentNotificationEmail } from '@/lib/ticket-notification-emails'
 
 /** Parse Gmail internalDate to ISO string for created_at */
 function getEmailDateIso(msg: { internalDate?: string }): string | null {
@@ -174,8 +176,10 @@ async function sendUserActivationEmail(params: {
   const bodyHtml = mergedTpl || fallbackHtml
   const subject = `Activate your portal account (Ticket #${ticketId})`
   const subjectMime = encodeSubjectHeader(subject)
+  const appSettings = await getAppSettings()
+  const fromHeader = formatFromHeader(appSettings.email_sender_name, fromEmail)
   const rawEmail = [
-    `From: ${fromEmail}`,
+    `From: ${fromHeader}`,
     `To: ${toEmail}`,
     `Subject: ${subjectMime}`,
     'MIME-Version: 1.0',
@@ -226,24 +230,25 @@ async function sendUserTemporaryPasswordEmail(params: {
         ticketId: String(ticketId),
         recipient: recipientMap,
         sender: senderMap,
+        extra: { temporary_password: temporaryPassword, login_url: loginUrl, change_password_url: changePasswordUrl },
         useDomMerge: false,
       })
     : ''
 
   const fallbackHtml =
     `<p>Hello,</p>` +
-    `<p>Here is your temporary password to access your new portal account.</p>`
-
-  const securityBlock =
+    `<p>Here is your temporary password to access your new portal account.</p>` +
     `<p><strong>Temporary password:</strong> <code>${temporaryPassword}</code></p>` +
     `<p>Login here: <a href="${loginUrl}">${loginUrl}</a></p>` +
     `<p>Please change your password immediately after login: <a href="${changePasswordUrl}">${changePasswordUrl}</a></p>`
 
-  const bodyHtml = (mergedTpl || fallbackHtml) + securityBlock
+  const bodyHtml = mergedTpl || fallbackHtml
   const subject = `Your temporary password (Ticket #${ticketId})`
   const subjectMime = encodeSubjectHeader(subject)
+  const appSettings2 = await getAppSettings()
+  const fromHeader2 = formatFromHeader(appSettings2.email_sender_name, fromEmail)
   const rawEmail = [
-    `From: ${fromEmail}`,
+    `From: ${fromHeader2}`,
     `To: ${toEmail}`,
     `Subject: ${subjectMime}`,
     'MIME-Version: 1.0',
@@ -1512,6 +1517,19 @@ export async function POST(request: NextRequest) {
                 senderEmail,
                 (mailErr as Error)?.message
               )
+            }
+          }
+
+          if (newTicket.teamId && creatorUserId) {
+            try {
+              await sendNewTicketAgentNotificationEmail({
+                ticketId: newTicket.id,
+                ticketTitle: title,
+                teamId: newTicket.teamId,
+                creatorUserId,
+              })
+            } catch (mailErr) {
+              console.error('[Sync] agent new ticket notification email failed:', (mailErr as Error)?.message)
             }
           }
 

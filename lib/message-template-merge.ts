@@ -14,29 +14,14 @@ function fmtTs(v: Date | string | null | undefined): string {
 }
 
 /** Map a `users` row to flat keys used in `{{ recipient.* }}` / `{{ sender.* }}` (and bare `{{ email }}` → recipient). */
-export function userRowToMergeMap(row: typeof users.$inferSelect | null): Record<string, string> {
+export function userRowToMergeMap(row: typeof users.$inferSelect | null, companyName?: string | null): Record<string, string> {
   if (!row) {
     return {
-      first_name: '—',
-      last_name: '—',
-      full_name: '—',
-      email: '—',
-      user_id: '—',
-      avatar_url: '—',
-      role: '—',
-      status: '—',
-      phone: '—',
-      department: '—',
-      position: '—',
-      bio: '—',
-      timezone: '—',
-      locale: '—',
-      is_email_verified: '—',
-      company_id: '—',
-      last_login_at: '—',
-      last_active_at: '—',
-      created_at: '—',
-      updated_at: '—',
+      first_name: '—', last_name: '—', full_name: '—', email: '—', user_id: '—',
+      avatar_url: '—', role: '—', status: '—', phone: '—', department: '—',
+      position: '—', bio: '—', timezone: '—', locale: '—', is_email_verified: '—',
+      company_id: '—', company_name: '—',
+      last_login_at: '—', last_active_at: '—', created_at: '—', updated_at: '—',
     }
   }
   const fn = row.firstName?.trim() || ''
@@ -59,6 +44,7 @@ export function userRowToMergeMap(row: typeof users.$inferSelect | null): Record
     locale: row.locale?.trim() || '—',
     is_email_verified: row.isEmailVerified === true ? 'true' : row.isEmailVerified === false ? 'false' : '—',
     company_id: row.companyId ?? '—',
+    company_name: companyName?.trim() || '—',
     last_login_at: fmtTs(row.lastLoginAt),
     last_active_at: fmtTs(row.lastActiveAt),
     created_at: fmtTs(row.createdAt),
@@ -128,7 +114,7 @@ function applyPlaceholderReplacements(html: string, ctx: ReplaceContext): string
   })
 }
 
-function makeContext(origin: string, ticketId: string, recipient: Record<string, string>, sender: Record<string, string>) {
+function makeContext(origin: string, ticketId: string, recipient: Record<string, string>, sender: Record<string, string>, extra?: Record<string, string>) {
   const ticketUrl = `${origin.replace(/\/$/, '')}/tickets/${ticketId}`
   const officialKeys = new Set(allMessageTemplatePlaceholderKeys().map((k) => k.toLowerCase()))
 
@@ -147,11 +133,26 @@ function makeContext(origin: string, ticketId: string, recipient: Record<string,
       const field = key.slice('sender.'.length)
       return sender[field] ?? null
     }
+    const buttonStyle = 'display:inline-block;padding:10px 20px;background:#1677ff;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px'
+    if (key === 'login_button') {
+      const url = extra?.login_url ?? ''
+      const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      return `<a href="${safe}" target="_blank" rel="noopener noreferrer" style="${buttonStyle}">Login</a>`
+    }
+    if (key === 'change_password_button') {
+      const url = extra?.change_password_url ?? ''
+      const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      return `<a href="${safe}" target="_blank" rel="noopener noreferrer" style="${buttonStyle}">Change Password</a>`
+    }
+    // Extra keys (e.g. temporary_password, reply_content) are official placeholders
+    // but resolved from the extra map passed at call time
+    if (extra && Object.prototype.hasOwnProperty.call(extra, key)) return extra[key]!
     return null
   }
 
   const replaceBareRecipient = (key: string): string | null => {
     if (key.includes('.')) return null
+    if (extra && Object.prototype.hasOwnProperty.call(extra, key)) return extra[key]!
     if (Object.prototype.hasOwnProperty.call(recipient, key)) return recipient[key]!
     return null
   }
@@ -164,6 +165,8 @@ export type MergeMessageTemplateHtmlOptions = {
   ticketId: string
   recipient: Record<string, string>
   sender: Record<string, string>
+  /** Extra flat key→value pairs merged after recipient/sender/ticket (e.g. temporary_password). */
+  extra?: Record<string, string>
   /** When true (browser), normalize split placeholders via DOMParser. */
   useDomMerge?: boolean
 }
@@ -172,9 +175,9 @@ export type MergeMessageTemplateHtmlOptions = {
 export function mergeMessageTemplateHtml(html: string, options: MergeMessageTemplateHtmlOptions): string {
   if (html == null || !String(html).trim()) return ''
 
-  const { origin, ticketId, recipient, sender } = options
+  const { origin, ticketId, recipient, sender, extra } = options
   const useDom = options.useDomMerge ?? (typeof document !== 'undefined')
-  const ctx = makeContext(origin, ticketId, recipient, sender)
+  const ctx = makeContext(origin, ticketId, recipient, sender, extra)
 
   let working = normalizeMergeSource(html)
 

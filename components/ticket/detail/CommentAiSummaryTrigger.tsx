@@ -5,7 +5,7 @@ import { Button, Tooltip } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
 import { summarizeAnchorSearchParams } from '@/lib/ticket-ai-summary-anchor'
-import type { SummarizeAnchorRequest } from '@/lib/ticket-comment-summarize'
+import type { SummarizeAnchorRequest } from '@/lib/ticket-summarize-types'
 
 import CommentAiSummaryModal from './CommentAiSummaryModal'
 
@@ -19,6 +19,7 @@ export type CommentAiSummaryTriggerProps = {
   disabled?: boolean
   size?: 'small' | 'middle' | 'large'
   tooltip?: string
+  variant?: 'ticket' | 'default'
 }
 
 export default function CommentAiSummaryTrigger({
@@ -31,6 +32,7 @@ export default function CommentAiSummaryTrigger({
   disabled = false,
   size = 'middle',
   tooltip,
+  variant = 'default',
 }: CommentAiSummaryTriggerProps) {
   const [open, setOpen] = useState(false)
   const [hasSavedSummary, setHasSavedSummary] = useState(false)
@@ -65,6 +67,8 @@ export default function CommentAiSummaryTrigger({
         ? 'Generate AI summary for this comment once (English)'
         : 'Generate AI summary once (English)')
 
+  const isTicketVariant = variant === 'ticket'
+
   return (
     <>
       <Tooltip title={tooltipText}>
@@ -74,6 +78,7 @@ export default function CommentAiSummaryTrigger({
           disabled={disabled || addCommentLoading}
           onClick={() => setOpen(true)}
           aria-label="AI summary"
+          style={isTicketVariant ? { color: '#722ed1', borderColor: '#722ed1' } : undefined}
         />
       </Tooltip>
       <CommentAiSummaryModal

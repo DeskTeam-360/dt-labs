@@ -41,6 +41,7 @@ export const users = pgTable('users', {
   bio: text('bio'),
   timezone: varchar('timezone', { length: 50 }).default('UTC'),
   locale: varchar('locale', { length: 10 }).default('en'),
+  mustChangePassword: boolean('must_change_password').default(false),
   metadata: jsonb('metadata'),
   companyId: uuid('company_id'),
   createdAt: ts('created_at').notNull().defaultNow(),
@@ -229,6 +230,8 @@ export const tickets = pgTable('tickets', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
+  /** Immutable copy of description before first edit — set once, never overwritten. */
+  originalDescription: text('original_description'),
   shortNote: text('short_note'),
   createdBy: uuid('created_by'),
   /** Customer-facing email reply recipient when set; otherwise use createdBy. */
@@ -637,6 +640,7 @@ export const messageTemplates = pgTable(
     title: varchar('title', { length: 255 }).notNull(),
     key: varchar('key', { length: 128 }).notNull().unique(),
     status: varchar('status', { length: 32 }).notNull().default('active'),
+    emailSubject: text('email_subject'),
     content: text('content'),
     createdAt: ts('created_at').notNull().defaultNow(),
     updatedAt: ts('updated_at').notNull().defaultNow(),
@@ -730,6 +734,79 @@ export const customerWeeklyRecapCells = pgTable(
   ]
 )
 
+// ============ AI Settings ============
+/** Multi-row AI provider presets; only the row with isActive=true is used at runtime. */
+export const aiSettings = pgTable('ai_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 128 }).notNull().default('Default'),
+  isActive: boolean('is_active').notNull().default(false),
+  provider: varchar('provider', { length: 32 }).notNull().default('openai'),
+  openaiApiKey: text('openai_api_key'),
+  openaiBaseUrl: text('openai_base_url'),
+  openaiModel: varchar('openai_model', { length: 128 }),
+  codexApiKey: text('codex_api_key'),
+  codexBaseUrl: text('codex_base_url'),
+  codexModel: varchar('codex_model', { length: 128 }),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  updatedBy: uuid('updated_by'),
+})
+
+// ============ Recurring Tickets ============
+/**
+ * Template + schedule for auto-creating tickets on a recurring basis.
+ * frequency: 'daily' | 'weekdays' | 'weekends' | 'specific_days' | 'specific_date' | 'interval'
+ * - specific_days: uses specificDays int[] (0=Sun … 6=Sat)
+ * - specific_date: uses specificDate int (1–31, day of month)
+ * - interval: uses intervalDays int (every N days)
+ */
+export const recurringTickets = pgTable('recurring_tickets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description'),
+  frequency: varchar('frequency', { length: 32 }).notNull().default('daily'),
+  specificDays: jsonb('specific_days').$type<number[]>(),
+  specificDate: integer('specific_date'),
+  intervalDays: integer('interval_days'),
+  timeOfDay: varchar('time_of_day', { length: 5 }).notNull().default('08:00'),
+  timezone: varchar('timezone', { length: 64 }).notNull().default('UTC'),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date'),
+  isActive: boolean('is_active').notNull().default(true),
+  lastRunAt: ts('last_run_at'),
+  nextRunAt: ts('next_run_at'),
+  ticketStatus: varchar('ticket_status', { length: 128 }),
+  ticketPriority: integer('ticket_priority').default(0),
+  teamId: uuid('team_id'),
+  companyId: uuid('company_id'),
+  assigneeIds: jsonb('assignee_ids').$type<string[]>().default([]),
+  ticketTypeId: integer('ticket_type_id'),
+  contactUserId: uuid('contact_user_id'),
+  visibility: varchar('visibility', { length: 32 }).notNull().default('public'),
+  createdBy: uuid('created_by'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
+/** Append-only log of every ticket created by a recurring rule. */
+export const recurringTicketRuns = pgTable(
+  'recurring_ticket_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    recurringTicketId: uuid('recurring_ticket_id')
+      .notNull()
+      .references(() => recurringTickets.id, { onDelete: 'cascade' }),
+    ticketId: integer('ticket_id'),
+    ranAt: ts('ran_at').notNull().defaultNow(),
+    status: varchar('status', { length: 16 }).notNull().default('success'),
+    error: text('error'),
+  },
+  (t) => [
+    index('recurring_ticket_runs_rule_idx').on(t.recurringTicketId),
+    index('recurring_ticket_runs_ran_at_idx').on(t.ranAt),
+  ]
+)
+
 /** Dashboard announcements: title preview on dashboard, full body in modal; optional role targeting (see KB roles). */
 export const dashboardAnnouncements = pgTable('dashboard_announcements', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -744,4 +821,12 @@ export const dashboardAnnouncements = pgTable('dashboard_announcements', {
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
   createdBy: uuid('created_by'),
+})
+
+// ============ App Settings ============
+/** Global app branding settings stored as key-value pairs. */
+export const appSettings = pgTable('app_settings', {
+  key: varchar('key', { length: 64 }).primaryKey(),
+  value: text('value'),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
 })

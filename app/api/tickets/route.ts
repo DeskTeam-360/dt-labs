@@ -38,6 +38,7 @@ import {
   assertTicketContactUserAllowed,
   getEffectiveCompanyIdForUser,
 } from '@/lib/ticket-contact-user'
+import { sendNewTicketAgentNotificationEmail } from '@/lib/ticket-notification-emails'
 import { assertCustomerMayUseTicketType } from '@/lib/ticket-type-customer-access'
 
 const DEFAULT_LIMIT = 50
@@ -701,6 +702,18 @@ export async function POST(request: Request) {
       })
     } catch (mailErr) {
       console.error('[POST ticket] requester notification email failed:', mailErr)
+    }
+    if (role === 'customer' && ticket.teamId) {
+      try {
+        await sendNewTicketAgentNotificationEmail({
+          ticketId: ticket.id,
+          ticketTitle: ticket.title || 'Untitled',
+          teamId: ticket.teamId,
+          creatorUserId: userId,
+        })
+      } catch (mailErr) {
+        console.error('[POST ticket] agent new ticket notification email failed:', mailErr)
+      }
     }
   }
 

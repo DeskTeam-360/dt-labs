@@ -36,6 +36,7 @@ import {
   assertTicketContactUserAllowed,
   getEffectiveCompanyIdForUser,
 } from '@/lib/ticket-contact-user'
+import { sendAgentClosesTicketEmail } from '@/lib/ticket-notification-emails'
 import { assertCustomerMayUseTicketType } from '@/lib/ticket-type-customer-access'
 
 async function triggerTicketUpdatedAutomation(ticketId: number) {
@@ -251,6 +252,14 @@ export async function PATCH(
       } catch (e) {
         console.error('[PATCH ticket status] slack:', e)
       }
+      if (nextStatus === 'closed' && cur.status !== 'closed' && actorRole !== 'customer') {
+        try {
+          const [closedMeta] = await db.select({ title: tickets.title }).from(tickets).where(eq(tickets.id, ticketId)).limit(1)
+          await sendAgentClosesTicketEmail({ ticketId, ticketTitle: closedMeta?.title || 'Ticket', agentUserId: actorUserId })
+        } catch (e) {
+          console.error('[PATCH ticket status] close email:', e)
+        }
+      }
     }
     await triggerTicketUpdatedAutomation(ticketId)
     bumpTicketDataVersion(ticketId)
@@ -370,15 +379,22 @@ export async function PATCH(
   // Quick path: description only (from detail page)
   if (body.description !== undefined && !body.title && !body.assignees && !body.tag_ids) {
     const [cur] = await db
-      .select({ description: tickets.description })
+      .select({ description: tickets.description, originalDescription: tickets.originalDescription })
       .from(tickets)
       .where(eq(tickets.id, ticketId))
       .limit(1)
+    const descChanged = cur && String(cur.description ?? '') !== String(body.description ?? '')
+    // Preserve original on first edit only (when originalDescription is still NULL)
+    const preserveOriginal = descChanged && cur.originalDescription == null && cur.description != null
     await db
       .update(tickets)
-      .set({ description: body.description ?? null, updatedAt: new Date() })
+      .set({
+        description: body.description ?? null,
+        ...(preserveOriginal ? { originalDescription: cur.description } : {}),
+        updatedAt: new Date(),
+      })
       .where(eq(tickets.id, ticketId))
-    if (cur && String(cur.description ?? '') !== String(body.description ?? '')) {
+    if (descChanged) {
       await logTicketActivity({
         ticketId,
         actorUserId,

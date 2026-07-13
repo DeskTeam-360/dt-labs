@@ -7,6 +7,7 @@ import {
   BellOutlined,
   CalendarOutlined,
   FileTextOutlined,
+  GlobalOutlined,
   InfoCircleOutlined,
   MailOutlined,
   NotificationOutlined,
@@ -16,6 +17,7 @@ import {
   TeamOutlined,
   ThunderboltOutlined,
   ToolOutlined,
+  UnorderedListOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { Col, Layout, Row, Typography } from 'antd'
@@ -35,6 +37,7 @@ import {
   canAccessKnowledgeBase,
   canAccessMessageTemplates,
   canAccessRecapSnapshots,
+  canAccessRecurringTickets,
   canAccessSlackNotifications,
   canAccessTeams,
   canAccessTicketAttributes,
@@ -227,6 +230,24 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
+                {canAccessRecurringTickets(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Recurring Tickets"
+                      description="Auto-create tickets on a schedule"
+                      href="/settings/recurring-tickets"
+                      icon={<CalendarOutlined />}
+                    />
+                  </Col>
+                )}
+                <Col xs={24} sm={12} md={8}>
+                  <HubTile
+                    title="Feature Access"
+                    description="Role-based access overview for all features"
+                    href="/settings/feature-access"
+                    icon={<UnorderedListOutlined />}
+                  />
+                </Col>
               </Row>
             </Section>
           )}
@@ -264,6 +285,21 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
+              </Row>
+            </Section>
+          )}
+
+          {isAdmin(role) && (
+            <Section heading="App">
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12} md={8}>
+                  <HubTile
+                    title="App Branding"
+                    description="App name, logo, and favicon"
+                    href="/settings/app-branding"
+                    icon={<GlobalOutlined />}
+                  />
+                </Col>
               </Row>
             </Section>
           )}

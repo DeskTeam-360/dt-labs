@@ -33,13 +33,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     title: row.title,
     key: row.key,
     status: row.status,
+    email_subject: row.emailSubject ?? null,
     content: row.content ?? null,
     created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',
     updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : '',
   })
 }
 
-/** PATCH /api/message-templates/[id] — body: { content?: string | null, status?: 'active' | 'inactive' } */
+/** PATCH /api/message-templates/[id] — body: { content?: string | null, status?: 'active' | 'inactive', email_subject?: string | null } */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   const deny = assertAdmin(session)
@@ -49,7 +50,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!id) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
   const body = await request.json().catch(() => ({}))
-  const { content, status } = body as { content?: string | null; status?: string }
+  const { content, status, email_subject } = body as { content?: string | null; status?: string; email_subject?: string | null }
 
   const updates: Partial<typeof messageTemplates.$inferInsert> = {
     updatedAt: new Date(),
@@ -58,6 +59,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (content !== undefined) {
     updates.content = content === null || content === '' ? null : String(content)
+    touched = true
+  }
+  if (email_subject !== undefined) {
+    updates.emailSubject = email_subject === null || email_subject === '' ? null : String(email_subject)
     touched = true
   }
   if (status !== undefined) {
@@ -88,6 +93,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     title: row.title,
     key: row.key,
     status: row.status,
+    email_subject: row.emailSubject ?? null,
     content: row.content ?? null,
     created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',
     updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : '',

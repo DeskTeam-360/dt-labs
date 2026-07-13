@@ -6,6 +6,7 @@ import Script from "next/script";
 import { auth } from "@/auth";
 // import { Geist, Geist_Mono } from "next/font/google";
 import AntdProvider from "@/components/providers/AntdProvider";
+import { getAppSettings } from "@/lib/app-settings";
 
 const themeInitScript = `
 (function(){
@@ -28,10 +29,15 @@ const themeInitScript = `
 //   subsets: ["latin"],
 // });
 
-export const metadata: Metadata = {
-  title: process.env.NEXT_PUBLIC_APP_NAME,
-  description: process.env.NEXT_PUBLIC_APP_DESCRIPTION,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getAppSettings()
+  const appName = settings.app_name || process.env.NEXT_PUBLIC_APP_NAME || 'DeskTeam360'
+  return {
+    title: { default: appName, template: `%s | ${appName}` },
+    description: process.env.NEXT_PUBLIC_APP_DESCRIPTION,
+    icons: settings.app_favicon_url ? [{ url: settings.app_favicon_url }] : undefined,
+  }
+}
 
 export default async function RootLayout({
   children,

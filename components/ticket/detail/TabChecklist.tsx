@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react'
 import DateDisplay from '@/components/common/DateDisplay'
 import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 import type { ChecklistItemDto } from '@/lib/ticket-checklist-map'
-import { linkifyPlainTextForHtml } from '@/lib/ticket-comment-summarize'
+import { linkifyPlainTextForHtml } from '@/lib/ticket-comment-utils'
 
 const { Text } = Typography
 

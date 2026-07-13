@@ -1,7 +1,8 @@
 import { and, asc, eq } from 'drizzle-orm'
 import { google } from 'googleapis'
 
-import { companyUsers, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
+import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
+import { companies, companyUsers, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 
 export const REQUESTER_NEW_TICKET_TEMPLATE_KEY = 'requester_notification_new_ticket_created' as const
@@ -128,11 +129,13 @@ export async function sendRequesterTicketCreatedEmail(
 
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
   const fromEmail = integration.emailAddress || 'noreply@example.com'
+  const appSettings = await getAppSettings()
+  const fromHeader = formatFromHeader(appSettings.email_sender_name, fromEmail)
   const safeBase = baseUrl.replace(/\/$/, '')
   const ticketUrl = `${safeBase}/tickets/${ticketId}`
 
   const [tpl] = await db
-    .select({ content: messageTemplates.content })
+    .select({ content: messageTemplates.content, emailSubject: messageTemplates.emailSubject })
     .from(messageTemplates)
     .where(
       and(
@@ -149,13 +152,18 @@ export async function sendRequesterTicketCreatedEmail(
     return false
   }
 
-  const senderMap = userRowToMergeMap(creatorUser ?? null)
+  let companyName: string | null = null
+  if (companyId) {
+    const [companyRow] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1)
+    companyName = companyRow?.name ?? null
+  }
+  const senderMap = userRowToMergeMap(creatorUser ?? null, companyName)
   const rawTpl = tpl.content?.trim() ?? ''
-  const subject = `Ticket #${ticketId} has been created`
+  const subject = tpl.emailSubject?.trim() || `Ticket #${ticketId} has been created`
   const subjectMime = encodeSubjectHeader(subject)
 
   for (const recipient of recipientEntries) {
-    const recipientMap = userRowToMergeMap(recipient.user)
+    const recipientMap = userRowToMergeMap(recipient.user, companyName)
     const mergedTpl = rawTpl
       ? mergeMessageTemplateHtml(rawTpl, {
           origin: safeBase,
@@ -174,7 +182,7 @@ export async function sendRequesterTicketCreatedEmail(
 
     const bodyHtml = mergedTpl || fallbackHtml
     const rawEmail = [
-      `From: ${fromEmail}`,
+      `From: ${fromHeader}`,
       `To: ${recipient.email}`,
       `Subject: ${subjectMime}`,
       'MIME-Version: 1.0',

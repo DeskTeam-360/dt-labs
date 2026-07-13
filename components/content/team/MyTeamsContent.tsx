@@ -504,7 +504,7 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
               setFocusMember(null)
               setDetailActivity(null)
             }}
-            destroyOnClose
+            destroyOnHidden
           >
             <Spin spinning={detailLoading}>
               {focusMember ? (

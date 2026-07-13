@@ -1,6 +1,6 @@
 'use client'
 
-import { CommentOutlined, DeleteOutlined, EditOutlined, FieldTimeOutlined, FlagOutlined, MoreOutlined, UserOutlined } from '@ant-design/icons'
+import { CommentOutlined, DeleteOutlined, EditOutlined, FieldTimeOutlined, FlagOutlined, MoreOutlined, RobotOutlined, SyncOutlined, UserOutlined } from '@ant-design/icons'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Avatar, Button, Card, Dropdown, Flex, Modal, Tag, Tooltip, Typography } from 'antd'
@@ -247,6 +247,12 @@ export default function KanbanCard({
               <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />
             )}
             #{ticket.id} {ticket.title}
+            {ticket.created_via === 'recurring' && (
+              <SyncOutlined title="Created by recurring ticket" style={{ fontSize: 11, color: '#722ed1', marginLeft: 5, verticalAlign: 'middle' }} />
+            )}
+            {ticket.created_via === 'automation' && (
+              <RobotOutlined title="Created by automation" style={{ fontSize: 11, color: '#722ed1', marginLeft: 5, verticalAlign: 'middle' }} />
+            )}
           </Text>
           {ticket.by_label && (
             <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic', color: '#16324A', display: 'block', marginTop: 4 }}>

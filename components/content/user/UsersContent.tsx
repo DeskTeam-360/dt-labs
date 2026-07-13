@@ -110,6 +110,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const [searchText, setSearchText] = useState('')
   const [audienceTab, setAudienceTab] = useState<UserAudienceTab>('non_customer')
   const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined)
+  const [filterRole, setFilterRole] = useState<string | undefined>(undefined)
   const [form] = Form.useForm()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
@@ -153,9 +154,10 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
         if (audienceTab === 'non_customer' && u.role === 'customer') return false
       }
       if (filterStatus && u.status !== filterStatus) return false
+      if (filterRole && u.role !== filterRole) return false
       return true
     })
-  }, [users, searchText, audienceTab, filterStatus, isCustomer])
+  }, [users, searchText, audienceTab, filterStatus, filterRole, isCustomer])
 
   const customerCount = useMemo(() => users.filter((u) => u.role === 'customer').length, [users])
   const nonCustomerCount = useMemo(() => users.filter((u) => u.role !== 'customer').length, [users])
@@ -705,6 +707,22 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                   <Option value="suspended">Suspended</Option>
                   <Option value="pending">Pending</Option>
                 </Select>
+                {audienceTab === 'non_customer' && (
+                  <Select
+                    placeholder="Filter by Role"
+                    allowClear
+                    value={filterRole}
+                    onChange={(v) => {
+                      setFilterRole(v)
+                      setPagination((p) => ({ ...p, current: 1 }))
+                    }}
+                    style={{ width: 150 }}
+                  >
+                    <Option value="admin">Admin</Option>
+                    <Option value="manager">Manager</Option>
+                    <Option value="staff">Staff</Option>
+                  </Select>
+                )}
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
