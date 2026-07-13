@@ -19,6 +19,10 @@ async function fetchCompanyName(companyId: string | null | undefined): Promise<s
   return row?.name ?? null
 }
 
+function mergeSubject(subject: string, ticketId: number): string {
+  return subject.replace(/\{\{\s*ticket_id\s*\}\}/g, String(ticketId))
+}
+
 function encodeSubjectHeader(subject: string): string {
   if (/^[\x01-\x7F]*$/.test(subject)) return subject
   return '=?UTF-8?B?' + Buffer.from(subject, 'utf8').toString('base64') + '?='
@@ -130,7 +134,7 @@ export async function sendAgentClosesTicketEmail(params: {
   const recipientMap = userRowToMergeMap(recipient, companyName)
   const senderMap = userRowToMergeMap(agent ?? null)
   const rawTpl = tpl.content?.trim() ?? ''
-  const subject = tpl.emailSubject?.trim() || `Ticket #${ticketId} has been closed`
+  const subject = mergeSubject(tpl.emailSubject?.trim() || `Ticket #${ticketId} has been closed`, ticketId)
 
   const bodyHtml = rawTpl
     ? mergeMessageTemplateHtml(rawTpl, { origin: baseUrl, ticketId: String(ticketId), recipient: recipientMap, sender: senderMap, useDomMerge: false })
@@ -183,7 +187,7 @@ export async function sendNewTicketAgentNotificationEmail(params: {
   const fromHeader = formatFromHeader(appSettings.email_sender_name, gmailSender.fromEmail)
   const senderMap = userRowToMergeMap(creator ?? null, creatorCompanyName)
   const rawTpl = tpl.content?.trim() ?? ''
-  const subject = tpl.emailSubject?.trim() || `New ticket #${ticketId} assigned to your team`
+  const subject = mergeSubject(tpl.emailSubject?.trim() || `New ticket #${ticketId} assigned to your team`, ticketId)
 
   for (const recipient of recipients) {
     const recipientCompanyName = await fetchCompanyName(recipient.companyId)
@@ -232,7 +236,7 @@ export async function sendTicketAssignedEmail(params: {
   const fromHeader = formatFromHeader(appSettings.email_sender_name, gmailSender.fromEmail)
   const senderMap = userRowToMergeMap(actor ?? null)
   const rawTpl = tpl.content?.trim() ?? ''
-  const subject = tpl.emailSubject?.trim() || `You have been assigned to Ticket #${ticketId}`
+  const subject = mergeSubject(tpl.emailSubject?.trim() || `You have been assigned to Ticket #${ticketId}`, ticketId)
 
   for (const userId of assignedUserIds) {
     if (userId === actorUserId) continue
@@ -299,7 +303,7 @@ export async function sendNoteAddedNotificationEmail(params: {
   const fromHeader = formatFromHeader(appSettings.email_sender_name, gmailSender.fromEmail)
   const senderMap = userRowToMergeMap(actor ?? null, actorCompanyName)
   const rawTpl = tpl.content?.trim() ?? ''
-  const subject = tpl.emailSubject?.trim() || `Note added on Ticket #${ticketId}`
+  const subject = mergeSubject(tpl.emailSubject?.trim() || `Note added on Ticket #${ticketId}`, ticketId)
 
   for (const recipient of recipients) {
     const recipientCompanyName = await fetchCompanyName(recipient.companyId)
