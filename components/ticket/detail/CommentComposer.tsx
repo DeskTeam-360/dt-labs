@@ -8,7 +8,7 @@ import {
   SendOutlined,
   UserAddOutlined,
 } from '@ant-design/icons'
-import { Button, Flex, message, Select } from 'antd'
+import { Button, Flex, message, Modal, Select } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { linkifyRichHtml } from '@/lib/linkify-rich-html'
@@ -229,6 +229,46 @@ export default function CommentComposer({
       : 'Reply (visible to client)...'
     : 'Add a comment...'
 
+  const handleModeChange = (next: 'note' | 'reply') => {
+    if (!onCommentVisibilityChange) return
+    if (mode === next) return
+
+    const switchMode = () => {
+      setAttachments([])
+      setTaggedUserIds([])
+      if (next === 'reply') {
+        agentReplyTemplateConsumedRef.current = false
+        const html = agentReplyTemplateHtmlRef.current.trim()
+        if (html) {
+          agentReplyTemplateConsumedRef.current = true
+          setDraft(html)
+        } else {
+          setDraft('')
+          void fetchAgentReplyTemplate()
+        }
+      } else {
+        setDraft('')
+      }
+      onCommentVisibilityChange(next)
+    }
+
+    const hasContent = !isBlankEditorValue(draft) || attachments.length > 0
+    if (hasContent && mode != null) {
+      const currentLabel = mode === 'note' ? 'note' : 'reply'
+      Modal.confirm({
+        title: 'Discard changes?',
+        content: `Are you sure you want to discard your ${currentLabel}?`,
+        okText: 'Discard',
+        okType: 'danger',
+        cancelText: 'Cancel',
+        onOk: switchMode,
+      })
+      return
+    }
+
+    switchMode()
+  }
+
   const isNote = showNoteOption && mode === 'note'
   const bgColor = isNote ? '#fffbe6' : '#e6f7ff'
   const borderColor = isNote ? '#ffe5b4' : '#91caff'
@@ -239,14 +279,14 @@ export default function CommentComposer({
         <Button
           type={mode === 'note' ? 'primary' : 'default'}
           icon={<CommentOutlined />}
-          onClick={() => onCommentVisibilityChange('note')}
+          onClick={() => handleModeChange('note')}
         >
           Add note
         </Button>
         <Button
           type={mode === 'reply' ? 'primary' : 'default'}
           icon={<SendOutlined />}
-          onClick={() => onCommentVisibilityChange('reply')}
+          onClick={() => handleModeChange('reply')}
         >
           Reply
         </Button>
@@ -316,6 +356,7 @@ export default function CommentComposer({
         </Flex>
       )}
       <CommentWysiwyg
+        key={mode ?? 'composer'}
         ticketId={ticketId}
         value={draft}
         onChange={setDraft}

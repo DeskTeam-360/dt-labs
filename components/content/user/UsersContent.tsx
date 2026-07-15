@@ -356,7 +356,10 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     }
   }
 
-  const runUserModalSave = async (values: any) => {
+  const runUserModalSave = async (
+    values: any,
+    options?: { sendActivationEmail?: boolean }
+  ) => {
     setSubmitting(true)
     try {
       if (editingUser) {
@@ -434,7 +437,23 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
             body: JSON.stringify(updateData),
           })
 
-          message.success('User created successfully')
+          if (options?.sendActivationEmail) {
+            try {
+              await apiFetch(`/api/users/${result.data.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ send_activation_email: true }),
+              })
+              message.success(`User created and activation email sent to ${values.email}`)
+            } catch (mailErr: any) {
+              message.warning(
+                `User created, but activation email failed: ${mailErr?.message || 'unknown error'}`
+              )
+            }
+          } else {
+            message.success('User created successfully')
+          }
+
           setModalVisible(false)
           form.resetFields()
           setAvatarUrl(null)
@@ -448,8 +467,33 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     }
   }
 
+  const confirmCreateUserWithActivationEmail = (values: any) => {
+    Modal.confirm({
+      title: 'Send account activation email?',
+      icon: <ExclamationCircleOutlined />,
+      content: `Create this user and send an activation email to ${values.email}?`,
+      okText: 'Create & Send Email',
+      cancelText: 'Create Without Email',
+      closable: false,
+      maskClosable: false,
+      keyboard: false,
+      onOk: () => runUserModalSave(values, { sendActivationEmail: true }),
+      onCancel: () => {
+        void runUserModalSave(values, { sendActivationEmail: false })
+      },
+    })
+  }
+
   const handleSubmit = async (values: any) => {
-    if (editingUser && !isCustomer && values.role === 'customer') {
+    if (!editingUser) {
+      if (isAdmin) {
+        confirmCreateUserWithActivationEmail(values)
+        return
+      }
+      await runUserModalSave(values, { sendActivationEmail: false })
+      return
+    }
+    if (!isCustomer && values.role === 'customer') {
       const newCo = (values.company_id || null) as string | null
       const oldCo = editingUser.company_id || null
       if (newCo && oldCo && newCo !== oldCo) {
@@ -1143,7 +1187,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 </Col>
               </Row>
 
-              {editingUser && (
+              {/* {editingUser && (
                 <Form.Item
                   name="is_email_verified"
                   label="Email Verified"
@@ -1151,7 +1195,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                 >
                   <Switch />
                 </Form.Item>
-              )}
+              )} */}
 
               <Form.Item>
                 <Space>

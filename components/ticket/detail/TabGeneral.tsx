@@ -831,7 +831,7 @@ export default function TabGeneral({
         </Col>
 
         <Col xs={8} className="ticket-detail-sidebar-sticky">
-          <div >
+          <div style={{ width: '100%', minWidth: 0, maxWidth: '100%' }}>
           <Flex justify="flex-end" gap={8} wrap="wrap" style={{ marginBottom: 12 }}>
             <Button
               type="primary"
@@ -848,7 +848,16 @@ export default function TabGeneral({
               Reset
             </Button>
           </Flex>
-          <Descriptions column={1} bordered style={{ maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+          <Descriptions
+            column={1}
+            bordered
+            className="ticket-detail-sidebar-descriptions"
+            style={{ width: '100%', maxWidth: '100%' }}
+            styles={{
+              label: { width: '38%', whiteSpace: 'normal' },
+              content: { width: '62%', overflow: 'hidden' },
+            }}
+          >
             <Descriptions.Item label="Short Note">
               <Input.TextArea
                 value={sidebarDraft.shortNote}
@@ -885,7 +894,7 @@ export default function TabGeneral({
                       </span>
                     ),
                   }))}
-                  style={{ minWidth: 140, width: '100%' }}
+                  style={{ width: '100%' }}
                   allowClear
                   placeholder="Kolom board"
                 />
@@ -910,7 +919,7 @@ export default function TabGeneral({
                       </span>
                     ),
                   }))}
-                  style={{ minWidth: 140, width: '100%' }}
+                  style={{ width: '100%' }}
                   allowClear={false}
                 />
               )}
@@ -929,7 +938,7 @@ export default function TabGeneral({
                   value: t.id,
                   label: <Tag color={t.color} style={{ margin: 0 }}>{t.title}</Tag>,
                 }))}
-                style={{ minWidth: 140, width: '100%' }}
+                style={{ width: '100%' }}
                 allowClear
                 placeholder="Select type"
               />
@@ -953,7 +962,7 @@ export default function TabGeneral({
                   }
                   disabled={sidebarAttributesSaving}
                   placeholder="Rank"
-                  style={{ width: '100%', minWidth: 120 }}
+                  style={{ width: '100%' }}
                 />
               </Tooltip>
             </Descriptions.Item>
@@ -974,7 +983,7 @@ export default function TabGeneral({
                   }))}
                   showSearch
                   optionFilterProp="label"
-                  style={{ minWidth: 140, width: '100%' }}
+                  style={{ width: '100%' }}
                   allowClear
                   placeholder="Select company"
                 />
@@ -995,7 +1004,7 @@ export default function TabGeneral({
                   }
                   loading={sidebarAttributesSaving}
                   options={tagOptions.map((t) => ({ value: t.id, label: t.name }))}
-                  style={{ minWidth: 160, width: '100%' }}
+                  style={{ width: '100%' }}
                   placeholder="Select tags"
                   allowClear
                 />
@@ -1024,7 +1033,7 @@ export default function TabGeneral({
                     value: u.id,
                     label: u.full_name ? `${u.full_name} (${u.email})` : u.email,
                   }))}
-                  style={{ minWidth: 200, width: '100%' }}
+                  style={{ width: '100%' }}
                   showSearch
                   optionFilterProp="label"
                 />
@@ -1085,7 +1094,7 @@ export default function TabGeneral({
                   }
                   loading={sidebarAttributesSaving}
                   options={teamOptions.map((t) => ({ value: t.id, label: t.name }))}
-                  style={{ minWidth: 140, width: '100%' }}
+                  style={{ width: '100%' }}
                   placeholder="Select team"
                   allowClear
                 />
@@ -1106,7 +1115,7 @@ export default function TabGeneral({
                     value: u.id,
                     label: u.full_name ? `${u.full_name} (${u.email})` : u.email,
                   }))}
-                  style={{ minWidth: 160, width: '100%' }}
+                  style={{ width: '100%' }}
                   placeholder="Select assignees"
                   allowClear
                   showSearch
@@ -1215,18 +1224,19 @@ export default function TabGeneral({
           {/* Input fields for adding a new attribute */}
           
           <Descriptions.Item label="Add new attribute">
-            <Flex  align="center" style={{ width: '100%' }} gap={10}>
+            <Flex align="center" style={{ width: '100%', minWidth: 0 }} gap={8} wrap="wrap">
               <Input
                 placeholder="Key"
                 value={newAttributeKey}
                 onChange={e => onNewAttributeKeyChange(e.target.value)}
-                style={{ maxWidth: 100 }}
+                style={{ width: 100, maxWidth: '100%', flex: '0 1 100px' }}
               />
               <Input
                 placeholder="Value"
                 value={newAttributeValue}
                 onChange={e => onNewAttributeValueChange(e.target.value)}
                 onPressEnter={onAddAttribute}
+                style={{ flex: '1 1 80px', minWidth: 0 }}
               />
               <Button
                 type="primary"

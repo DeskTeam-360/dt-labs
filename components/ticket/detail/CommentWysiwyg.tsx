@@ -74,8 +74,11 @@ export default function CommentWysiwyg({
 }: CommentWysiwygProps) {
   const { resolved } = useTheme()
   const [mounted, setMounted] = useState(false)
+  /** Remount Quill when blank → HTML is applied externally (template); avoids tags showing as plain text. */
+  const [quillEpoch, setQuillEpoch] = useState(0)
   const quillRef = useRef<{ getEditor: () => QuillEditor } | null>(null)
   const normalizedPlainTextForQuillRef = useRef(false)
+  const prevValueForEpochRef = useRef(value)
   const ticketIdRef = useRef(ticketId)
   ticketIdRef.current = ticketId
   const onChangeRef = useRef(onChange)
@@ -84,6 +87,19 @@ export default function CommentWysiwyg({
   onChangeRef.current = onChange
   valueRef.current = value
   autoLinkifyRef.current = autoLinkify
+
+  const isBlankEditorValue = (v: string): boolean => {
+    const textOnly = String(v || '')
+      .replace(/<p><br><\/p>/gi, '')
+      .replace(/<br\s*\/?>/gi, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .trim()
+    return textOnly.length === 0
+  }
+
+  const valueLooksLikeHtml = /<[a-z][\s\S]*>/i.test(value ?? '')
 
   const modules = useMemo(() => ({
     toolbar: {
@@ -167,7 +183,7 @@ export default function CommentWysiwyg({
       window.clearTimeout(t)
       if (root && onPaste) root.removeEventListener('paste', onPaste)
     }
-  }, [mounted, autoLinkify])
+  }, [mounted, autoLinkify, quillEpoch])
 
   const applyAutoLinkify = () => {
     if (!autoLinkify || !onChange) return
@@ -178,6 +194,16 @@ export default function CommentWysiwyg({
   useEffect(() => {
     normalizedPlainTextForQuillRef.current = false
   }, [ticketId])
+
+  /** Remount Quill when parent injects HTML into a blank editor (agent reply template, mode switch). */
+  useEffect(() => {
+    const prev = prevValueForEpochRef.current ?? ''
+    prevValueForEpochRef.current = value ?? ''
+    if (!mounted) return
+    if (isBlankEditorValue(prev) && !isBlankEditorValue(value ?? '') && /<[a-z][\s\S]*>/i.test(value ?? '')) {
+      setQuillEpoch((e) => e + 1)
+    }
+  }, [mounted, value])
 
   /** After swap to Quill, turn multiline plain text (from fallback textarea) into <p> HTML once. */
   useEffect(() => {
@@ -202,9 +228,31 @@ export default function CommentWysiwyg({
   }, [height])
 
   // Editable fallback until ReactQuill loads (Enter / plain-text bullets work here).
+  // Never put HTML template strings into the plain textarea — they show as raw tags.
   if (!mounted) {
     const parsed = height ? parseInt(height.replace('px', ''), 10) : NaN
     const minH = Number.isFinite(parsed) ? parsed : 200
+    if (valueLooksLikeHtml) {
+      return (
+        <div
+          className="comment-wysiwyg-wrapper"
+          style={{
+            marginBottom: 8,
+            minHeight: minH,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#999',
+            border: '1px solid #d9d9d9',
+            borderRadius: 6,
+            background: '#fff',
+          }}
+          suppressHydrationWarning
+        >
+          Loading editor…
+        </div>
+      )
+    }
     return (
       <div className="comment-wysiwyg-wrapper" style={{ marginBottom: 8 }} suppressHydrationWarning>
         <Input.TextArea
@@ -286,8 +334,8 @@ export default function CommentWysiwyg({
     `}</style>
 
     <div className="comment-wysiwyg-wrapper" style={{ marginBottom: 20, height: height, }}>
-      {/* ref passed for image handler; react-quill-new types omit ref */}
-      <ReactQuill {...(quillProps as React.ComponentProps<typeof ReactQuill>)} />
+      {/* key remounts Quill when HTML is injected into a blank editor; react-quill-new types omit ref */}
+      <ReactQuill key={quillEpoch} {...(quillProps as React.ComponentProps<typeof ReactQuill>)} />
     </div>
     </>
   )

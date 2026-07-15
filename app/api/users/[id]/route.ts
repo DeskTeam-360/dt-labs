@@ -157,6 +157,121 @@ async function sendCustomerResetPasswordEmail(params: {
   })
 }
 
+async function sendUserActivationEmail(params: { toEmail: string }) {
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  if (!clientId || !clientSecret) {
+    throw new Error('Email integration not configured')
+  }
+
+  const [tpl] = await db
+    .select({ status: messageTemplates.status, content: messageTemplates.content })
+    .from(messageTemplates)
+    .where(eq(messageTemplates.key, 'requester_notification_user_activation'))
+    .limit(1)
+
+  const [integration] = await db
+    .select({
+      id: emailIntegrations.id,
+      emailAddress: emailIntegrations.emailAddress,
+      accessToken: emailIntegrations.accessToken,
+      refreshToken: emailIntegrations.refreshToken,
+      expiresAt: emailIntegrations.expiresAt,
+    })
+    .from(emailIntegrations)
+    .where(and(eq(emailIntegrations.provider, 'google'), eq(emailIntegrations.isActive, true)))
+    .limit(1)
+
+  if (!integration?.accessToken) {
+    throw new Error('Email integration not connected')
+  }
+
+  const oauth2Client = new google.auth.OAuth2(
+    clientId,
+    clientSecret,
+    `${baseUrl}/api/email/google/callback`
+  )
+
+  let accessToken = integration.accessToken
+  const expiresAt = integration.expiresAt ? new Date(integration.expiresAt) : null
+  const needsRefresh = !expiresAt || expiresAt <= new Date()
+
+  if (needsRefresh && integration.refreshToken) {
+    oauth2Client.setCredentials({ refresh_token: integration.refreshToken })
+    const { credentials } = await oauth2Client.refreshAccessToken()
+    accessToken = credentials.access_token ?? integration.accessToken
+    if (credentials.access_token && credentials.expiry_date) {
+      await db
+        .update(emailIntegrations)
+        .set({
+          accessToken: credentials.access_token,
+          expiresAt: new Date(credentials.expiry_date),
+          updatedAt: new Date(),
+        })
+        .where(eq(emailIntegrations.id, integration.id))
+    }
+  } else {
+    oauth2Client.setCredentials({ access_token: accessToken })
+  }
+
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
+  const fromEmail = integration.emailAddress || 'noreply@example.com'
+  const appSettings = await getAppSettings()
+  const fromHeader = formatFromHeader(appSettings.email_sender_name, fromEmail)
+  const safeBaseUrl = baseUrl.replace(/\/$/, '')
+  const loginUrl = `${safeBaseUrl}/login`
+  const changePasswordUrl = `${safeBaseUrl}/change-password`
+  const subject = 'Activate your portal account'
+  const subjectMime = encodeSubjectHeader(subject)
+
+  const [recipientUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, params.toEmail))
+    .limit(1)
+
+  const recipientMap = userRowToMergeMap(recipientUser ?? null)
+
+  const fallbackHtml =
+    `<p>Hello,</p>` +
+    `<p>A portal account has been created for you.</p>` +
+    `<p>You can login at <a href="${loginUrl}">${loginUrl}</a> and update your password at <a href="${changePasswordUrl}">${changePasswordUrl}</a>.</p>`
+
+  // Manual admin send should always deliver; use template when active, otherwise fallback.
+  const rawTpl = tpl?.status === 'active' ? tpl.content?.trim() ?? '' : ''
+  const bodyHtml = rawTpl
+    ? mergeMessageTemplateHtml(rawTpl, {
+        origin: safeBaseUrl,
+        ticketId: '',
+        recipient: recipientMap,
+        sender: recipientMap,
+        useDomMerge: false,
+      })
+    : fallbackHtml
+
+  const rawEmail = [
+    `From: ${fromHeader}`,
+    `To: ${params.toEmail}`,
+    `Subject: ${subjectMime}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=UTF-8',
+    '',
+    bodyHtml,
+  ].join('\r\n')
+
+  const raw = Buffer.from(rawEmail)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw },
+  })
+}
+
 /** GET /api/users/[id] - Get user detail */
 export async function GET(
   _request: Request,
@@ -255,6 +370,25 @@ export async function PATCH(
       before: beforeSnapshot,
       after: beforeSnapshot,
       extra: { password_reset_email_sent: true },
+    })
+    return NextResponse.json({ ok: true, sent: true })
+  }
+
+  if (body.send_activation_email) {
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    if (!targetUser.email) {
+      return NextResponse.json({ error: 'User email is missing' }, { status: 400 })
+    }
+    await sendUserActivationEmail({ toEmail: targetUser.email })
+    await logUserUpdated({
+      actorUserId: session.user.id ?? null,
+      actorRole: actorRoleFromSession(session),
+      targetUserId: id,
+      before: beforeSnapshot,
+      after: beforeSnapshot,
+      extra: { activation_email_sent: true },
     })
     return NextResponse.json({ ok: true, sent: true })
   }
