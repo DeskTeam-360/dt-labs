@@ -23,7 +23,7 @@ import {
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { shouldOpenHrefInNewTab } from '@/components/common/SpaNavLink'
@@ -160,11 +160,12 @@ function GroupTabPanel({
 
 export default function MessageTemplatesContent({ user: currentUser }: MessageTemplatesContentProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [collapsed, setCollapsed] = useState(false)
   const [rows, setRows] = useState<MessageTemplateRow[]>([])
   const [loading, setLoading] = useState(false)
   const [previewRow, setPreviewRow] = useState<MessageTemplateRow | null>(null)
-  const [activeGroup, setActiveGroup] = useState<string>('')
+  const [activeGroup, setActiveGroup] = useState<string>(() => searchParams.get('tab') ?? '')
 
   const groupsInOrder = useMemo(() => {
     const seen = new Set<string>()
@@ -288,7 +289,8 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
         width: 200,
         fixed: 'right' as const,
         render: (_: unknown, r) => {
-          const editHref = `/settings/message-templates/${r.id}/edit`
+          const fromTab = encodeURIComponent(r.group || '')
+          const editHref = `/settings/message-templates/${r.id}/edit?from_tab=${fromTab}`
           const isInactive = r.status !== 'active'
           return (
             <Space>
@@ -373,7 +375,10 @@ export default function MessageTemplatesContent({ user: currentUser }: MessageTe
               {groupsInOrder.length > 0 ? (
                 <Tabs
                   activeKey={resolvedGroup}
-                  onChange={setActiveGroup}
+                  onChange={(g) => {
+                    setActiveGroup(g)
+                    router.replace(`/settings/message-templates?tab=${encodeURIComponent(g)}`, { scroll: false })
+                  }}
                   items={tabItems}
                   destroyOnHidden={false}
                 />

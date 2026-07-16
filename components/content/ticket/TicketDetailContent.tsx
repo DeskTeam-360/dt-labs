@@ -1006,6 +1006,7 @@ export default function TicketDetailContent({
                 contact_user_id: d.contactUserId,
                 due_date: d.dueDate,
                 team_id: d.teamId,
+                assignees: d.assigneeIds,
                 short_note: d.shortNote.trim() || null,
             }
             if (useProjectBoard) {
@@ -1083,6 +1084,14 @@ export default function TicketDetailContent({
                     due_date: d.dueDate,
                     team_id: d.teamId,
                     short_note: d.shortNote.trim() || null,
+                    assignees: d.assigneeIds.map((uid) => {
+                        const u = fromLists.find((x) => x.id === uid)
+                        return {
+                            id: uid,
+                            user_id: uid,
+                            user: u ? { id: u.id, full_name: u.full_name ?? null, email: u.email, avatar_url: u.avatar_url ?? null } : null,
+                        }
+                    }),
                 }
             })
 

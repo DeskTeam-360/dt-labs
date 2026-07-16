@@ -599,11 +599,11 @@ export default function CompanyDetailContent({
                           <InputNumber min={0} precision={0} addonAfter="H" style={{ width: '100%' }} />
                         </Form.Item>
                       </Col>
-                      <Col xs={24} sm={12}>
+                      {/* <Col xs={24} sm={12}>
                         <Form.Item name="is_customer" label="Is customer" valuePropName="checked">
                           <Switch checkedChildren="Yes" unCheckedChildren="No" />
                         </Form.Item>
-                      </Col>
+                      </Col> */}
                     </Row>
                   </>
                 )}

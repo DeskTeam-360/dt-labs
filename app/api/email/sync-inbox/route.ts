@@ -23,6 +23,7 @@ import {
   users,
 } from '@/lib/db'
 import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
+import { isInboxAutoUserActivationEmailEnabled } from '@/lib/inbox-user-activation'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 import { sendRequesterTicketCreatedEmail } from '@/lib/requester-new-ticket-email'
 import { uploadBuffer } from '@/lib/storage-idrive'
@@ -280,6 +281,14 @@ async function sendNewInboxUserOnboardingEmails(params: {
   integrationActorUserId: string
   temporaryPassword: string
 }): Promise<void> {
+  // Temporarily off — set INBOX_AUTO_USER_ACTIVATION_EMAIL_ENABLED=true in lib/inbox-user-activation.ts
+  if (!isInboxAutoUserActivationEmailEnabled()) {
+    console.info(
+      '[Sync] inbox auto user activation email skipped (INBOX_AUTO_USER_ACTIVATION_EMAIL_ENABLED is false)'
+    )
+    return
+  }
+
   const {
     gmail,
     fromEmail,

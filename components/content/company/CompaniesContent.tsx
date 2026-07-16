@@ -307,18 +307,18 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
         </Tag>
       ),
     },
-    {
-      title: 'Is customer',
-      dataIndex: 'is_customer',
-      key: 'is_customer',
-      width: 140,
-      align: 'center',
-      sorter: (a, b) => Number(a.is_customer ?? false) - Number(b.is_customer ?? false),
-      sortDirections: ['ascend', 'descend'],
-      render: (is_customer: boolean | undefined) => (
-        <Tag color={is_customer ? 'blue' : 'default'}>{is_customer ? 'Yes' : 'No'}</Tag>
-      ),
-    },
+    // {
+    //   title: 'Is customer',
+    //   dataIndex: 'is_customer',
+    //   key: 'is_customer',
+    //   width: 140,
+    //   align: 'center',
+    //   sorter: (a, b) => Number(a.is_customer ?? false) - Number(b.is_customer ?? false),
+    //   sortDirections: ['ascend', 'descend'],
+    //   render: (is_customer: boolean | undefined) => (
+    //     <Tag color={is_customer ? 'blue' : 'default'}>{is_customer ? 'Yes' : 'No'}</Tag>
+    //   ),
+    // },
     {
       title: 'Color',
       dataIndex: 'color',
@@ -442,7 +442,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                   <Option value={true}>Active</Option>
                   <Option value={false}>Inactive</Option>
                 </Select>
-                <Select
+                {/* <Select
                   placeholder="Filter Is Customer"
                   allowClear
                   value={filterIsCustomer}
@@ -454,7 +454,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                 >
                   <Option value={true}>Customer</Option>
                   <Option value={false}>Non-customer</Option>
-                </Select>
+                </Select> */}
                 <Button
                 type="primary"
                 icon={<PlusOutlined />}
@@ -563,7 +563,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
               </Form.Item>
 
               <Row gutter={24}>
-                <Col xs={24} sm={6}>
+                <Col xs={24} sm={8}>
                   <Form.Item
                     name="active_time"
                     label="Active time"
@@ -572,7 +572,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                     <InputNumber min={0} precision={0} addonAfter="H" style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
-                <Col xs={24} sm={5}>
+                {/* <Col xs={24} sm={5}>
                   <Form.Item
                     name="is_customer"
                     label="Is customer"
@@ -581,11 +581,11 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                   >
                     <Switch checkedChildren="Yes" unCheckedChildren="No" />
                   </Form.Item>
-                </Col>
-                <Col xs={24} sm={5}>
+                </Col> */}
+                <Col xs={24} sm={8}>
                   <Form.Item
                     name="is_active"
-                    label="Status ?"
+                    label="Status"
                     valuePropName="checked"
                   >
                     <Switch checkedChildren="Yes" unCheckedChildren="No" />

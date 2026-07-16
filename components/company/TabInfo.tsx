@@ -67,11 +67,11 @@ export default function TabInfo({ companyData }: TabInfoProps) {
             <Descriptions.Item label="Active time">
               <Text>{`${companyData.active_time ?? 0} H`}</Text>
             </Descriptions.Item>
-            <Descriptions.Item label="Is customer">
+            {/* <Descriptions.Item label="Is customer">
               <Tag color={companyData.is_customer ? 'blue' : 'default'}>
                 {companyData.is_customer ? 'Yes' : 'No'}
               </Tag>
-            </Descriptions.Item>
+            </Descriptions.Item> */}
             <Descriptions.Item label="Company ID">
               <Text code style={{ fontSize: 12 }}>
                 {companyData.id}

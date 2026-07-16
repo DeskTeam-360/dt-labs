@@ -40,7 +40,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   })
 }
 
-/** PATCH /api/message-templates/[id] — body: { content?: string | null, status?: 'active' | 'inactive', email_subject?: string | null } */
+/** PATCH /api/message-templates/[id] — body: { content?, status?, email_subject?, title?, group? } */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   const deny = assertAdmin(session)
@@ -50,13 +50,29 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!id) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
   const body = await request.json().catch(() => ({}))
-  const { content, status, email_subject } = body as { content?: string | null; status?: string; email_subject?: string | null }
+  const { content, status, email_subject, title, group } = body as {
+    content?: string | null
+    status?: string
+    email_subject?: string | null
+    title?: string
+    group?: string
+  }
 
   const updates: Partial<typeof messageTemplates.$inferInsert> = {
     updatedAt: new Date(),
   }
   let touched = false
 
+  if (title !== undefined) {
+    const t = String(title).trim()
+    if (!t) return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    updates.title = t
+    touched = true
+  }
+  if (group !== undefined) {
+    updates.templateGroup = String(group).trim() || 'general'
+    touched = true
+  }
   if (content !== undefined) {
     updates.content = content === null || content === '' ? null : String(content)
     touched = true

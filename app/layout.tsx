@@ -1,5 +1,6 @@
 import "./globals.css?v=1.0.1";
 
+import { AntdRegistry } from "@ant-design/nextjs-registry";
 import type { Metadata } from "next";
 import Script from "next/script";
 
@@ -55,9 +56,11 @@ export default async function RootLayout({
         <Script id="deskteam-theme-init" strategy="beforeInteractive">
           {themeInitScript}
         </Script>
-        <AntdProvider session={session}>
-          {children}
-        </AntdProvider>
+        <AntdRegistry>
+          <AntdProvider session={session}>
+            {children}
+          </AntdProvider>
+        </AntdRegistry>
       </body>
     </html>
   );

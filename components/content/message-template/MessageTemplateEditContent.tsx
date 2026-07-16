@@ -2,7 +2,7 @@
 
 import { ArrowLeftOutlined, EyeOutlined,SaveOutlined } from '@ant-design/icons'
 import { Button, Card, Input, Layout, message, Space, Spin,Typography } from 'antd'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback,useEffect, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
@@ -35,10 +35,13 @@ export default function MessageTemplateEditContent({
   templateId,
 }: MessageTemplateEditContentProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [collapsed, setCollapsed] = useState(false)
   const [row, setRow] = useState<MessageTemplateRow | null>(null)
   const [content, setContent] = useState('')
   const [emailSubject, setEmailSubject] = useState('')
+  const [title, setTitle] = useState('')
+  const [group, setGroup] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -50,6 +53,8 @@ export default function MessageTemplateEditContent({
       setRow(data)
       setContent(data.content ?? '')
       setEmailSubject(data.email_subject ?? '')
+      setTitle(data.title ?? '')
+      setGroup(data.group ?? '')
     } catch (e: unknown) {
       message.error((e as Error).message || 'Failed to load template')
       setRow(null)
@@ -69,17 +74,28 @@ export default function MessageTemplateEditContent({
     }
     setSaving(true)
     try {
+      if (!title.trim()) {
+        message.error('Title is required')
+        setSaving(false)
+        return
+      }
       const updated = await apiFetch<MessageTemplateRow>(`/api/message-templates/${templateId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          title: title.trim(),
+          group: group.trim() || 'general',
           content: content.trim() ? content : null,
           email_subject: emailSubject.trim() || null,
         }),
       })
       setRow(updated)
       message.success('Template saved')
-      router.push('/settings/message-templates')
+      const fromTab = searchParams.get('from_tab') ?? updated.group
+      const backUrl = fromTab
+        ? `/settings/message-templates?tab=${encodeURIComponent(fromTab)}`
+        : '/settings/message-templates'
+      router.push(backUrl)
     } catch (e: unknown) {
       message.error((e as Error).message || 'Save failed')
     } finally {
@@ -95,7 +111,13 @@ export default function MessageTemplateEditContent({
           <Card>
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
               <Space wrap>
-                <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/settings/message-templates')}>
+                <Button icon={<ArrowLeftOutlined />} onClick={() => {
+                  const fromTab = searchParams.get('from_tab')
+                  const backUrl = fromTab
+                    ? `/settings/message-templates?tab=${encodeURIComponent(fromTab)}`
+                    : '/settings/message-templates'
+                  router.push(backUrl)
+                }}>
                   Back to list
                 </Button>
               </Space>
@@ -107,22 +129,36 @@ export default function MessageTemplateEditContent({
               ) : (
                 <>
                   <div>
-                    <Title level={4} style={{ marginBottom: 4 }}>
-                      {row.title}
-                    </Title>
-                    <Space direction="vertical" size={0}>
-                      <Text type="secondary">
-                        <strong>Group:</strong> {row.group}
-                      </Text>
-                      <Text type="secondary" copyable={{ text: row.key }}>
-                        <strong>Key:</strong> {row.key}
-                      </Text>
-                      <Text type="secondary">
-                        <strong>Type:</strong> {row.type}
-                      </Text>
-                      <Text type="secondary">
-                        <strong>Status:</strong> {row.status === 'active' ? 'Active' : 'Inactive'}
-                      </Text>
+                    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                      <div>
+                        <Text strong style={{ display: 'block', marginBottom: 4 }}>Title</Text>
+                        <Input
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          placeholder="Template title"
+                          disabled={row.status !== 'active'}
+                        />
+                      </div>
+                      <div>
+                        <Text strong style={{ display: 'block', marginBottom: 4 }}>Category (Group)</Text>
+                        <Input
+                          value={group}
+                          onChange={(e) => setGroup(e.target.value)}
+                          placeholder="e.g. agent_notifications, requester_notifications"
+                          disabled={row.status !== 'active'}
+                        />
+                      </div>
+                      <Space direction="vertical" size={0}>
+                        <Text type="secondary" copyable={{ text: row.key }}>
+                          <strong>Key:</strong> {row.key}
+                        </Text>
+                        <Text type="secondary">
+                          <strong>Type:</strong> {row.type}
+                        </Text>
+                        <Text type="secondary">
+                          <strong>Status:</strong> {row.status === 'active' ? 'Active' : 'Inactive'}
+                        </Text>
+                      </Space>
                     </Space>
                   </div>
 
@@ -181,7 +217,13 @@ export default function MessageTemplateEditContent({
                     >
                       Save and return to list
                     </Button>
-                    <Button onClick={() => router.push('/settings/message-templates')}>Cancel</Button>
+                    <Button onClick={() => {
+                      const fromTab = searchParams.get('from_tab') ?? row?.group
+                      const backUrl = fromTab
+                        ? `/settings/message-templates?tab=${encodeURIComponent(fromTab)}`
+                        : '/settings/message-templates'
+                      router.push(backUrl)
+                    }}>Cancel</Button>
                   </Space>
 
                   <MessageTemplatePreviewModal
