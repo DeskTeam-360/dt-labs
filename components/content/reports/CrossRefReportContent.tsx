@@ -70,7 +70,7 @@ type UserRow = {
   user_name: string
   ticket_count: number
   total_seconds: number
-  customers: { id: string; name: string; ticket_count: number }[]
+  customers: { id: string; name: string; ticket_count: number; seconds: number }[]
 }
 
 type TeamRow = {
@@ -244,13 +244,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
         r.customers.length === 0 ? (
           <Text type="secondary">—</Text>
         ) : (
-          <Space size={4} wrap>
-            {r.customers.map((c) => (
-              <Tag key={c.id}>
-                {c.name} <Text type="secondary">({c.ticket_count})</Text>
-              </Tag>
-            ))}
-          </Space>
+          <Text type="secondary">{r.customers.length} customer(s) — click to expand</Text>
         ),
     },
   ]
@@ -540,6 +534,47 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                     size="small"
                     pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} users` }}
                     locale={{ emptyText: 'Tidak ada data' }}
+                    expandable={{
+                      expandRowByClick: true,
+                      rowExpandable: (r) => r.customers.length > 0,
+                      expandedRowRender: (r) => {
+                        const maxSec = Math.max(...r.customers.map((c) => c.seconds), 1)
+                        return (
+                          <div style={{ padding: '8px 16px 16px' }}>
+                            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 10 }}>
+                              Persebaran waktu per customer — {r.user_name}
+                            </Text>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                              {r.customers.map((c) => (
+                                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                  <div style={{ width: 160, flexShrink: 0 }}>
+                                    <Text strong style={{ fontSize: 13 }}>{c.name}</Text>
+                                  </div>
+                                  <div style={{ flex: 1 }}>
+                                    <Tooltip title={`${formatDuration(c.seconds)} · ${c.ticket_count} ticket`}>
+                                      <Progress
+                                        percent={Math.round((c.seconds / maxSec) * 100)}
+                                        format={() => (
+                                          <span style={{ fontSize: 12 }}>
+                                            <ClockCircleOutlined style={{ marginRight: 4 }} />
+                                            {formatDuration(c.seconds)}
+                                            <Text type="secondary" style={{ marginLeft: 6, fontSize: 11 }}>
+                                              ({c.ticket_count} tiket)
+                                            </Text>
+                                          </span>
+                                        )}
+                                        strokeColor="#01C4C4"
+                                        size="small"
+                                      />
+                                    </Tooltip>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      },
+                    }}
                   />
                 )}
 

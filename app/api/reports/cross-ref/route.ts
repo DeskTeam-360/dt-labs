@@ -241,16 +241,14 @@ export async function GET(request: Request) {
       user_name: string
       ticket_count: number
       total_seconds: number
-      customers: { id: string; name: string; ticket_count: number }[]
+      customers: { id: string; name: string; ticket_count: number; seconds: number }[]
     }
     const map = new Map<string, UserEntry>()
 
-    const ticketUserSet = new Map<number, Set<string>>()
-    for (const tr of trackerRows) {
-      const s = ticketUserSet.get(tr.ticketId) ?? new Set()
-      s.add(tr.userId)
-      ticketUserSet.set(tr.ticketId, s)
+    // userId -> customerId -> { tickets, seconds }
+    const userCustomerMap = new Map<string, Map<string, { tickets: Set<number>; seconds: number }>>()
 
+    for (const tr of trackerRows) {
       if (!map.has(tr.userId)) {
         const u = userMap.get(tr.userId)
         map.set(tr.userId, {
@@ -262,33 +260,30 @@ export async function GET(request: Request) {
         })
       }
       map.get(tr.userId)!.total_seconds += trackerSec(tr)
-    }
 
-    // ticket count per user (from tickets they tracked time on)
-    const userTicketSet = new Map<string, Set<number>>()
-    for (const tr of trackerRows) {
-      const s = userTicketSet.get(tr.userId) ?? new Set()
-      s.add(tr.ticketId)
-      userTicketSet.set(tr.userId, s)
+      const cid = ticketCompany.get(tr.ticketId)
+      if (cid) {
+        const byCustomer = userCustomerMap.get(tr.userId) ?? new Map()
+        const entry = byCustomer.get(cid) ?? { tickets: new Set<number>(), seconds: 0 }
+        entry.tickets.add(tr.ticketId)
+        entry.seconds += trackerSec(tr)
+        byCustomer.set(cid, entry)
+        userCustomerMap.set(tr.userId, byCustomer)
+      }
     }
 
     // Build customer breakdown per user
     for (const [uid, entry] of map) {
-      const myTickets = [...(userTicketSet.get(uid) ?? [])]
-      entry.ticket_count = myTickets.length
-      const customerTicketCount = new Map<string, number>()
-      for (const tid of myTickets) {
-        const cid = ticketCompany.get(tid)
-        if (!cid) continue
-        customerTicketCount.set(cid, (customerTicketCount.get(cid) ?? 0) + 1)
-      }
-      entry.customers = [...customerTicketCount.entries()]
-        .map(([cid, count]) => ({
+      const byCustomer = userCustomerMap.get(uid) ?? new Map()
+      entry.ticket_count = new Set([...byCustomer.values()].flatMap((v) => [...v.tickets])).size
+      entry.customers = [...byCustomer.entries()]
+        .map(([cid, { tickets, seconds }]) => ({
           id: cid,
           name: companyMap.get(cid)?.name ?? 'Unknown',
-          ticket_count: count,
+          ticket_count: tickets.size,
+          seconds: Math.round(seconds),
         }))
-        .sort((a, b) => b.ticket_count - a.ticket_count)
+        .sort((a, b) => b.seconds - a.seconds)
     }
 
     const result = [...map.values()].sort((a, b) => b.ticket_count - a.ticket_count)
@@ -323,7 +318,7 @@ export async function GET(request: Request) {
       }
     }
 
-    for (const tid of teamIds) {
+    for (const tid of allTeamIds) {
       const team = teamMap.get(tid)
       if (!team) continue
       // all users in this team
