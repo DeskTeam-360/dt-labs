@@ -256,7 +256,7 @@ export default function ProjectDetailContent({ user: currentUser, projectId }: P
           children: (
             <Card size="small" style={{ marginTop: 8 }}>
               <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                Setiap aktivitas berupa tiket proyek; tidak muncul di daftar tiket utama.
+                Each activity is a project ticket; it does not appear in the main ticket list.
               </Text>
               <Table
                 rowKey="id"
@@ -289,7 +289,7 @@ export default function ProjectDetailContent({ user: currentUser, projectId }: P
                     Edit project
                   </Button>
                   <Popconfirm
-                    title="Hapus proyek? Semua tiket aktivitas jadi tiket support biasa."
+                    title="Delete project? All activity tickets will become regular support tickets."
                     onConfirm={handleDeleteProject}
                   >
                     <Button danger>Delete project</Button>

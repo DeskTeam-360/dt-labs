@@ -5,7 +5,7 @@
 export interface AutomationActions {
   /** Assign ticket to this team (uuid) */
   team_id?: string
-  /** Bilangan bulat Priority tiket */
+  /** Integer ticket Priority value */
   priority?: number
   /** @deprecated UI removed; engine still applies legacy rules */
   priority_slug?: string
@@ -19,9 +19,9 @@ export interface AutomationActions {
   tag_ids?: string[]
   /** @deprecated UI removed; engine still applies legacy rules */
   visibility?: string
-  /** Add an automatic note (comment) to the ticket — tampil sebagai "Automation", tanpa pilih user */
+  /** Add an automatic note (comment) to the ticket — shown as "Automation", no user picker */
   add_note?: string
-  /** @deprecated Opsional: kalau diisi, catatan di-atribusi ke user ini; default engine pakai placeholder */
+  /** @deprecated Optional: if set, the note is attributed to this user; engine default uses a placeholder */
   add_note_user_id?: string
   /** Add checklist items (array of titles) */
   add_checklist_items?: string[]

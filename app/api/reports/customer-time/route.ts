@@ -168,7 +168,7 @@ export async function GET(request: Request) {
   const urgentPriorityValue =
     urgentPrio != null ? Number(urgentPrio.sortOrder ?? urgentPrio.id) : null
 
-  /** Label referensi untuk nilai ticket.priority (bukan FK). */
+  /** Reference label for ticket.priority values (not an FK). */
   const priorityMetaByValue = new Map<number, { title: string | null; slug: string | null }>()
   for (const p of priorityRows) {
     const key = Number(p.sortOrder ?? p.id)

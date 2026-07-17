@@ -145,7 +145,7 @@ export const teamMembers = pgTable(
   (t) => [unique('team_members_team_id_user_id_key').on(t.teamId, t.userId)]
 )
 
-// ============ Projects (id, title, description — aktivitas = tiket project_* di tabel tickets) ============
+// ============ Projects (id, title, description — activity = project_* tickets in tickets table) ============
 export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
   title: varchar('title', { length: 255 }).notNull(),
@@ -241,10 +241,14 @@ export const tickets = pgTable('tickets', {
   visibility: varchar('visibility', { length: 50 }).notNull().default('private'),
   teamId: uuid('team_id'),
   gmailThreadId: varchar('gmail_thread_id', { length: 255 }),
-  /** Tingkat Priority numerik (bukan FK ke ticket_priorities). NULL when closed support (out of queue). */
+  /** Numeric Priority level (not an FK to ticket_priorities). NULL when closed support (out of queue). */
   priority: integer('priority').default(0),
   createdVia: varchar('created_via', { length: 50 }),
   lastReadAt: ts('last_read_at'),
+  /** When a customer last opened the ticket (unread-dot for customers). */
+  customerLastReadAt: ts('customer_last_read_at'),
+  /** When an agent/staff last opened the ticket (unread-dot for staff). */
+  staffLastReadAt: ts('staff_last_read_at'),
   typeId: integer('type_id').references(() => ticketTypes.id, { onDelete: 'restrict' }),
   /** support | spam | trash | project — `project` = board card under a project; hidden from main ticket lists */
   ticketType: varchar('ticket_type', { length: 32 }).notNull().default('support'),
@@ -784,7 +788,7 @@ export const recurringTickets = pgTable('recurring_tickets', {
   assigneeIds: jsonb('assignee_ids').$type<string[]>().default([]),
   ticketTypeId: integer('ticket_type_id'),
   contactUserId: uuid('contact_user_id'),
-  visibility: varchar('visibility', { length: 32 }).notNull().default('public'),
+  visibility: varchar('visibility', { length: 32 }).notNull().default('team'),
   createdBy: uuid('created_by'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),

@@ -209,10 +209,10 @@ export function RecapSnapshotPayloadGridTable({
                           ) : null}
                           {onDeleteRow ? (
                             <Popconfirm
-                              title="Hapus recap ini?"
-                              description="Data tidak dapat dikembalikan."
-                              okText="Hapus"
-                              cancelText="Batal"
+                              title="Delete this recap?"
+                              description="This action cannot be undone."
+                              okText="Delete"
+                              cancelText="Cancel"
                               okButtonProps={{ danger: true }}
                               onConfirm={() => onDeleteRow(row.key)}
                             >

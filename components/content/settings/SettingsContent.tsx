@@ -6,6 +6,7 @@ import {
   BarChartOutlined,
   BellOutlined,
   CalendarOutlined,
+  EyeOutlined,
   FileTextOutlined,
   GlobalOutlined,
   InfoCircleOutlined,
@@ -41,6 +42,7 @@ import {
   canAccessSlackNotifications,
   canAccessTeams,
   canAccessTicketAttributes,
+  canAccessTicketVisibilitySettings,
   canAccessUsers,
   canManageDashboardAnnouncements,
   canManageGlobalAnnouncement,
@@ -187,7 +189,9 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
           {(canAccessEmailIntegration(role) ||
             canAccessSlackNotifications(role) ||
             canAccessMessageTemplates(role) ||
-            canAccessAutomationRules(role)) && (
+            canAccessAutomationRules(role) ||
+            canAccessRecurringTickets(role) ||
+            canAccessTicketVisibilitySettings(role)) && (
             <Section heading="Automation">
               <Row gutter={[16, 16]}>
                 {canAccessEmailIntegration(role) && (
@@ -237,6 +241,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                       description="Auto-create tickets on a schedule"
                       href="/settings/recurring-tickets"
                       icon={<CalendarOutlined />}
+                    />
+                  </Col>
+                )}
+                {canAccessTicketVisibilitySettings(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Ticket Visibility"
+                      description="Who can see each visibility level"
+                      href="/settings/ticket-visibility"
+                      icon={<EyeOutlined />}
                     />
                   </Col>
                 )}
@@ -317,7 +331,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                   <Col xs={24} sm={12} md={8}>
                     <HubTile
                       title="AI Integration"
-                      description="Provider Codex/OpenAI dan model aktif"
+                      description="Codex/OpenAI provider and active model"
                       href="/settings/ai"
                       icon={<RobotOutlined />}
                     />

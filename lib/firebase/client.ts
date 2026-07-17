@@ -12,8 +12,8 @@ export type ClientFirebaseConfig = {
 }
 
 /**
- * Baca konfigurasi Firebase untuk client. Authentikasi aplikasi tetap NextAuth;
- * SDK ini hanya untuk Firestore / FCM web (tanpa signInWithCredential).
+ * Read Firebase client config. App auth remains NextAuth;
+ * this SDK is only for Firestore / FCM web (no signInWithCredential).
  */
 export function getClientFirebaseConfig(): Partial<ClientFirebaseConfig> {
   return {

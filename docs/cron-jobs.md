@@ -1,39 +1,39 @@
 # Cron Jobs — DeskTeam360
 
-Semua cron job dijalankan di server Lightsail (`ubuntu@3.23.67.169`) menggunakan `crontab`.
-Auth menggunakan `Authorization: Bearer <secret>` yang dibaca dari `.env`.
+All cron jobs run on the Lightsail server (`ubuntu@3.23.67.169`) via `crontab`.
+Auth uses `Authorization: Bearer <secret>` read from `.env`.
 
-## Daftar Cron Jobs
+## Cron Job List
 
-| Endpoint | Jadwal | Fungsi |
+| Endpoint | Schedule | Purpose |
 |---|---|---|
-| `POST /api/email/sync-inbox` | Setiap 2 menit | Sinkronisasi inbox email (Gmail/IMAP), buat ticket dari email masuk |
-| `POST /api/cron/process-recurring-tickets` | Setiap 1 menit | Buat ticket otomatis dari aturan recurring yang sudah jatuh tempo |
-| `POST /api/cron/company-daily-active` | Setiap hari 00:05 UTC | Snapshot harian jumlah tiket aktif per perusahaan |
-| `POST /api/cron/customer-weekly-recap` | Setiap Minggu 01:00 UTC | Materialize data rekap mingguan per tim (proses berat, jadwal off-peak) |
+| `POST /api/email/sync-inbox` | Every 2 minutes | Sync email inbox (Gmail/IMAP), create tickets from incoming mail |
+| `POST /api/cron/process-recurring-tickets` | Every 1 minute | Create tickets automatically from recurring rules that are due |
+| `POST /api/cron/company-daily-active` | Every day at 00:05 UTC | Daily snapshot of active ticket counts per company |
+| `POST /api/cron/customer-weekly-recap` | Every Sunday at 01:00 UTC | Materialize weekly recap data per team (heavy job, off-peak schedule) |
 
 ## Secret / Auth
 
-Semua endpoint cron menggunakan satu secret yang sama:
+All cron endpoints use the same secret:
 
 ```
-env var: SYNC_INBOX_CRON_SECRET  (juga dipakai oleh COMPANY_DAILY_ACTIVE_CRON_SECRET)
+env var: SYNC_INBOX_CRON_SECRET  (also used by COMPANY_DAILY_ACTIVE_CRON_SECRET)
 header:  Authorization: Bearer <value>
 ```
 
-Secret disimpan di `/var/www/dt-labs/.env` di server.
+The secret is stored in `/var/www/dt-labs/.env` on the server.
 
-## Crontab di Server
+## Crontab on Server
 
-Untuk melihat/edit cron yang aktif:
+To view/edit active crons:
 
 ```bash
 ssh -i "~/LightsailDefaultKey-us-east-2.pem" ubuntu@3.23.67.169
-crontab -l        # lihat
+crontab -l        # list
 crontab -e        # edit
 ```
 
-Isi crontab saat ini:
+Current crontab:
 
 ```cron
 # Email inbox sync — every 2 minutes
@@ -55,25 +55,25 @@ Isi crontab saat ini:
 
 ## Log Files
 
-Output tiap cron disimpan di server:
+Each cron's output is stored on the server:
 
 ```
-/var/log/dt-labs-sync-inbox.log       — hasil sync email terakhir
-/var/log/dt-labs-recurring.log        — hasil proses recurring ticket terakhir
-/var/log/dt-labs-company-daily.log    — hasil snapshot harian terakhir
-/var/log/dt-labs-weekly-recap.log     — hasil rekap mingguan terakhir
+/var/log/dt-labs-sync-inbox.log       — latest email sync result
+/var/log/dt-labs-recurring.log        — latest recurring ticket process result
+/var/log/dt-labs-company-daily.log    — latest daily snapshot result
+/var/log/dt-labs-weekly-recap.log     — latest weekly recap result
 ```
 
-Cek log terakhir:
+Check the latest logs:
 
 ```bash
 tail -f /var/log/dt-labs-recurring.log
 tail -f /var/log/dt-labs-sync-inbox.log
 ```
 
-## Menambah Cron Baru
+## Adding a New Cron
 
-1. Buat endpoint di `app/api/cron/<nama>/route.ts`
-2. Tambahkan auth check menggunakan `SYNC_INBOX_CRON_SECRET` (atau buat secret baru di `.env`)
-3. Pasang di server via `crontab -e`
-4. Update tabel di dokumen ini
+1. Create an endpoint at `app/api/cron/<name>/route.ts`
+2. Add an auth check using `SYNC_INBOX_CRON_SECRET` (or create a new secret in `.env`)
+3. Install it on the server via `crontab -e`
+4. Update the table in this document

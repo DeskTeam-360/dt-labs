@@ -1,21 +1,42 @@
-import { and, eq, isNull, or, type SQL } from 'drizzle-orm'
+import { and, eq, inArray, isNull, not, or, type SQL } from 'drizzle-orm'
 
 import { getCustomerCompanyId } from '@/lib/customer-company'
 import { db, tickets } from '@/lib/db'
 import { coerceTicketType } from '@/lib/ticket-classification'
+import {
+  isTicketVisibilityLevel,
+  TICKET_VISIBILITY_LEVELS,
+  userMatchesVisibilityRule,
+} from '@/lib/ticket-visibility'
+import { getTicketVisibilityRules } from '@/lib/ticket-visibility-server'
 
 export type CustomerTicketRow = {
   companyId: string | null
   contactUserId: string | null
   createdBy: string | null
+  visibility?: string | null
 }
 
-/** Ticket tanpa company: contact atau creator. */
+/** Ticket without company: contact or creator. */
 export function customerOwnsPersonalTicket(ticket: CustomerTicketRow, userId: string): boolean {
   return ticket.contactUserId === userId || ticket.createdBy === userId
 }
 
-/** Portal customer boleh lihat ticket perusahaan atau milik pribadi (company null). */
+/** Whether a visibility value is allowed for the customer role under current rules. */
+export async function customerMaySeeVisibility(visibility: string | null | undefined): Promise<boolean> {
+  if (!visibility) return true
+  if (!isTicketVisibilityLevel(visibility)) {
+    // Legacy public/private/specific_users — company/ownership still gates access
+    return true
+  }
+  const rules = await getTicketVisibilityRules()
+  return userMatchesVisibilityRule(
+    { role: 'customer', department: null, position: null },
+    rules[visibility]
+  )
+}
+
+/** Customer portal may see company tickets or personal ones (company null). */
 export function customerCanAccessTicket(
   ticket: CustomerTicketRow,
   userId: string,
@@ -27,16 +48,31 @@ export function customerCanAccessTicket(
   return customerOwnsPersonalTicket(ticket, userId)
 }
 
-/** Kondisi SQL untuk daftar ticket customer. */
-export function customerTicketsAccessCondition(userId: string, customerCompanyId: string | null): SQL {
+/** Visibility levels the customer role must not see (from configured rules). */
+export async function customerBlockedVisibilityLevels(): Promise<string[]> {
+  const rules = await getTicketVisibilityRules()
+  return TICKET_VISIBILITY_LEVELS.filter(
+    (level) =>
+      !userMatchesVisibilityRule({ role: 'customer', department: null, position: null }, rules[level])
+  )
+}
+
+/** SQL condition for the customer ticket list. */
+export async function customerTicketsAccessCondition(
+  userId: string,
+  customerCompanyId: string | null
+): Promise<SQL> {
   const personalOwned = and(
     isNull(tickets.companyId),
     or(eq(tickets.contactUserId, userId), eq(tickets.createdBy, userId))!
   )!
-  if (customerCompanyId) {
-    return or(eq(tickets.companyId, customerCompanyId), personalOwned)!
-  }
-  return personalOwned
+  const scope = customerCompanyId
+    ? or(eq(tickets.companyId, customerCompanyId), personalOwned)!
+    : personalOwned
+
+  const blocked = await customerBlockedVisibilityLevels()
+  if (blocked.length === 0) return scope
+  return and(scope, not(inArray(tickets.visibility, blocked)))!
 }
 
 export async function assertCustomerMayAccessTicket(
@@ -50,12 +86,16 @@ export async function assertCustomerMayAccessTicket(
       contactUserId: tickets.contactUserId,
       createdBy: tickets.createdBy,
       ticketType: tickets.ticketType,
+      visibility: tickets.visibility,
     })
     .from(tickets)
     .where(eq(tickets.id, ticketId))
     .limit(1)
   if (!trow) return { ok: false, status: 404 }
   if (!customerCanAccessTicket(trow, userId, customerCompanyId)) {
+    return { ok: false, status: 403 }
+  }
+  if (!(await customerMaySeeVisibility(trow.visibility))) {
     return { ok: false, status: 403 }
   }
   const cls = coerceTicketType(trow.ticketType)

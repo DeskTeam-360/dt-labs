@@ -1,6 +1,6 @@
 /**
- * Kolom Kanban hanya untuk status yang boleh tampil.
- * Mendukung boolean, angka, string Postgres legacy ('t'/'f'), null = default ON (sama schema).
+ * Kanban columns only for statuses that are allowed to show.
+ * Supports boolean, number, legacy Postgres strings ('t'/'f'), null = default ON (same as schema).
  */
 export function isTicketStatusInKanban(showInKanban: unknown): boolean {
   if (showInKanban === null || showInKanban === undefined) return true

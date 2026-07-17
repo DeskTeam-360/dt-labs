@@ -3,9 +3,9 @@
 import {
   BarChartOutlined,
   CheckSquareOutlined,
+  ClockCircleOutlined,
   DashboardOutlined,
   DeleteOutlined,
-  FolderOutlined,
   InfoCircleOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -24,7 +24,6 @@ import { shouldOpenHrefInNewTab,SpaNavLink } from '@/components/common/SpaNavLin
 import {
   canAccessCustomerTimeReport,
   canAccessMyTeams,
-  canAccessProjects,
   canAccessSettingsHub,
   canAccessTickets,
   isSettingsHrefPathname,
@@ -173,8 +172,8 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
                 },
                 {
                   key: '/reports',
-                  icon: <BarChartOutlined />,
-                  label: linkLabel('/reports', 'Reports'),
+                  icon: <ClockCircleOutlined />,
+                  label: linkLabel('/reports', 'Time Report'),
                 },
               ]
             : []),

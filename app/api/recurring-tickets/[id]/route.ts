@@ -5,6 +5,7 @@ import { auth } from '@/auth'
 import { isAdminOrManager } from '@/lib/auth-utils'
 import { db, recurringTicketRuns, recurringTickets } from '@/lib/db'
 import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
+import { isTicketVisibilityLevel } from '@/lib/ticket-visibility'
 
 function authError() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -91,7 +92,12 @@ export async function PATCH(
 
   if (body.ticket_type_id !== undefined) updates.ticketTypeId = body.ticket_type_id ?? null
   if (body.contact_user_id !== undefined) updates.contactUserId = body.contact_user_id ?? null
-  if (body.visibility !== undefined) updates.visibility = body.visibility
+  if (body.visibility !== undefined) {
+    if (!isTicketVisibilityLevel(body.visibility)) {
+      return NextResponse.json({ error: 'invalid visibility' }, { status: 400 })
+    }
+    updates.visibility = body.visibility
+  }
 
   // Recompute nextRunAt if schedule-affecting fields changed
   const scheduleFields = ['frequency', 'specific_days', 'specific_date', 'interval_days', 'time_of_day', 'timezone', 'start_date', 'end_date', 'is_active']

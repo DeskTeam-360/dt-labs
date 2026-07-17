@@ -4,8 +4,8 @@ import { getToken } from 'next-auth/jwt'
 import { authSecureCookieFromRequest } from '@/lib/auth-secure-cookies'
 
 /**
- * Jangan import `auth` dari `@/auth` di sini — itu menarik Drizzle + postgres + bcrypt ke Edge
- * (timeout Vercel / memori besar). Cukup decode JWT sesi dengan getToken (ringan).
+ * Do not import `auth` from `@/auth` here — that pulls Drizzle + postgres + bcrypt into Edge
+ * (Vercel timeouts / large memory). Just decode the session JWT with getToken (lightweight).
  */
 export async function middleware(req: NextRequest) {
   const secret = process.env.AUTH_SECRET
@@ -41,7 +41,7 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next()
 }
 
-/** Hanya halaman yang butuh redirect auth — mengurangi invokasi middleware di Vercel. */
+/** Only pages that need auth redirects — reduces middleware invocations on Vercel. */
 export const config = {
   matcher: ['/login', '/dashboard/:path*', '/tickets/:path*', '/settings/:path*', '/change-password'],
 }

@@ -1,4 +1,4 @@
--- Normalisasi: tiket support + company dapat priority rapat 1..n tanpa duplikasi; lalu UNIQUE (company_id, priority).
+-- Normalize: support tickets + company get dense priority 1..n without duplicates; then UNIQUE (company_id, priority).
 WITH ranked AS (
   SELECT
     id,

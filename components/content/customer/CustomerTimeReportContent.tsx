@@ -882,7 +882,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
     if (!recapPreview?.payload) return []
     return [
       {
-        groupLabel: `Yang akan disimpan — ${recapPreview.period_start} → ${recapPreview.period_end} (${recapPreview.period_type})`,
+        groupLabel: `To be saved — ${recapPreview.period_start} → ${recapPreview.period_end} (${recapPreview.period_type})`,
         rows: [
           {
             key: 'preview',

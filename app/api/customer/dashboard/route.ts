@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
@@ -17,11 +17,31 @@ import {
 } from '@/lib/db'
 import { DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
 
+type TimePeriod = 'current-day' | 'week' | 'all'
+
+function parseTimePeriod(raw: string | null): TimePeriod {
+  if (raw === 'week' || raw === 'all' || raw === 'current-day') return raw
+  return 'current-day'
+}
+
+function timePeriodStart(period: TimePeriod): Date | null {
+  if (period === 'all') return null
+  const now = new Date()
+  if (period === 'current-day') {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  }
+  // This week: Monday 00:00 local
+  const day = now.getDay() // 0 Sun .. 6 Sat
+  const daysFromMonday = day === 0 ? 6 : day - 1
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysFromMonday)
+}
+
 /** GET /api/customer/dashboard - Stats for customer dashboard. */
 export async function GET(request: Request) {
   const session = await auth()
   const { searchParams } = new URL(request.url)
   const debug = searchParams.get('debug') === '1'
+  const timePeriod = parseTimePeriod(searchParams.get('time_period'))
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -29,7 +49,8 @@ export async function GET(request: Request) {
   const userId = session.user.id
   const companyId = await getCustomerCompanyId(userId)
 
-  // Support tickets: perusahaan + milik pribadi tanpa company (exclude spam/trash)
+  // Support tickets: company + personal (no company); exclude spam/trash
+  const customerAccess = await customerTicketsAccessCondition(userId, companyId)
   const myTickets = await db
     .select({
       id: tickets.id,
@@ -41,7 +62,7 @@ export async function GET(request: Request) {
       updatedAt: tickets.updatedAt,
     })
     .from(tickets)
-    .where(and(customerTicketsAccessCondition(userId, companyId), eq(tickets.ticketType, DEFAULT_TICKET_TYPE)))
+    .where(and(customerAccess, eq(tickets.ticketType, DEFAULT_TICKET_TYPE)))
 
   const typeIds = [...new Set(myTickets.map((t) => t.typeId).filter(Boolean))] as number[]
   const typeMap: Record<number, { title: string; color: string }> = {}
@@ -72,7 +93,14 @@ export async function GET(request: Request) {
   const timeByType: Array<{ type_title: string; seconds: number; color: string }> = []
   let totalTimeSeconds = 0
   if (myTicketIds.length > 0) {
-    const trackerRows = await db.select({ ticketId: ticketTimeTracker.ticketId, durationSeconds: ticketTimeTracker.durationSeconds }).from(ticketTimeTracker).where(inArray(ticketTimeTracker.ticketId, myTicketIds))
+    const periodStart = timePeriodStart(timePeriod)
+    const trackerWhere = periodStart
+      ? and(inArray(ticketTimeTracker.ticketId, myTicketIds), gte(ticketTimeTracker.startTime, periodStart))
+      : inArray(ticketTimeTracker.ticketId, myTicketIds)
+    const trackerRows = await db
+      .select({ ticketId: ticketTimeTracker.ticketId, durationSeconds: ticketTimeTracker.durationSeconds })
+      .from(ticketTimeTracker)
+      .where(trackerWhere)
     const ticketToType: Record<number, number | null> = {}
     myTickets.forEach((t) => { ticketToType[t.id] = t.typeId })
     const secondsByType: Record<number | string, number> = {}

@@ -64,7 +64,7 @@ export default function LoginPage() {
 
       if (result?.ok) {
         message.success('Login successful!')
-        // Full page navigation agar cookie session ikut terkirim (penting untuk Vercel/serverless)
+        // Full page navigation so the session cookie is sent (important for Vercel/serverless)
         window.location.href = '/dashboard'
         return
       }

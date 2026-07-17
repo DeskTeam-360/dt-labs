@@ -1,7 +1,7 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 
-/** Re-check DB at most this often (ms) per JWT to limit load (hanya di Node, bukan Edge). */
+/** Re-check DB at most this often (ms) per JWT to limit load (Node only, not Edge). */
 const JWT_USER_RECHECK_MS = 60_000
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -39,7 +39,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return token
       }
 
-      // Edge: jangan load postgres / Drizzle (middleware sudah pakai getToken, bukan auth()).
+      // Edge: do not load postgres / Drizzle (middleware already uses getToken, not auth()).
       if (process.env.NEXT_RUNTIME === 'edge') {
         return token
       }

@@ -4,7 +4,7 @@ import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, Card, DatePicker, Layout, message, Space, Typography } from 'antd'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
@@ -55,6 +55,14 @@ function cellBackground(embedded: boolean, pct: number | null | undefined): stri
   return '#fff'
 }
 
+function formatTrackedTime(seconds: number | null | undefined): string {
+  const totalMinutes = Math.round((Number(seconds) || 0) / 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours > 0) return `${hours}h ${minutes}m`
+  return `${minutes}m`
+}
+
 function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows: GridRow[] }) {
   return (
     <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
@@ -62,7 +70,7 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
         style={{
           borderCollapse: 'collapse',
           fontSize: 12,
-          minWidth: 200 + weeksDisplay.length * 112,
+          minWidth: 200 + weeksDisplay.length * 216,
         }}
       >
         <thead>
@@ -79,6 +87,7 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                 borderBottom: '1px solid #fff',
                 minWidth: 200,
               }}
+              rowSpan={2}
             >
               Customer
             </th>
@@ -96,9 +105,40 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                   fontWeight: 600,
                 }}
                 title={w.label}
+              colSpan={2}
               >
                {w.iso_year} {w.header ?? `${w.iso_year} W${w.iso_week}`}
               </th>
+            ))}
+          </tr>
+          <tr>
+            {weeksDisplay.map((w) => (
+              <Fragment key={w.week_start}>
+                <th
+                  style={{
+                    background: 'var(--ant-color-primary, #1677ff)',
+                    color: '#fff',
+                    padding: '6px 4px',
+                    textAlign: 'center',
+                    borderLeft: '1px solid rgba(255,255,255,0.25)',
+                    minWidth: 108,
+                  }}
+                >
+                  Utilization
+                </th>
+                <th
+                  style={{
+                    background: 'var(--ant-color-primary, #1677ff)',
+                    color: '#fff',
+                    padding: '6px 4px',
+                    textAlign: 'center',
+                    borderLeft: '1px solid rgba(255,255,255,0.25)',
+                    minWidth: 108,
+                  }}
+                >
+                  Total Time
+                </th>
+              </Fragment>
             ))}
           </tr>
         </thead>
@@ -124,18 +164,30 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                 const embedded = cell?.is_embedded ?? false
                 const pct = cell?.utilization_percent
                 return (
-                  <td
-                    key={w.week_start}
-                    style={{
-                      textAlign: 'center',
-                      padding: '6px 4px',
-                      borderBottom: '1px solid #f0f0f0',
-                      borderLeft: '1px solid #f0f0f0',
-                      background: cellBackground(embedded, pct),
-                    }}
-                  >
-                    {embedded ? (pct != null ? `${pct.toFixed(1)}%` : '—') : '—'}
-                  </td>
+                  <Fragment key={w.week_start}>
+                    <td
+                      style={{
+                        textAlign: 'center',
+                        padding: '6px 4px',
+                        borderBottom: '1px solid #f0f0f0',
+                        borderLeft: '1px solid #f0f0f0',
+                        background: cellBackground(embedded, pct),
+                      }}
+                    >
+                      {embedded ? (pct != null ? `${pct.toFixed(1)}%` : '—') : '—'}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: 'center',
+                        padding: '6px 4px',
+                        borderBottom: '1px solid #f0f0f0',
+                        borderLeft: '1px solid #f0f0f0',
+                        background: embedded ? '#fff' : 'var(--ant-color-fill-secondary, #e8e8e8)',
+                      }}
+                    >
+                      {embedded ? formatTrackedTime(cell?.tracker_reported_seconds) : '—'}
+                    </td>
+                  </Fragment>
                 )
               })}
             </tr>

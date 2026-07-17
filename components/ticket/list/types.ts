@@ -140,12 +140,19 @@ export function darkenColor(hex: string, percent: number = 30): string {
 export function getVisibilityColor(visibility: string): string {
   switch (visibility) {
   case 'public':
+  case 'team':
     return 'green'
   case 'private':
   case 'specific_users':
     return 'default'
-  case 'team':
+  case 'account_manager':
     return 'blue'
+  case 'team_leader':
+    return 'geekblue'
+  case 'admin':
+    return 'purple'
+  case 'project_manager':
+    return 'cyan'
   default:
     return 'default'
   }

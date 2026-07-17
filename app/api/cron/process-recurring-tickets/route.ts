@@ -8,6 +8,7 @@ import { and, eq, isNotNull, lte } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { db, recurringTicketRuns, recurringTickets, tickets } from '@/lib/db'
+import { sendRecurringTicketCreatedEmail } from '@/lib/recurring-ticket-email'
 import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
 import { assignCompanySupportTicketRank, assignCreatorSupportTicketRank, parseCompanyTicketDesiredRank, resolveSupportQueueScope } from '@/lib/ticket-company-priority-order'
 
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
           teamId: rule.teamId ?? null,
           companyId: rule.companyId ?? null,
           typeId: rule.ticketTypeId ?? null,
-          visibility: rule.visibility ?? 'public',
+          visibility: rule.visibility ?? 'team',
           createdBy: rule.createdBy ?? null,
           contactUserId: rule.contactUserId ?? null,
           createdVia: 'recurring',
@@ -112,6 +113,21 @@ export async function POST(req: NextRequest) {
         ranAt: now,
         status: 'success',
       })
+
+      try {
+        await sendRecurringTicketCreatedEmail({
+          ticketId: newTicket.id,
+          ticketTitle: rule.title,
+          companyId: rule.companyId ?? null,
+          contactUserId: rule.contactUserId ?? null,
+          createdByUserId: rule.createdBy ?? null,
+        })
+      } catch (emailErr) {
+        console.error(
+          `[recurring-tickets] Email failed for rule ${rule.id} ticket #${newTicket.id}:`,
+          emailErr
+        )
+      }
 
       created++
     } catch (err) {

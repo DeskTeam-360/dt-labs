@@ -27,7 +27,7 @@ export async function GET() {
     }
     const role = (session.user as { role?: string }).role
     if (!isAdmin(role)) {
-      return NextResponse.json({ error: 'Forbidden — hanya role admin.' }, { status: 403 })
+      return NextResponse.json({ error: 'Forbidden — admin role only.' }, { status: 403 })
     }
 
     const rows = await db

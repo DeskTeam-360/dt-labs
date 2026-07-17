@@ -330,7 +330,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     openedEditFromQueryRef.current = false
   }, [userData.id])
 
-  /** Dari company detail: link `/settings/users/{id}?edit=1` langsung buka mode edit. */
+  /** From company detail: link `/settings/users/{id}?edit=1` opens edit mode directly. */
   useEffect(() => {
     if (openedEditFromQueryRef.current) return
     if (searchParams.get('edit') !== '1') return

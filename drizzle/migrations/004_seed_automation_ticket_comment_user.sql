@@ -1,5 +1,5 @@
--- User sandi untuk catatan automation (FK ticket_comments.user_id).
--- Samakan id dengan lib/automation-constants.ts AUTOMATION_NOTE_USER_ID
+-- Automation note user (FK ticket_comments.user_id).
+-- Keep id in sync with lib/automation-constants.ts AUTOMATION_NOTE_USER_ID
 INSERT INTO users (id, email, full_name, role, status)
 VALUES (
   '00000000-0000-0000-0000-0000000000a1',

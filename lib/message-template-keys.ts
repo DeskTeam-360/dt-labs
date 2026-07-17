@@ -5,6 +5,7 @@ export const MESSAGE_TEMPLATE_KEYS = [
   'agent_notification_requester_replies',
   'requester_notification_agent_closes',
   'requester_notification_new_ticket_created',
+  'requester_notification_recurring_ticket_created',
   'requester_notification_password_reset',
   'requester_notification_user_activation',
   'template_agent_reply',

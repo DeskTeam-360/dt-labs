@@ -29,7 +29,7 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs, { type Dayjs } from 'dayjs'
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
@@ -100,22 +100,38 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
   const [viewBy, setViewBy] = useState<ViewBy>('customer')
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<ReportData | null>(null)
+  /** Once a report has been run, changing View by re-fetches with the same date range. */
+  const hasRunRef = useRef(false)
 
-  const handleRun = async () => {
-    if (!dateRange[0] || !dateRange[1]) return
+  const fetchReport = useCallback(async (nextViewBy: ViewBy, range: [Dayjs, Dayjs]) => {
+    if (!range[0] || !range[1]) return
     setLoading(true)
-    setData(null)
     try {
-      const from = dateRange[0].startOf('day').toISOString()
-      const to = dateRange[1].endOf('day').toISOString()
+      const from = range[0].startOf('day').toISOString()
+      const to = range[1].endOf('day').toISOString()
       const res = await fetch(
-        `/api/reports/cross-ref?date_from=${encodeURIComponent(from)}&date_to=${encodeURIComponent(to)}&view_by=${viewBy}`,
+        `/api/reports/cross-ref?date_from=${encodeURIComponent(from)}&date_to=${encodeURIComponent(to)}&view_by=${nextViewBy}`,
         { credentials: 'include' }
       )
       const json = await res.json()
-      if (res.ok) setData(json)
+      if (res.ok) {
+        setData(json as ReportData)
+        hasRunRef.current = true
+      }
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  const handleRun = () => {
+    void fetchReport(viewBy, dateRange)
+  }
+
+  const handleViewByChange = (next: ViewBy) => {
+    setViewBy(next)
+    // Keep existing results visible; switch perspective for the last-run date range.
+    if (hasRunRef.current) {
+      void fetchReport(next, dateRange)
     }
   }
 
@@ -373,7 +389,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
               Cross Reference Report
             </Title>
             <Text type="secondary" style={{ fontSize: 13 }}>
-              Analisa tiket, waktu, customer, user, dan team dalam rentang tanggal tertentu.
+              Analyze tickets, time, customers, users, and teams within a selected date range.
             </Text>
           </div>
 
@@ -426,10 +442,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                   <Text type="secondary" style={{ fontSize: 11, lineHeight: 1 }}>View by</Text>
                   <Segmented
                     value={viewBy}
-                    onChange={(v) => {
-                      setViewBy(v as ViewBy)
-                      setData(null)
-                    }}
+                    onChange={(v) => handleViewByChange(v as ViewBy)}
                     options={[
                       { label: 'Customer', value: 'customer', icon: <FileTextOutlined /> },
                       { label: 'User', value: 'user', icon: <UserOutlined /> },
@@ -447,7 +460,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
           {/* ── Results ── */}
           <Spin spinning={loading}>
             {!data && !loading && (
-              <Empty description="Pilih date range dan view by, lalu klik Run Report" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              <Empty description="Select a date range and view by, then click Run Report" image={Empty.PRESENTED_IMAGE_SIMPLE} />
             )}
 
             {data && summaryStats && (
@@ -481,7 +494,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                     dataSource={data.rows}
                     size="small"
                     pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} customers` }}
-                    locale={{ emptyText: 'Tidak ada data' }}
+                    locale={{ emptyText: 'No data' }}
                     expandable={{
                       expandRowByClick: true,
                       rowExpandable: (r) => r.user_breakdown.length > 0,
@@ -490,7 +503,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                         return (
                           <div style={{ padding: '8px 16px 16px' }}>
                             <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 10 }}>
-                              Persebaran waktu per user — {r.company_name}
+                              Time distribution per user — {r.company_name}
                             </Text>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                               {r.user_breakdown.map((u) => (
@@ -507,7 +520,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                                             <ClockCircleOutlined style={{ marginRight: 4 }} />
                                             {formatDuration(u.seconds)}
                                             <Text type="secondary" style={{ marginLeft: 6, fontSize: 11 }}>
-                                              ({u.ticket_count} tiket)
+                                              ({u.ticket_count} tickets)
                                             </Text>
                                           </span>
                                         )}
@@ -533,7 +546,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                     dataSource={data.rows}
                     size="small"
                     pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} users` }}
-                    locale={{ emptyText: 'Tidak ada data' }}
+                    locale={{ emptyText: 'No data' }}
                     expandable={{
                       expandRowByClick: true,
                       rowExpandable: (r) => r.customers.length > 0,
@@ -542,7 +555,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                         return (
                           <div style={{ padding: '8px 16px 16px' }}>
                             <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 10 }}>
-                              Persebaran waktu per customer — {r.user_name}
+                              Time distribution per customer — {r.user_name}
                             </Text>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                               {r.customers.map((c) => (
@@ -559,7 +572,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                                             <ClockCircleOutlined style={{ marginRight: 4 }} />
                                             {formatDuration(c.seconds)}
                                             <Text type="secondary" style={{ marginLeft: 6, fontSize: 11 }}>
-                                              ({c.ticket_count} tiket)
+                                              ({c.ticket_count} tickets)
                                             </Text>
                                           </span>
                                         )}
@@ -585,7 +598,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                     dataSource={data.rows}
                     size="small"
                     pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} teams` }}
-                    locale={{ emptyText: 'Tidak ada data' }}
+                    locale={{ emptyText: 'No data' }}
                   />
                 )}
               </>

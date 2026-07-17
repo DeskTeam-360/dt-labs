@@ -474,7 +474,7 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
               </Text>
             }
           >
-            <TextArea rows={3} placeholder="mis. P1 — mohon konfirmasi di thread" maxLength={1000} showCount />
+            <TextArea rows={3} placeholder="e.g. P1 — please confirm in the thread" maxLength={1000} showCount />
           </Form.Item>
           <Title level={5}>When to notify</Title>
           <Flex gap={16}>

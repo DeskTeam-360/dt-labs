@@ -47,7 +47,7 @@ export async function GET() {
     }
     return NextResponse.json(body, {
       headers: {
-        /** Katalog lookup jarang berubah; browser boleh cache singkat. */
+        /** Lookup catalog rarely changes; browser may cache briefly. */
         'Cache-Control': 'private, max-age=60, stale-while-revalidate=120',
       },
     })

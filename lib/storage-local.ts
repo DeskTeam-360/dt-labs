@@ -1,12 +1,12 @@
 /**
- * Local filesystem storage (untuk VPS via `next start` + PM2, customer tanpa iDrive).
+ * Local filesystem storage (for VPS via `next start` + PM2, customers without iDrive).
  *
- * Files disimpan di ./storage-data (di luar /public, di-gitignore) dan
- * di-serve lewat /api/storage/file/[...path].
+ * Files are stored in ./storage-data (outside /public, gitignored) and
+ * served via /api/storage/file/[...path].
  *
  * Env vars:
- * - STORAGE_LOCAL_DIR: (optional) override lokasi folder, default './storage-data'
- * - STORAGE_LOCAL_PUBLIC_URL: (optional) base URL publik, default '/api/storage/file'
+ * - STORAGE_LOCAL_DIR: (optional) override folder location, default './storage-data'
+ * - STORAGE_LOCAL_PUBLIC_URL: (optional) public base URL, default '/api/storage/file'
  */
 import { mkdir, readFile, rm, writeFile } from 'fs/promises'
 import path from 'path'

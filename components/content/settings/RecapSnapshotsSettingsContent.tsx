@@ -51,7 +51,7 @@ interface RecapSnapshotsSettingsContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string | null }
 }
 
-/** Kunci stabil untuk Select: recap tanpa judul. */
+/** Stable Select key for recaps without a title. */
 const EMPTY_TITLE_KEY = '__empty_title__'
 
 function titleKey(row: SnapshotGridRow): string {
@@ -60,7 +60,7 @@ function titleKey(row: SnapshotGridRow): string {
 }
 
 function titleLabelFromKey(key: string): string {
-  return key === EMPTY_TITLE_KEY ? '(Tanpa judul)' : key
+  return key === EMPTY_TITLE_KEY ? '(Untitled)' : key
 }
 
 function normalizeTeamIds(raw: unknown): string[] {
@@ -109,7 +109,7 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
   const [rows, setRows] = useState<SnapshotGridRow[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  /** Empty = tampilkan semua judul. Nilai = `titleKey` (judul unik atau placeholder tanpa judul). */
+  /** Empty = show all titles. Values are `titleKey` (unique title or untitled placeholder). */
   const [selectedTitleKeys, setSelectedTitleKeys] = useState<string[]>([])
   const [teamsById, setTeamsById] = useState<Record<string, string>>({})
   const [detailOpen, setDetailOpen] = useState(false)
@@ -234,12 +234,12 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
     try {
       const raw = JSON.parse(editPayloadJson) as unknown
       if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-        message.error('Payload harus berupa objek JSON (bukan array atau primitif).')
+        message.error('Payload must be a JSON object (not an array or primitive).')
         return
       }
       parsed = raw as Record<string, unknown>
     } catch {
-      message.error('JSON payload tidak valid.')
+      message.error('Invalid JSON payload.')
       return
     }
     setDetailSaveLoading(true)
@@ -307,10 +307,10 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
         if (!res.ok) throw new Error(body?.error || res.statusText)
         setRows((prev) => prev.filter((r) => r.id !== id))
         setTotal((t) => (t > 0 ? t - 1 : 0))
-        message.success('Recap dihapus')
+        message.success('Recap deleted')
         if (detailRow?.id === id) closeDetailModal()
       } catch (e) {
-        message.error(e instanceof Error ? e.message : 'Gagal menghapus')
+        message.error(e instanceof Error ? e.message : 'Failed to delete')
       }
     },
     [closeDetailModal, detailRow?.id]
@@ -516,11 +516,11 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
             {!loading && rows.length > 0 && (
               <Card size="small">
                 <Space wrap align="center" size="middle">
-                  <Text strong>Judul recap</Text>
+                  <Text strong>Recap title</Text>
                   <Select
                     mode="multiple"
                     allowClear
-                    placeholder="Semua judul"
+                    placeholder="All titles"
                     style={{ minWidth: 320, maxWidth: '100%' }}
                     options={titleSelectOptions}
                     value={selectedTitleKeys}
@@ -530,8 +530,8 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
                   />
                   <Text type="secondary">
                     {selectedTitleKeys.length === 0
-                      ? `${rows.length} baris · ${grouped.length} grup periode`
-                      : `${rowsFilteredByTitle.length} baris · ${grouped.length} grup periode`}
+                      ? `${rows.length} rows · ${grouped.length} period groups`
+                      : `${rowsFilteredByTitle.length} rows · ${grouped.length} period groups`}
                   </Text>
                 </Space>
               </Card>
@@ -540,16 +540,16 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
             <Card styles={{ body: { padding: 0 } }}>
               {loading ? (
                 <div style={{ padding: 48, textAlign: 'center' }}>
-                  <Text type="secondary">Memuat…</Text>
+                  <Text type="secondary">Loading…</Text>
                 </div>
               ) : rows.length === 0 ? (
                 <div style={{ padding: 48, textAlign: 'center' }}>
-                  <Text type="secondary">Belum ada recap yang disimpan.</Text>
+                  <Text type="secondary">No saved recaps yet.</Text>
                 </div>
               ) : grouped.length === 0 ? (
                 <div style={{ padding: 48, textAlign: 'center' }}>
                   <Text type="secondary">
-                    Tidak ada data untuk judul yang dipilih. Kosongkan filter untuk melihat semua.
+                    No data for the selected title(s). Clear the filter to see all.
                   </Text>
                 </div>
               ) : (
@@ -605,13 +605,13 @@ export default function RecapSnapshotsSettingsContent({ user: currentUser }: Rec
           detailEditing ? (
             <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
               <div>
-                <Text strong>Judul</Text>
+                <Text strong>Title</Text>
                 <Input
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   maxLength={500}
                   showCount
-                  placeholder="Judul recap"
+                  placeholder="Recap title"
                   style={{ marginTop: 8 }}
                 />
               </div>

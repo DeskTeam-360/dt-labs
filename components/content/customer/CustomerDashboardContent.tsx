@@ -101,6 +101,14 @@ const FAQ_ITEMS = [
   'Do I get the rights to the design created?',
 ]
 
+type TimePeriod = 'current-day' | 'week' | 'all'
+
+const TIME_PERIOD_OPTIONS: Array<{ label: string; value: TimePeriod }> = [
+  { label: 'Current Day', value: 'current-day' },
+  { label: 'This Week', value: 'week' },
+  { label: 'All Time', value: 'all' },
+]
+
 export default function CustomerDashboardContent({ user, withSidebar }: CustomerDashboardContentProps) {
   const router = useRouter()
   const canMoveTicketToTrash = canDeleteTickets(user.role)
@@ -110,6 +118,8 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
   const [data, setData] = useState<DashboardData | null>(null)
   const [kbArticles, setKbArticles] = useState<KnowledgeBaseArticle[]>([])
   const [kbCategory, setKbCategory] = useState<string>('')
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('current-day')
+  const [timeLoading, setTimeLoading] = useState(false)
   const [hourlyStopped, setHourlyStopped] = useState<StoppedTimeSession[]>([])
   const [hourlyActive, setHourlyActive] = useState<Array<{ ticket_id: number; start_time: string }>>([])
 
@@ -154,14 +164,15 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
   /** Refetch dashboard aggregates (e.g. after moving a ticket to trash). */
   const refreshDashboard = useCallback(async () => {
     try {
-      const dashRes = await fetch('/api/customer/dashboard', { credentials: 'include' })
+      const qs = new URLSearchParams({ time_period: timePeriod })
+      const dashRes = await fetch(`/api/customer/dashboard?${qs}`, { credentials: 'include' })
       if (dashRes.ok) {
         setData(await dashRes.json())
       }
     } catch {
       /* keep current data */
     }
-  }, [])
+  }, [timePeriod])
 
   useEffect(() => {
     fetchHourlyTimeData()
@@ -172,8 +183,9 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
     const load = async () => {
       setLoading(true)
       try {
+        const qs = new URLSearchParams({ time_period: timePeriod })
         const [dashRes, kbRes] = await Promise.all([
-          fetch('/api/customer/dashboard', { credentials: 'include' }),
+          fetch(`/api/customer/dashboard?${qs}`, { credentials: 'include' }),
           fetch('/api/knowledge-base-articles?published=true', { credentials: 'include' }),
         ])
         if (!cancelled) {
@@ -201,6 +213,33 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
     void load()
     return () => {
       cancelled = true
+    }
+    // Initial load only — time period changes use applyTimePeriod below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const applyTimePeriod = useCallback(async (period: TimePeriod) => {
+    setTimePeriod(period)
+    setTimeLoading(true)
+    try {
+      const qs = new URLSearchParams({ time_period: period })
+      const dashRes = await fetch(`/api/customer/dashboard?${qs}`, { credentials: 'include' })
+      if (dashRes.ok) {
+        const next = await dashRes.json()
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                time_by_type: next.time_by_type ?? [],
+                total_time_seconds: next.total_time_seconds ?? 0,
+              }
+            : next
+        )
+      }
+    } catch {
+      /* keep current time data */
+    } finally {
+      setTimeLoading(false)
     }
   }, [])
 
@@ -377,11 +416,12 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Show:</Text>
                     <Select
-                      value="current-day"
+                      value={timePeriod}
                       size="small"
                       variant="borderless"
                       style={{ fontSize: 12, minWidth: 100 }}
-                      options={[{ label: 'Current Day', value: 'current-day' }, { label: 'This Week', value: 'week' }, { label: 'All Time', value: 'all' }]}
+                      options={TIME_PERIOD_OPTIONS}
+                      onChange={(v) => void applyTimePeriod(v as TimePeriod)}
                     />
                   </div>
                 </div>
@@ -390,7 +430,11 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                   <Text strong style={{ fontSize: 16 }}>{totalTimeFormatted}</Text>
                 </div>
               </Flex>
-              {donutData.length > 0 ? (
+              {timeLoading ? (
+                <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Spin />
+                </div>
+              ) : donutData.length > 0 ? (
                 <LazyCustomerDashboardDonutBlock
                   donutData={donutData}
                   formatTime={formatTime}

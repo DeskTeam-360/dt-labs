@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { fetchUserSessionEligibility } from '@/lib/auth-user-session'
 import { db, users } from '@/lib/db'
 
-/** Hanya dipanggil dari Node (route sign-in), bukan Edge middleware. */
+/** Called only from Node (sign-in route), not Edge middleware. */
 export async function authorizeWithCredentials(credentials: Record<'email' | 'password', string> | undefined) {
   try {
     if (!credentials?.email || !credentials?.password) return null

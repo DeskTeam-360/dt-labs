@@ -20,6 +20,11 @@ import {
 import dayjs from 'dayjs'
 import { useEffect, useState } from 'react'
 
+import {
+  DEFAULT_RECURRING_VISIBILITY,
+  TICKET_VISIBILITY_OPTIONS,
+} from '@/lib/ticket-visibility'
+
 import type { RecurringTicketRow } from './RecurringTicketsContent'
 
 const { Text } = Typography
@@ -102,7 +107,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         end_date: initialValues.endDate ? dayjs(initialValues.endDate) : null,
         ticket_status: initialValues.ticketStatus ?? 'open',
         ticket_priority: initialValues.ticketPriority || null,
-        visibility: initialValues.visibility ?? 'public',
+        visibility: initialValues.visibility ?? DEFAULT_RECURRING_VISIBILITY,
         company_id: initialValues.companyId ?? null,
         team_id: initialValues.teamId ?? null,
         ticket_type_id: initialValues.ticketTypeId ?? null,
@@ -119,7 +124,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         start_date: dayjs(),
         ticket_status: 'open',
         ticket_priority: null,
-        visibility: 'public',
+        visibility: DEFAULT_RECURRING_VISIBILITY,
       })
     }
   }, [initialValues, form])
@@ -140,7 +145,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         end_date: values.end_date ? (values.end_date as dayjs.Dayjs).format('YYYY-MM-DD') : null,
         ticket_status: values.ticket_status || 'open',
         ticket_priority: values.ticket_priority || null,
-        visibility: values.visibility ?? 'public',
+        visibility: values.visibility ?? DEFAULT_RECURRING_VISIBILITY,
         company_id: values.company_id || null,
         team_id: values.team_id || null,
 
@@ -273,7 +278,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         </Row>
 
         <Form.Item name="contact_user_id" label="Contact (email replies)"
-          tooltip="User who will receive email replies for tickets created by this rule">
+          tooltip="If set, recurring ticket notifications are sent to this user's email; otherwise the company email is used">
           <Select allowClear showSearch placeholder="Select contact user"
             optionFilterProp="label" options={contacts} />
         </Form.Item>
@@ -307,10 +312,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
           </Col>
           <Col span={12}>
             <Form.Item name="visibility" label="Visibility">
-              <Select>
-                <Select.Option value="public">Public</Select.Option>
-                <Select.Option value="private">Private</Select.Option>
-              </Select>
+              <Select options={[...TICKET_VISIBILITY_OPTIONS]} />
             </Form.Item>
           </Col>
         </Row>

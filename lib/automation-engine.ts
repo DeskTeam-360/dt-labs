@@ -43,9 +43,9 @@ export interface TicketContext {
   title?: string | null
   description?: string | null
   status?: string | null
-  /** Nilai bilangan bulat Priority tiket */
+  /** Integer ticket Priority value */
   priority?: number | null
-  /** @deprecated Dipetakan dari priority untuk aturan otomasi lawas */
+  /** @deprecated Mapped from priority for legacy automation rules */
   priority_slug?: string | null
   /** Ticket type slug (ticket_types.slug), for conditions e.g. Type = bug */
   type_slug?: string | null

@@ -1,6 +1,6 @@
 /**
- * Upload file to iDrive e2 storage (migrasi dari Supabase Storage).
- * Client components dapat POST FormData dengan 'file' dan 'path'.
+ * Upload file to iDrive e2 storage (migrated from Supabase Storage).
+ * Client components can POST FormData with 'file' and 'path'.
  */
 import { NextResponse } from 'next/server'
 

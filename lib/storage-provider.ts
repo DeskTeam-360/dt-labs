@@ -1,7 +1,7 @@
 /**
  * Storage provider dispatcher. Switch via STORAGE_PROVIDER env var:
  * - 'idrive' (default): iDrive e2 (S3-compatible)
- * - 'local': filesystem lokal di VPS (lihat lib/storage-local.ts)
+ * - 'local': local filesystem on VPS (see lib/storage-local.ts)
  */
 import * as idrive from './storage-idrive'
 import * as local from './storage-local'

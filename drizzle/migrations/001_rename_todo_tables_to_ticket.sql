@@ -1,6 +1,6 @@
 -- =============================================================================
 -- Migration 001 — Rename todo_* → ticket_* (schema + FK + helper function)
--- Jalankan urut: 001 → 002 → 003 (lihat README.md di folder ini)
+-- Run in order: 001 → 002 → 003 (see README.md in this folder)
 -- Run: psql $DATABASE_URL -f drizzle/migrations/001_rename_todo_tables_to_ticket.sql
 -- =============================================================================
 

@@ -356,7 +356,12 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     updated_at: t.updatedAt ? new Date(t.updatedAt).toISOString() : '',
     gmail_thread_id: t.gmailThreadId,
     created_via: t.createdVia,
-    last_read_at: t.lastReadAt ? new Date(t.lastReadAt).toISOString() : null,
+    last_read_at: (() => {
+      const audienceLastRead = isCustomerPortalView(options)
+        ? t.customerLastReadAt
+        : t.staffLastReadAt
+      return audienceLastRead ? new Date(audienceLastRead).toISOString() : null
+    })(),
     creator: ticketRow.creator
       ? {
           id: ticketRow.creator.id,

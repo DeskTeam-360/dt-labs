@@ -7,6 +7,7 @@ import { getCustomerCompanyId } from '@/lib/customer-company'
 import { customerTicketsAccessCondition } from '@/lib/customer-ticket-access'
 import { db, ticketActivityLog, tickets, users } from '@/lib/db'
 import { TICKET_ACTIVITY_ACTIONS, type TicketActivityAction } from '@/lib/ticket-activity-actions'
+import { buildTicketVisibilityAccessSql } from '@/lib/ticket-visibility-server'
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 100
@@ -43,18 +44,13 @@ export async function GET(request: Request) {
 
   const searchRaw = url.searchParams.get('search')?.trim() ?? ''
 
-  const visibilityAccess = or(
-    eq(tickets.visibility, 'public'),
-    and(eq(tickets.visibility, 'private'), eq(tickets.createdBy, userId)),
-    sql`(${tickets.visibility} = 'specific_users' AND ${tickets.id} IN (SELECT ticket_id FROM ticket_assignees WHERE user_id = ${userId}))`,
-    sql`(${tickets.visibility} = 'team' AND ${tickets.teamId} IN (SELECT team_id FROM team_members WHERE user_id = ${userId}))`
-  )!
+  const visibilityAccess = await buildTicketVisibilityAccessSql(userId, role)
 
   let ticketFilter: SQL | null = null
 
   if (role === 'customer') {
     const companyId = await getCustomerCompanyId(userId)
-    ticketFilter = customerTicketsAccessCondition(userId, companyId)
+    ticketFilter = await customerTicketsAccessCondition(userId, companyId)
   } else if (!isAdmin(role)) {
     ticketFilter = visibilityAccess
   }

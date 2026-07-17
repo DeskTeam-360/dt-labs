@@ -384,7 +384,7 @@ export default function JobTypesCatalogAdminContent({ user: currentUser }: JobTy
                 </Form.Item>
                 {editing?.slug === 'other' ? (
                   <Text type="secondary" style={{ display: 'block' }}>
-                    Slug &quot;other&quot; harus tetap aktif sebagai fallback dan tidak bisa dihapus.
+                    The &quot;other&quot; slug must remain active as a fallback and cannot be deleted.
                   </Text>
                 ) : null}
               </Form>

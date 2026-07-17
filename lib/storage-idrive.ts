@@ -1,13 +1,13 @@
 /**
  * iDrive e2 Storage (S3-compatible)
- * Menggantikan Supabase Storage
+ * Replaces Supabase Storage
  *
  * Env vars:
  * - IDRIVE_E2_ENDPOINT: https://xyz1.ch11.idrivee2-2.com
  * - IDRIVE_E2_ACCESS_KEY
  * - IDRIVE_E2_SECRET_KEY
  * - IDRIVE_E2_BUCKET: dtlabs
- * - IDRIVE_E2_PUBLIC_URL: (optional) Base URL untuk file public, e.g. https://dtlabs.xyz1.ch11.idrivee2-2.com
+ * - IDRIVE_E2_PUBLIC_URL: (optional) Base URL for public files, e.g. https://dtlabs.xyz1.ch11.idrivee2-2.com
  */
 
 import {

@@ -52,7 +52,7 @@ function sanitizeFileName(name: string): string {
   return ext ? `${safe}.${ext}` : safe
 }
 
-/** Sanitize company name for storage path. Tanpa company → non-company. */
+/** Sanitize company name for storage path. No company → non-company. */
 function sanitizeCompanyName(name: string | undefined): string {
   const s = (name || '').trim()
   if (!s || s.toLowerCase() === 'unknown') return 'non-company'

@@ -266,9 +266,18 @@ export async function PATCH(
     return NextResponse.json({ ok: true })
   }
 
-  // Quick path: mark ticket as read (no automation - UI only)
+  // Quick path: mark ticket as read for this audience only (no automation - UI only).
+  // Customer open must not clear staff unread, and vice versa.
   if (Object.keys(body).length === 1 && body.mark_read === true) {
-    await db.update(tickets).set({ lastReadAt: new Date() }).where(eq(tickets.id, ticketId))
+    const now = new Date()
+    await db
+      .update(tickets)
+      .set(
+        role === 'customer'
+          ? { customerLastReadAt: now, lastReadAt: now }
+          : { staffLastReadAt: now, lastReadAt: now }
+      )
+      .where(eq(tickets.id, ticketId))
     return NextResponse.json({ ok: true })
   }
 

@@ -403,7 +403,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
             </Title>
             
             {teamPlanGroups.length === 0 ? (
-              <Text type="secondary">Tidak ada company dengan tim aktif — tidak ada yang ditampilkan di blok ini.</Text>
+              <Text type="secondary">No companies with active teams — nothing to show in this section.</Text>
             ) : (
               <>
                 {Array.from({ length: Math.ceil(teamPlanGroups.length / 2) }, (_, rowIdx) => {

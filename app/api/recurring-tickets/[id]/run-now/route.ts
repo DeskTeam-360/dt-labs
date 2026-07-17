@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { canAccessRecurringTickets } from '@/lib/auth-utils'
 import { db, recurringTicketRuns, recurringTickets, tickets } from '@/lib/db'
+import { sendRecurringTicketCreatedEmail } from '@/lib/recurring-ticket-email'
 import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
 import { assignCompanySupportTicketRank, assignCreatorSupportTicketRank, parseCompanyTicketDesiredRank, resolveSupportQueueScope } from '@/lib/ticket-company-priority-order'
 
@@ -31,7 +32,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         teamId: rule.teamId ?? null,
         companyId: rule.companyId ?? null,
         typeId: rule.ticketTypeId ?? null,
-        visibility: rule.visibility ?? 'public',
+        visibility: rule.visibility ?? 'team',
         createdBy: rule.createdBy ?? null,
         contactUserId: rule.contactUserId ?? null,
         createdVia: 'recurring',
@@ -75,6 +76,21 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       ranAt: now,
       status: 'success',
     })
+
+    try {
+      await sendRecurringTicketCreatedEmail({
+        ticketId: newTicket.id,
+        ticketTitle: rule.title,
+        companyId: rule.companyId ?? null,
+        contactUserId: rule.contactUserId ?? null,
+        createdByUserId: rule.createdBy ?? null,
+      })
+    } catch (emailErr) {
+      console.error(
+        `[recurring-tickets] Email failed for rule ${id} ticket #${newTicket.id}:`,
+        emailErr
+      )
+    }
 
     return NextResponse.json({ ok: true, ticketId: newTicket.id })
   } catch (err) {

@@ -5,7 +5,7 @@ import { getFirebaseAdminFirestore } from '@/lib/firebase/admin'
 
 const BATCH_MAX = 450
 
-/** Hapus semua dokumen notifikasi yang sudah `read: true` untuk user yang login. */
+/** Delete all notification documents that are already `read: true` for the logged-in user. */
 export async function POST() {
   const session = await auth()
   if (!session?.user?.id) {

@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 /**
  * Must match JWT Auth.js cookie name (`getToken` { secureCookie }).
  *
- * Auth.js memilih `useSecureCookies` dari **URL request** (`url.protocol === "https:"`),
+ * Auth.js derives `useSecureCookies` from the **request URL** (`url.protocol === "https:"`),
  * not just from `AUTH_URL` alone (@auth/core init). If you open `http://IP:3003`
  * on your VPS but `.env` still has `AUTH_URL=https://...` (Vercel copy), reading `AUTH_URL` first
  * forces `secureCookie: true` but the session cookie is named `authjs.session-token`

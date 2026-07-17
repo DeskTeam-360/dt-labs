@@ -446,8 +446,8 @@ function replaceContentIdsInHtml(html: string, cidToUrl: Map<string, string>): s
 }
 
 /**
- * Unduh part Gmail (attachmentId / gambar inline), unggah ke storage,
- * ganti cid: di HTML dengan URL publik, dan kumpulkan file untuk ticket_attachments / comment_attachments.
+ * Download Gmail parts (attachmentId / inline images), upload to storage,
+ * replace cid: in HTML with public URLs, and collect files for ticket_attachments / comment_attachments.
  */
 async function processIncomingEmailMedia(
   gmail: any,
@@ -600,7 +600,7 @@ export async function POST(request: NextRequest) {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
-    // Fetch only since last sync (atau 2 hari untuk first sync)
+    // Fetch only since last sync (or 2 days for first sync)
     const lastSyncAt = integration.lastSyncAt ? new Date(integration.lastSyncAt) : null
     const twoDaysAgo = Math.floor((Date.now() - 2 * 24 * 60 * 60 * 1000) / 1000)
     const sinceSeconds = lastSyncAt

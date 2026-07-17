@@ -25,7 +25,7 @@ function serializeStatus(row: typeof projectStatuses.$inferSelect) {
   }
 }
 
-/** Ticket payload for Kanban (column id = ps-{project_status_id}). Aktivitas proyek = tiket ini saja. */
+/** Ticket payload for Kanban (column id = ps-{project_status_id}). Project activity = these tickets only. */
 function serializeProjectBoardTicket(
   row: {
     t: typeof tickets.$inferSelect
@@ -62,7 +62,7 @@ function serializeProjectBoardTicket(
   }
 }
 
-/** GET /api/projects/[id] — project + statuses + aktivitas (board tickets) */
+/** GET /api/projects/[id] — project + statuses + activity (board tickets) */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireProjectApiSession()
   if ('error' in gate) return gate.error
