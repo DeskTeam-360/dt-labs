@@ -310,11 +310,6 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
               <InputNumber min={1} placeholder="Lowest" style={{ width: '100%' }} />
             </Form.Item>
           </Col>
-          <Col span={12}>
-            <Form.Item name="visibility" label="Visibility">
-              <Select options={[...TICKET_VISIBILITY_OPTIONS]} />
-            </Form.Item>
-          </Col>
         </Row>
 
         <Form.Item style={{ marginBottom: 0, marginTop: 8 }}>
