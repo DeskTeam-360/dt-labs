@@ -244,16 +244,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
-                {canAccessTicketVisibilitySettings(role) && (
-                  <Col xs={24} sm={12} md={8}>
-                    <HubTile
-                      title="Ticket Visibility"
-                      description="Who can see each visibility level"
-                      href="/settings/ticket-visibility"
-                      icon={<EyeOutlined />}
-                    />
-                  </Col>
-                )}
+                {/* Ticket Visibility hidden — not exposed in settings UI */}
                 <Col xs={24} sm={12} md={8}>
                   <HubTile
                     title="Feature Access"
