@@ -119,7 +119,7 @@ export const DEFAULT_ALL_STATUS_COLUMNS: StatusColumn[] = [
   { id: 'am_review', title: 'AM Review', color: '#6D9EEB' },
   { id: 'client_review', title: 'Client Review', color: '#52c41a' },
   { id: 'feedback_received', title: 'Feedback Received', color: '#C9DAF8' },
-  { id: 'revision', title: 'Revision', color: '#1890ff' },
+  { id: 'revision', title: 'Revision', color: '#16324A' },
   { id: 'pending', title: 'Pending', color: '#8c8c8c' },
   { id: 'resolved', title: 'Resolved', color: '#52c41a' },
   { id: 'closed', title: 'Closed', color: '#595959' },

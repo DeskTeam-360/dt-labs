@@ -21,7 +21,7 @@ export default function DashboardStaffCharts({ chartData }: { chartData: ChartRo
           <PolarGrid />
           <PolarAngleAxis dataKey="short" />
           <PolarRadiusAxis angle={90} domain={[0, 'auto']} tickFormatter={(v) => `${v}m`} />
-          <Radar name="Minutes" dataKey="duration" stroke="#1890ff" fill="#1890ff" fillOpacity={0.4} />
+          <Radar name="Minutes" dataKey="duration" stroke="#64BCE9" fill="#64BCE9" fillOpacity={0.4} />
           <Tooltip
             formatter={(value: number | undefined) => [`${value ?? 0} min`, 'Duration']}
             labelFormatter={(label) => chartData.find((d) => d.short === label)?.day ?? label}

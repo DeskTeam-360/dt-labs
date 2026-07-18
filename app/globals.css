@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 :root {
+  --brand-primary: #16324A;
+  --brand-accent: #64BCE9;
+  --brand-primary-soft: #e8f4fc;
   --background: #ffffff;
   --foreground: #171717;
   --layout-bg: #f0f2f5;
@@ -12,10 +15,10 @@
   /* Top ticket search bar (TicketSearchNavbar) */
   --ticket-nav-bg: #ffffff;
   --ticket-nav-border: #f0f0f0;
-  --ticket-nav-brand: #2b1252;
+  --ticket-nav-brand: #16324A;
   --ticket-nav-icon-btn-bg: #ffffff;
   --ticket-nav-icon-btn-border: #d9d9d9;
-  --ticket-nav-icon-btn-color: #2b1252;
+  --ticket-nav-icon-btn-color: #16324A;
   --ticket-nav-icon-hover-bg: #fafafa;
   --ticket-nav-panel-bg: #ffffff;
   --ticket-nav-panel-border: #f0f0f0;
@@ -23,9 +26,9 @@
   --ticket-nav-muted: #8c8c8c;
   --ticket-nav-text: #262626;
   --ticket-nav-text-secondary: #595959;
-  --ticket-nav-filter-bg: #f5f0ff;
-  --ticket-nav-filter-border: #d3adf7;
-  --ticket-nav-filter-link: #2b1252;
+  --ticket-nav-filter-bg: var(--brand-primary-soft);
+  --ticket-nav-filter-border: #64BCE9;
+  --ticket-nav-filter-link: #16324A;
   --ticket-nav-shadow: rgba(0, 0, 0, 0.12);
   /* Global announcement marquee (under top nav) */
   --global-announcement-bg: #fff7e6;
@@ -50,7 +53,7 @@
   --ticket-row-chip-neutral-bg: #e9ecef;
   --ticket-row-chip-neutral-fg: #495057;
   /* Customer dashboard charts / panels */
-  --customer-dash-chart-surface: #f4f5ff;
+  --customer-dash-chart-surface: var(--brand-primary-soft);
   --customer-dash-chart-legend-bg: #f8f9fb;
   --customer-dash-priority-track: #f0f0f0;
   --customer-dash-eta-banner: #ffe0e5;
@@ -89,10 +92,10 @@
   --settings-hub-tile-hover-bg: #2a2a2a;
   --ticket-nav-bg: #141414;
   --ticket-nav-border: #303030;
-  --ticket-nav-brand: #d4c8f0;
+  --ticket-nav-brand: var(--brand-accent);
   --ticket-nav-icon-btn-bg: #1f1f1f;
   --ticket-nav-icon-btn-border: #434343;
-  --ticket-nav-icon-btn-color: #e8e0ff;
+  --ticket-nav-icon-btn-color: var(--brand-accent);
   --ticket-nav-icon-hover-bg: #2a2a2a;
   --ticket-nav-panel-bg: #1f1f1f;
   --ticket-nav-panel-border: #434343;
@@ -100,9 +103,9 @@
   --ticket-nav-muted: #a3a3a3;
   --ticket-nav-text: #e8e8e8;
   --ticket-nav-text-secondary: #bfbfbf;
-  --ticket-nav-filter-bg: #2a2438;
-  --ticket-nav-filter-border: #553e7a;
-  --ticket-nav-filter-link: #d4c4f5;
+  --ticket-nav-filter-bg: #142838;
+  --ticket-nav-filter-border: var(--brand-primary);
+  --ticket-nav-filter-link: var(--brand-accent);
   --ticket-nav-shadow: rgba(0, 0, 0, 0.45);
   --global-announcement-bg: #2b2111;
   --global-announcement-border: #594214;
@@ -450,7 +453,7 @@ html.dark .ticket-thread-bubble.ticket-thread-bubble--agent-reply,
 
 /* Admin sidebar - DeskTeam360 style: purple bg, active item light gray with rounded right */
 .admin-sidebar-deskteam-2.ant-layout-sider {
-  background: #2B1251 !important;
+  background: #16324a !important;
   border-radius: 0px 30px 0px 0px !important;
 }
 .admin-sidebar-deskteam-2 .ant-menu-dark {
@@ -469,7 +472,7 @@ html.dark .ticket-thread-bubble.ticket-thread-bubble--agent-reply,
 
 .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected {
   background: #f0f2f5 !important;
-  color: #35165c !important;
+  color: var(--brand-primary) !important;
   border-radius: 40px 0 0 40px;
   position: relative;
   margin: 10px 8px 10px 0 !important;
@@ -477,11 +480,11 @@ html.dark .ticket-thread-bubble.ticket-thread-bubble--agent-reply,
   overflow: visible !important;
 }
 .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-item-selected .anticon {
-  color: #35165c !important;
+  color: var(--brand-primary) !important;
 }
 
 .ant-menu.ant-menu-sub.ant-menu-inline {
-  background: #2B1251 !important;
+  background: #16324a !important;
   /* margin-left: -5px !important;
   padding-left: 10px; */
 }
@@ -518,7 +521,7 @@ html.dark .ticket-thread-bubble.ticket-thread-bubble--agent-reply,
   margin-bottom: 8px !important;
 }
 .admin-sidebar-deskteam-2 .ant-menu-dark .ant-menu-submenu .ant-menu-item-selected .anticon {
-  color: #35165c !important;
+  color: var(--brand-primary) !important;
 }
 
 /* Admin sidebar — penuh ke bawah viewport, hindari scrollbar ganda / gap 100vh */
@@ -545,7 +548,7 @@ html.dark .ticket-thread-bubble.ticket-thread-bubble--agent-reply,
 .admin-sidebar-deskteam [class*="ant-menu-item"][class*="selected"],
 .admin-sidebar-deskteam li[aria-selected="true"] {
   background: #f0f2f5 !important;
-  color: #35165c !important;
+  color: var(--brand-primary) !important;
   border-radius: 40px 0 0 40px !important;
   position: relative !important;
   margin: 10px 8px 10px 0 !important;
@@ -555,7 +558,7 @@ html.dark .ticket-thread-bubble.ticket-thread-bubble--agent-reply,
 .admin-sidebar-deskteam .ant-menu-item-selected .anticon,
 .admin-sidebar-deskteam li.ant-menu-item-selected .anticon,
 .admin-sidebar-deskteam [class*="item-selected"] .anticon {
-  color: #35165c !important;
+  color: var(--brand-primary) !important;
 }
 
 /*
@@ -655,7 +658,7 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
 .kb-article-content ul { list-style: disc; }
 .kb-article-content ol { list-style: decimal; }
 .kb-article-content li { display: list-item; margin-bottom: 0.25em; }
-.kb-article-content a { color: #1890ff; text-decoration: none; }
+.kb-article-content a { color: var(--brand-primary); text-decoration: none; }
 .kb-article-content a:hover { text-decoration: underline; }
 .kb-article-content strong { font-weight: 600; }
 .kb-article-content img { max-width: 100%; height: auto; }

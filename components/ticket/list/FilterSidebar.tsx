@@ -248,7 +248,7 @@ export default function FilterSidebar({
             </div>
             {hasActiveFilters && (
               <>
-                <Button type="link" size="small" onClick={onClearFilters} style={{ padding: 0, color: '#1890ff' }}>
+                <Button type="link" size="small" onClick={onClearFilters} style={{ padding: 0, color: '#78C4D4' }}>
                   Clear filters
                 </Button>
                 <Text style={{ fontSize: 12, display: 'block', color: 'rgba(255,255,255,0.65)' }}>

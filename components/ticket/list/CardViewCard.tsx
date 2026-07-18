@@ -85,7 +85,7 @@ export default function CardViewCard({
             <RobotOutlined title="Created by automation" style={{ fontSize: 12, color: '#722ed1', marginLeft: 6, verticalAlign: 'middle' }} />
           )}
         </Text>
-        <Text style={{ fontSize: 13, color: '#1890ff', display: 'block' }}>
+        <Text style={{ fontSize: 13, color: '#16324A', display: 'block' }}>
           by {ticket.by_label ?? ticket.creator_name ?? 'Unassigned'}
         </Text>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginTop: 4 }}>

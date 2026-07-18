@@ -110,7 +110,7 @@ export default function DashboardHourlyActivityCard({
                     }}
                   >
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>Hour {label}</div>
-                    <div style={{ fontSize: 12, color: '#1890ff' }}>{minutes} min — time in this hour</div>
+                    <div style={{ fontSize: 12, color: '#64BCE9' }}>{minutes} min — time in this hour</div>
                     <div style={{ fontSize: 12, color: '#fa8c16' }}>
                       {tickets} distinct ticket{tickets === 1 ? '' : 's'} overlapping
                     </div>
@@ -119,7 +119,7 @@ export default function DashboardHourlyActivityCard({
               }}
             />
             <Legend />
-            <Bar yAxisId="left" dataKey="minutes" name="Minutes" fill="#1890ff" radius={[2, 2, 0, 0]} />
+            <Bar yAxisId="left" dataKey="minutes" name="Minutes" fill="#64BCE9" radius={[2, 2, 0, 0]} />
             <Line
               yAxisId="right"
               type="monotone"

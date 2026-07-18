@@ -35,7 +35,7 @@ function formatTime(seconds: number) {
   return '0m'
 }
 
-const DEFAULT_COLORS = ['#1890ff', '#eb2f96', '#faad14', '#52c41a', '#13c2c2', '#722ed1']
+const DEFAULT_COLORS = ['#64BCE9', '#eb2f96', '#faad14', '#52c41a', '#13c2c2', '#722ed1']
 
 const RECHARTS_TOOLTIP_STYLE: CSSProperties = {
   background: 'var(--ticket-nav-panel-bg)',
@@ -458,7 +458,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                   style={{
                     fontWeight: 600,
                     fontSize: 16,
-                    color: '#1890ff',
+                    color: '#16324A',
                     cursor: 'pointer',
                   }}
                   onClick={() => router.push(ticketsNeedActionListHref)}
@@ -508,7 +508,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                           }
                         >
                           <span style={{ width: 20, height: 20, background: s.color, flexShrink: 0 }} />
-                          <Text style={s.count > 0 ? { color: '#1890ff' } : undefined}>
+                          <Text style={s.count > 0 ? { color: '#16324A' } : undefined}>
                             {s.status_title}: {s.count} tickets
                           </Text>
                         </div>
@@ -564,14 +564,14 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                       key={art.id}
                       style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}
                     >
-                      <QuestionCircleOutlined style={{ color: '#1890ff', marginTop: 2 }} />
+                      <QuestionCircleOutlined style={{ color: '#16324A', marginTop: 2 }} />
                       <Text>{art.title}</Text>
                     </div>
                   ))
                 ) : (
                   FAQ_ITEMS.map((q, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
-                      <QuestionCircleOutlined style={{ color: '#1890ff', marginTop: 2 }} />
+                      <QuestionCircleOutlined style={{ color: '#16324A', marginTop: 2 }} />
                       <Text>{q}</Text>
                     </div>
                   ))
@@ -612,7 +612,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                         <Text strong style={{ flex: 1, fontSize: 16, fontWeight: 700, color: 'var(--kanban-card-title)', lineHeight: 1.4 }}>
                         #{t.id} {t.title}
                         </Text>
-                        <Text style={{ fontSize: 13, color: '#1890ff', display: 'block' }}>
+                        <Text style={{ fontSize: 13, color: '#16324A', display: 'block' }}>
                           by {t.creator_name || 'Unknown'}
                         </Text>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>

@@ -31,7 +31,7 @@ import {
 
 const { Sider } = Layout
 
-const SIDEBAR_BG = '#2b1252'
+const SIDEBAR_BG = '#16324a'
 
 interface SessionUser {
   id: string

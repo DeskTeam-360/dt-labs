@@ -255,7 +255,7 @@ export default function KanbanCard({
             )}
           </Text>
           {ticket.by_label && (
-            <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic', color: '#1890ff', display: 'block', marginTop: 4 }}>
+            <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic', color: '#16324A', display: 'block', marginTop: 4 }}>
               by {ticket.by_label}
             </Text>
           )}

@@ -105,7 +105,7 @@ async function seedTicketStatuses() {
       title: 'Revision',
       customerTitle: 'Working on your revision',
       description: 'Implementing changes based on your feedback.',
-      color: '#1890ff',
+      color: '#64BCE9',
       showInKanban: true,
       sortOrder: 8,
       isDeletable: false,
@@ -160,7 +160,7 @@ async function seedTicketTypes() {
     .values([
       { slug: 'bug', title: 'Bug', color: '#ff4d4f', sortOrder: 1 },
       { slug: 'feature', title: 'Feature', color: '#52c41a', sortOrder: 2 },
-      { slug: 'task', title: 'Task', color: '#1890ff', sortOrder: 3 },
+      { slug: 'task', title: 'Task', color: '#64BCE9', sortOrder: 3 },
       { slug: 'support', title: 'Support', color: '#fa8c16', sortOrder: 4 },
     ])
     .onConflictDoNothing({ target: ticketTypes.slug })
@@ -177,7 +177,7 @@ async function seedTicketPriorities() {
     .values([
       { slug: 'urgent', title: 'Urgent', color: '#ff4d4f', sortOrder: 1 },
       { slug: 'high', title: 'High', color: '#fa8c16', sortOrder: 2 },
-      { slug: 'medium', title: 'Medium', color: '#1890ff', sortOrder: 3 },
+      { slug: 'medium', title: 'Medium', color: '#64BCE9', sortOrder: 3 },
       { slug: 'low', title: 'Low', color: '#8c8c8c', sortOrder: 4 },
     ])
     .onConflictDoNothing({ target: ticketPriorities.slug })

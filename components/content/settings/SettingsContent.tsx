@@ -82,7 +82,7 @@ function HubTile({ title, description, href, icon }: HubTileProps) {
         className="settings-hub-tile"
         style={tileStyle}
       >
-        <div style={{ fontSize: 22, color: '#1890ff', marginBottom: 12 }}>{icon}</div>
+        <div style={{ fontSize: 22, color: '#16324A', marginBottom: 12 }}>{icon}</div>
         <div>
         <Text strong style={{ fontSize: 15, display: 'block', color: 'var(--settings-hub-tile-title)' }}>
           {title}

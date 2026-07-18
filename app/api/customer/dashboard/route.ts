@@ -68,13 +68,13 @@ export async function GET(request: Request) {
   const typeMap: Record<number, { title: string; color: string }> = {}
   if (typeIds.length > 0) {
     const types = await db.select({ id: ticketTypes.id, title: ticketTypes.title, color: ticketTypes.color }).from(ticketTypes).where(inArray(ticketTypes.id, typeIds))
-    types.forEach((t) => { typeMap[t.id] = { title: t.title, color: t.color ?? '#1890ff' } })
+    types.forEach((t) => { typeMap[t.id] = { title: t.title, color: t.color ?? '#64BCE9' } })
   }
   const typeCounts: Record<string | number, { type_title: string; type_id: number | null; count: number; color: string }> = {}
   myTickets.forEach((t) => {
     const key = t.typeId ?? 'none'
     const label = t.typeId ? (typeMap[t.typeId]?.title ?? 'Unknown') : 'No Type'
-    const color = t.typeId ? (typeMap[t.typeId]?.color ?? '#1890ff') : '#d9d9d9'
+    const color = t.typeId ? (typeMap[t.typeId]?.color ?? '#64BCE9') : '#d9d9d9'
     if (!typeCounts[key]) typeCounts[key] = { type_title: label, type_id: t.typeId ?? null, count: 0, color }
     typeCounts[key].count += 1
   })
@@ -112,7 +112,7 @@ export async function GET(request: Request) {
     })
     Object.entries(secondsByType).forEach(([tid, sec]) => {
       const typeId = tid === 'none' ? null : parseInt(tid, 10)
-      timeByType.push({ type_title: typeId ? (typeMap[typeId]?.title ?? 'Unknown') : 'No Type', seconds: sec, color: typeId ? (typeMap[typeId]?.color ?? '#1890ff') : '#d9d9d9' })
+      timeByType.push({ type_title: typeId ? (typeMap[typeId]?.title ?? 'Unknown') : 'No Type', seconds: sec, color: typeId ? (typeMap[typeId]?.color ?? '#64BCE9') : '#d9d9d9' })
     })
   }
 

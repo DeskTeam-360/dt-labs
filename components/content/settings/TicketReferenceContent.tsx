@@ -47,7 +47,7 @@ const FAQ_CATEGORY_COLORS: Record<string, string> = {
 
 function faqCategoryColor(category?: string): string {
   const slug = (category ?? 'general').trim().toLowerCase() || 'general'
-  return FAQ_CATEGORY_COLORS[slug] ?? '#1890ff'
+  return FAQ_CATEGORY_COLORS[slug] ?? '#16324A'
 }
 
 function glossaryStripeColor(color: string): string {
@@ -55,7 +55,7 @@ function glossaryStripeColor(color: string): string {
     ? color.startsWith('#')
       ? color
       : `#${color}`
-    : '#1890ff'
+    : '#16324A'
 }
 
 function GlossaryBodyContent({

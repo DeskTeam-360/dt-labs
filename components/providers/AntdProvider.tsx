@@ -19,7 +19,7 @@ function ThemedConfig({ children }: { children: React.ReactNode }) {
       theme={{
         algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
-          colorPrimary: '#667eea',
+          colorPrimary: '#16324A',
           borderRadius: 8,
           ...(isDark
             ? {
@@ -48,7 +48,7 @@ function ThemedConfig({ children }: { children: React.ReactNode }) {
                 headerColor: 'rgba(0, 0, 0, 0.88)',
                 borderColor: '#f0f0f0',
                 headerSplitColor: '#f0f0f0',
-                rowHoverBg: '#f5f8ff',
+                rowHoverBg: '#e8f4fc',
                 headerBorderRadius: 8,
               },
         },
