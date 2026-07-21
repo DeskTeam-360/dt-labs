@@ -249,6 +249,15 @@ export default function RecurringTicketsContent({ user }: Props) {
       },
     },
     {
+      title: 'Created',
+      key: 'createdAt',
+      render: (_: unknown, row: RecurringTicketRow) => (
+        <Tooltip title={dayjs(row.createdAt).format('YYYY-MM-DD HH:mm:ss')}>
+          <Text type="secondary">{dayjs(row.createdAt).format('MMM D, YYYY')}</Text>
+        </Tooltip>
+      ),
+    },
+    {
       title: 'Active',
       key: 'isActive',
       render: (_: unknown, row: RecurringTicketRow) => (
