@@ -1336,7 +1336,7 @@ export default function TicketDetailContent({
                         <Flex gap={16} align="center" wrap="wrap" style={{ marginBottom: 24 }}>
                             <Button
                                 icon={<ArrowLeftOutlined />}
-                                onClick={() => { router.push('/tickets'); router.refresh() }}
+                                onClick={() => { window.location.href = '/tickets' }}
                             >
                                 Back to {isCustomer ? 'Portal' : 'Tickets'}
                             </Button>
