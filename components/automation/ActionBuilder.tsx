@@ -168,131 +168,117 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
             <div
               key={type}
               style={{
-                position: 'relative',
-                padding: '12px 44px 12px 12px',
+                padding: 12,
                 background: 'var(--automation-builder-card-bg)',
                 borderRadius: 6,
                 border: '1px solid var(--automation-builder-card-border)',
               }}
             >
-              <div style={{ minWidth: 0 }}>
+              {/* Header: title + close button */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontWeight: 500, fontSize: 13 }}>{ACTION_LABELS[type]}</span>
+                <Button
+                  type="default"
+                  danger
+                  icon={<CloseOutlined />}
+                  onClick={() => removeAction(type)}
+                  size="small"
+                />
+              </div>
+
+              {/* Content: full width */}
+              <div style={{ width: '100%' }}>
                 {type === 'team_id' && (
-                  <Form.Item label={ACTION_LABELS.team_id} style={{ marginBottom: 0 }}>
-                    <Select
-                      allowClear
-                      showSearch
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                      placeholder="Select team"
-                      style={{ width: '100%' }}
-                      value={(actions as Record<string, unknown>).team_id}
-                      onChange={(v) => update('team_id', v)}
-                      options={lookup.teams.map((t) => ({ value: t.id, label: t.name }))}
-                    />
-                  </Form.Item>
+                  <Select
+                    allowClear
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    placeholder="Select team"
+                    style={{ width: '100%' }}
+                    value={(actions as Record<string, unknown>).team_id}
+                    onChange={(v) => update('team_id', v)}
+                    options={lookup.teams.map((t) => ({ value: t.id, label: t.name }))}
+                  />
                 )}
                 {type === 'priority' && (
-                  <Form.Item label={ACTION_LABELS.priority} style={{ marginBottom: 0 }}>
-                    <InputNumber
-                      min={0}
-                      placeholder="Priority (bilangan bulat)"
-                      style={{ width: '100%' }}
-                      value={(actions as Record<string, unknown>).priority as number | undefined}
-                      onChange={(v) => update('priority', v ?? undefined)}
-                    />
-                  </Form.Item>
+                  <InputNumber
+                    min={0}
+                    placeholder="Priority number"
+                    style={{ width: '100%' }}
+                    value={(actions as Record<string, unknown>).priority as number | undefined}
+                    onChange={(v) => update('priority', v ?? undefined)}
+                  />
                 )}
                 {type === 'status_slug' && (
-                  <Form.Item label={ACTION_LABELS.status_slug} style={{ marginBottom: 0 }}>
-                    <Select
-                      showSearch
-                      allowClear
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                      placeholder="Select status"
-                      style={{ width: '100%' }}
-                      value={(actions as Record<string, unknown>).status_slug as string | undefined}
-                      onChange={(v) => update('status_slug', v)}
-                      options={lookup.statuses.map((s) => ({ value: s.slug, label: s.title }))}
-                    />
-                  </Form.Item>
+                  <Select
+                    showSearch
+                    allowClear
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    placeholder="Select status"
+                    style={{ width: '100%' }}
+                    value={(actions as Record<string, unknown>).status_slug as string | undefined}
+                    onChange={(v) => update('status_slug', v)}
+                    options={lookup.statuses.map((s) => ({ value: s.slug, label: s.title }))}
+                  />
                 )}
                 {type === 'ticket_type' && (
-                  <Form.Item
-                    label={ACTION_LABELS.ticket_type}
-                    extra="Maps to DB column ticket_type (not the Type dropdown on tickets)."
-                    style={{ marginBottom: 0 }}
-                  >
-                    <Select
-                      showSearch
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                      placeholder="Select classification"
-                      style={{ width: '100%' }}
-                      value={(actions as Record<string, unknown>).ticket_type}
-                      onChange={(v) => update('ticket_type', v)}
-                      options={TICKET_CLASSIFICATION_OPTIONS}
-                    />
-                  </Form.Item>
+                  <Select
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    placeholder="Select classification"
+                    style={{ width: '100%' }}
+                    value={(actions as Record<string, unknown>).ticket_type}
+                    onChange={(v) => update('ticket_type', v)}
+                    options={TICKET_CLASSIFICATION_OPTIONS}
+                  />
                 )}
                 {type === 'tag_ids' && (
-                  <Form.Item label={ACTION_LABELS.tag_ids} style={{ marginBottom: 0 }}>
-                    <Select
-                      mode="multiple"
-                      allowClear
-                      showSearch
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                      placeholder="Select tags"
-                      style={{ width: '100%' }}
-                      value={(actions as Record<string, unknown>).tag_ids as string[] | undefined}
-                      onChange={(v) => update('tag_ids', v?.length ? v : undefined)}
-                      options={lookup.tags.map((t) => ({
-                        value: t.id,
-                        label: t.name,
-                      }))}
-                    />
-                  </Form.Item>
+                  <Select
+                    mode="multiple"
+                    allowClear
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    placeholder="Select tags"
+                    style={{ width: '100%' }}
+                    value={(actions as Record<string, unknown>).tag_ids as string[] | undefined}
+                    onChange={(v) => update('tag_ids', v?.length ? v : undefined)}
+                    options={lookup.tags.map((t) => ({ value: t.id, label: t.name }))}
+                  />
                 )}
                 {type === 'add_note' && (
-                  <Form.Item
-                    label={ACTION_LABELS.add_note}
-                    extra="Notes are attributed to Automation (no user picker)."
-                    style={{ marginBottom: 0 }}
-                  >
+                  <>
                     <CommentWysiwyg
                       placeholder="Enter note (rich text). Images upload to draft storage."
-                      height="450px"
+                      height="400px"
                       value={((actions as Record<string, unknown>).add_note as string | undefined) ?? ''}
                       onChange={(html) => update('add_note', html)}
                     />
-                  </Form.Item>
+                    <div style={{ fontSize: 12, color: 'var(--ant-color-text-description)', marginTop: 4 }}>
+                      Notes are attributed to Automation (no user picker).
+                    </div>
+                  </>
                 )}
                 {type === 'add_checklist_items' && (
-                  <Form.Item label={ACTION_LABELS.add_checklist_items} style={{ marginBottom: 0 }}>
-                    <Input.TextArea
-                      placeholder="One item per line (e.g.&#10;Verify customer info&#10;Check payment&#10;Send confirmation)"
-                      rows={5}
-                      value={((actions as Record<string, unknown>).add_checklist_items as string[] | undefined)?.join('\n') ?? ''}
-                      onChange={(e) => {
-                        const lines = e.target.value.split('\n').map((s) => s.trim()).filter(Boolean)
-                        update('add_checklist_items', lines.length ? lines : undefined)
-                      }}
-                    />
-                  </Form.Item>
+                  <Input.TextArea
+                    placeholder={'One item per line (e.g.\nVerify customer info\nCheck payment\nSend confirmation)'}
+                    rows={5}
+                    style={{ width: '100%' }}
+                    value={((actions as Record<string, unknown>).add_checklist_items as string[] | undefined)?.join('\n') ?? ''}
+                    onChange={(e) => {
+                      const lines = e.target.value.split('\n').map((s) => s.trim()).filter(Boolean)
+                      update('add_checklist_items', lines.length ? lines : undefined)
+                    }}
+                  />
                 )}
               </div>
-              <Button
-                type="default"
-                danger
-                icon={<CloseOutlined />}
-                onClick={() => removeAction(type)}
-                style={{ position: 'absolute', top: 8, right: 8 }}
-              />
             </div>
           ))
         )}
