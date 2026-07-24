@@ -63,7 +63,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       startDate: rule.startDate,
       endDate: rule.endDate ?? null,
     }
-    const nextRunAt = computeNextRunAt(schedule, now)
+    // Always schedule next run from tomorrow midnight so the cron doesn't fire again today
+    const tomorrowMidnight = new Date(now)
+    tomorrowMidnight.setUTCDate(tomorrowMidnight.getUTCDate() + 1)
+    tomorrowMidnight.setUTCHours(0, 0, 0, 0)
+    const nextRunAt = computeNextRunAt(schedule, tomorrowMidnight)
 
     await db
       .update(recurringTickets)

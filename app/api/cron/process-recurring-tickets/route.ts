@@ -92,7 +92,11 @@ export async function POST(req: NextRequest) {
         startDate: rule.startDate,
         endDate: rule.endDate ?? null,
       }
-      const nextRunAt = computeNextRunAt(schedule, now)
+      // Always start next-run search from tomorrow midnight to avoid double-firing on the same day
+      const tomorrowMidnight = new Date(now)
+      tomorrowMidnight.setUTCDate(tomorrowMidnight.getUTCDate() + 1)
+      tomorrowMidnight.setUTCHours(0, 0, 0, 0)
+      const nextRunAt = computeNextRunAt(schedule, tomorrowMidnight)
 
       // Update rule — set lastRunAt and nextRunAt (null if expired)
       await db
