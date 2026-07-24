@@ -168,16 +168,14 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
             <div
               key={type}
               style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 8,
-                padding: 12,
+                position: 'relative',
+                padding: '12px 44px 12px 12px',
                 background: 'var(--automation-builder-card-bg)',
                 borderRadius: 6,
                 border: '1px solid var(--automation-builder-card-border)',
               }}
             >
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ minWidth: 0 }}>
                 {type === 'team_id' && (
                   <Form.Item label={ACTION_LABELS.team_id} style={{ marginBottom: 0 }}>
                     <Select
@@ -288,7 +286,13 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                   </Form.Item>
                 )}
               </div>
-              <Button type="default" danger icon={<CloseOutlined />} onClick={() => removeAction(type)} />
+              <Button
+                type="default"
+                danger
+                icon={<CloseOutlined />}
+                onClick={() => removeAction(type)}
+                style={{ position: 'absolute', top: 8, right: 8 }}
+              />
             </div>
           ))
         )}
