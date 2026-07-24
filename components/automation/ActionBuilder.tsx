@@ -268,7 +268,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                   >
                     <CommentWysiwyg
                       placeholder="Enter note (rich text). Images upload to draft storage."
-                      height="320px"
+                      height="450px"
                       value={((actions as Record<string, unknown>).add_note as string | undefined) ?? ''}
                       onChange={(html) => update('add_note', html)}
                     />

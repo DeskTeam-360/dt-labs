@@ -111,6 +111,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
   const [editingCompany, setEditingCompany] = useState<CompanyRecord | null>(null)
   const [searchText, setSearchText] = useState('')
   const [filterIsCustomer, setFilterIsCustomer] = useState<boolean | undefined>(undefined)
+  const [filterStatus, setFilterStatus] = useState<boolean | undefined>(undefined)
   const [leaderOptions, setLeaderOptions] = useState<LeaderOption[]>([])
   const [teamOptions, setTeamOptions] = useState<TeamOption[]>([])
   const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([])
@@ -129,10 +130,11 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
           if (!matchesSearch) return false
         }
         if (filterIsCustomer !== undefined && (c.is_customer ?? false) !== filterIsCustomer) return false
+        if (filterStatus !== undefined && (c.is_active ?? true) !== filterStatus) return false
         return true
       })
       .sort((a, b) => Number(b.is_customer ?? false) - Number(a.is_customer ?? false))
-  }, [companies, searchText, filterIsCustomer])
+  }, [companies, searchText, filterIsCustomer, filterStatus])
 
   const fetchCompanies = async () => {
     setLoading(true)
