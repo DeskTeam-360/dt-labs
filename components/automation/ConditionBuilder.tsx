@@ -2,7 +2,7 @@
 
 import 'react-querybuilder/dist/query-builder.css'
 
-import { PlusOutlined } from '@ant-design/icons'
+import { CloseOutlined, PlusOutlined } from '@ant-design/icons'
 import { QueryBuilderAntD } from '@react-querybuilder/antd'
 import { Button, Select } from 'antd'
 import { useEffect, useRef, useState } from 'react'
@@ -16,6 +16,19 @@ function AddRuleButton({ handleOnClick, label }: ActionProps) {
     <Button type="dashed" icon={<PlusOutlined />} block onClick={(e) => handleOnClick(e)}>
       {label ?? 'Add Rule'}
     </Button>
+  )
+}
+
+function RemoveRuleButton({ handleOnClick }: ActionProps) {
+  return (
+    <Button
+      type="default"
+      danger
+      icon={<CloseOutlined />}
+      onClick={(e) => handleOnClick(e)}
+      size="small"
+      style={{ width: 24, minWidth: 24, height: 24, padding: 0, flexShrink: 0 }}
+    />
   )
 }
 
@@ -118,6 +131,49 @@ export default function ConditionBuilder({ value, onChange = () => {} }: Conditi
   }
 
   return (
+    <>
+    <style>{`
+      .condition-builder-action-style .ruleGroup {
+        border: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+      }
+      .condition-builder-action-style .ruleGroup-header {
+        margin-bottom: 8px;
+      }
+      .condition-builder-action-style .ruleGroup-body {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .condition-builder-action-style .rule {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+      }
+      .condition-builder-action-style .rule .rule-remove {
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      /* Shrink the operator dropdown so it doesn't crowd the X button */
+      .condition-builder-action-style .rule .rule-operators {
+        flex: 0 0 90px;
+        min-width: 0;
+        width: 90px !important;
+      }
+      .condition-builder-action-style .rule .rule-operators .ant-select {
+        width: 90px !important;
+      }
+    `}</style>
     <div
       className="condition-builder-action-style"
       style={{
@@ -138,10 +194,12 @@ export default function ConditionBuilder({ value, onChange = () => {} }: Conditi
           controlElements={{
             addGroupAction: () => null,
             addRuleAction: AddRuleButton,
+            removeRuleAction: RemoveRuleButton,
             valueSelector: SearchableValueSelector,
           }}
         />
       </QueryBuilderAntD>
     </div>
+    </>
   )
 }

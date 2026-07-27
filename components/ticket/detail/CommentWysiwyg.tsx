@@ -311,13 +311,12 @@ export default function CommentWysiwyg({
     <style>{`
       .comment-wysiwyg-wrapper {
         position: relative;
-        overflow: visible;
+        overflow: hidden;
       }
       .comment-wysiwyg-wrapper .quill {
-        flex: 1;
+        height: 100%;
         display: flex;
         flex-direction: column;
-        min-height: 0;
       }
       .comment-wysiwyg-wrapper .ql-container {
         flex: 1;
@@ -326,6 +325,8 @@ export default function CommentWysiwyg({
       }
       .comment-wysiwyg-wrapper .ql-editor {
         min-height: ${editorMinPx}px;
+        height: 100%;
+        box-sizing: border-box;
       }
       /* Toolbar: size / color pickers need room; dropdowns above sibling controls */
       .comment-wysiwyg-wrapper .ql-toolbar.ql-snow {
