@@ -395,7 +395,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
 
           {/* ── Filter bar ── */}
           <Card size="small" style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
               {/* Date range */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <Text type="secondary" style={{ fontSize: 11, lineHeight: 1 }}>
