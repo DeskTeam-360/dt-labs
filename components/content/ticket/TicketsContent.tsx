@@ -2,7 +2,7 @@
 
 import { Alert, Layout, message, Spin } from 'antd'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
@@ -126,7 +126,16 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     submitting,
     ticketsPageLimit,
     setTicketsPageLimit,
+    refetchTickets,
   } = useTicketsData(currentUser.id, isCustomer, canDeleteTicket)
+
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(0)
+
+  useEffect(() => {
+    if (autoRefreshInterval === 0) return
+    const id = setInterval(() => { refetchTickets() }, autoRefreshInterval * 60 * 1000)
+    return () => clearInterval(id)
+  }, [autoRefreshInterval, refetchTickets])
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -154,6 +163,9 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             filterTicketType={filterTicketType}
             ticketsPageLimit={ticketsPageLimit}
             onTicketsPageLimitChange={setTicketsPageLimit}
+            onRefresh={refetchTickets}
+            autoRefreshInterval={autoRefreshInterval}
+            onAutoRefreshIntervalChange={setAutoRefreshInterval}
           />
 
           {!isCustomer && filterTicketType === 'spam' && (

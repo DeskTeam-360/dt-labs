@@ -1,7 +1,7 @@
 'use client'
 
-import { AppstoreOutlined, IdcardOutlined, PlusOutlined, SearchOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import { Button, Flex, Input, Segmented, Select, Typography } from 'antd'
+import { AppstoreOutlined, IdcardOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { Button, Flex, Input, Segmented, Select, Tooltip, Typography } from 'antd'
 
 import { TICKETS_PAGE_LIMIT_OPTIONS, type TicketsPageLimit } from '@/lib/tickets-list-query'
 
@@ -20,6 +20,9 @@ interface TicketsHeaderProps {
   filterTicketType?: 'spam' | 'trash' | null
   ticketsPageLimit?: TicketsPageLimit
   onTicketsPageLimitChange?: (v: TicketsPageLimit) => void
+  onRefresh?: () => void
+  autoRefreshInterval?: number
+  onAutoRefreshIntervalChange?: (v: number) => void
 }
 
 export default function TicketsHeader({
@@ -33,6 +36,9 @@ export default function TicketsHeader({
   filterTicketType = null,
   ticketsPageLimit = 50,
   onTicketsPageLimitChange,
+  onRefresh,
+  autoRefreshInterval = 0,
+  onAutoRefreshIntervalChange,
 }: TicketsHeaderProps) {
   const inJunkFolder = !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
   const junkTitle =
@@ -89,6 +95,36 @@ export default function TicketsHeader({
                 aria-label="Tickets per load"
               />
             </Flex>
+          )}
+          {onAutoRefreshIntervalChange && (
+            <Flex align="center" gap={8}>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                Auto refresh
+              </Typography.Text>
+              <Select
+                value={autoRefreshInterval}
+                onChange={onAutoRefreshIntervalChange}
+                style={{ width: 90 }}
+                options={[
+                  { value: 0, label: 'Off' },
+                  { value: 1, label: '1 min' },
+                  { value: 2, label: '2 min' },
+                  { value: 5, label: '5 min' },
+                  { value: 10, label: '10 min' },
+                ]}
+                aria-label="Auto refresh interval"
+              />
+            </Flex>
+          )}
+          {onRefresh && (
+            <Tooltip title="Refresh tickets">
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={onRefresh}
+                loading={loading}
+                size="middle"
+              />
+            </Tooltip>
           )}
         </Flex>
       </Flex>

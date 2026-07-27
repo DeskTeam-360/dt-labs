@@ -1326,5 +1326,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     canDeleteTicket,
     ticketsPageLimit,
     setTicketsPageLimit,
+    refetchTickets: () => queryClient.invalidateQueries({ queryKey: ticketsListQueryKeyRef.current }),
   }
 }
