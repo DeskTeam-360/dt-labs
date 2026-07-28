@@ -176,7 +176,12 @@ export async function GET(request: Request) {
   }
   if (search) {
     const pattern = `%${search.replace(/[%_\\]/g, '\\$&')}%`
-    conditions.push(or(ilike(tickets.title, pattern), ilike(tickets.description, pattern))!)
+    const searchAsId = /^\d+$/.test(search) ? parseInt(search, 10) : null
+    if (searchAsId !== null) {
+      conditions.push(or(eq(tickets.id, searchAsId), ilike(tickets.title, pattern), ilike(tickets.description, pattern))!)
+    } else {
+      conditions.push(or(ilike(tickets.title, pattern), ilike(tickets.description, pattern))!)
+    }
   }
   if (tagIds.length > 0) {
     conditions.push(

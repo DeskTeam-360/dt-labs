@@ -410,6 +410,18 @@ export default function CommentComposer({
         >
           {showNoteOption ? (mode === 'note' ? 'Add note' : 'Reply') : 'Reply'}
         </Button>
+        {showNoteOption && (
+          <Button
+            onClick={() => {
+              setDraft('')
+              setAttachments([])
+              onCommentVisibilityChange?.(null as any)
+            }}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+        )}
         </Flex>
       </Flex>
     </Flex>
