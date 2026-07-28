@@ -285,7 +285,36 @@ export const ticketChecklist = pgTable('ticket_checklist', {
     onDelete: 'set null',
   }),
   completionNote: text('completion_note'),
+  groupName: text('group_name'),
   createdAt: ts('created_at').notNull().defaultNow(),
+})
+
+export const checklistTemplates = pgTable('checklist_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: text('title').notNull(),
+  description: text('description'),
+  createdByUserId: uuid('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
+export const checklistTemplateGroups = pgTable('checklist_template_groups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  templateId: uuid('template_id')
+    .notNull()
+    .references(() => checklistTemplates.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  orderIndex: integer('order_index').default(0),
+})
+
+export const checklistTemplateItems = pgTable('checklist_template_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  templateId: uuid('template_id')
+    .notNull()
+    .references(() => checklistTemplates.id, { onDelete: 'cascade' }),
+  groupId: uuid('group_id').references(() => checklistTemplateGroups.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  orderIndex: integer('order_index').default(0),
 })
 
 export const ticketComments = pgTable('ticket_comments', {

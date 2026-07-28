@@ -136,7 +136,7 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                     minWidth: 108,
                   }}
                 >
-                  Total Time
+                  Client Time
                 </th>
               </Fragment>
             ))}
@@ -185,7 +185,7 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                         background: embedded ? '#fff' : 'var(--ant-color-fill-secondary, #e8e8e8)',
                       }}
                     >
-                      {embedded ? formatTrackedTime(cell?.tracker_reported_seconds) : '—'}
+                      {embedded ? formatTrackedTime((cell?.client_time_hours ?? 0) * 3600) : '—'}
                     </td>
                   </Fragment>
                 )

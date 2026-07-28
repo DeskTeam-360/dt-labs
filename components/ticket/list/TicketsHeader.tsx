@@ -77,7 +77,7 @@ export default function TicketsHeader({
 
         <Flex align="center" gap={16} wrap="wrap">
           <Input
-            placeholder="Title or description..."
+            placeholder="Search by ID, title or description..."
             allowClear
             value={filterSearch}
             onChange={(e) => onFilterSearchChange?.(e.target.value)}

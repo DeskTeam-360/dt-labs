@@ -967,7 +967,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
         dataIndex: 'total_tracker_reported_seconds',
         width: 140,
         align: 'center',
-        render: (sec: number) => (Number(sec) || 0).toLocaleString(),
+        render: (sec: number) => hoursFromSeconds(Number(sec) || 0),
       },
       {
         title: 'Average Time Spent (in percent)',

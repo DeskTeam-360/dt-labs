@@ -48,6 +48,10 @@ export async function PATCH(
     updates.completionNote = note.length > 0 ? note : null
   }
 
+  if ('group_name' in body) {
+    updates.groupName = typeof body.group_name === 'string' ? body.group_name.trim() || null : null
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No updates' }, { status: 400 })
   }

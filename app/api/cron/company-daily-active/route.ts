@@ -63,6 +63,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid date; use YYYY-MM-DD (UTC calendar day).' }, { status: 400 })
     }
 
+    // Saturday (6) and Sunday (0) in UTC — store active_time as 0
+    const [sy, sm, sd] = snapshotDate.split('-').map(Number)
+    const dow = new Date(Date.UTC(sy, sm - 1, sd)).getUTCDay()
+    const isWeekend = dow === 0 || dow === 6
+
     const [{ n: companyCount }] = await db.select({ n: count() }).from(companies)
 
     const result = await db.execute(sql`
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
         ${snapshotDate}::date,
         active_team_id,
         active_manager_id,
-        active_time
+        ${isWeekend ? sql`0` : sql`active_time`}
       FROM companies
       ON CONFLICT (company_id, snapshot_date) DO UPDATE SET
         active_team_id = EXCLUDED.active_team_id,

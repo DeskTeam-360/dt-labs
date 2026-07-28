@@ -140,6 +140,7 @@ interface ChecklistItem {
     title: string
     is_completed: boolean
     order_index: number
+    group_name: string | null
     created_at: string
     completed_at: string | null
     completed_by_user_id: string | null
@@ -627,14 +628,14 @@ export default function TicketDetailContent({
     const addChecklistItemByTitle = async (
         title: string,
         orderIndex: number,
-        options?: { silent?: boolean }
+        options?: { silent?: boolean; groupName?: string | null }
     ) => {
         const trimmed = title.trim()
         if (!trimmed) return null
         const data = await apiFetch<any>(`/api/tickets/${displayTicket.id}/checklist`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: trimmed, order_index: orderIndex }),
+            body: JSON.stringify({ title: trimmed, order_index: orderIndex, group_name: options?.groupName ?? null }),
         })
         const row = { ...data, order_index: data.order_index ?? orderIndex }
         setChecklistItems((prev) => [...prev, row])
@@ -642,7 +643,7 @@ export default function TicketDetailContent({
         return row
     }
 
-    const handleAddChecklistItem = async () => {
+    const handleAddChecklistItem = async (groupName?: string | null) => {
         if (!newChecklistTitle.trim()) {
             message.warning('Please enter a checklist item title')
             return
@@ -651,13 +652,26 @@ export default function TicketDetailContent({
         try {
             const maxOrder =
                 checklistItems.length > 0 ? Math.max(...checklistItems.map((item) => item.order_index)) : -1
-            await addChecklistItemByTitle(newChecklistTitle, maxOrder + 1)
+            await addChecklistItemByTitle(newChecklistTitle, maxOrder + 1, { groupName })
             setNewChecklistTitle('')
         } catch (err: any) {
             message.error(err?.message || 'Failed to add checklist item')
         } finally {
             setLoading(false)
         }
+    }
+
+    const loadChecklistItems = async () => {
+        try {
+            const items = await apiFetch<ChecklistItem[]>(`/api/tickets/${displayTicket.id}/checklist`)
+            setChecklistItems(items)
+        } catch {
+            // silent
+        }
+    }
+
+    const handleChecklistTemplateApplied = () => {
+        void loadChecklistItems()
     }
 
     const handleAddChecklistItemsBulk = async (titles: string[]) => {
@@ -681,7 +695,7 @@ export default function TicketDetailContent({
 
     const patchChecklistItem = async (
         itemId: string,
-        body: { is_completed?: boolean; completion_note?: string }
+        body: { is_completed?: boolean; completion_note?: string; group_name?: string | null }
     ) => {
         const updated = await apiFetch<ChecklistItem>(
             `/api/tickets/${displayTicket.id}/checklist/${itemId}`,
@@ -717,6 +731,17 @@ export default function TicketDetailContent({
             await patchChecklistItem(itemId, { completion_note: completionNote })
         } catch (err: any) {
             message.error(err?.message || 'Failed to save note')
+        }
+    }
+
+    const handleMoveChecklistItemToGroup = async (itemId: string, groupName: string | null) => {
+        try {
+            await patchChecklistItem(itemId, { group_name: groupName })
+            setChecklistItems((prev) =>
+                prev.map((item) => (item.id === itemId ? { ...item, group_name: groupName } : item))
+            )
+        } catch (err: any) {
+            message.error(err?.message || 'Failed to move item')
         }
     }
 
@@ -1730,6 +1755,7 @@ export default function TicketDetailContent({
                                             : 'Checklist',
                                     children: (
                                         <TabChecklist
+                                            ticketId={displayTicket.id}
                                             checklistItems={checklistItems}
                                             totalChecklistCount={totalChecklistCount}
                                             completedChecklistCount={completedChecklistCount}
@@ -1740,6 +1766,8 @@ export default function TicketDetailContent({
                                             onUncompleteChecklistItem={handleUncompleteChecklistItem}
                                             onUpdateChecklistNote={handleUpdateChecklistNote}
                                             onDeleteChecklistItem={handleDeleteChecklistItem}
+                                            onMoveToGroup={handleMoveChecklistItemToGroup}
+                                            onTemplateApplied={handleChecklistTemplateApplied}
                                         />
                                     ),
                                 },

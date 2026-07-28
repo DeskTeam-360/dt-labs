@@ -9,6 +9,7 @@ export type ChecklistItemDto = {
   title: string
   is_completed: boolean
   order_index: number
+  group_name: string | null
   created_at: string
   completed_at: string | null
   completed_by_user_id: string | null
@@ -27,6 +28,7 @@ export function mapChecklistItemToDto(row: ChecklistRow, completer?: CompleterRo
     completed_at: row.completedAt ? new Date(row.completedAt).toISOString() : null,
     completed_by_user_id: row.completedByUserId ?? null,
     completed_by_name: completer?.fullName || completer?.email || null,
+    group_name: row.groupName ?? null,
     completion_note: row.completionNote ?? null,
   }
 }

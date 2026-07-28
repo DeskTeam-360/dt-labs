@@ -6,6 +6,7 @@ import {
   BarChartOutlined,
   BellOutlined,
   CalendarOutlined,
+  CheckSquareOutlined,
   EyeOutlined,
   FileTextOutlined,
   GlobalOutlined,
@@ -365,6 +366,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                       description="Raw daily snapshots (active team, manager, time) per company"
                       href="/settings/company-log"
                       icon={<FileTextOutlined />}
+                    />
+                  </Col>
+                )}
+                {role?.toLowerCase() === 'admin' && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Checklist Templates"
+                      description="Reusable checklist templates with groups, applied to tickets"
+                      href="/settings/checklist-templates"
+                      icon={<CheckSquareOutlined />}
                     />
                   </Col>
                 )}

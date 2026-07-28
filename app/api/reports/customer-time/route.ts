@@ -34,7 +34,7 @@ function makeCompanySummary(
     const trSec = trackerSecondsByCompany.get(id) ?? 0
     const trHours = trSec / 3600
     const avgLogVsTrackerPct =
-      trHours > 0 ? Math.round((log.hours / trHours) * 10000) / 100 : null
+      log.hours > 0 ? Math.round((trHours / log.hours) * 10000) / 100 : null
     const avgHoursPerLogDay =
       log.days > 0 ? Math.round((log.hours / log.days) * 100) / 100 : null
 

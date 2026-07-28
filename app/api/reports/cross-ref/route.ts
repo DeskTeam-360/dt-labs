@@ -310,18 +310,25 @@ export async function GET(request: Request) {
       userTrackerTickets.set(tr.userId, s)
     }
 
-    // team -> seconds
+    // team -> seconds, team -> customerId -> seconds
     const teamSeconds = new Map<string, number>()
+    const teamCustomerSeconds = new Map<string, Map<string, number>>()
     for (const tr of trackerRows) {
+      const cid = ticketCompany.get(tr.ticketId)
+      const sec = trackerSec(tr)
       for (const tid of userTeamIds.get(tr.userId) ?? []) {
-        teamSeconds.set(tid, (teamSeconds.get(tid) ?? 0) + trackerSec(tr))
+        teamSeconds.set(tid, (teamSeconds.get(tid) ?? 0) + sec)
+        if (cid) {
+          const byCustomer = teamCustomerSeconds.get(tid) ?? new Map<string, number>()
+          byCustomer.set(cid, (byCustomer.get(cid) ?? 0) + sec)
+          teamCustomerSeconds.set(tid, byCustomer)
+        }
       }
     }
 
     for (const tid of allTeamIds) {
       const team = teamMap.get(tid)
       if (!team) continue
-      // all users in this team
       const members = teamMemberRows.filter((m) => m.teamId === tid).map((m) => m.userId)
       const allTickets = new Set<number>()
       const customerTicketCount = new Map<string, number>()
@@ -338,14 +345,20 @@ export async function GET(request: Request) {
         }
       }
 
+      const byCustomer = teamCustomerSeconds.get(tid) ?? new Map<string, number>()
       map.set(tid, {
         team_id: tid,
         team_name: team.name,
         ticket_count: allTickets.size,
         total_seconds: Math.round(teamSeconds.get(tid) ?? 0),
         customers: [...customerTicketCount.entries()]
-          .map(([cid, count]) => ({ id: cid, name: companyMap.get(cid)?.name ?? 'Unknown', ticket_count: count }))
-          .sort((a, b) => b.ticket_count - a.ticket_count),
+          .map(([cid, count]) => ({
+            id: cid,
+            name: companyMap.get(cid)?.name ?? 'Unknown',
+            ticket_count: count,
+            seconds: Math.round(byCustomer.get(cid) ?? 0),
+          }))
+          .sort((a, b) => b.seconds - a.seconds),
         members: memberList,
       })
     }

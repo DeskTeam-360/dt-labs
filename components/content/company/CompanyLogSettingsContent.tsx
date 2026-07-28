@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeftOutlined, FileTextOutlined, PlusOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, FileTextOutlined, PlusOutlined, WarningOutlined } from '@ant-design/icons'
 import {
   Button,
   Card,
@@ -10,6 +10,7 @@ import {
   Layout,
   message,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Typography,
@@ -44,6 +45,25 @@ export default function CompanyLogSettingsContent({ user: currentUser }: Company
 
   const [addOpen, setAddOpen] = useState(false)
   const [addSaving, setAddSaving] = useState(false)
+  const [zeroingWeekends, setZeroingWeekends] = useState(false)
+
+  const handleZeroWeekends = async () => {
+    setZeroingWeekends(true)
+    try {
+      const res = await fetch('/api/admin/company-log/zero-weekends', {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body?.error || res.statusText)
+      message.success(`Done — ${body.rows_updated ?? 0} rows set to 0`)
+      setLogNonce((n) => n + 1)
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Failed')
+    } finally {
+      setZeroingWeekends(false)
+    }
+  }
   const [addForm] = Form.useForm<{
     company_id: string
     snapshot_date: Dayjs
@@ -169,9 +189,22 @@ export default function CompanyLogSettingsContent({ user: currentUser }: Company
               <SpaNavLink href="/settings" style={{ fontSize: 14 }}>
                 <ArrowLeftOutlined /> Back to Settings
               </SpaNavLink>
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => void openAddFromSettings()}>
-                Add log entry
-              </Button>
+              <Space>
+                <Popconfirm
+                  title="Zero out all weekend rows?"
+                  description="Set active_time = 0 for every Saturday & Sunday row in Company Log."
+                  okText="Yes, zero them"
+                  okButtonProps={{ danger: true, loading: zeroingWeekends }}
+                  onConfirm={() => void handleZeroWeekends()}
+                >
+                  <Button danger icon={<WarningOutlined />} loading={zeroingWeekends}>
+                    Zero weekends
+                  </Button>
+                </Popconfirm>
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => void openAddFromSettings()}>
+                  Add log entry
+                </Button>
+              </Space>
             </Space>
             <div>
               <Space align="center">

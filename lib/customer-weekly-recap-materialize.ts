@@ -135,8 +135,22 @@ export async function materializeCustomerWeeklyRecapForTeam(opts: {
       })
       if (sec <= 0) continue
       trackerByCompany.set(cid, (trackerByCompany.get(cid) ?? 0) + sec)
-      companyUniverse.add(cid)
+      // Only count tracker time for companies assigned to THIS team (via active_team_id).
+      // Adding foreign companies here caused the same company to appear under every team
+      // whose members happened to log time on it.
     }
+
+    // Delete all existing cells for this team+week before re-inserting so stale
+    // companies (from previous runs that incorrectly added tracker-only companies)
+    // are fully removed rather than left untouched by the upsert.
+    await db
+      .delete(customerWeeklyRecapCells)
+      .where(
+        and(
+          eq(customerWeeklyRecapCells.teamId, teamId),
+          eq(customerWeeklyRecapCells.weekStart, wsYmd)
+        )
+      )
 
     const batch: (typeof customerWeeklyRecapCells.$inferInsert)[] = []
     const now = new Date()
@@ -163,25 +177,7 @@ export async function materializeCustomerWeeklyRecapForTeam(opts: {
     for (let i = 0; i < batch.length; i += chunkSize) {
       const chunk = batch.slice(i, i + chunkSize)
       if (chunk.length === 0) continue
-      await db
-        .insert(customerWeeklyRecapCells)
-        .values(chunk)
-        .onConflictDoUpdate({
-          target: [
-            customerWeeklyRecapCells.teamId,
-            customerWeeklyRecapCells.companyId,
-            customerWeeklyRecapCells.weekStart,
-          ],
-          set: {
-            weekEnd: sql`excluded.week_end`,
-            isoYear: sql`excluded.iso_year`,
-            isoWeek: sql`excluded.iso_week`,
-            isEmbedded: sql`excluded.is_embedded`,
-            clientTimeHours: sql`excluded.client_time_hours`,
-            trackerReportedSeconds: sql`excluded.tracker_reported_seconds`,
-            computedAt: sql`excluded.computed_at`,
-          },
-        })
+      await db.insert(customerWeeklyRecapCells).values(chunk)
       cellsWritten += chunk.length
     }
   }

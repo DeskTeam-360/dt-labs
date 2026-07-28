@@ -175,7 +175,6 @@ export async function buildRecapSnapshotPayload(
   const leftOverTimeSeconds = totalClientTimeSeconds - totalTimeUsedSeconds
   const leftOverPerDay =
     avgLogRowsPerCompany > 0 ? leftOverTimeSeconds / avgLogRowsPerCompany : 0
-  const availableTasks = leftOverPerDay / SECONDS_PER_AVAILABLE_TASK
 
   const roleTasks = roles
     .filter((r) => r.team_members_with_role > 0)
@@ -186,6 +185,9 @@ export async function buildRecapSnapshotPayload(
           ? r.time_left_over_seconds / avgLogRowsPerCompany / SECONDS_PER_AVAILABLE_TASK
           : 0,
     }))
+
+  // Total available_tasks = sum of per-position available_tasks so they always reconcile
+  const availableTasks = roleTasks.reduce((sum, r) => sum + r.available_tasks, 0)
 
   const payload: Record<string, unknown> = {
     formula_version: 1,
