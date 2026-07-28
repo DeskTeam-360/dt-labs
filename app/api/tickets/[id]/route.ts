@@ -609,7 +609,7 @@ export async function PATCH(
           const scope = await resolveSupportQueueScope(tx, ticketId)
           await tx
             .update(tickets)
-            .set({ priority: null, updatedAt: new Date() })
+            .set({ priority: null })
             .where(eq(tickets.id, ticketId))
           if (scope) await compactSupportQueueAfterRemoval(tx, scope, ticketId)
         } else {

@@ -97,7 +97,7 @@ export default function CardViewCard({
           )}
           <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--kanban-card-muted)' }}>
             <ClockCircleOutlined style={{ fontSize: 12 }} />
-            Updated {dayjs(ticket.updated_at).format('MMM DD, YYYY')}
+            Last update {dayjs(ticket.updated_at).format('MMM DD, YYYY')}
           </span>
         </div>
         {Number(ticket.checklist_total) > 0 && (

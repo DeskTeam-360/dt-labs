@@ -290,7 +290,7 @@ export default function KanbanCard({
             {ticket.updated_at && (
               <Flex align="center" gap={4} style={{ color: 'var(--kanban-card-muted)', fontSize: 11 }}>
                 <FieldTimeOutlined />
-                <span>Updated <DateDisplay date={ticket.updated_at} format="date-only" /></span>
+                <span>Last update <DateDisplay date={ticket.updated_at} format="date-only" /></span>
               </Flex>
             )}
             {ticket.has_unread_replies && (

@@ -934,11 +934,16 @@ export default function TabGeneral({
                     typeId: v ?? null,
                   }))
                 }
-                loading={sidebarAttributesSaving}
+                loading={sidebarAttributesSaving || (sidebarDraft.typeId != null && typeOptions.length === 0)}
                 options={typeOptions.map((t) => ({
                   value: t.id,
                   label: <Tag color={t.color} style={{ margin: 0 }}>{t.title}</Tag>,
                 }))}
+                labelRender={(props) => {
+                  const found = typeOptions.find((t) => t.id === (props.value as number))
+                  if (!found) return <span style={{ color: '#999' }}>Loading…</span>
+                  return <Tag color={found.color} style={{ margin: 0 }}>{found.title}</Tag>
+                }}
                 style={{ width: '100%' }}
                 allowClear
                 placeholder="Select type"

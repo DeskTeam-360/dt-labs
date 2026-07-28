@@ -70,6 +70,36 @@ const { Title, Text } = Typography
 const { TextArea } = Input
 const { Option } = Select
 
+function TitleDisplay({ id, title }: { id: number; title: string }) {
+    const [expanded, setExpanded] = useState(false)
+    const isLong = title.length > 80
+    return (
+        <span style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <span
+                style={{
+                    display: '-webkit-box',
+                    WebkitBoxOrient: 'vertical',
+                    WebkitLineClamp: expanded ? 'unset' : 2,
+                    overflow: 'hidden',
+                    wordBreak: 'break-word',
+                }}
+            >
+                #{id} {title}
+            </span>
+            {isLong && (
+                <Button
+                    type="link"
+                    size="small"
+                    style={{ padding: 0, fontSize: 12, height: 'auto' }}
+                    onClick={() => setExpanded((e) => !e)}
+                >
+                    {expanded ? 'show less' : 'show more'}
+                </Button>
+            )}
+        </span>
+    )
+}
+
 interface Screenshot {
     id: string
     file_name: string
@@ -1336,9 +1366,13 @@ export default function TicketDetailContent({
                         <Flex gap={16} align="center" wrap="wrap" style={{ marginBottom: 24 }}>
                             <Button
                                 icon={<ArrowLeftOutlined />}
-                                onClick={() => { window.location.href = '/tickets' }}
+                                onClick={() => {
+                                    if (rowTicketType === 'spam') window.location.href = '/tickets?ticket_type=spam'
+                                    else if (rowTicketType === 'trash') window.location.href = '/tickets?ticket_type=trash'
+                                    else window.location.href = '/tickets'
+                                }}
                             >
-                                Back to {isCustomer ? 'Portal' : 'Tickets'}
+                                Back to {isCustomer ? 'Portal' : rowTicketType === 'spam' ? 'Spam' : rowTicketType === 'trash' ? 'Trash' : 'Tickets'}
                             </Button>
                             <div
                                 style={{
@@ -1362,7 +1396,7 @@ export default function TicketDetailContent({
                                     }}
                                 >
                                     <Title
-                                        level={2}
+                                        level={4}
                                         style={{
                                             margin: 0,
                                             flex: '1 1 160px',
@@ -1372,26 +1406,6 @@ export default function TicketDetailContent({
                                             gap: 10,
                                         }}
                                     >
-                                        {rowTicketType === 'spam' && (
-                                            <Tooltip title="Spam">
-                                                <span style={{ display: 'inline-flex', flexShrink: 0 }}>
-                                                    <WarningTwoTone
-                                                        twoToneColor={['#ff4d4f', '#ffccc7']}
-                                                        style={{ fontSize: 32 }}
-                                                    />
-                                                </span>
-                                            </Tooltip>
-                                        )}
-                                        {rowTicketType === 'trash' && (
-                                            <Tooltip title="Trash">
-                                                <span style={{ display: 'inline-flex', flexShrink: 0 }}>
-                                                    <DeleteTwoTone
-                                                        twoToneColor={['#ff4d4f', '#ffccc7']}
-                                                        style={{ fontSize: 32 }}
-                                                    />
-                                                </span>
-                                            </Tooltip>
-                                        )}
                                         <span style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap' }}>
                                             {!isCustomer && titleEditing ? (
                                                 <Flex gap={8} align="center" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
@@ -1429,12 +1443,10 @@ export default function TicketDetailContent({
                                                 </Flex>
                                             ) : (
                                                 <>
-                                                    <span>
-                                                        #{displayTicket.id}{' '}
-                                                        {typeof displayTicket.title === 'string'
-                                                            ? displayTicket.title
-                                                            : ''}
-                                                    </span>
+                                                    <TitleDisplay
+                                                        id={displayTicket.id}
+                                                        title={typeof displayTicket.title === 'string' ? displayTicket.title : ''}
+                                                    />
                                                     {!isCustomer && (
                                                         <Button
                                                             type="primary"
@@ -1492,11 +1504,11 @@ export default function TicketDetailContent({
                                                 gap: 8,
                                             }}
                                         >
-                                            {/* {rowTicketType !== 'support' && (
+                                            {rowTicketType !== 'support' && (
                                                 <Tag color={rowTicketType === 'spam' ? 'red' : 'orange'}>
-                                                    {rowTicketType === 'spam' ? 'Spam' : 'Trash'}
+                                                    {rowTicketType === 'spam' ? 'Spam ticket' : 'Trash ticket'}
                                                 </Tag>
-                                            )} */}
+                                            )}
                                             { rowTicketType !=='spam'&&(
                                                 <Button
                                                 icon={<WarningOutlined />}

@@ -57,9 +57,11 @@ export default function TicketsHeader({
           <Typography.Title level={2} style={{ margin: 0 }}>
             {junkTitle ?? 'My Tickets'}
           </Typography.Title>
-          <Button type="primary" icon={<PlusOutlined />} onClick={onCreateClick} loading={loading}>
-            Add Ticket
-          </Button>
+          {!inJunkFolder && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={onCreateClick} loading={loading}>
+              Add Ticket
+            </Button>
+          )}
         </Flex>
 
         {!inJunkFolder && (
@@ -96,7 +98,7 @@ export default function TicketsHeader({
               />
             </Flex>
           )}
-          {onAutoRefreshIntervalChange && (
+          {!inJunkFolder && onAutoRefreshIntervalChange && (
             <Flex align="center" gap={8}>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 Auto refresh
@@ -116,7 +118,7 @@ export default function TicketsHeader({
               />
             </Flex>
           )}
-          {onRefresh && (
+          {!inJunkFolder && onRefresh && (
             <Tooltip title="Refresh tickets">
               <Button
                 icon={<ReloadOutlined />}
