@@ -353,7 +353,7 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
           <div style={{ marginBottom: 20 }}>
             <Title level={2} className="settings-section-heading" style={{ margin: 0, fontSize: '1.5rem' }}>
               <TeamOutlined style={{ marginRight: 10 }} />
-              My Teams
+              E Report
             </Title>
             <Text type="secondary" style={{ fontSize: 13 }}>
               Reported work time for teams you belong to. Pick a date range in your local time (up to two years

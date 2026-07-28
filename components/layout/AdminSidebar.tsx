@@ -159,7 +159,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
                 {
                   key: '/my-teams',
                   icon: <TeamOutlined />,
-                  label: linkLabel('/my-teams', 'My Teams'),
+                  label: linkLabel('/my-teams', 'E Report'),
                 },
               ]
             : []),

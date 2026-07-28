@@ -1,9 +1,9 @@
-import { and, desc,eq, inArray, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { canAccessMyTeams } from '@/lib/auth-utils'
-import { db, teamMembers, tickets, ticketTimeTracker, users } from '@/lib/db'
+import { db, teamMembers, teams, tickets, ticketTimeTracker, users } from '@/lib/db'
 import { loadActiveJobTypeTitleMap } from '@/lib/job-types-db'
 import { accumulateSession, roundHourly, type SessionLike } from '@/lib/my-teams-activity-aggregate'
 import { localDayBoundsFromYmd, localYmd, validateMyTeamsActivityDayWindow } from '@/lib/my-teams-date'
@@ -29,12 +29,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
   }
 
   const viewerId = session.user.id
-  const [membership] = await db
-    .select({ id: teamMembers.id })
-    .from(teamMembers)
-    .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, viewerId)))
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const role = (sessionRole(session) ?? '').toLowerCase()
+  const isAdmin = role === 'admin'
+  const isManager = role === 'manager'
+
+  if (!isAdmin) {
+    const [membership] = await db
+      .select({ id: teamMembers.id })
+      .from(teamMembers)
+      .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, viewerId)))
+
+    if (isManager && !membership) {
+      // Manager can access public teams even without membership
+      const [teamRow] = await db.select({ type: teams.type }).from(teams).where(eq(teams.id, teamId)).limit(1)
+      if (!teamRow || teamRow.type !== 'public') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
   }
 
   const url = new URL(request.url)
