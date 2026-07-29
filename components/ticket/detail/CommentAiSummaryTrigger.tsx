@@ -2,9 +2,8 @@
 
 import { RobotOutlined } from '@ant-design/icons'
 import { Button, Tooltip } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 
-import { summarizeAnchorSearchParams } from '@/lib/ticket-ai-summary-anchor'
 import type { SummarizeAnchorRequest } from '@/lib/ticket-summarize-types'
 
 import CommentAiSummaryModal from './CommentAiSummaryModal'
@@ -36,23 +35,6 @@ export default function CommentAiSummaryTrigger({
 }: CommentAiSummaryTriggerProps) {
   const [open, setOpen] = useState(false)
   const [hasSavedSummary, setHasSavedSummary] = useState(false)
-
-  const refreshSavedState = useCallback(async () => {
-    if (!ticketId || ticketId <= 0) return
-    try {
-      const res = await fetch(
-        `/api/tickets/${ticketId}/comments/summarize?${summarizeAnchorSearchParams(summarizeAnchor)}`,
-        { credentials: 'include' }
-      )
-      setHasSavedSummary(res.ok)
-    } catch {
-      setHasSavedSummary(false)
-    }
-  }, [ticketId, summarizeAnchor])
-
-  useEffect(() => {
-    void refreshSavedState()
-  }, [refreshSavedState])
 
   if (!ticketId || ticketId <= 0) return null
   if (!onAddComment && !onApplyToDescription) return null
