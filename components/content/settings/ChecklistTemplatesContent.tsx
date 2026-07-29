@@ -25,6 +25,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
 import { SpaNavLink } from '@/components/common/SpaNavLink'
@@ -77,6 +78,8 @@ interface Props {
 }
 
 export default function ChecklistTemplatesContent({ user: currentUser }: Props) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [collapsed, setCollapsed] = useState(false)
   const [templates, setTemplates] = useState<TemplateSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -141,6 +144,15 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
   useEffect(() => {
     void loadTemplates()
   }, [loadTemplates])
+
+  // Auto-select template from URL param after templates load
+  useEffect(() => {
+    if (loading) return
+    const id = searchParams.get('id')
+    if (id && !activeDetail) {
+      void loadDetail(id)
+    }
+  }, [loading, searchParams, activeDetail, loadDetail])
 
   // ── Create template ──────────────────────────────────────────────
   const openCreate = () => {
@@ -473,7 +485,7 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                   {templates.map((t) => (
                     <div
                       key={t.id}
-                      onClick={() => void loadDetail(t.id)}
+                      onClick={() => { router.replace(`?id=${t.id}`, { scroll: false }); void loadDetail(t.id) }}
                       style={{
                         cursor: 'pointer',
                         padding: '6px 10px',
