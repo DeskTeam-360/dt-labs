@@ -83,6 +83,7 @@ export async function GET(request: Request) {
   const dueDateFrom = url.searchParams.get('due_date_from')
   const dueDateTo = url.searchParams.get('due_date_to')
   const search = url.searchParams.get('search')?.trim()
+  const searchBy = url.searchParams.get('search_by')?.trim() || 'all' // 'all' | 'title' | 'id'
   const limit = Math.min(
     Math.max(1, parseInt(url.searchParams.get('limit') || String(DEFAULT_LIMIT), 10)),
     MAX_LIMIT
@@ -177,10 +178,18 @@ export async function GET(request: Request) {
   if (search) {
     const pattern = `%${search.replace(/[%_\\]/g, '\\$&')}%`
     const searchAsId = /^\d+$/.test(search) ? parseInt(search, 10) : null
-    if (searchAsId !== null) {
-      conditions.push(or(eq(tickets.id, searchAsId), ilike(tickets.title, pattern), ilike(tickets.description, pattern))!)
+    if (searchBy === 'id') {
+      if (searchAsId !== null) conditions.push(eq(tickets.id, searchAsId)!)
+      else conditions.push(sql`false`)
+    } else if (searchBy === 'title') {
+      conditions.push(ilike(tickets.title, pattern)!)
     } else {
-      conditions.push(or(ilike(tickets.title, pattern), ilike(tickets.description, pattern))!)
+      // 'all' — default: id OR title OR description
+      if (searchAsId !== null) {
+        conditions.push(or(eq(tickets.id, searchAsId), ilike(tickets.title, pattern), ilike(tickets.description, pattern))!)
+      } else {
+        conditions.push(or(ilike(tickets.title, pattern), ilike(tickets.description, pattern))!)
+      }
     }
   }
   if (tagIds.length > 0) {

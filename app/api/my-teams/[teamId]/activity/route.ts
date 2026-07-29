@@ -221,10 +221,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
     memberHourlyOut = roundHourly(bins)
   }
 
+  // Build per-member hourly map for single-day team view (stacked chart)
+  const memberHourlyMap: Record<string, number[]> = {}
+  if (!isMultiDay && !memberFocus) {
+    for (const uid of memberUserIds) {
+      const bins = memberHourly.get(uid)
+      if (bins) memberHourlyMap[uid] = roundHourly(bins)
+    }
+  }
+
   return NextResponse.json({
     date,
     members: membersOut,
     team_hourly_seconds: roundHourly(teamHourly),
+    member_hourly_seconds_map: Object.keys(memberHourlyMap).length > 0 ? memberHourlyMap : null,
     team_daily_seconds: isMultiDay
       ? rangeDates.map((d) => {
           const entry: Record<string, unknown> = { date: d }

@@ -745,6 +745,16 @@ export default function TicketDetailContent({
         }
     }
 
+    const handleDeleteGroup = async (groupName: string) => {
+        const itemsInGroup = checklistItems.filter((i) => i.group_name === groupName)
+        await Promise.all(
+            itemsInGroup.map((i) => patchChecklistItem(i.id, { group_name: null }))
+        )
+        setChecklistItems((prev) =>
+            prev.map((i) => i.group_name === groupName ? { ...i, group_name: null } : i)
+        )
+    }
+
     const handleDeleteChecklistItem = async (itemId: string) => {
         try {
             await apiFetch(`/api/tickets/${displayTicket.id}/checklist/${itemId}`, { method: 'DELETE' })
@@ -1767,6 +1777,7 @@ export default function TicketDetailContent({
                                             onUpdateChecklistNote={handleUpdateChecklistNote}
                                             onDeleteChecklistItem={handleDeleteChecklistItem}
                                             onMoveToGroup={handleMoveChecklistItemToGroup}
+                                            onDeleteGroup={handleDeleteGroup}
                                             onTemplateApplied={handleChecklistTemplateApplied}
                                         />
                                     ),

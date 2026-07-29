@@ -48,19 +48,18 @@ interface CustomerWeeklyRecapSettingsContentProps {
 
 function cellBackground(embedded: boolean, pct: number | null | undefined): string {
   if (!embedded) return 'var(--ant-color-fill-secondary, #e8e8e8)'
-  if (pct == null) return '#fff'
-  if (pct >= 100) return '#ffd8a8'
-  if (pct >= 70) return '#fff7d6'
-  if (pct <= 0) return '#ffc6c6'
-  return '#fff'
+  if (pct == null) return 'var(--ant-color-bg-container, #fff)'
+  if (pct >= 100) return 'rgba(255, 150, 50, 0.18)'
+  if (pct >= 70) return 'rgba(255, 215, 0, 0.15)'
+  if (pct <= 0) return 'rgba(255, 77, 79, 0.15)'
+  return 'var(--ant-color-bg-container, #fff)'
 }
 
 function formatTrackedTime(seconds: number | null | undefined): string {
-  const totalMinutes = Math.round((Number(seconds) || 0) / 60)
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
+  const total = Number(seconds) || 0
+  if (total <= 0) return '—'
+  const hours = Math.round(total / 3600)
+  return `${hours}h`
 }
 
 function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows: GridRow[] }) {
@@ -84,7 +83,7 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                 color: '#fff',
                 padding: '10px 12px',
                 textAlign: 'left',
-                borderBottom: '1px solid #fff',
+                borderBottom: 'none',
                 minWidth: 200,
               }}
               rowSpan={2}
@@ -99,7 +98,7 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                   color: '#fff',
                   padding: '8px 6px',
                   textAlign: 'center',
-                  borderLeft: '1px solid rgba(255,255,255,0.25)',
+                  borderLeft: 'none',
                   minWidth: 108,
                   maxWidth: 140,
                   fontWeight: 600,
@@ -120,7 +119,7 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                     color: '#fff',
                     padding: '6px 4px',
                     textAlign: 'center',
-                    borderLeft: '1px solid rgba(255,255,255,0.25)',
+                    borderLeft: 'none',
                     minWidth: 108,
                   }}
                 >
@@ -132,7 +131,7 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                     color: '#fff',
                     padding: '6px 4px',
                     textAlign: 'center',
-                    borderLeft: '1px solid rgba(255,255,255,0.25)',
+                    borderLeft: 'none',
                     minWidth: 108,
                   }}
                 >
@@ -150,9 +149,8 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                   position: 'sticky',
                   left: 0,
                   zIndex: 1,
-                  background: '#fff',
+                  background: 'var(--ant-color-bg-container, #fff)',
                   padding: '8px 12px',
-                  borderBottom: '1px solid #f0f0f0',
                   fontWeight: r.any_embedded ? 600 : 400,
                   color: r.any_embedded ? undefined : 'var(--ant-color-text-secondary)',
                 }}
@@ -169,8 +167,6 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                       style={{
                         textAlign: 'center',
                         padding: '6px 4px',
-                        borderBottom: '1px solid #f0f0f0',
-                        borderLeft: '1px solid #f0f0f0',
                         background: cellBackground(embedded, pct),
                       }}
                     >
@@ -180,9 +176,7 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                       style={{
                         textAlign: 'center',
                         padding: '6px 4px',
-                        borderBottom: '1px solid #f0f0f0',
-                        borderLeft: '1px solid #f0f0f0',
-                        background: embedded ? '#fff' : 'var(--ant-color-fill-secondary, #e8e8e8)',
+                        background: embedded ? 'var(--ant-color-bg-container, #fff)' : 'var(--ant-color-fill-secondary, #e8e8e8)',
                       }}
                     >
                       {embedded ? formatTrackedTime((cell?.client_time_hours ?? 0) * 3600) : '—'}

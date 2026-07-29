@@ -416,7 +416,11 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         params.set('due_date_from', filterDueDateRange[0].startOf('day').toISOString())
         params.set('due_date_to', filterDueDateRange[1].endOf('day').toISOString())
       }
-      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
+      if (debouncedSearch.trim()) {
+        params.set('search', debouncedSearch.trim())
+        const sb = searchParams.get('search_by')
+        if (sb && (sb === 'title' || sb === 'id')) params.set('search_by', sb)
+      }
       params.set('limit', String(ticketsPageLimit))
 
       const qs = params.toString()

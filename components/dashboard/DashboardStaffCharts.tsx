@@ -20,10 +20,11 @@ export default function DashboardStaffCharts({ chartData }: { chartData: ChartRo
         <RadarChart data={chartData}>
           <PolarGrid />
           <PolarAngleAxis dataKey="short" />
-          <PolarRadiusAxis angle={90} domain={[0, 'auto']} tickFormatter={(v) => `${v}m`} />
-          <Radar name="Minutes" dataKey="duration" stroke="#1890ff" fill="#1890ff" fillOpacity={0.4} />
+          <PolarRadiusAxis angle={90} domain={[0, 'auto']} tickFormatter={(v) => `${v}h`} />
+          <Radar name="Hours" dataKey="duration" stroke="#1890ff" fill="#1890ff" fillOpacity={0.4} />
           <Tooltip
-            formatter={(value: number | undefined) => [`${value ?? 0} min`, 'Duration']}
+            contentStyle={{ color: '#141414' }}
+            formatter={(value: number | undefined) => [`${value ?? 0} h`, 'Duration']}
             labelFormatter={(label) => chartData.find((d) => d.short === label)?.day ?? label}
           />
           <Legend />

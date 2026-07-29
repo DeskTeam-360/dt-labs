@@ -109,7 +109,7 @@ export default function DashboardHourlyActivityCard({
                       boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                     }}
                   >
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>Hour {label}</div>
+                    <div style={{ fontWeight: 600, marginBottom: 4, color: '#141414' }}>Hour {label}</div>
                     <div style={{ fontSize: 12, color: '#1890ff' }}>{minutes} min — time in this hour</div>
                     <div style={{ fontSize: 12, color: '#fa8c16' }}>
                       {tickets} distinct ticket{tickets === 1 ? '' : 's'} overlapping

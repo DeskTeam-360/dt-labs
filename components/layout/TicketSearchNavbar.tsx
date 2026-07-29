@@ -3,7 +3,7 @@
 import 'dayjs/locale/en'
 
 import { CloseOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icons'
-import { Input, Spin, Typography } from 'antd'
+import { Input, Select, Spin, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { usePathname, useRouter } from 'next/navigation'
@@ -75,6 +75,7 @@ export default function TicketSearchNavbar({
   const router = useRouter()
   const pathname = usePathname()
   const [q, setQ] = useState('')
+  const [searchBy, setSearchBy] = useState<'all' | 'title' | 'id'>('all')
   const [preview, setPreview] = useState<TicketPreview[]>([])
   const [panelVisible, setPanelVisible] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -160,7 +161,7 @@ export default function TicketSearchNavbar({
       setPreview([])
       try {
         const res = await fetch(
-          `/api/tickets?search=${encodeURIComponent(trimmed)}&limit=${PREVIEW_LIMIT}`,
+          `/api/tickets?search=${encodeURIComponent(trimmed)}&search_by=${searchBy}&limit=${PREVIEW_LIMIT}`,
           { credentials: 'include', signal: ac.signal }
         )
         if (!res.ok) throw new Error('fetch failed')
@@ -200,7 +201,7 @@ export default function TicketSearchNavbar({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [q])
+  }, [q, searchBy])
 
   const applySearch = useCallback(
     (value: string) => {
@@ -209,12 +210,12 @@ export default function TicketSearchNavbar({
       const onTicketList = pathname === '/tickets' || pathname === '/tickets/'
       if (onTicketList) {
         const sp = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
-        if (trimmed) sp.set('search', trimmed)
-        else sp.delete('search')
+        if (trimmed) { sp.set('search', trimmed); sp.set('search_by', searchBy) }
+        else { sp.delete('search'); sp.delete('search_by') }
         const qs = sp.toString()
         router.push(qs ? `/tickets?${qs}` : '/tickets', { scroll: false })
       } else {
-        router.push(trimmed ? `/tickets?search=${encodeURIComponent(trimmed)}` : '/tickets')
+        router.push(trimmed ? `/tickets?search=${encodeURIComponent(trimmed)}&search_by=${searchBy}` : '/tickets')
       }
     },
     [pathname, router]
@@ -301,7 +302,7 @@ export default function TicketSearchNavbar({
         <Input.Search
           size={NAV_CONTROL_SIZE}
           allowClear
-          placeholder="Search tickets (title, description)…"
+          placeholder={searchBy === 'id' ? 'Search by ticket ID…' : searchBy === 'title' ? 'Search by title…' : 'Search tickets…'}
           enterButton={<SearchOutlined />}
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -312,6 +313,20 @@ export default function TicketSearchNavbar({
             }
           }}
           style={{ width: '100%' }}
+          addonBefore={
+            <Select
+              value={searchBy}
+              onChange={(v) => { setSearchBy(v); setPreview([]); setPanelVisible(false) }}
+              size="large"
+              popupMatchSelectWidth={false}
+              style={{ minWidth: 80 }}
+              options={[
+                { value: 'all', label: 'All' },
+                { value: 'title', label: 'Title' },
+                { value: 'id', label: 'ID' },
+              ]}
+            />
+          }
         />
         {panelVisible && q.trim().length >= PREVIEW_MIN_CHARS && (
           <div

@@ -1571,7 +1571,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                             labelFormatter={(_, payload) =>
                               (payload?.[0]?.payload as { fullTitle?: string })?.fullTitle ?? ''
                             }
-                            contentStyle={{ borderRadius: 8 }}
+                            contentStyle={{ borderRadius: 8, color: '#141414' }}
                           />
                           <Bar dataKey="hours" name="Hours" radius={[0, 6, 6, 0]} maxBarSize={28}>
                             {chartRows.map((_, i) => (

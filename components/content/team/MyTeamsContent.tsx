@@ -85,6 +85,7 @@ type ActivityResponse = {
   date: string
   members: MemberRow[]
   team_hourly_seconds: number[]
+  member_hourly_seconds_map: Record<string, number[]> | null
   team_daily_seconds: Record<string, unknown>[] | null
   daily_member_ids: string[] | null
   sessions: SessionRow[]
@@ -197,11 +198,19 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
 
   const hourlyChartData = useMemo(() => {
     const bins = activity?.team_hourly_seconds ?? []
-    return bins.map((seconds, hour) => ({
-      hour: `${hour}:00`,
-      seconds: Math.round(seconds),
-      hours: Math.round((seconds / 3600) * 100) / 100,
-    }))
+    const memberMap = activity?.member_hourly_seconds_map ?? null
+    return bins.map((seconds, hour) => {
+      const entry: Record<string, unknown> = {
+        hour: `${hour}:00`,
+        seconds: Math.round(seconds),
+      }
+      if (memberMap) {
+        for (const uid of Object.keys(memberMap)) {
+          entry[uid] = Math.round(memberMap[uid]?.[hour] ?? 0)
+        }
+      }
+      return entry
+    })
   }, [activity])
 
   const memberHourlyChartData = useMemo(() => {
@@ -479,22 +488,50 @@ export default function MyTeamsContent({ user: currentUser }: MyTeamsContentProp
 
                       {isSingleDay ? (
                         <Card title="Hourly activity" size="small" style={{ marginBottom: 16 }}>
-                          {hourlyChartData.some((d) => d.seconds > 0) ? (
+                          {hourlyChartData.some((d) => (d.seconds as number) > 0) ? (
                             <div style={{ width: '100%', height: 280 }}>
                               <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={hourlyChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                  <CartesianGrid strokeDasharray="3 3" className="customer-time-report-chart-grid" />
-                                  <XAxis dataKey="hour" tick={{ fontSize: 11 }} interval={2} />
-                                  <YAxis
-                                    tick={{ fontSize: 11 }}
-                                    tickFormatter={(v) => (v >= 3600 ? `${Math.round(v / 3600)}h` : `${Math.round(v / 60)}m`)}
-                                  />
-                                  <Tooltip
-                                    formatter={(value) => [formatDuration(Number(value ?? 0)), 'Time']}
-                                    labelFormatter={(l) => `Hour ${l}`}
-                                  />
-                                  <Bar dataKey="seconds" fill="#9155FD" radius={[4, 4, 0, 0]} name="Seconds" />
-                                </BarChart>
+                                {(() => {
+                                  const memberMap = activity?.member_hourly_seconds_map
+                                  const memberIds = memberMap ? Object.keys(memberMap) : null
+                                  const COLORS = ['#9155FD','#01C4C4','#FF9800','#4CAF50','#F44336','#2196F3','#E91E63','#FF5722']
+                                  return (
+                                    <BarChart data={hourlyChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                      <CartesianGrid strokeDasharray="3 3" className="customer-time-report-chart-grid" />
+                                      <XAxis dataKey="hour" tick={{ fontSize: 11 }} interval={2} />
+                                      <YAxis
+                                        tick={{ fontSize: 11 }}
+                                        tickFormatter={(v) => (v >= 3600 ? `${Math.round(v / 3600)}h` : `${Math.round(v / 60)}m`)}
+                                      />
+                                      <Tooltip
+                                        wrapperStyle={{ zIndex: 9999 }}
+                                        contentStyle={{ color: '#141414' }}
+                                        formatter={(value, name) => {
+                                          if (memberIds) {
+                                            const member = activity?.members.find((m) => m.user_id === name)
+                                            return [formatDuration(Number(value ?? 0)), member?.user_name ?? name]
+                                          }
+                                          return [formatDuration(Number(value ?? 0)), 'Time']
+                                        }}
+                                        labelFormatter={(l) => `Hour ${l}`}
+                                      />
+                                      {memberIds ? (
+                                        memberIds.map((uid, i) => (
+                                          <Bar
+                                            key={uid}
+                                            dataKey={uid}
+                                            stackId="a"
+                                            fill={COLORS[i % COLORS.length]}
+                                            name={uid}
+                                            radius={i === memberIds.length - 1 ? [4, 4, 0, 0] : undefined}
+                                          />
+                                        ))
+                                      ) : (
+                                        <Bar dataKey="seconds" fill="#9155FD" radius={[4, 4, 0, 0]} name="Seconds" />
+                                      )}
+                                    </BarChart>
+                                  )
+                                })()}
                               </ResponsiveContainer>
                             </div>
                           ) : (

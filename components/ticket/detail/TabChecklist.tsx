@@ -2,6 +2,7 @@
 
 import {
   DeleteOutlined,
+  EditOutlined,
   FileAddOutlined,
   PlusOutlined,
   TagOutlined,
@@ -89,6 +90,7 @@ export type TabChecklistProps = {
   onUpdateChecklistNote: (itemId: string, completionNote: string) => Promise<void>
   onDeleteChecklistItem: (itemId: string) => void
   onMoveToGroup?: (itemId: string, groupName: string | null) => Promise<void>
+  onDeleteGroup?: (groupName: string) => Promise<void>
   onTemplateApplied?: () => void
 }
 
@@ -107,6 +109,7 @@ export default function TabChecklist({
   onUpdateChecklistNote,
   onDeleteChecklistItem,
   onMoveToGroup,
+  onDeleteGroup,
   onTemplateApplied,
 }: TabChecklistProps) {
   const [templates, setTemplates] = useState<TemplateSummary[]>([])
@@ -114,6 +117,7 @@ export default function TabChecklist({
   const [applying, setApplying] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
   const [addingGroup, setAddingGroup] = useState(false)
+  const [editMode, setEditMode] = useState(false)
 
   useEffect(() => {
     fetch('/api/checklist-templates', { credentials: 'include' })
@@ -266,33 +270,50 @@ export default function TabChecklist({
     [onCompleteChecklistItem, onUncompleteChecklistItem, onUpdateChecklistNote, onDeleteChecklistItem]
   )
 
+  // Move-to column for a given current group (null = ungrouped)
+  const makeMoveCol = (currentGroup: string | null): ColumnsType<ChecklistItemDto>[number] => ({
+    title: 'Move to',
+    key: 'move_to',
+    width: 180,
+    render: (_: unknown, item: ChecklistItemDto) => (
+      <Select
+        placeholder="Group…"
+        style={{ width: '100%' }}
+        value={undefined}
+        options={[
+          { value: '__ungrouped__', label: '— No Group' },
+          ...namedGroups
+            .filter((g) => g !== currentGroup)
+            .map((g) => ({ value: g, label: g })),
+        ]}
+        onChange={(v: string) => {
+          const target = v === '__ungrouped__' ? null : v
+          void onMoveToGroup?.(item.id, target)
+        }}
+      />
+    ),
+  })
+
   // Columns for ungrouped table — adds "Move to group" select when named groups exist
   const ungroupedColumns: ColumnsType<ChecklistItemDto> = useMemo(() => {
-    if (namedGroups.length === 0 || !onMoveToGroup) return columns
-    const moveCol: ColumnsType<ChecklistItemDto>[number] = {
-      title: 'Move to',
-      key: 'move_to',
-      width: 160,
-      render: (_: unknown, item: ChecklistItemDto) => (
-        <Select
-          placeholder="Group…"
-          style={{ width: '100%' }}
-          allowClear
-          options={namedGroups.map((g) => ({ value: g, label: g }))}
-          onChange={(g: string | undefined) => {
-            if (g !== undefined) void onMoveToGroup(item.id, g)
-          }}
-        />
-      ),
-    }
+    if (namedGroups.length === 0 || !onMoveToGroup || !editMode) return columns
+    const moveCol = makeMoveCol(null)
     return [...columns.slice(0, -1), moveCol, columns[columns.length - 1]]
-  }, [columns, namedGroups, onMoveToGroup])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columns, namedGroups, onMoveToGroup, editMode])
+
+  // Columns for a named group — adds "Move to" when in edit mode
+  const makeGroupColumns = (groupName: string): ColumnsType<ChecklistItemDto> => {
+    if (!editMode || !onMoveToGroup) return columns
+    const moveCol = makeMoveCol(groupName)
+    return [...columns.slice(0, -1), moveCol, columns[columns.length - 1]]
+  }
 
   // ── Render ───────────────────────────────────────────────────────
   return (
     <div style={{ width: '100%' }}>
       {/* Toolbar */}
-      <Space style={{ marginBottom: 12 }}>
+      <Space style={{ marginBottom: 12 }} wrap>
         {templates.length > 0 && (
           <>
             <Select
@@ -317,6 +338,15 @@ export default function TabChecklist({
         <Button icon={<TagOutlined />} onClick={() => setAddingGroup((v) => !v)}>
           Add Group
         </Button>
+        {hasGroups && (
+          <Button
+            icon={<EditOutlined />}
+            type={editMode ? 'primary' : 'default'}
+            onClick={() => setEditMode((v) => !v)}
+          >
+            {editMode ? 'Done' : 'Edit'}
+          </Button>
+        )}
       </Space>
 
       <Space orientation="vertical" style={{ width: '100%' }} size="middle">
@@ -363,6 +393,22 @@ export default function TabChecklist({
                         </Tag>
                       </Space>
                     ),
+                    extra: onDeleteGroup && editMode ? (
+                      <Popconfirm
+                        title={`Delete group "${g}"?`}
+                        description="All items in this group will become ungrouped."
+                        okText="Delete"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => void onDeleteGroup(g)}
+                      >
+                        <Button
+                          danger
+                          type="text"
+                          icon={<DeleteOutlined />}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </Popconfirm>
+                    ) : undefined,
                     children: (
                       <Space orientation="vertical" style={{ width: '100%' }} size={8}>
                         {items.length > 0 && (
@@ -370,7 +416,7 @@ export default function TabChecklist({
                             rowKey="id"
                             size="small"
                             pagination={false}
-                            columns={columns}
+                            columns={makeGroupColumns(g)}
                             dataSource={items}
                             scroll={{ x: 900 }}
                           />

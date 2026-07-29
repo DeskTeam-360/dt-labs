@@ -6,6 +6,7 @@ import {
   DeleteOutlined,
   EditOutlined,
   PlusOutlined,
+  SaveOutlined,
 } from '@ant-design/icons'
 import {
   Button,
@@ -17,6 +18,7 @@ import {
   message,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Tag,
   Typography,
@@ -30,8 +32,8 @@ import AdminSidebar from '@/components/layout/AdminSidebar'
 const { Content } = Layout
 const { Title, Text } = Typography
 
-type TemplateGroup = { id: string; title: string; order_index: number }
-type TemplateItem = { id: string; group_id: string | null; title: string; order_index: number }
+type TemplateGroup = { id: string; title: string; orderIndex: number }
+type TemplateItem = { id: string; groupId: string | null; title: string; orderIndex: number }
 type TemplateDetail = {
   id: string
   title: string
@@ -40,6 +42,31 @@ type TemplateDetail = {
   items: TemplateItem[]
 }
 type TemplateSummary = { id: string; title: string; description: string | null }
+
+// Draft tracks local edits before saving
+type DraftState = {
+  groups: TemplateGroup[]         // current groups (includes newly added with __new__ prefix)
+  items: TemplateItem[]           // current items (includes newly added with __new__ prefix)
+  deletedGroupIds: Set<string>    // existing IDs to delete on save
+  deletedItemIds: Set<string>     // existing IDs to delete on save
+  movedItems: Map<string, string | null> // itemId -> new groupId (existing items only)
+  dirty: boolean
+}
+
+function freshDraft(detail: TemplateDetail): DraftState {
+  return {
+    groups: [...detail.groups],
+    items: [...detail.items],
+    deletedGroupIds: new Set(),
+    deletedItemIds: new Set(),
+    movedItems: new Map(),
+    dirty: false,
+  }
+}
+
+function isNew(id: string) { return id.startsWith('__new__') }
+let draftCounter = 0
+function newId() { return `__new__${++draftCounter}` }
 
 interface Props {
   user: { id?: string; email?: string | null; name?: string | null; role?: string | null }
@@ -51,6 +78,8 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
   const [loading, setLoading] = useState(true)
   const [activeDetail, setActiveDetail] = useState<TemplateDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [draft, setDraft] = useState<DraftState | null>(null)
+  const [saving, setSaving] = useState(false)
 
   // Create template modal
   const [createOpen, setCreateOpen] = useState(false)
@@ -62,12 +91,11 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
   const [editSaving, setEditSaving] = useState(false)
   const [editForm] = Form.useForm<{ title: string; description?: string }>()
 
-  // Add group modal
-  const [groupOpen, setGroupOpen] = useState(false)
-  const [groupSaving, setGroupSaving] = useState(false)
-  const [groupForm] = Form.useForm<{ title: string }>()
+  // Add group inline
+  const [addingGroup, setAddingGroup] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
 
-  // Add item modal
+  // Add item
   const [itemOpen, setItemOpen] = useState(false)
   const [itemSaving, setItemSaving] = useState(false)
   const [itemGroupId, setItemGroupId] = useState<string | null>(null)
@@ -92,7 +120,9 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
       const res = await fetch(`/api/checklist-templates/${id}`, { credentials: 'include' })
       const body = await res.json().catch(() => null)
       if (!res.ok || !body) throw new Error(body?.error || 'Failed')
-      setActiveDetail(body as TemplateDetail)
+      const detail = body as TemplateDetail
+      setActiveDetail(detail)
+      setDraft(freshDraft(detail))
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to load template')
     } finally {
@@ -174,105 +204,164 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
       if (!res.ok) throw new Error('Failed')
       message.success('Deleted')
       setActiveDetail(null)
+      setDraft(null)
       await loadTemplates()
     } catch {
       message.error('Failed to delete')
     }
   }
 
-  // ── Add group ────────────────────────────────────────────────────
-  const openAddGroup = () => {
-    groupForm.resetFields()
-    setGroupOpen(true)
+  // ── Draft mutations ──────────────────────────────────────────────
+  const draftAddGroup = () => {
+    const g = newGroupName.trim()
+    if (!g || !draft) return
+    setDraft((d) => d ? ({
+      ...d,
+      groups: [...d.groups, { id: newId(), title: g, orderIndex: d.groups.length }],
+      dirty: true,
+    }) : d)
+    setNewGroupName('')
+    setAddingGroup(false)
   }
 
-  const submitAddGroup = async () => {
-    if (!activeDetail) return
-    const v = await groupForm.validateFields()
-    setGroupSaving(true)
-    try {
-      const res = await fetch(`/api/checklist-templates/${activeDetail.id}/groups`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: v.title, order_index: activeDetail.groups.length }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body?.error || 'Failed')
-      message.success('Group added')
-      setGroupOpen(false)
-      await loadDetail(activeDetail.id)
-    } catch (e) {
-      message.error(e instanceof Error ? e.message : 'Failed')
-    } finally {
-      setGroupSaving(false)
-    }
+  const draftDeleteGroup = (gid: string) => {
+    if (!draft) return
+    setDraft((d) => {
+      if (!d) return d
+      const nextGroups = d.groups.filter((g) => g.id !== gid)
+      // Move items in this group to ungrouped
+      const nextItems = d.items.map((i) =>
+        i.groupId === gid ? { ...i, groupId: null } : i
+      )
+      const deletedGroupIds = new Set(d.deletedGroupIds)
+      if (!isNew(gid)) deletedGroupIds.add(gid)
+      return { ...d, groups: nextGroups, items: nextItems, deletedGroupIds, dirty: true }
+    })
   }
 
-  const deleteGroup = async (gid: string) => {
-    if (!activeDetail) return
-    try {
-      await fetch(`/api/checklist-templates/${activeDetail.id}/groups/${gid}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      message.success('Group deleted')
-      await loadDetail(activeDetail.id)
-    } catch {
-      message.error('Failed')
-    }
-  }
-
-  // ── Add item ─────────────────────────────────────────────────────
   const openAddItem = (groupId: string | null) => {
     setItemGroupId(groupId)
     itemForm.resetFields()
     setItemOpen(true)
   }
 
-  const submitAddItem = async () => {
-    if (!activeDetail) return
+  const draftAddItem = async () => {
     const v = await itemForm.validateFields()
+    if (!draft) return
     setItemSaving(true)
+    const itemsInGroup = draft.items.filter((i) => i.groupId === itemGroupId).length
+    setDraft((d) => d ? ({
+      ...d,
+      items: [...d.items, {
+        id: newId(),
+        title: v.title.trim(),
+        groupId: itemGroupId,
+        orderIndex: itemsInGroup,
+      }],
+      dirty: true,
+    }) : d)
+    setItemSaving(false)
+    setItemOpen(false)
+  }
+
+  const draftDeleteItem = (iid: string) => {
+    setDraft((d) => {
+      if (!d) return d
+      const nextItems = d.items.filter((i) => i.id !== iid)
+      const deletedItemIds = new Set(d.deletedItemIds)
+      if (!isNew(iid)) deletedItemIds.add(iid)
+      return { ...d, items: nextItems, deletedItemIds, dirty: true }
+    })
+  }
+
+  const draftMoveItem = (iid: string, groupId: string | null) => {
+    setDraft((d) => {
+      if (!d) return d
+      const nextItems = d.items.map((i) => i.id === iid ? { ...i, groupId } : i)
+      const movedItems = new Map(d.movedItems)
+      if (!isNew(iid)) movedItems.set(iid, groupId)
+      return { ...d, items: nextItems, movedItems, dirty: true }
+    })
+  }
+
+  // ── Save all draft changes ───────────────────────────────────────
+  const saveAll = async () => {
+    if (!draft || !activeDetail) return
+    setSaving(true)
     try {
-      const res = await fetch(`/api/checklist-templates/${activeDetail.id}/items`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: v.title,
-          group_id: itemGroupId,
-          order_index: activeDetail.items.filter((i) => i.group_id === itemGroupId).length,
-        }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body?.error || 'Failed')
-      message.success('Item added')
-      setItemOpen(false)
-      await loadDetail(activeDetail.id)
+      const tid = activeDetail.id
+
+      // 1. Delete items first (before groups, to avoid FK issues)
+      for (const iid of draft.deletedItemIds) {
+        await fetch(`/api/checklist-templates/${tid}/items/${iid}`, {
+          method: 'DELETE', credentials: 'include',
+        })
+      }
+
+      // 2. Delete groups
+      for (const gid of draft.deletedGroupIds) {
+        await fetch(`/api/checklist-templates/${tid}/groups/${gid}`, {
+          method: 'DELETE', credentials: 'include',
+        })
+      }
+
+      // 3. Create new groups, collect tempId → realId map
+      const groupIdMap = new Map<string, string>()
+      for (const g of draft.groups) {
+        if (!isNew(g.id)) continue
+        const res = await fetch(`/api/checklist-templates/${tid}/groups`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: g.title, order_index: g.orderIndex }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (res.ok && body.id) groupIdMap.set(g.id, body.id)
+      }
+
+      // 4. Create new items (resolve temp groupIds)
+      for (const item of draft.items) {
+        if (!isNew(item.id)) continue
+        const realGroupId = item.groupId
+          ? (isNew(item.groupId) ? (groupIdMap.get(item.groupId) ?? null) : item.groupId)
+          : null
+        await fetch(`/api/checklist-templates/${tid}/items`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: item.title, group_id: realGroupId, order_index: item.orderIndex }),
+        })
+      }
+
+      // 5. Move existing items to new groups
+      for (const [iid, newGroupId] of draft.movedItems) {
+        const realGroupId = newGroupId
+          ? (isNew(newGroupId) ? (groupIdMap.get(newGroupId) ?? null) : newGroupId)
+          : null
+        await fetch(`/api/checklist-templates/${tid}/items/${iid}`, {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ group_id: realGroupId }),
+        })
+      }
+
+      message.success('Saved')
+      await loadDetail(tid)
     } catch (e) {
-      message.error(e instanceof Error ? e.message : 'Failed')
+      message.error(e instanceof Error ? e.message : 'Failed to save')
     } finally {
-      setItemSaving(false)
+      setSaving(false)
     }
   }
 
-  const deleteItem = async (iid: string) => {
-    if (!activeDetail) return
-    try {
-      await fetch(`/api/checklist-templates/${activeDetail.id}/items/${iid}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      message.success('Item deleted')
-      await loadDetail(activeDetail.id)
-    } catch {
-      message.error('Failed')
-    }
+  // ── Discard draft ────────────────────────────────────────────────
+  const discardDraft = () => {
+    if (activeDetail) setDraft(freshDraft(activeDetail))
   }
 
-  // ── Render ───────────────────────────────────────────────────────
-  const ungroupedItems = activeDetail?.items.filter((i) => !i.group_id) ?? []
+  // ── Derived ──────────────────────────────────────────────────────
+  const currentGroups = draft?.groups ?? activeDetail?.groups ?? []
+  const currentItems = draft?.items ?? activeDetail?.items ?? []
+  const ungroupedItems = currentItems.filter((i) => !i.groupId)
+  const isDirty = draft?.dirty ?? false
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -305,9 +394,7 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
               <Card size="small" loading={loading} style={{ minWidth: 240, width: 240, flexShrink: 0 }}>
                 <Space direction="vertical" style={{ width: '100%' }} size={4}>
                   {templates.length === 0 && !loading && (
-                    <Text type="secondary" style={{ fontSize: 13 }}>
-                      No templates yet.
-                    </Text>
+                    <Text type="secondary" style={{ fontSize: 13 }}>No templates yet.</Text>
                   )}
                   {templates.map((t) => (
                     <div
@@ -331,13 +418,13 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
               {/* Template detail */}
               {activeDetail ? (
                 <Card
-                  size="small"
                   loading={detailLoading}
                   style={{ flex: 1 }}
+                  styles={{ header: { padding: '12px 16px' }, body: { padding: 16 } }}
                   title={
                     <Space>
                       <Text strong>{activeDetail.title}</Text>
-                      <Button size="small" icon={<EditOutlined />} type="text" onClick={openEdit} />
+                      <Button icon={<EditOutlined />} type="text" onClick={openEdit} />
                       <Popconfirm
                         title="Delete this template?"
                         description="All groups and items will be removed."
@@ -345,17 +432,30 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                         okButtonProps={{ danger: true }}
                         onConfirm={() => void deleteTemplate(activeDetail.id)}
                       >
-                        <Button size="small" icon={<DeleteOutlined />} type="text" danger />
+                        <Button icon={<DeleteOutlined />} type="text" danger />
                       </Popconfirm>
                     </Space>
                   }
                   extra={
                     <Space>
-                      <Button size="small" icon={<PlusOutlined />} onClick={openAddGroup}>
+                      {isDirty && (
+                        <>
+                          <Button onClick={discardDraft}>Discard</Button>
+                          <Button
+                            type="primary"
+                            icon={<SaveOutlined />}
+                            loading={saving}
+                            onClick={() => void saveAll()}
+                          >
+                            Save
+                          </Button>
+                        </>
+                      )}
+                      <Button icon={<PlusOutlined />} onClick={() => setAddingGroup((v) => !v)}>
                         Add Group
                       </Button>
-                      <Button size="small" icon={<PlusOutlined />} type="primary" onClick={() => openAddItem(null)}>
-                        Add Item (no group)
+                      <Button icon={<PlusOutlined />} type="primary" onClick={() => openAddItem(null)}>
+                        Add Item
                       </Button>
                     </Space>
                   }
@@ -365,23 +465,42 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                       <Text type="secondary">{activeDetail.description}</Text>
                     )}
 
+                    {/* Add group inline input */}
+                    {addingGroup && (
+                      <Space>
+                        <Input
+                          placeholder="Group name…"
+                          value={newGroupName}
+                          autoFocus
+                          onChange={(e) => setNewGroupName(e.target.value)}
+                          onPressEnter={draftAddGroup}
+                          onKeyDown={(e) => { if (e.key === 'Escape') setAddingGroup(false) }}
+                          style={{ width: 260 }}
+                        />
+                        <Button type="primary" onClick={draftAddGroup} disabled={!newGroupName.trim()}>
+                          Create
+                        </Button>
+                        <Button onClick={() => setAddingGroup(false)}>Cancel</Button>
+                      </Space>
+                    )}
+
                     {/* Groups */}
-                    {activeDetail.groups.length > 0 && (
+                    {currentGroups.length > 0 && (
                       <Collapse
-                        size="small"
-                        defaultActiveKey={activeDetail.groups.map((g) => g.id)}
-                        items={activeDetail.groups.map((g) => ({
+                        key={currentGroups.map((g) => g.id).join(',')}
+                        defaultActiveKey={currentGroups.map((g) => g.id)}
+                        items={currentGroups.map((g) => ({
                           key: g.id,
                           label: (
                             <Space>
                               <Text strong>{g.title}</Text>
-                              <Tag>{activeDetail.items.filter((i) => i.group_id === g.id).length} items</Tag>
+                              {isNew(g.id) && <Tag color="blue">new</Tag>}
+                              <Tag>{currentItems.filter((i) => i.groupId === g.id).length} items</Tag>
                             </Space>
                           ),
                           extra: (
                             <Space onClick={(e) => e.stopPropagation()}>
                               <Button
-                                size="small"
                                 icon={<PlusOutlined />}
                                 onClick={() => openAddItem(g.id)}
                               >
@@ -392,17 +511,17 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                                 description="Items in this group will become ungrouped."
                                 okText="Delete"
                                 okButtonProps={{ danger: true }}
-                                onConfirm={() => void deleteGroup(g.id)}
+                                onConfirm={() => draftDeleteGroup(g.id)}
                               >
-                                <Button size="small" danger icon={<DeleteOutlined />} type="text" />
+                                <Button danger icon={<DeleteOutlined />} type="text" />
                               </Popconfirm>
                             </Space>
                           ),
                           children: (
                             <Space direction="vertical" style={{ width: '100%' }} size={4}>
-                              {activeDetail.items
-                                .filter((i) => i.group_id === g.id)
-                                .sort((a, b) => a.order_index - b.order_index)
+                              {currentItems
+                                .filter((i) => i.groupId === g.id)
+                                .sort((a, b) => a.orderIndex - b.orderIndex)
                                 .map((item) => (
                                   <div
                                     key={item.id}
@@ -410,23 +529,34 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'space-between',
-                                      padding: '4px 8px',
+                                      gap: 8,
+                                      padding: '6px 8px',
                                       background: 'var(--ant-color-fill-quaternary, #f5f5f5)',
                                       borderRadius: 4,
                                     }}
                                   >
-                                    <Text style={{ fontSize: 13 }}>{item.title}</Text>
+                                    <Text style={{ flex: 1 }}>{item.title}</Text>
+                                    <Select
+                                      size="small"
+                                      value={undefined}
+                                      style={{ width: 160 }}
+                                      placeholder="Move to…"
+                                      onChange={(v: string) => draftMoveItem(item.id, v || null)}
+                                      options={currentGroups
+                                        .filter((grp) => grp.id !== g.id)
+                                        .map((grp) => ({ value: grp.id, label: grp.title }))}
+                                    />
                                     <Popconfirm
                                       title="Delete item?"
                                       okText="Delete"
                                       okButtonProps={{ danger: true }}
-                                      onConfirm={() => void deleteItem(item.id)}
+                                      onConfirm={() => draftDeleteItem(item.id)}
                                     >
-                                      <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                                      <Button type="text" danger icon={<DeleteOutlined />} />
                                     </Popconfirm>
                                   </div>
                                 ))}
-                              {activeDetail.items.filter((i) => i.group_id === g.id).length === 0 && (
+                              {currentItems.filter((i) => i.groupId === g.id).length === 0 && (
                                 <Text type="secondary" style={{ fontSize: 12 }}>
                                   No items in this group yet.
                                 </Text>
@@ -445,7 +575,7 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                         </Text>
                         <Space direction="vertical" style={{ width: '100%' }} size={4}>
                           {ungroupedItems
-                            .sort((a, b) => a.order_index - b.order_index)
+                            .sort((a, b) => a.orderIndex - b.orderIndex)
                             .map((item) => (
                               <div
                                 key={item.id}
@@ -453,19 +583,30 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'space-between',
-                                  padding: '4px 8px',
+                                  gap: 8,
+                                  padding: '6px 8px',
                                   background: 'var(--ant-color-fill-quaternary, #f5f5f5)',
                                   borderRadius: 4,
                                 }}
                               >
-                                <Text style={{ fontSize: 13 }}>{item.title}</Text>
+                                <Text style={{ flex: 1 }}>{item.title}</Text>
+                                {currentGroups.length > 0 && (
+                                  <Select
+                                    size="small"
+                                    value={undefined}
+                                    style={{ width: 160 }}
+                                    placeholder="Move to group…"
+                                    onChange={(v: string) => draftMoveItem(item.id, v)}
+                                    options={currentGroups.map((g) => ({ value: g.id, label: g.title }))}
+                                  />
+                                )}
                                 <Popconfirm
                                   title="Delete item?"
                                   okText="Delete"
                                   okButtonProps={{ danger: true }}
-                                  onConfirm={() => void deleteItem(item.id)}
+                                  onConfirm={() => draftDeleteItem(item.id)}
                                 >
-                                  <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                                  <Button type="text" danger icon={<DeleteOutlined />} />
                                 </Popconfirm>
                               </div>
                             ))}
@@ -473,7 +614,7 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                       </div>
                     )}
 
-                    {activeDetail.groups.length === 0 && ungroupedItems.length === 0 && (
+                    {currentGroups.length === 0 && ungroupedItems.length === 0 && !addingGroup && (
                       <Text type="secondary">No groups or items yet. Add a group or item above.</Text>
                     )}
                   </Space>
@@ -526,34 +667,18 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
         </Form>
       </Modal>
 
-      {/* Add group modal */}
-      <Modal
-        title="Add Group"
-        open={groupOpen}
-        onOk={() => void submitAddGroup()}
-        onCancel={() => setGroupOpen(false)}
-        confirmLoading={groupSaving}
-        destroyOnHidden
-      >
-        <Form form={groupForm} layout="vertical" requiredMark={false}>
-          <Form.Item name="title" label="Group Name" rules={[{ required: true, message: 'Required' }]}>
-            <Input placeholder="e.g. Before Deployment" />
-          </Form.Item>
-        </Form>
-      </Modal>
-
       {/* Add item modal */}
       <Modal
         title={itemGroupId ? 'Add Item to Group' : 'Add Ungrouped Item'}
         open={itemOpen}
-        onOk={() => void submitAddItem()}
+        onOk={() => void draftAddItem()}
         onCancel={() => setItemOpen(false)}
         confirmLoading={itemSaving}
         destroyOnHidden
       >
         <Form form={itemForm} layout="vertical" requiredMark={false}>
           <Form.Item name="title" label="Item Title" rules={[{ required: true, message: 'Required' }]}>
-            <Input placeholder="e.g. Notify stakeholders" />
+            <Input placeholder="e.g. Notify stakeholders" autoFocus />
           </Form.Item>
         </Form>
       </Modal>

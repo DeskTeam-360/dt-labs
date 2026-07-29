@@ -197,8 +197,8 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
       days.push({
         day: d.format('ddd D/M'),
         short: d.format('ddd'),
-        duration: Math.round(duration / 60),
-        fullMark: 24 * 60,
+        duration: Math.round((duration / 3600) * 10) / 10,
+        fullMark: 24,
       })
     }
     return days
@@ -496,7 +496,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
               title={
                 <Space>
                   <ClockCircleOutlined />
-                  <span>Time tracked - Last 7 days (minutes)</span>
+                  <span>Time tracked - Last 7 days (hours)</span>
                 </Space>
               }
               style={{ marginBottom: 16 }}
