@@ -1,7 +1,9 @@
 'use client'
 
 import {
+  ArrowDownOutlined,
   ArrowLeftOutlined,
+  ArrowUpOutlined,
   CheckSquareOutlined,
   DeleteOutlined,
   EditOutlined,
@@ -45,11 +47,12 @@ type TemplateSummary = { id: string; title: string; description: string | null }
 
 // Draft tracks local edits before saving
 type DraftState = {
-  groups: TemplateGroup[]         // current groups (includes newly added with __new__ prefix)
-  items: TemplateItem[]           // current items (includes newly added with __new__ prefix)
-  deletedGroupIds: Set<string>    // existing IDs to delete on save
-  deletedItemIds: Set<string>     // existing IDs to delete on save
-  movedItems: Map<string, string | null> // itemId -> new groupId (existing items only)
+  groups: TemplateGroup[]
+  items: TemplateItem[]
+  deletedGroupIds: Set<string>
+  deletedItemIds: Set<string>
+  movedItems: Map<string, string | null>
+  changedItems: Map<string, { title?: string; note?: string | null; order_index?: number }>
   dirty: boolean
 }
 
@@ -60,6 +63,7 @@ function freshDraft(detail: TemplateDetail): DraftState {
     deletedGroupIds: new Set(),
     deletedItemIds: new Set(),
     movedItems: new Map(),
+    changedItems: new Map(),
     dirty: false,
   }
 }
@@ -99,7 +103,11 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
   const [itemOpen, setItemOpen] = useState(false)
   const [itemSaving, setItemSaving] = useState(false)
   const [itemGroupId, setItemGroupId] = useState<string | null>(null)
-  const [itemForm] = Form.useForm<{ title: string }>()
+  const [itemForm] = Form.useForm<{ title: string; note?: string }>()
+
+  // Edit item
+  const [editItemId, setEditItemId] = useState<string | null>(null)
+  const [editItemForm] = Form.useForm<{ title: string; note?: string }>()
 
   const loadTemplates = useCallback(async () => {
     setLoading(true)
@@ -285,6 +293,62 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
     })
   }
 
+  const openEditItem = (item: TemplateItem) => {
+    setEditItemId(item.id)
+    editItemForm.setFieldsValue({ title: item.title, note: item.note ?? '' })
+  }
+
+  const submitEditItem = async () => {
+    const v = await editItemForm.validateFields()
+    const title = v.title.trim()
+    const note = typeof v.note === 'string' && v.note.trim() ? v.note.trim() : null
+    setDraft((d) => {
+      if (!d || !editItemId) return d
+      const nextItems = d.items.map((i) =>
+        i.id === editItemId ? { ...i, title, note } : i
+      )
+      const changedItems = new Map(d.changedItems)
+      if (!isNew(editItemId)) {
+        const prev = changedItems.get(editItemId) ?? {}
+        changedItems.set(editItemId, { ...prev, title, note })
+      }
+      return { ...d, items: nextItems, changedItems, dirty: true }
+    })
+    setEditItemId(null)
+  }
+
+  const draftReorderItem = (iid: string, direction: 'up' | 'down') => {
+    setDraft((d) => {
+      if (!d) return d
+      const item = d.items.find((i) => i.id === iid)
+      if (!item) return d
+      const siblings = d.items
+        .filter((i) => i.groupId === item.groupId)
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+      const idx = siblings.findIndex((i) => i.id === iid)
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+      if (swapIdx < 0 || swapIdx >= siblings.length) return d
+      const swapItem = siblings[swapIdx]
+      const newOrder = item.orderIndex
+      const swapOrder = swapItem.orderIndex
+      const changedItems = new Map(d.changedItems)
+      if (!isNew(iid)) {
+        const prev = changedItems.get(iid) ?? {}
+        changedItems.set(iid, { ...prev, order_index: swapOrder })
+      }
+      if (!isNew(swapItem.id)) {
+        const prev = changedItems.get(swapItem.id) ?? {}
+        changedItems.set(swapItem.id, { ...prev, order_index: newOrder })
+      }
+      const nextItems = d.items.map((i) => {
+        if (i.id === iid) return { ...i, orderIndex: swapOrder }
+        if (i.id === swapItem.id) return { ...i, orderIndex: newOrder }
+        return i
+      })
+      return { ...d, items: nextItems, changedItems, dirty: true }
+    })
+  }
+
   // ── Save all draft changes ───────────────────────────────────────
   const saveAll = async () => {
     if (!draft || !activeDetail) return
@@ -341,6 +405,15 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
           method: 'PATCH', credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ group_id: realGroupId }),
+        })
+      }
+
+      // 6. PATCH edited / reordered items
+      for (const [iid, changes] of draft.changedItems) {
+        await fetch(`/api/checklist-templates/${tid}/items/${iid}`, {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(changes),
         })
       }
 
@@ -520,26 +593,31 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                           ),
                           children: (
                             <Space direction="vertical" style={{ width: '100%' }} size={4}>
-                              {currentItems
-                                .filter((i) => i.groupId === g.id)
-                                .sort((a, b) => a.orderIndex - b.orderIndex)
-                                .map((item) => (
+                              {(() => {
+                                const groupItems = currentItems
+                                  .filter((i) => i.groupId === g.id)
+                                  .sort((a, b) => a.orderIndex - b.orderIndex)
+                                return groupItems.map((item, idx) => (
                                   <div
                                     key={item.id}
                                     style={{
                                       display: 'flex',
                                       alignItems: 'center',
-                                      justifyContent: 'space-between',
                                       gap: 8,
                                       padding: '6px 8px',
                                       background: 'var(--ant-color-fill-quaternary, #f5f5f5)',
                                       borderRadius: 4,
                                     }}
                                   >
+                                    <Space size={0} direction="vertical" style={{ flexShrink: 0 }}>
+                                      <Button type="text" size="small" icon={<ArrowUpOutlined />} disabled={idx === 0} onClick={() => draftReorderItem(item.id, 'up')} style={{ padding: '0 4px', height: 18 }} />
+                                      <Button type="text" size="small" icon={<ArrowDownOutlined />} disabled={idx === groupItems.length - 1} onClick={() => draftReorderItem(item.id, 'down')} style={{ padding: '0 4px', height: 18 }} />
+                                    </Space>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <Text>{item.title}</Text>
                                       {item.note && <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>{item.note}</Text>}
                                     </div>
+                                    <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEditItem(item)} />
                                     <Select
                                       size="small"
                                       value={undefined}
@@ -559,7 +637,8 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                                       <Button type="text" danger icon={<DeleteOutlined />} />
                                     </Popconfirm>
                                   </div>
-                                ))}
+                                ))
+                              })()}
                               {currentItems.filter((i) => i.groupId === g.id).length === 0 && (
                                 <Text type="secondary" style={{ fontSize: 12 }}>
                                   No items in this group yet.
@@ -580,23 +659,27 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                         <Space direction="vertical" style={{ width: '100%' }} size={4}>
                           {ungroupedItems
                             .sort((a, b) => a.orderIndex - b.orderIndex)
-                            .map((item) => (
+                            .map((item, idx, arr) => (
                               <div
                                 key={item.id}
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
-                                  justifyContent: 'space-between',
                                   gap: 8,
                                   padding: '6px 8px',
                                   background: 'var(--ant-color-fill-quaternary, #f5f5f5)',
                                   borderRadius: 4,
                                 }}
                               >
+                                <Space size={0} direction="vertical" style={{ flexShrink: 0 }}>
+                                  <Button type="text" size="small" icon={<ArrowUpOutlined />} disabled={idx === 0} onClick={() => draftReorderItem(item.id, 'up')} style={{ padding: '0 4px', height: 18 }} />
+                                  <Button type="text" size="small" icon={<ArrowDownOutlined />} disabled={idx === arr.length - 1} onClick={() => draftReorderItem(item.id, 'down')} style={{ padding: '0 4px', height: 18 }} />
+                                </Space>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <Text>{item.title}</Text>
                                   {item.note && <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>{item.note}</Text>}
                                 </div>
+                                <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEditItem(item)} />
                                 {currentGroups.length > 0 && (
                                   <Select
                                     size="small"
@@ -686,6 +769,24 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
         <Form form={itemForm} layout="vertical" requiredMark={false}>
           <Form.Item name="title" label="Item Title" rules={[{ required: true, message: 'Required' }]}>
             <Input placeholder="e.g. Notify stakeholders" autoFocus />
+          </Form.Item>
+          <Form.Item name="note" label="Note (optional)">
+            <Input.TextArea rows={2} placeholder="Pre-filled note when template is applied…" maxLength={2000} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Edit item modal */}
+      <Modal
+        title="Edit Item"
+        open={!!editItemId}
+        onOk={() => void submitEditItem()}
+        onCancel={() => setEditItemId(null)}
+        destroyOnHidden
+      >
+        <Form form={editItemForm} layout="vertical" requiredMark={false}>
+          <Form.Item name="title" label="Item Title" rules={[{ required: true, message: 'Required' }]}>
+            <Input autoFocus />
           </Form.Item>
           <Form.Item name="note" label="Note (optional)">
             <Input.TextArea rows={2} placeholder="Pre-filled note when template is applied…" maxLength={2000} />
