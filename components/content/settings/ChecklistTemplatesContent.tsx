@@ -33,7 +33,7 @@ const { Content } = Layout
 const { Title, Text } = Typography
 
 type TemplateGroup = { id: string; title: string; orderIndex: number }
-type TemplateItem = { id: string; groupId: string | null; title: string; orderIndex: number }
+type TemplateItem = { id: string; groupId: string | null; title: string; note: string | null; orderIndex: number }
 type TemplateDetail = {
   id: string
   title: string
@@ -255,6 +255,7 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
       items: [...d.items, {
         id: newId(),
         title: v.title.trim(),
+        note: typeof v.note === 'string' && v.note.trim() ? v.note.trim() : null,
         groupId: itemGroupId,
         orderIndex: itemsInGroup,
       }],
@@ -327,7 +328,7 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
         await fetch(`/api/checklist-templates/${tid}/items`, {
           method: 'POST', credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: item.title, group_id: realGroupId, order_index: item.orderIndex }),
+          body: JSON.stringify({ title: item.title, note: item.note ?? null, group_id: realGroupId, order_index: item.orderIndex }),
         })
       }
 
@@ -535,7 +536,10 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                                       borderRadius: 4,
                                     }}
                                   >
-                                    <Text style={{ flex: 1 }}>{item.title}</Text>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <Text>{item.title}</Text>
+                                      {item.note && <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>{item.note}</Text>}
+                                    </div>
                                     <Select
                                       size="small"
                                       value={undefined}
@@ -589,7 +593,10 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
                                   borderRadius: 4,
                                 }}
                               >
-                                <Text style={{ flex: 1 }}>{item.title}</Text>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <Text>{item.title}</Text>
+                                  {item.note && <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>{item.note}</Text>}
+                                </div>
                                 {currentGroups.length > 0 && (
                                   <Select
                                     size="small"
@@ -679,6 +686,9 @@ export default function ChecklistTemplatesContent({ user: currentUser }: Props) 
         <Form form={itemForm} layout="vertical" requiredMark={false}>
           <Form.Item name="title" label="Item Title" rules={[{ required: true, message: 'Required' }]}>
             <Input placeholder="e.g. Notify stakeholders" autoFocus />
+          </Form.Item>
+          <Form.Item name="note" label="Note (optional)">
+            <Input.TextArea rows={2} placeholder="Pre-filled note when template is applied…" maxLength={2000} />
           </Form.Item>
         </Form>
       </Modal>

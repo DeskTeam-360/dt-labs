@@ -66,6 +66,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     isCompleted: false,
     orderIndex: maxOrder + i + 1,
     groupName: item.groupId ? (groupMap.get(item.groupId) ?? null) : null,
+    completionNote: item.note ?? null,
   }))
 
   await db.insert(ticketChecklist).values(rows)

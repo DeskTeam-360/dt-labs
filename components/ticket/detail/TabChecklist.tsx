@@ -118,6 +118,7 @@ export default function TabChecklist({
   const [newGroupName, setNewGroupName] = useState('')
   const [addingGroup, setAddingGroup] = useState(false)
   const [editMode, setEditMode] = useState(false)
+  const [localGroups, setLocalGroups] = useState<string[]>([])
 
   useEffect(() => {
     fetch('/api/checklist-templates', { credentials: 'include' })
@@ -149,10 +150,16 @@ export default function TabChecklist({
   const handleAddGroup = () => {
     const g = newGroupName.trim()
     if (!g) return
-    onAddChecklistItem(g)
+    setLocalGroups((prev) => (prev.includes(g) ? prev : [...prev, g]))
     setNewGroupName('')
     setAddingGroup(false)
   }
+
+  // Drop localGroups that already have real items
+  const activeLocalGroups = useMemo(() => {
+    const realGroups = new Set(checklistItems.map((i) => i.group_name ?? ''))
+    return localGroups.filter((g) => !realGroups.has(g))
+  }, [localGroups, checklistItems])
 
   // ── Derived state ───────────────────────────────────────────────
   const groupOrder = useMemo(() => {
@@ -161,8 +168,11 @@ export default function TabChecklist({
       const g = item.group_name ?? ''
       if (!seen.includes(g)) seen.push(g)
     }
+    for (const g of activeLocalGroups) {
+      if (!seen.includes(g)) seen.push(g)
+    }
     return seen
-  }, [checklistItems])
+  }, [checklistItems, activeLocalGroups])
 
   const itemsByGroup = useMemo(() => {
     const map = new Map<string, ChecklistItemDto[]>()

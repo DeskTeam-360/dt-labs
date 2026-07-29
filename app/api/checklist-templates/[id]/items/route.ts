@@ -41,6 +41,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       templateId: id,
       groupId: typeof body.group_id === 'string' ? body.group_id : null,
       title,
+      note: typeof body.note === 'string' ? body.note.trim() || null : null,
       orderIndex: typeof body.order_index === 'number' ? body.order_index : 0,
     })
     .returning()

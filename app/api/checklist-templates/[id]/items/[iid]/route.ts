@@ -23,6 +23,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (typeof body.order_index === 'number') updates.orderIndex = body.order_index
   if ('group_id' in body)
     updates.groupId = typeof body.group_id === 'string' ? body.group_id : null
+  if ('note' in body)
+    updates.note = typeof body.note === 'string' ? body.note.trim() || null : null
 
   const [row] = await db
     .update(checklistTemplateItems)

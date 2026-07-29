@@ -314,6 +314,7 @@ export const checklistTemplateItems = pgTable('checklist_template_items', {
     .references(() => checklistTemplates.id, { onDelete: 'cascade' }),
   groupId: uuid('group_id').references(() => checklistTemplateGroups.id, { onDelete: 'set null' }),
   title: text('title').notNull(),
+  note: text('note'),
   orderIndex: integer('order_index').default(0),
 })
 
