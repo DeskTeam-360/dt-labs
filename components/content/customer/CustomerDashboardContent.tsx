@@ -9,20 +9,16 @@ import {
   PlusOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Col, Dropdown, Flex, Layout, message, Modal, Row, Select, Space, Spin, Tag, Tooltip, Typography } from 'antd'
+import { Button, Card, Col, Dropdown, Flex, Layout, message, Modal, Row, Space, Spin, Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react'
 
-import {
-  LazyCustomerDashboardBarBlock,
-  LazyCustomerDashboardDonutBlock,
-} from '@/components/dashboard/CustomerDashboardChartsLazy'
+import { LazyCustomerDashboardBarBlock } from '@/components/dashboard/CustomerDashboardChartsLazy'
 import DashboardAnnouncementsSection from '@/components/dashboard/DashboardAnnouncementsSection'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { canDeleteTickets } from '@/lib/auth-utils'
-import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 import { kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 
 const { Title, Text } = Typography
@@ -66,7 +62,15 @@ interface DashboardData {
     priority: number | null
     creator_name: string | null
     tags?: Array<{ id: string; name: string; color: string | null }>
+    total_time_seconds?: number
   }>
+  monthly_summary?: {
+    this_month_completed: number
+    last_month_completed: number
+    this_month_time_seconds: number
+  }
+  awaiting_response?: Array<{ id: number; title: string; status: string; updated_at: string }>
+  recent_team_updates?: Array<{ ticket_id: number; ticket_title: string; comment: string; author_name: string | null; created_at: string }>
 }
 
 interface CustomerDashboardContentProps {
@@ -101,13 +105,6 @@ const FAQ_ITEMS = [
   'Do I get the rights to the design created?',
 ]
 
-type TimePeriod = 'current-day' | 'week' | 'all'
-
-const TIME_PERIOD_OPTIONS: Array<{ label: string; value: TimePeriod }> = [
-  { label: 'Current Day', value: 'current-day' },
-  { label: 'This Week', value: 'week' },
-  { label: 'All Time', value: 'all' },
-]
 
 export default function CustomerDashboardContent({ user, withSidebar }: CustomerDashboardContentProps) {
   const router = useRouter()
@@ -118,11 +115,6 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
   const [data, setData] = useState<DashboardData | null>(null)
   const [kbArticles, setKbArticles] = useState<KnowledgeBaseArticle[]>([])
   const [kbCategory, setKbCategory] = useState<string>('')
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('current-day')
-  const [timeLoading, setTimeLoading] = useState(false)
-  const [hourlyStopped, setHourlyStopped] = useState<StoppedTimeSession[]>([])
-  const [hourlyActive, setHourlyActive] = useState<Array<{ ticket_id: number; start_time: string }>>([])
-
   const ticketsNeedActionListHref = useMemo(() => {
     if (!data?.status_counts?.length) return '/tickets?view=list'
     const withTickets = data.status_counts.filter((s) => s.count > 0 && s.status_slug)
@@ -133,59 +125,26 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
     return `/tickets?${qs.toString()}`
   }, [data?.status_counts])
 
-  const fetchHourlyTimeData = useCallback(async () => {
-    if (!user?.id) return
-    try {
-      const startOfMonth = dayjs().subtract(30, 'day').startOf('day').toISOString()
-      const end = dayjs().toISOString()
-      const [stoppedRes, activeRes] = await Promise.all([
-        fetch(
-          `/api/users/time-tracker?user_id=${user.id}&filter=custom&start=${encodeURIComponent(startOfMonth)}&end=${encodeURIComponent(end)}&stopped_only=1&limit=500`,
-          { credentials: 'include' }
-        ),
-        fetch(`/api/users/time-tracker?user_id=${user.id}&active_only=1`, { credentials: 'include' }),
-      ])
-      const stopped = stoppedRes.ok ? await stoppedRes.json() : []
-      const act = activeRes.ok ? await activeRes.json() : []
-      setHourlyStopped(Array.isArray(stopped) ? stopped : [])
-      const list = Array.isArray(act) ? act : []
-      setHourlyActive(
-        list.map((t: { ticket_id: number; start_time: string }) => ({
-          ticket_id: t.ticket_id,
-          start_time: t.start_time,
-        }))
-      )
-    } catch {
-      setHourlyStopped([])
-      setHourlyActive([])
-    }
-  }, [user?.id])
-
   /** Refetch dashboard aggregates (e.g. after moving a ticket to trash). */
   const refreshDashboard = useCallback(async () => {
     try {
-      const qs = new URLSearchParams({ time_period: timePeriod })
-      const dashRes = await fetch(`/api/customer/dashboard?${qs}`, { credentials: 'include' })
+      const dashRes = await fetch(`/api/customer/dashboard`, { credentials: 'include' })
       if (dashRes.ok) {
         setData(await dashRes.json())
       }
     } catch {
       /* keep current data */
     }
-  }, [timePeriod])
+  }, [])
 
-  useEffect(() => {
-    fetchHourlyTimeData()
-  }, [fetchHourlyTimeData])
 
   useEffect(() => {
     let cancelled = false
     const load = async () => {
       setLoading(true)
       try {
-        const qs = new URLSearchParams({ time_period: timePeriod })
         const [dashRes, kbRes] = await Promise.all([
-          fetch(`/api/customer/dashboard?${qs}`, { credentials: 'include' }),
+          fetch(`/api/customer/dashboard`, { credentials: 'include' }),
           fetch('/api/knowledge-base-articles?published=true', { credentials: 'include' }),
         ])
         if (!cancelled) {
@@ -214,33 +173,6 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
     return () => {
       cancelled = true
     }
-    // Initial load only — time period changes use applyTimePeriod below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const applyTimePeriod = useCallback(async (period: TimePeriod) => {
-    setTimePeriod(period)
-    setTimeLoading(true)
-    try {
-      const qs = new URLSearchParams({ time_period: period })
-      const dashRes = await fetch(`/api/customer/dashboard?${qs}`, { credentials: 'include' })
-      if (dashRes.ok) {
-        const next = await dashRes.json()
-        setData((prev) =>
-          prev
-            ? {
-                ...prev,
-                time_by_type: next.time_by_type ?? [],
-                total_time_seconds: next.total_time_seconds ?? 0,
-              }
-            : next
-        )
-      }
-    } catch {
-      /* keep current time data */
-    } finally {
-      setTimeLoading(false)
-    }
   }, [])
 
   const filteredKbArticles = useMemo(() => {
@@ -258,17 +190,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
     }))
   }, [data?.tickets_by_type])
 
-  const donutData = useMemo(() => {
-    if (!data?.time_by_type?.length) return []
-    return data.time_by_type.map((t, i) => ({
-      name: t.type_title,
-      value: t.seconds,
-      fill: t.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length],
-    }))
-  }, [data?.time_by_type])
 
-  const totalTimeFormatted = data ? formatTime(data.total_time_seconds) : '0m'
-  const maxPriority = Math.max(...(data?.priority_counts?.map((p) => p.count) ?? [1]), 1)
 
   const content = (
     <div style={{ padding: 24, background: 'var(--layout-bg)', boxSizing: 'border-box', maxWidth: '100%', overflowX: 'hidden' }}>
@@ -288,27 +210,46 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
         </div>
       ) : (
         <Row gutter={[16, 16]} style={{ margin: 0, maxWidth: '100%' }}>
-          {/* My Tickets - Bar Chart */}
-          <Col xs={24} lg={24}>
+          {/* Monthly Summary */}
+          <Col xs={24}>
             <Card>
-              <Flex justify="space-between" align="center">
+              <span style={{ fontWeight: 600, fontSize: 16 }}>This Month&apos;s Summary</span>
+              <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+                <Col xs={24} sm={12}>
+                  <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                    <div style={{ fontSize: 36, fontWeight: 700, color: '#52c41a' }}>
+                      {data?.monthly_summary?.this_month_completed ?? 0}
+                    </div>
+                    <Text type="secondary">Tickets completed this month</Text>
+                  </div>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                    <div style={{ fontSize: 36, fontWeight: 700, color: '#8c8c8c' }}>
+                      {data?.monthly_summary?.last_month_completed ?? 0}
+                    </div>
+                    <Text type="secondary">Tickets completed last month</Text>
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+          </Col>
+
+          {/* My Tickets + Tickets by Status — combined */}
+          <Col xs={24}>
+            <Card>
+              <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
                 <div>
                   <Title level={2} style={{ margin: 0 }}>My Tickets</Title>
-                  <Text type="secondary">Tickets belonging to my company</Text>
+                  <Text type="secondary">All tickets for your company</Text>
                 </div>
-                <div>
-                  <Text type="secondary">
-                    Total Tickets: {data?.my_tickets_count ?? 0} tickets
-                  </Text>
-                </div>
+                <Text type="secondary">Total: {data?.my_tickets_count ?? 0} tickets</Text>
               </Flex>
-              <Row gutter={24}>
-                <Col xs={24} lg={12} style={{ padding: 16, borderRadius: 8 }}>
+              <Row gutter={[24, 16]}>
+                <Col xs={24} lg={14}>
                   <div style={{ background: 'var(--customer-dash-chart-surface)', padding: 16, borderRadius: 8 }}>
-
-
                     {barChartData.length > 0 ? (
-                      <div className="customer-dash-recharts" style={{ height: 300 }}>
+                      <div className="customer-dash-recharts" style={{ height: 220 }}>
                         <LazyCustomerDashboardBarBlock
                           barChartData={barChartData}
                           tooltipStyle={RECHARTS_TOOLTIP_STYLE}
@@ -327,256 +268,142 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                     )}
                   </div>
                 </Col>
-                <Col xs={24} lg={12} style={{ padding: 16, borderRadius: 8 }}>
-                  <div style={{ position: 'relative', background: 'var(--customer-dash-chart-surface)', padding: 16, borderRadius: 8, height: '100%' }}>
-                    {/* Closest due date — all company tickets */}
-                    <div style={{ marginBottom: 16, position: 'absolute', top: 0, right: 40, background: 'var(--customer-dash-eta-banner)', padding: '8px 16px', borderRadius: '0 0 10px 10px' }}>
-                      <Tooltip title={data?.last_due_ticket ? `#${data.last_due_ticket.id} ${data.last_due_ticket.title}` : undefined}>
-                        <Text
-                          type="danger"
-                          style={{ fontWeight: 700, cursor: data?.last_due_ticket ? 'pointer' : 'default' }}
-                          onClick={() => data?.last_due_ticket && router.push(`/tickets/${data.last_due_ticket!.id}`)}
-                        >
-                          <ClockCircleOutlined style={{ marginRight: 4, fontWeight: 700 }} /> Closest due date: {data?.last_due_date ? dayjs(data.last_due_date).format('MMM DD, YYYY') : 'N/A'}
-                        </Text>
-                      </Tooltip>
-                    </div>
-                    <br /><br />
-                    {(data?.priority_counts?.length ?? 0) > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {data!.priority_counts.map((p, i) => (
-                          <div key={`prio-${p.priority}-${i}`}>
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                marginBottom: 4,
-                                gap: 8,
-                                padding: 8,
-                                borderRadius: 8,
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span
-                                  style={{
-                                    width: 20,
-                                    height: 20,
-                                    borderRadius: 2,
-                                    background: DEFAULT_COLORS[i % DEFAULT_COLORS.length],
-                                    flexShrink: 0,
-                                  }}
-                                />
-                                <Text>Priority {p.priority}</Text>
-                              </div>
-                              <div
-                                style={{
-                                  width: '75%',
-                                  height: 8,
-                                  borderRadius: 4,
-                                  background: 'var(--customer-dash-priority-track)',
-                                  overflow: 'hidden',
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    height: '100%',
-                                    width: `${(p.count / maxPriority) * 100}%`,
-                                    background: DEFAULT_COLORS[i % DEFAULT_COLORS.length],
-                                    borderRadius: 4,
-                                  }}
-                                />
-                              </div>
-                              <Text strong style={{ fontSize: 16 }}>{p.count}</Text>
-                            </div>
-
+                <Col xs={24} lg={10}>
+                  <Title level={4} style={{ marginBottom: 12 }}>Tickets by Status</Title>
+                  {(data?.status_counts?.length ?? 0) > 0 ? (
+                    <Row gutter={[16, 10]}>
+                      {data!.status_counts.map((s, i) => (
+                        <Col xs={24} sm={12} key={`status-${s.status_slug}-${i}`}>
+                          <div
+                            role={s.count > 0 ? 'link' : undefined}
+                            tabIndex={s.count > 0 ? 0 : undefined}
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: s.count > 0 ? 'pointer' : 'default' }}
+                            onClick={() => {
+                              if (s.count === 0 || !s.status_slug) return
+                              const qs = new URLSearchParams()
+                              qs.set('view', 'list')
+                              qs.set('status', s.status_slug)
+                              router.push(`/tickets?${qs.toString()}`)
+                            }}
+                          >
+                            <span style={{ width: 14, height: 14, borderRadius: 3, background: s.color, flexShrink: 0 }} />
+                            <Text style={s.count > 0 ? { color: '#1890ff' } : undefined}>
+                              {s.status_title}: {s.count}
+                            </Text>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Text type="secondary">No priority data</Text>
-                      </div>
-                    )}
-                  </div>
+                        </Col>
+                      ))}
+                    </Row>
+                  ) : (
+                    <Text type="secondary">No status data</Text>
+                  )}
                 </Col>
               </Row>
-
-
-
             </Card>
           </Col>
 
-          {/* Time Spent - Donut */}
-          <Col xs={24} lg={10}>
+          {/* Awaiting Response */}
+          <Col xs={24}>
             <Card>
-              <Flex justify="space-between" align="center">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={{ fontWeight: 600, fontSize: 16 }}>Time Spent</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>Show:</Text>
-                    <Select
-                      value={timePeriod}
-                      size="small"
-                      variant="borderless"
-                      style={{ fontSize: 12, minWidth: 100 }}
-                      options={TIME_PERIOD_OPTIONS}
-                      onChange={(v) => void applyTimePeriod(v as TimePeriod)}
-                    />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <ClockCircleOutlined style={{ color: '#13c2c2', fontSize: 18 }} />
-                  <Text strong style={{ fontSize: 16 }}>{totalTimeFormatted}</Text>
-                </div>
+              <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
+                <span style={{ fontWeight: 600, fontSize: 16 }}>Awaiting Your Response</span>
+                <Tag color="orange">{data?.awaiting_response?.length ?? 0}</Tag>
               </Flex>
-              {timeLoading ? (
-                <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Spin />
-                </div>
-              ) : donutData.length > 0 ? (
-                <LazyCustomerDashboardDonutBlock
-                  donutData={donutData}
-                  formatTime={formatTime}
-                  tooltipStyle={RECHARTS_TOOLTIP_STYLE}
-                />
-              ) : (
-                <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text type="secondary">No time tracked yet</Text>
-                </div>
-              )}
-            </Card>
-          </Col>
-
-          {/* Tickets Status */}
-          <Col xs={24} lg={14}>
-            <Card>
-              <Flex justify="space-between" style={{ marginBottom: 16 }} align="center">
-                <span
-                  role="link"
-                  tabIndex={0}
-                  style={{
-                    fontWeight: 600,
-                    fontSize: 16,
-                    color: '#1890ff',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => router.push(ticketsNeedActionListHref)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      router.push(ticketsNeedActionListHref)
-                    }
-                  }}
-                >
-                  Assigned and need action
-                </span>
-              </Flex>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {(data?.status_counts?.length ?? 0) > 0 && (
-                  <Row gutter={[16, 12]}>
-                    {data!.status_counts.map((s, i) => (
-                      <Col xs={24} sm={12} key={`status-${s.status_slug}-${i}`}>
-                        <div
-                          role={s.count > 0 ? 'link' : undefined}
-                          tabIndex={s.count > 0 ? 0 : undefined}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            cursor: s.count > 0 ? 'pointer' : 'default',
-                          }}
-                          onClick={() => {
-                            if (s.count === 0 || !s.status_slug) return
-                            const qs = new URLSearchParams()
-                            qs.set('view', 'list')
-                            qs.set('status', s.status_slug)
-                            router.push(`/tickets?${qs.toString()}`)
-                          }}
-                          onKeyDown={
-                            s.count > 0
-                              ? (e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault()
-                                    const qs = new URLSearchParams()
-                                    qs.set('view', 'list')
-                                    qs.set('status', s.status_slug)
-                                    router.push(`/tickets?${qs.toString()}`)
-                                  }
-                                }
-                              : undefined
-                          }
-                        >
-                          <span style={{ width: 20, height: 20, background: s.color, flexShrink: 0 }} />
-                          <Text style={s.count > 0 ? { color: '#1890ff' } : undefined}>
-                            {s.status_title}: {s.count} tickets
-                          </Text>
-                        </div>
-                      </Col>
-                    ))}
-                  </Row>
-                )}
-
-              </div>
-              {(data?.status_counts?.length ?? 0) === 0 && (data?.priority_counts?.length ?? 0) === 0 && (
-                <div style={{ minHeight: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text type="secondary">No status data</Text>
-                </div>
-              )}
-            </Card>
-          </Col>
-
-          {/* Knowledge Base — whole card opens /reference */}
-          <Col xs={24} lg={12}>
-            <Card
-              hoverable
-              role="link"
-              tabIndex={0}
-              onClick={() => router.push('/reference')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  router.push('/reference')
-                }
-              }}
-              styles={{ body: { cursor: 'pointer' } }}
-            >
-              <span style={{ fontWeight: 600, fontSize: 16 }}>Frequently asked questions</span>
-              <br />
-              <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>How can we help you today?</Text>
-              {/* <Space orientation="vertical" style={{ width: '100%' }}>
-                <Select
-                  placeholder="Filter by category"
-                  style={{ width: '100%' }}
-                  allowClear
-                  value={kbCategory || undefined}
-                  onChange={(v) => setKbCategory(v ?? '')}
-                  options={[
-                    { label: 'General', value: 'general' },
-                    { label: 'Requests', value: 'requests' },
-                  ]}
-                />
-              </Space> */}
-              <div style={{ marginTop: 16 }}>
-                {filteredKbArticles.length > 0 ? (
-                  filteredKbArticles.map((art) => (
+              {(data?.awaiting_response?.length ?? 0) > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {data!.awaiting_response!.map((t) => (
                     <div
-                      key={art.id}
-                      style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}
+                      key={t.id}
+                      onClick={() => router.push(`/tickets/${t.id}`)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 12px',
+                        borderRadius: 8,
+                        background: 'var(--kanban-card-bg)',
+                        border: '1px solid var(--kanban-card-border)',
+                        cursor: 'pointer',
+                        gap: 8,
+                      }}
                     >
-                      <QuestionCircleOutlined style={{ color: '#1890ff', marginTop: 2 }} />
-                      <Text>{art.title}</Text>
+                      <div style={{ minWidth: 0 }}>
+                        <Text strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          #{t.id} {t.title}
+                        </Text>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          Updated {dayjs(t.updated_at).format('MMM DD, YYYY')}
+                        </Text>
+                      </div>
+                      {(() => {
+                        const s = data?.status_counts?.find((sc) => sc.status_slug === t.status)
+                        return (
+                          <Tag style={{ flexShrink: 0, ...kanbanTagStyle({ fillHex: s?.color }) }}>
+                            {s?.status_title ?? t.status}
+                          </Tag>
+                        )
+                      })()}
                     </div>
-                  ))
-                ) : (
-                  FAQ_ITEMS.map((q, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
-                      <QuestionCircleOutlined style={{ color: '#1890ff', marginTop: 2 }} />
-                      <Text>{q}</Text>
-                    </div>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ minHeight: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text type="secondary">No tickets awaiting your response</Text>
+                </div>
+              )}
+            </Card>
+          </Col>
+
+          {/* Recent Team Updates */}
+          <Col xs={24} lg={12}>
+            <Card>
+              <Flex justify="space-between" align="center" style={{ marginBottom: 12 }}>
+                <span style={{ fontWeight: 600, fontSize: 16 }}>Recent Team Updates</span>
+              </Flex>
+              {(data?.recent_team_updates?.length ?? 0) > 0 ? (
+                <Flex vertical gap={12}>
+                  {data!.recent_team_updates!.map((u, i) => (
+                    <Flex
+                      key={i}
+                      justify="space-between"
+                      gap={12}
+                      onClick={() => router.push(`/tickets/${u.ticket_id}`)}
+                      style={{
+                        width: '100%',
+                        padding: 16,
+                        background: 'var(--kanban-card-bg)',
+                        borderRadius: 12,
+                        border: '1px solid var(--kanban-card-border)',
+                        boxShadow: 'var(--kanban-card-shadow)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Flex vertical gap={4} style={{ flex: 1, minWidth: 0 }}>
+                        <Text strong style={{ fontSize: 16, fontWeight: 700, color: 'var(--kanban-card-title)', lineHeight: 1.4 }}>
+                          #{u.ticket_id} {u.ticket_title}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#1890ff' }}>
+                          by {u.author_name}
+                        </Text>
+                        <Text
+                          type="secondary"
+                          style={{ fontSize: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                        >
+                          {u.comment}
+                        </Text>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--kanban-card-muted)' }}>
+                          <ClockCircleOutlined style={{ fontSize: 12 }} />
+                          {dayjs(u.created_at).format('MMM DD, HH:mm')}
+                        </span>
+                      </Flex>
+                    </Flex>
+                  ))}
+                </Flex>
+              ) : (
+                <div style={{ minHeight: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text type="secondary">No recent updates from the team</Text>
+                </div>
+              )}
             </Card>
           </Col>
 
@@ -584,7 +411,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
           <Col xs={24} lg={12}>
             <Card>
               <Flex justify="space-between" align="center">
-               <span style={{ fontWeight: 600, fontSize: 16 }}>Check Tickets Status</span>
+               <span style={{ fontWeight: 600, fontSize: 16 }}>Recent Tickets</span>
               
                 <Button type="primary" icon={<PlusOutlined />} onClick={() => router.push('/tickets?new=1')}>
                   New Ticket
@@ -592,7 +419,6 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                 </Flex>
               
               
-              <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>Preview Tickets list</Text>
               {(data?.recent_tickets?.length ?? 0) > 0 ? (
                 <Flex vertical justify="center" align="center" gap={12}>
                   {data!.recent_tickets.map((t) => (
@@ -638,6 +464,12 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                             <ClockCircleOutlined style={{ fontSize: 12 }} />
                             Last Updated {dayjs(t.updated_at).format('MMM DD, YYYY')}
                           </span>
+                          {(t.total_time_seconds ?? 0) > 0 && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#13c2c2', fontWeight: 600 }}>
+                              <ClockCircleOutlined style={{ fontSize: 12 }} />
+                              {formatTime(t.total_time_seconds!)}
+                            </span>
+                          )}
                         </div>
                       </Flex>
                       <Flex justify="space-between" gap={12} align="center">
@@ -707,7 +539,6 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                                               }
                                               message.success('Ticket moved to trash')
                                               void refreshDashboard()
-                                              void fetchHourlyTimeData()
                                             } catch (err) {
                                               message.error((err as Error).message || 'Failed to move ticket to trash')
                                             }
@@ -734,11 +565,14 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                   <Text type="secondary">No tickets yet</Text>
                   <Button type="primary" icon={<PlusOutlined />} style={{ marginTop: 8 }} onClick={() => router.push('/tickets?new=1')}>
                     Create your first ticket
+
                   </Button>
                 </div>
               )}
             </Card>
           </Col>
+
+
         </Row>
       )}
     </div>

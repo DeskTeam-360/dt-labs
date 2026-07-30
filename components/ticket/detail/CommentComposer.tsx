@@ -51,6 +51,8 @@ interface CommentComposerProps {
   ticketCcEmails?: string[]
   /** Portal customer: hide CC/BCC (no outbound copy). */
   showReplyCcBcc?: boolean
+  /** Optional cancel callback — shows a Cancel button next to Submit. */
+  onCancel?: () => void
 }
 
 export default function CommentComposer({
@@ -65,6 +67,7 @@ export default function CommentComposer({
   companyCustomers = [],
   ticketCcEmails = [],
   showReplyCcBcc = true,
+  onCancel,
 }: CommentComposerProps) {
   const isBlankEditorValue = (value: string): boolean => {
     const textOnly = String(value || '')
@@ -410,18 +413,20 @@ export default function CommentComposer({
         >
           {showNoteOption ? (mode === 'note' ? 'Add note' : 'Reply') : 'Reply'}
         </Button>
-        {showNoteOption && (
-          <Button
-            onClick={() => {
-              setDraft('')
-              setAttachments([])
+        <Button
+          onClick={() => {
+            setDraft('')
+            setAttachments([])
+            setTaggedUserIds([])
+            if (showNoteOption) {
               onCommentVisibilityChange?.(null as any)
-            }}
-            disabled={loading}
-          >
-            Cancel
-          </Button>
-        )}
+            }
+            onCancel?.()
+          }}
+          disabled={loading}
+        >
+          Cancel
+        </Button>
         </Flex>
       </Flex>
     </Flex>

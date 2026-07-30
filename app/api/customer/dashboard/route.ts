@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
@@ -8,6 +8,7 @@ import { db } from '@/lib/db'
 import {
   companies,
   tags,
+  ticketComments,
   tickets,
   ticketStatuses,
   ticketTags,
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
       title: tickets.title,
       dueDate: tickets.dueDate,
       updatedAt: tickets.updatedAt,
+      customerLastReadAt: tickets.customerLastReadAt,
     })
     .from(tickets)
     .where(and(customerAccess, eq(tickets.ticketType, DEFAULT_TICKET_TYPE)))
@@ -127,12 +129,9 @@ export async function GET(request: Request) {
   }))
 
   const sortedForRecent = [...myTickets].sort((a, b) => {
-    const pa = Number(a.priority ?? 0)
-    const pb = Number(b.priority ?? 0)
-    if (pa !== pb) return pa - pb
-    const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity
-    const dbTime = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
-    return da - dbTime
+    const da = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+    const db2 = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+    return db2 - da
   })
   const recentIds = sortedForRecent.slice(0, 5).map((t) => t.id)
   let recentTickets: Array<{
@@ -172,6 +171,13 @@ export async function GET(request: Request) {
       tagsByTicketId[row.ticketId].push({ id: row.tag.id, name: row.tag.name, color: row.tag.color })
     })
 
+    const timeRows = await db
+      .select({ ticketId: ticketTimeTracker.ticketId, durationSeconds: ticketTimeTracker.durationSeconds })
+      .from(ticketTimeTracker)
+      .where(inArray(ticketTimeTracker.ticketId, recentIds))
+    const timeByTicketId: Record<number, number> = {}
+    timeRows.forEach((r) => { timeByTicketId[r.ticketId] = (timeByTicketId[r.ticketId] ?? 0) + (r.durationSeconds ?? 0) })
+
     const orderMap: Record<number, number> = {}
     recentIds.forEach((id, i) => { orderMap[id] = i })
     recentTickets = rows.map((r) => ({
@@ -186,6 +192,7 @@ export async function GET(request: Request) {
       priority: r.ticket.priority != null ? Number(r.ticket.priority) : null,
       creator_name: r.creatorFullName || r.creatorEmail || null,
       tags: tagsByTicketId[r.ticket.id] ?? [],
+      total_time_seconds: timeByTicketId[r.ticket.id] ?? 0,
     })).sort((a, b) => (orderMap[a.id] ?? 999) - (orderMap[b.id] ?? 999))
   }
 
@@ -202,6 +209,72 @@ export async function GET(request: Request) {
     }
   }
 
+  // ── Monthly summary ─────────────────────────────────────────────
+  const now = new Date()
+  const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const completedStatuses = ['resolved', 'closed', 'completed']
+  const thisMonthCompleted = myTickets.filter(
+    (t) => completedStatuses.includes(t.status ?? '') && t.updatedAt && new Date(t.updatedAt) >= startOfThisMonth
+  ).length
+  const lastMonthCompleted = myTickets.filter(
+    (t) => completedStatuses.includes(t.status ?? '') && t.updatedAt &&
+      new Date(t.updatedAt) >= startOfLastMonth && new Date(t.updatedAt) < startOfThisMonth
+  ).length
+
+  let monthTimeSeconds = 0
+  if (myTicketIds.length > 0) {
+    const monthRows = await db
+      .select({ durationSeconds: ticketTimeTracker.durationSeconds })
+      .from(ticketTimeTracker)
+      .where(and(inArray(ticketTimeTracker.ticketId, myTicketIds), gte(ticketTimeTracker.startTime, startOfThisMonth)))
+    monthTimeSeconds = monthRows.reduce((s, r) => s + (r.durationSeconds ?? 0), 0)
+  }
+
+  // ── Tickets awaiting customer response ───────────────────────────
+  const awaitingSlugs = ['question', 'client_review']
+  const awaitingTickets = myTickets
+    .filter((t) => awaitingSlugs.includes(t.status ?? ''))
+    .sort((a, b) => new Date(b.updatedAt!).getTime() - new Date(a.updatedAt!).getTime())
+    .slice(0, 5)
+    .map((t) => ({ id: t.id, title: t.title, status: t.status, updated_at: t.updatedAt ? new Date(t.updatedAt).toISOString() : '' }))
+
+  // ── Recent team updates (agent comments on customer tickets) ─────
+  type RecentUpdate = { ticket_id: number; ticket_title: string; comment: string; author_name: string | null; created_at: string }
+  let recentTeamUpdates: RecentUpdate[] = []
+  if (myTicketIds.length > 0) {
+    const commentRows = await db
+      .select({
+        ticketId: ticketComments.ticketId,
+        comment: ticketComments.comment,
+        createdAt: ticketComments.createdAt,
+        authorFullName: users.fullName,
+        authorEmail: users.email,
+      })
+      .from(ticketComments)
+      .leftJoin(users, eq(ticketComments.userId, users.id))
+      .where(and(
+        inArray(ticketComments.ticketId, myTicketIds),
+        eq(ticketComments.authorType, 'agent'),
+        inArray(ticketComments.visibility, ['reply', 'public']),
+      ))
+      .orderBy(desc(ticketComments.createdAt))
+      .limit(5)
+
+    const titleMap: Record<number, string> = {}
+    myTickets.forEach((t) => { titleMap[t.id] = t.title })
+    recentTeamUpdates = commentRows.map((r) => {
+      const plain = r.comment.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+      return {
+        ticket_id: r.ticketId,
+        ticket_title: titleMap[r.ticketId] ?? `Ticket #${r.ticketId}`,
+        comment: plain.length > 120 ? plain.slice(0, 120) + '…' : plain,
+        author_name: r.authorFullName || r.authorEmail || 'Team',
+        created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
+      }
+    })
+  }
+
   const payload: Record<string, unknown> = {
     company_id: companyId,
     my_tickets_count: myTickets.length,
@@ -213,6 +286,13 @@ export async function GET(request: Request) {
     recent_tickets: recentTickets,
     last_due_date: lastDueDate,
     last_due_ticket: lastDueTicket,
+    monthly_summary: {
+      this_month_completed: thisMonthCompleted,
+      last_month_completed: lastMonthCompleted,
+      this_month_time_seconds: monthTimeSeconds,
+    },
+    awaiting_response: awaitingTickets,
+    recent_team_updates: recentTeamUpdates,
   }
 
   if (debug) {

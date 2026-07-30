@@ -167,21 +167,6 @@ export default function KanbanCard({
                   {t.name}
                 </Tag>
               ))}
-            {onFilterByStatus && (
-              <Tag
-                style={kanbanTagStyle({
-                  fillHex: statusColor,
-                  cursor: 'pointer',
-                })}
-                title="Filter by this status"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onFilterByStatus(ticket.status)
-                }}
-              >
-                {statusTitle}
-              </Tag>
-            )}
             {Number(ticket.checklist_total) > 0 && (
               <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_GREEN })}>
                 Checklist: {ticket.checklist_completed}/{ticket.checklist_total}

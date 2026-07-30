@@ -236,21 +236,12 @@ export default function TicketsListView({
           key: 'priority',
           width: 100,
           align: 'center',
-          render: (_: unknown, record: TicketRecord) => (
-            <Tag
-              style={{
-                borderRadius: '10px',
-                backgroundColor: '#E8E8E8',
-                padding: '4px 8px',
-                minWidth: '48px',
-                textAlign: 'center',
-                fontWeight: 500,
-                margin: 0,
-              }}
-            >
-              {record.priority != null && record.priority > 0 ? `P${record.priority}` : '—'}
-            </Tag>
-          ),
+          render: (_: unknown, record: TicketRecord) =>
+            record.priority != null && record.priority > 0 ? (
+              <Tag style={kanbanTagStyle({ neutral: true })}>P{record.priority}</Tag>
+            ) : (
+              '—'
+            ),
         },
         {
           title: 'Type',
@@ -343,16 +334,10 @@ export default function TicketsListView({
             if (!col) return status
             return (
               <Tag
-                style={{
-                  borderRadius: '10px',
-                  backgroundColor: col.color,
-                  padding: '4px 16px',
-                  minWidth: '100px',
-                  textAlign: 'center',
-                  fontWeight: 500,
-                  color: '#000',
+                style={kanbanTagStyle({
+                  fillHex: col.color,
                   cursor: onFilterByStatus ? 'pointer' : undefined,
-                }}
+                })}
                 title={onFilterByStatus ? 'Filter by this status' : undefined}
                 onClick={
                   onFilterByStatus
