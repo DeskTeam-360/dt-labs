@@ -45,7 +45,7 @@ export function CustomerDashboardBarBlock({
 }: Pick<Props, 'barChartData' | 'tooltipStyle' | 'onBarTypeClick'>) {
   return barChartData.length > 0 ? (
     <div className="customer-dash-recharts" style={{ height: 300 }}>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="80%">
         <BarChart data={barChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="name" />
