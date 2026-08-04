@@ -30,7 +30,8 @@ export function canDeleteTickets(role: string | undefined): boolean {
 
 /** Companies: Admin only */
 export function canAccessCompanies(role: string | undefined): boolean {
-  return isAdmin(role)
+  const r = (role ?? '').toLowerCase()
+  return r === 'admin' || r === 'customer'
 }
 
 /** Tickets: Admin & Manager */

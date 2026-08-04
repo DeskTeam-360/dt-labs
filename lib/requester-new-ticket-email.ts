@@ -159,7 +159,11 @@ export async function sendRequesterTicketCreatedEmail(
   }
   const senderMap = userRowToMergeMap(creatorUser ?? null, companyName)
   const rawTpl = tpl.content?.trim() ?? ''
-  const subject = tpl.emailSubject?.trim() || `Ticket #${ticketId} has been created`
+  const rawSubject = tpl.emailSubject?.trim() || `Ticket #${ticketId} has been created`
+  const subject = rawSubject
+    .replace(/\{\{\s*ticket_id\s*\}\}/g, String(ticketId))
+    .replace(/\{\{\s*ticket\s*\}\}/g, `#${ticketId}`)
+    .replace(/\{\{\s*ticket_link\s*\}\}/g, ticketUrl)
   const subjectMime = encodeSubjectHeader(subject)
 
   for (const recipient of recipientEntries) {
