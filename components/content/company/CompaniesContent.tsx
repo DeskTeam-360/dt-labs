@@ -399,19 +399,6 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                   }}
                   style={{ width: 260 }}
                 />
-                <Select
-                  placeholder="Filter by Status"
-                  allowClear
-                  value={filterStatus}
-                  onChange={(v) => {
-                    setFilterStatus(v)
-                    setPagination((p) => ({ ...p, current: 1 }))
-                  }}
-                  style={{ width: 150 }}
-                >
-                  <Option value={true}>Active</Option>
-                  <Option value={false}>Inactive</Option>
-                </Select>
                 {/* <Select
                   placeholder="Filter Is Customer"
                   allowClear
