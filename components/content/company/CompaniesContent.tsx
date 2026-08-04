@@ -559,16 +559,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                     <Switch checkedChildren="Yes" unCheckedChildren="No" />
                   </Form.Item>
                 </Col>
-                <Col xs={24} sm={8}>
-                  <Form.Item
-                    name="is_active"
-                    label="Status"
-                    valuePropName="checked"
-                  >
-                    <Switch checkedChildren="Yes" unCheckedChildren="No" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={8}>
+<Col xs={24} sm={8}>
                   <Form.Item name="color" label="Color (hex)" initialValue="#000000">
                     <ColorPickerWithInput />
                   </Form.Item>
