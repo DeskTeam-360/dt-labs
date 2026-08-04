@@ -549,7 +549,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                     <InputNumber min={0} precision={0} addonAfter="H" style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
-                {/* <Col xs={24} sm={5}>
+                <Col xs={24} sm={5}>
                   <Form.Item
                     name="is_customer"
                     label="Is customer"
@@ -558,7 +558,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                   >
                     <Switch checkedChildren="Yes" unCheckedChildren="No" />
                   </Form.Item>
-                </Col> */}
+                </Col>
                 <Col xs={24} sm={8}>
                   <Form.Item
                     name="is_active"
