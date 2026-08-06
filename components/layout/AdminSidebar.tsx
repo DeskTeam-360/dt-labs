@@ -4,7 +4,6 @@ import {
   CheckSquareOutlined,
   DashboardOutlined,
   DeleteOutlined,
-  InfoCircleOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   ReadOutlined,
@@ -59,7 +58,7 @@ function selectedKeysForPathname(pathname: string | null, ticketsSearch: string)
   if (pathname === '/reference' || pathname.startsWith('/reference/')) return ['/reference']
   if (pathname === '/projects' || pathname.startsWith('/projects/')) return ['/projects']
   if (isSettingsHrefPathname(pathname)) return ['/settings']
-  const topLevel = ['/dashboard', '/my-company', '/my-teams']
+  const topLevel = ['/dashboard', '/my-teams']
   const top = topLevel.find((k) => pathname === k || (k !== '/dashboard' && pathname.startsWith(`${k}/`)))
   if (top) return [top]
   const ticketsDetail = pathname.startsWith('/tickets/')
@@ -110,15 +109,6 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     //       },
     //     ]
     //   : []),
-    ...(isCustomer
-      ? [
-          {
-            key: '/my-company',
-            icon: <InfoCircleOutlined />,
-            label: linkLabel('/my-company', 'Company info'),
-          },
-        ]
-      : []),
     ...(canAccessTickets(role)
       ? [
           ...(isCustomer

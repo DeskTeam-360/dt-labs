@@ -115,7 +115,11 @@ function applyPlaceholderReplacements(html: string, ctx: ReplaceContext): string
 }
 
 function makeContext(origin: string, ticketId: string, recipient: Record<string, string>, sender: Record<string, string>, extra?: Record<string, string>) {
-  const ticketUrl = `${origin.replace(/\/$/, '')}/tickets/${ticketId}`
+  const base = origin.replace(/\/$/, '')
+  const ticketUrl = `${base}/tickets/${ticketId}`
+  /** Same values as `login_url` / `change_password_url` — buttons always href these. */
+  const loginUrl = extra?.login_url ?? `${base}/login`
+  const changePasswordUrl = extra?.change_password_url ?? `${base}/forgot-password`
   const officialKeys = new Set(allMessageTemplatePlaceholderKeys().map((k) => k.toLowerCase()))
 
   const replaceOfficialKey = (key: string): string | null => {
@@ -133,15 +137,15 @@ function makeContext(origin: string, ticketId: string, recipient: Record<string,
       const field = key.slice('sender.'.length)
       return sender[field] ?? null
     }
+    if (key === 'login_url') return loginUrl
+    if (key === 'change_password_url') return changePasswordUrl
     const buttonStyle = 'display:inline-block;padding:10px 20px;background:#1677ff;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px'
     if (key === 'login_button') {
-      const url = extra?.login_url ?? ''
-      const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      const safe = loginUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
       return `<a href="${safe}" target="_blank" rel="noopener noreferrer" style="${buttonStyle}">Login</a>`
     }
     if (key === 'change_password_button') {
-      const url = extra?.change_password_url ?? ''
-      const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      const safe = changePasswordUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
       return `<a href="${safe}" target="_blank" rel="noopener noreferrer" style="${buttonStyle}">Change Password</a>`
     }
     // Extra keys (e.g. temporary_password, reply_content) are official placeholders
