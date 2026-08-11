@@ -44,6 +44,7 @@ import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
 import CommentAiSummaryTrigger from './CommentAiSummaryTrigger'
 import CommentComposer from './CommentComposer'
+import CommentHtml from './CommentHtml'
 import CommentTaggedCcLines from './CommentTaggedCcLines'
 import CommentWysiwyg from './CommentWysiwyg'
 import TicketUserMention from './TicketUserMention'
@@ -760,11 +761,7 @@ export default function TabGeneral({
                               </Space>
                             </Flex>
                           ) : comment.comment && /<[a-z][\s\S]*>/i.test(comment.comment) ? (
-                            <div
-                              className="ql-editor comment-html"
-                              style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14, border: 'none' }}
-                              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(comment.comment) }}
-                            />
+                            <CommentHtml html={comment.comment} />
                           ) : (
                             <Paragraph style={{ margin: 0, color: 'var(--ticket-thread-text)' }}>{comment.comment}</Paragraph>
                           )}

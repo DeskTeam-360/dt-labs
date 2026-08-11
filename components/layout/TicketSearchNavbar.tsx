@@ -3,7 +3,7 @@
 import 'dayjs/locale/en'
 
 import { CloseOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icons'
-import { Input, Select, Spin, Typography } from 'antd'
+import { Input, Select, Space, Spin, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { usePathname, useRouter } from 'next/navigation'
@@ -299,35 +299,35 @@ export default function TicketSearchNavbar({
           alignSelf: 'stretch',
         }}
       >
-        <Input.Search
-          size={NAV_CONTROL_SIZE}
-          allowClear
-          placeholder={searchBy === 'id' ? 'Search by ticket ID…' : searchBy === 'title' ? 'Search by title…' : 'Search tickets…'}
-          enterButton={<SearchOutlined />}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onSearch={applySearch}
-          onFocus={() => {
-            if (q.trim().length >= PREVIEW_MIN_CHARS && (preview.length > 0 || previewLoading)) {
-              setPanelVisible(true)
-            }
-          }}
-          style={{ width: '100%' }}
-          addonBefore={
-            <Select
-              value={searchBy}
-              onChange={(v) => { setSearchBy(v); setPreview([]); setPanelVisible(false) }}
-              size="large"
-              popupMatchSelectWidth={false}
-              style={{ minWidth: 80 }}
-              options={[
-                { value: 'all', label: 'All' },
-                { value: 'title', label: 'Title' },
-                { value: 'id', label: 'ID' },
-              ]}
-            />
-          }
-        />
+        <Space.Compact style={{ width: '100%' }}>
+          <Select
+            value={searchBy}
+            onChange={(v) => { setSearchBy(v); setPreview([]); setPanelVisible(false) }}
+            size={NAV_CONTROL_SIZE}
+            popupMatchSelectWidth={false}
+            style={{ minWidth: 80 }}
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'title', label: 'Title' },
+              { value: 'id', label: 'ID' },
+            ]}
+          />
+          <Input.Search
+            size={NAV_CONTROL_SIZE}
+            allowClear
+            placeholder={searchBy === 'id' ? 'Search by ticket ID…' : searchBy === 'title' ? 'Search by title…' : 'Search tickets…'}
+            enterButton={<SearchOutlined />}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onSearch={applySearch}
+            onFocus={() => {
+              if (q.trim().length >= PREVIEW_MIN_CHARS && (preview.length > 0 || previewLoading)) {
+                setPanelVisible(true)
+              }
+            }}
+            style={{ flex: 1 }}
+          />
+        </Space.Compact>
         {panelVisible && q.trim().length >= PREVIEW_MIN_CHARS && (
           <div
             role="listbox"

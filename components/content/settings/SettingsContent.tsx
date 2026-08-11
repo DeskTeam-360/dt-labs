@@ -8,6 +8,7 @@ import {
   CalendarOutlined,
   CheckSquareOutlined,
   ClockCircleOutlined,
+  CloudDownloadOutlined,
   FileTextOutlined,
   GlobalOutlined,
   InfoCircleOutlined,
@@ -303,6 +304,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     icon={<UnorderedListOutlined />}
                   />
                 </Col>
+                {isAdmin(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Freshdesk Import"
+                      description="Import companies and contacts from Freshdesk"
+                      href="/settings/freshdesk-import"
+                      icon={<CloudDownloadOutlined />}
+                    />
+                  </Col>
+                )}
               </Row>
             </Section>
           )}
