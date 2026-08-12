@@ -58,6 +58,7 @@ interface TicketRecord {
   visibility?: 'private' | 'team' | 'specific_users' | 'public'
   type_id: number | null
   priority_id: number | null
+  priority?: number | null
   company_id: string | null
   due_date: string | null
   created_at: string
@@ -66,7 +67,6 @@ interface TicketRecord {
   by_label?: string
   team_name?: string
   type?: { id: number; title: string; slug: string; color: string } | null
-  priority?: { id: number; title: string; slug: string; color: string } | null
   company?: { id: string; name: string; color?: string } | null
   assignees?: Array<{ id: string; user_name?: string }>
   tags?: Array<{ id: string; name: string; slug: string; color?: string }>
@@ -184,6 +184,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
           status: t.status,
           type_id: t.type_id,
           priority_id: t.priority_id,
+          priority: typeof t.priority === 'number' ? t.priority : null,
           company_id: t.company_id,
           due_date: t.due_date,
           created_at: t.created_at,
@@ -192,7 +193,6 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
           by_label: t.by_label,
           team_name: t.team_name,
           type: t.type,
-          priority: t.priority,
           company: t.company,
           assignees: t.assignees || [],
           tags: t.tags || [],
@@ -447,10 +447,10 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
     {
       title: 'Priority',
       key: 'priority',
-      width: 110,
+      width: 80,
       render: (_, r) =>
-        r.priority ? (
-          <Tag color={r.priority.color || undefined}>{r.priority.title}</Tag>
+        r.priority && r.priority > 0 ? (
+          <Tag>P{r.priority}</Tag>
         ) : (
           <Text type="secondary">—</Text>
         ),
