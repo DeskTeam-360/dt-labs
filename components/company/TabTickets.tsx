@@ -47,6 +47,7 @@ interface TabTicketsProps {
   /** Used to hide ticket delete (trash) for non–admin/manager */
   viewerRole?: string | null
   basePath?: string
+  onTotalChange?: (total: number) => void
 }
 
 interface TicketRecord {
@@ -97,10 +98,13 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-export default function TabTickets({ companyData, currentUser, viewerRole, basePath }: TabTicketsProps) {
+export default function TabTickets({ companyData, currentUser, viewerRole, basePath, onTotalChange }: TabTicketsProps) {
   const router = useRouter()
   const canMoveTicketToTrash = canDeleteTickets(viewerRole ?? undefined)
   const [tickets, setTickets] = useState<TicketRecord[]>([])
+  const [total, setTotal] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
   const [loading, setLoading] = useState(true)
   const [statuses, setStatuses] = useState<StatusOption[]>([])
   const [types, setTypes] = useState<TypeOption[]>([])
@@ -148,20 +152,27 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
     }
   }
 
-  const fetchTickets = useCallback(async () => {
+  const fetchTickets = useCallback(async (page = currentPage, size = pageSize) => {
     if (!companyData?.id) return
     setLoading(true)
     try {
       const params = new URLSearchParams()
       params.set('company_id', companyData.id)
-      params.set('limit', '200')
+      params.set('limit', String(size))
+      params.set('offset', String((page - 1) * size))
+      params.set('paginated', '1')
+      if (filterStatus.length > 0) params.set('status', filterStatus.join(','))
+      if (filterTypeId != null) params.set('type_id', String(filterTypeId))
+      if (filterSearch.trim()) params.set('search', filterSearch.trim())
       if (filterDateRange) {
         params.set('date_from', filterDateRange[0].startOf('day').toISOString())
         params.set('date_to', filterDateRange[1].endOf('day').toISOString())
       }
-      const qs = params.toString()
-      const data = await apiFetch<TicketRecord[]>(`/api/tickets?${qs}`)
-      const list = Array.isArray(data) ? data : []
+      const res = await apiFetch<{ data: TicketRecord[]; total: number }>(`/api/tickets?${params}`)
+      const list = Array.isArray(res.data) ? res.data : []
+      const t = res.total ?? 0
+      setTotal(t)
+      onTotalChange?.(t)
       setTickets(
         list.map((t: any) => ({
           id: t.id,
@@ -192,7 +203,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
     } finally {
       setLoading(false)
     }
-  }, [companyData?.id, filterDateRange])
+  }, [companyData?.id, filterDateRange, filterStatus, filterTypeId, filterSearch, currentPage, pageSize, onTotalChange])
 
   const fetchLookup = async () => {
     try {
@@ -243,20 +254,14 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
     setFilterTypeId(undefined)
     setFilterSearch('')
     setFilterDateRange(null)
+    setCurrentPage(1)
   }
 
-  const filteredTickets = useMemo(() => {
-    return tickets.filter((t) => {
-      if (filterStatus.length > 0 && !filterStatus.includes(t.status)) return false
-      if (filterTypeId != null && t.type_id !== filterTypeId) return false
-      if (filterSearch.trim()) {
-        const q = filterSearch.toLowerCase()
-        if (!t.title?.toLowerCase().includes(q) && !(t.description || '').toLowerCase().includes(q))
-          return false
-      }
-      return true
-    })
-  }, [tickets, filterStatus, filterTypeId, filterSearch])
+  // Filters are now server-side; reset to page 1 when filters change
+  const handleFilterChange = useCallback(() => {
+    setCurrentPage(1)
+    fetchTickets(1, pageSize)
+  }, [fetchTickets, pageSize])
 
   const handleCreate = () => {
     setEditingTicket(null)
@@ -520,6 +525,8 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
                 prefix={<SearchOutlined />}
                 value={filterSearch}
                 onChange={(e) => setFilterSearch(e.target.value)}
+                onPressEnter={handleFilterChange}
+                onClear={handleFilterChange}
                 allowClear
                 style={{ width: 260 }}
               />
@@ -528,7 +535,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
                 placeholder="Status (all)"
                 allowClear
                 value={filterStatus}
-                onChange={(v) => setFilterStatus(v ?? [])}
+                onChange={(v) => { setFilterStatus(v ?? []); handleFilterChange() }}
                 style={{ minWidth: 180 }}
                 options={statuses.map((s) => ({
                   value: s.slug,
@@ -540,7 +547,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
                 placeholder="Type"
                 allowClear
                 value={filterTypeId}
-                onChange={setFilterTypeId}
+                onChange={(v) => { setFilterTypeId(v); handleFilterChange() }}
                 style={{ width: 160 }}
               >
                 {types.map((t) => (
@@ -552,9 +559,10 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
               <DatePicker.RangePicker
                 allowClear
                 value={filterDateRange}
-                onChange={(dates) =>
+                onChange={(dates) => {
                   setFilterDateRange(dates?.[0] && dates?.[1] ? [dates[0], dates[1]] : null)
-                }
+                  handleFilterChange()
+                }}
                 format="YYYY-MM-DD"
                 placeholder={['Created from', 'Created to']}
                 style={{ width: 280 }}
@@ -574,7 +582,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
             </Space>
             {hasActiveFilters && (
               <Text type="secondary" style={{ fontSize: 12 }}>
-                Showing {filteredTickets.length} ticket{filteredTickets.length !== 1 ? 's' : ''}
+                Showing {total} ticket{total !== 1 ? 's' : ''}
                 {hasDateFilter ? ' (created in selected range)' : ''}
               </Text>
             )}
@@ -592,12 +600,20 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
           <Table
             size="small"
             columns={columns}
-            dataSource={filteredTickets}
+            dataSource={tickets}
             rowKey="id"
             pagination={{
-              pageSize: 10,
+              current: currentPage,
+              pageSize,
+              total,
               showSizeChanger: true,
-              showTotal: (total) => `Total ${total} tickets`,
+              pageSizeOptions: ['25', '50', '100', '200', '500'],
+              showTotal: (t) => `Total ${t} tickets`,
+              onChange: (page, size) => {
+                setCurrentPage(page)
+                setPageSize(size)
+                fetchTickets(page, size)
+              },
             }}
             locale={{ emptyText: 'No tickets for this company' }}
           />

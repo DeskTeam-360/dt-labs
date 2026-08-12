@@ -43,8 +43,8 @@ import { assertCustomerMayUseTicketType } from '@/lib/ticket-type-customer-acces
 import { buildTicketVisibilityAccessSql } from '@/lib/ticket-visibility-server'
 
 const DEFAULT_LIMIT = 50
-/** Max tickets per list request (UI: 50 / 100 / 200). */
-const MAX_LIMIT = 200
+/** Max tickets per list request (UI: 50 / 100 / 200 / 500). */
+const MAX_LIMIT = 500
 /** GET /api/tickets - List tickets with related data (server-side filtering). Customer: only tickets of their company */
 export async function GET(request: Request) {
   const session = await auth()
@@ -84,6 +84,7 @@ export async function GET(request: Request) {
   const dueDateTo = url.searchParams.get('due_date_to')
   const search = url.searchParams.get('search')?.trim()
   const searchBy = url.searchParams.get('search_by')?.trim() || 'all' // 'all' | 'title' | 'id'
+  const paginated = url.searchParams.get('paginated') === '1'
   const limit = Math.min(
     Math.max(1, parseInt(url.searchParams.get('limit') || String(DEFAULT_LIMIT), 10)),
     MAX_LIMIT
@@ -399,6 +400,15 @@ export async function GET(request: Request) {
       attachments: attachmentsByTicket[t.id] || [],
     }
   })
+
+  if (paginated) {
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tickets)
+      .where(whereClause)
+    const total = countResult[0]?.count ?? 0
+    return NextResponse.json({ data: result, total })
+  }
 
   return NextResponse.json(result)
 }

@@ -96,6 +96,7 @@ export default function CompanyDetailContent({
   const [companyEditModalOpen, setCompanyEditModalOpen] = useState(false)
   const [companyEditLoading, setCompanyEditLoading] = useState(false)
   const [resyncing, setResyncing] = useState(false)
+  const [ticketTotal, setTicketTotal] = useState<number | null>(null)
   const [resyncModalOpen, setResyncModalOpen] = useState(false)
   const [resyncSince, setResyncSince] = useState<Dayjs | null>(dayjs().subtract(1, 'year'))
   const [resyncUntil, setResyncUntil] = useState<Dayjs | null>(dayjs())
@@ -456,7 +457,7 @@ export default function CompanyDetailContent({
       key: 'tickets',
       label: (
         <span>
-          <CheckSquareOutlined /> Tickets
+          <CheckSquareOutlined /> Tickets{ticketTotal !== null ? ` (${ticketTotal})` : ''}
         </span>
       ),
       children: (
@@ -465,6 +466,7 @@ export default function CompanyDetailContent({
           currentUser={currentUser}
           viewerRole={currentUserRole ?? (currentUser as { role?: string }).role ?? null}
           basePath={isCustomer ? '/customer' : undefined}
+          onTotalChange={setTicketTotal}
         />
       ),
     },
