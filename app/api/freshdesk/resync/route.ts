@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const companyId: string = body.company_id
   if (!companyId) return NextResponse.json({ error: 'company_id required' }, { status: 400 })
+  const ticketsSince: string | null = body.tickets_since ?? null
 
   const { domain, apiKey } = await getFreshdeskSettings()
   if (!domain || !apiKey) return NextResponse.json({ error: 'Freshdesk settings not configured' }, { status: 400 })
@@ -133,7 +134,9 @@ export async function POST(req: NextRequest) {
   if (firstCustomer.length > 0) companyFallbackUserId = firstCustomer[0].id
 
   // ── Tickets ───────────────────────────────────────────────────────
-  const fdTickets = await fetchPages<FDTicket>(`${baseUrl}/api/v2/tickets`, auth_, { company_id: String(fdCompanyId) })
+  const ticketParams: Record<string, string> = { company_id: String(fdCompanyId) }
+  if (ticketsSince) ticketParams['updated_since'] = ticketsSince
+  const fdTickets = await fetchPages<FDTicket>(`${baseUrl}/api/v2/tickets`, auth_, ticketParams)
 
   for (const ft of fdTickets) {
     try {

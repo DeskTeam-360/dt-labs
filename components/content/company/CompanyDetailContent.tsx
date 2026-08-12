@@ -12,7 +12,8 @@ import {
   SyncOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Col, Divider, Flex, Form, Input, InputNumber, Layout, message, Modal, Row, Select, Space, Switch, Tabs, Tag, Typography } from 'antd'
+import { Button, Card, Col, DatePicker, Divider, Flex, Form, Input, InputNumber, Layout, message, Modal, Row, Select, Space, Switch, Tabs, Tag, Typography } from 'antd'
+import dayjs, { type Dayjs } from 'dayjs'
 import { useRouter } from 'next/navigation'
 import { useEffect,useState } from 'react'
 
@@ -95,6 +96,9 @@ export default function CompanyDetailContent({
   const [companyEditModalOpen, setCompanyEditModalOpen] = useState(false)
   const [companyEditLoading, setCompanyEditLoading] = useState(false)
   const [resyncing, setResyncing] = useState(false)
+  const [resyncModalOpen, setResyncModalOpen] = useState(false)
+  const [resyncSince, setResyncSince] = useState<Dayjs | null>(dayjs().subtract(1, 'year'))
+  const [resyncAllTickets, setResyncAllTickets] = useState(false)
   const [companyEditForm] = Form.useForm()
   const [companyEditLeaderOptions, setCompanyEditLeaderOptions] = useState<
     { id: string; full_name: string | null; email: string; role: string }[]
@@ -114,11 +118,19 @@ export default function CompanyDetailContent({
   }
 
   async function handleResync() {
+    setResyncModalOpen(false)
     setResyncing(true)
     try {
       const data = await apiFetch<{ ok: boolean; result: { contacts: { imported: number; skipped: number }; tickets: { imported: number; skipped: number }; comments: { imported: number } } }>(
         '/api/freshdesk/resync',
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company_id: companyData.id }) }
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company_id: companyData.id,
+            tickets_since: resyncAllTickets ? null : (resyncSince ? resyncSince.toISOString() : null),
+          }),
+        }
       )
       const r = data.result
       message.success(
@@ -536,7 +548,7 @@ export default function CompanyDetailContent({
                   <Button
                     icon={<SyncOutlined spin={resyncing} />}
                     loading={resyncing}
-                    onClick={() => void handleResync()}
+                    onClick={() => setResyncModalOpen(true)}
                   >
                     Resync from Freshdesk
                   </Button>
@@ -642,6 +654,46 @@ export default function CompanyDetailContent({
               </Form>
             </Modal>
 
+            {/* Resync Modal */}
+            <Modal
+              title="Resync from Freshdesk"
+              open={resyncModalOpen}
+              onCancel={() => setResyncModalOpen(false)}
+              onOk={() => void handleResync()}
+              okText="Start Resync"
+              okButtonProps={{ icon: <SyncOutlined /> }}
+              width={420}
+            >
+              <Flex vertical gap={16} style={{ padding: '12px 0' }}>
+                <div>
+                  <Switch
+                    checked={resyncAllTickets}
+                    onChange={setResyncAllTickets}
+                    style={{ marginRight: 10 }}
+                  />
+                  <span>Import semua ticket (tanpa filter tanggal)</span>
+                </div>
+                {!resyncAllTickets && (
+                  <div>
+                    <div style={{ marginBottom: 6, color: 'var(--ant-color-text-secondary)', fontSize: 13 }}>
+                      Import ticket yang diupdate sejak:
+                    </div>
+                    <DatePicker
+                      value={resyncSince}
+                      onChange={setResyncSince}
+                      style={{ width: '100%' }}
+                      disabledDate={(d) => d.isAfter(dayjs())}
+                      format="DD MMM YYYY"
+                    />
+                  </div>
+                )}
+                {resyncAllTickets && (
+                  <Typography.Text type="warning" style={{ fontSize: 13 }}>
+                    ⚠ Jika company memiliki banyak ticket (1000+), proses ini bisa memakan waktu lama dan mungkin timeout.
+                  </Typography.Text>
+                )}
+              </Flex>
+            </Modal>
 
             {activeSection ? (
               (() => {
