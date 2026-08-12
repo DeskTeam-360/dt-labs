@@ -122,6 +122,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [form] = Form.useForm()
   const [syncingEmail, setSyncingEmail] = useState(false)
+  const [fixingPriority, setFixingPriority] = useState(false)
 
   const statusOptionsForModal = useMemo(() => {
     const active = statuses.filter((s) => s.is_active !== false)
@@ -576,6 +577,27 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
                 suffixIcon={<CalendarOutlined />}
               />
               <Button onClick={() => fetchTickets()}>Refresh</Button>
+              <Button
+                loading={fixingPriority}
+                onClick={async () => {
+                  setFixingPriority(true)
+                  try {
+                    const res = await apiFetch<{ updated: number }>('/api/tickets/fix-priority', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ company_id: companyData.id }),
+                    })
+                    message.success(`Priority fixed for ${res.updated} ticket${res.updated !== 1 ? 's' : ''}`)
+                    fetchTickets()
+                  } catch (err: unknown) {
+                    message.error((err as Error).message || 'Failed to fix priority')
+                  } finally {
+                    setFixingPriority(false)
+                  }
+                }}
+              >
+                Fix Priority
+              </Button>
               {basePath && (
                 <Button icon={<SyncOutlined />} onClick={handleSyncEmail} loading={syncingEmail}>
                   Sync Email
