@@ -18,12 +18,24 @@ function authHeader(apiKey: string) {
   return 'Basic ' + Buffer.from(`${apiKey}:X`).toString('base64')
 }
 
+class FreshdeskRateLimitError extends Error {
+  retryAfter: number
+  constructor(retryAfter: number) {
+    super(`Freshdesk rate limit hit — retry after ${retryAfter}s`)
+    this.retryAfter = retryAfter
+  }
+}
+
 async function fetchPages<T>(url: string, auth: string, extra: Record<string, string> = {}): Promise<T[]> {
   const results: T[] = []
   let page = 1
   while (true) {
     const params = new URLSearchParams({ page: String(page), per_page: '100', ...extra })
     const res = await fetch(`${url}?${params}`, { headers: { Authorization: auth, 'Content-Type': 'application/json' } })
+    if (res.status === 429) {
+      const retryAfter = Number(res.headers.get('Retry-After') ?? 60)
+      throw new FreshdeskRateLimitError(retryAfter)
+    }
     if (!res.ok) break
     const data = (await res.json()) as T[]
     if (!Array.isArray(data) || data.length === 0) break
@@ -62,6 +74,7 @@ export async function POST(req: NextRequest) {
   const companyId: string = body.company_id
   if (!companyId) return NextResponse.json({ error: 'company_id required' }, { status: 400 })
   const ticketsSince: string | null = body.tickets_since ?? null
+  const ticketsUntil: string | null = body.tickets_until ?? null
 
   const { domain, apiKey } = await getFreshdeskSettings()
   if (!domain || !apiKey) return NextResponse.json({ error: 'Freshdesk settings not configured' }, { status: 400 })
@@ -136,7 +149,20 @@ export async function POST(req: NextRequest) {
   // ── Tickets ───────────────────────────────────────────────────────
   const ticketParams: Record<string, string> = { company_id: String(fdCompanyId) }
   if (ticketsSince) ticketParams['updated_since'] = ticketsSince
-  const fdTickets = await fetchPages<FDTicket>(`${baseUrl}/api/v2/tickets`, auth_, ticketParams)
+  let fdTickets: FDTicket[]
+  try {
+    fdTickets = await fetchPages<FDTicket>(`${baseUrl}/api/v2/tickets`, auth_, ticketParams)
+  } catch (e) {
+    if (e instanceof FreshdeskRateLimitError) {
+      return NextResponse.json({ error: `Freshdesk rate limit tercapai. Coba lagi dalam ${e.retryAfter} detik.`, rate_limited: true, retry_after: e.retryAfter }, { status: 429 })
+    }
+    return NextResponse.json({ error: 'Gagal mengambil ticket dari Freshdesk.' }, { status: 502 })
+  }
+  // Filter by end date client-side (Freshdesk API doesn't support updated_before)
+  if (ticketsUntil) {
+    const until = new Date(ticketsUntil)
+    fdTickets = fdTickets.filter((t) => new Date(t.updated_at) <= until)
+  }
 
   for (const ft of fdTickets) {
     try {

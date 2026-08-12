@@ -98,6 +98,7 @@ export default function CompanyDetailContent({
   const [resyncing, setResyncing] = useState(false)
   const [resyncModalOpen, setResyncModalOpen] = useState(false)
   const [resyncSince, setResyncSince] = useState<Dayjs | null>(dayjs().subtract(1, 'year'))
+  const [resyncUntil, setResyncUntil] = useState<Dayjs | null>(dayjs())
   const [resyncAllTickets, setResyncAllTickets] = useState(false)
   const [companyEditForm] = Form.useForm()
   const [companyEditLeaderOptions, setCompanyEditLeaderOptions] = useState<
@@ -128,7 +129,8 @@ export default function CompanyDetailContent({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             company_id: companyData.id,
-            tickets_since: resyncAllTickets ? null : (resyncSince ? resyncSince.toISOString() : null),
+            tickets_since: resyncAllTickets ? null : (resyncSince ? resyncSince.startOf('day').toISOString() : null),
+            tickets_until: resyncAllTickets ? null : (resyncUntil ? resyncUntil.endOf('day').toISOString() : null),
           }),
         }
       )
@@ -138,7 +140,8 @@ export default function CompanyDetailContent({
       )
       router.refresh()
     } catch (e: unknown) {
-      message.error((e as Error).message || 'Resync failed')
+      const errMsg = (e as Error).message || 'Resync failed'
+      message.error(errMsg, errMsg.toLowerCase().includes('rate limit') ? 8 : 4)
     } finally {
       setResyncing(false)
     }
@@ -671,25 +674,47 @@ export default function CompanyDetailContent({
                     onChange={setResyncAllTickets}
                     style={{ marginRight: 10 }}
                   />
-                  <span>Import semua ticket (tanpa filter tanggal)</span>
+                  <span>Import all tickets (no date filter)</span>
                 </div>
                 {!resyncAllTickets && (
-                  <div>
-                    <div style={{ marginBottom: 6, color: 'var(--ant-color-text-secondary)', fontSize: 13 }}>
-                      Import ticket yang diupdate sejak:
+                  <Flex vertical gap={10}>
+                    <div>
+                      <div style={{ marginBottom: 6, color: 'var(--ant-color-text-secondary)', fontSize: 13 }}>
+                        From (updated since):
+                      </div>
+                      <DatePicker
+                        value={resyncSince}
+                        onChange={(d) => {
+                          setResyncSince(d)
+                          if (d && resyncUntil && d.isAfter(resyncUntil)) setResyncUntil(d)
+                        }}
+                        style={{ width: '100%' }}
+                        disabledDate={(d) => d.isAfter(dayjs())}
+                        format="DD MMM YYYY"
+                        placeholder="Select start date"
+                      />
                     </div>
-                    <DatePicker
-                      value={resyncSince}
-                      onChange={setResyncSince}
-                      style={{ width: '100%' }}
-                      disabledDate={(d) => d.isAfter(dayjs())}
-                      format="DD MMM YYYY"
-                    />
-                  </div>
+                    <div>
+                      <div style={{ marginBottom: 6, color: 'var(--ant-color-text-secondary)', fontSize: 13 }}>
+                        Until:
+                      </div>
+                      <DatePicker
+                        value={resyncUntil}
+                        onChange={(d) => {
+                          setResyncUntil(d)
+                          if (d && resyncSince && d.isBefore(resyncSince)) setResyncSince(d)
+                        }}
+                        style={{ width: '100%' }}
+                        disabledDate={(d) => d.isAfter(dayjs())}
+                        format="DD MMM YYYY"
+                        placeholder="Today"
+                      />
+                    </div>
+                  </Flex>
                 )}
                 {resyncAllTickets && (
                   <Typography.Text type="warning" style={{ fontSize: 13 }}>
-                    ⚠ Jika company memiliki banyak ticket (1000+), proses ini bisa memakan waktu lama dan mungkin timeout.
+                    ⚠ If this company has many tickets (1000+), the process may take a long time and could timeout.
                   </Typography.Text>
                 )}
               </Flex>
