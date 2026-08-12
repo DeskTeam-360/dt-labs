@@ -278,7 +278,7 @@ export async function POST(req: NextRequest) {
             const exists = await db.select({ id: users.id }).from(users).where(eq(users.id, contactUserId)).limit(1)
             if (exists.length === 0) contactUserId = null
           }
-          const createdBy = adminUserId
+          const createdBy = contactUserId ?? adminUserId
 
           // Freshdesk list endpoint omits description — fetch detail to get it
           let description: string | null = ft.description ?? ft.description_text ?? null

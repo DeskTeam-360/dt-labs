@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
       await db.execute(sql`
         INSERT INTO tickets (id, title, description, original_description, status, priority, company_id, contact_user_id, created_by, created_via, created_at, updated_at)
         OVERRIDING SYSTEM VALUE
-        VALUES (${ft.id}, ${ft.subject?.trim() || '(no subject)'}, ${description}, ${descText}, ${mapStatus(ft.status)}, ${null}, ${companyId}::uuid, ${contactUserId}::uuid, ${adminUserId}::uuid, ${'freshdesk'}, ${new Date(ft.created_at).toISOString()}::timestamptz, ${new Date(ft.updated_at).toISOString()}::timestamptz)
+        VALUES (${ft.id}, ${ft.subject?.trim() || '(no subject)'}, ${description}, ${descText}, ${mapStatus(ft.status)}, ${null}, ${companyId}::uuid, ${contactUserId}::uuid, ${contactUserId ?? adminUserId}::uuid, ${'freshdesk'}, ${new Date(ft.created_at).toISOString()}::timestamptz, ${new Date(ft.updated_at).toISOString()}::timestamptz)
       `)
       result.tickets.imported++
 
