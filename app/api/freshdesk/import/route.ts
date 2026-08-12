@@ -152,13 +152,16 @@ export async function POST(req: NextRequest) {
       const name = fc.name?.trim()
       if (!name) { result.companies.skipped++; continue }
 
-      const existing = await db.select({ id: companies.id })
+      const existing = await db.select({ id: companies.id, freshdeskId: companies.freshdeskId })
         .from(companies)
         .where(eq(companies.name, name))
         .limit(1)
 
       if (existing.length > 0) {
         ourCompanyId = existing[0].id
+        if (!existing[0].freshdeskId) {
+          await db.update(companies).set({ freshdeskId: fc.id }).where(eq(companies.id, ourCompanyId))
+        }
         result.companies.skipped++
       } else {
         const [inserted] = await db.insert(companies).values({
@@ -166,6 +169,7 @@ export async function POST(req: NextRequest) {
           isCustomer: true,
           domainList: fc.domains ?? [],
           color: '#1890ff',
+          freshdeskId: fc.id,
         }).returning({ id: companies.id })
         ourCompanyId = inserted.id
         result.companies.imported++

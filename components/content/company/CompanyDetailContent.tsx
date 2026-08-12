@@ -9,6 +9,7 @@ import {
   GlobalOutlined,
   PlayCircleOutlined,
   PlusOutlined,
+  SyncOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
 import { Button, Card, Col, Divider, Flex, Form, Input, InputNumber, Layout, message, Modal, Row, Select, Space, Switch, Tabs, Tag, Typography } from 'antd'
@@ -93,6 +94,7 @@ export default function CompanyDetailContent({
   const [crawlForm] = Form.useForm()
   const [companyEditModalOpen, setCompanyEditModalOpen] = useState(false)
   const [companyEditLoading, setCompanyEditLoading] = useState(false)
+  const [resyncing, setResyncing] = useState(false)
   const [companyEditForm] = Form.useForm()
   const [companyEditLeaderOptions, setCompanyEditLeaderOptions] = useState<
     { id: string; full_name: string | null; email: string; role: string }[]
@@ -109,6 +111,25 @@ export default function CompanyDetailContent({
       throw new Error(err?.error || res.statusText || 'Request failed')
     }
     return res.json()
+  }
+
+  async function handleResync() {
+    setResyncing(true)
+    try {
+      const data = await apiFetch<{ ok: boolean; result: { contacts: { imported: number; skipped: number }; tickets: { imported: number; skipped: number }; comments: { imported: number } } }>(
+        '/api/freshdesk/resync',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company_id: companyData.id }) }
+      )
+      const r = data.result
+      message.success(
+        `Resync done — contacts: +${r.contacts.imported} (${r.contacts.skipped} skipped), tickets: +${r.tickets.imported} (${r.tickets.skipped} skipped), comments: +${r.comments.imported}`
+      )
+      router.refresh()
+    } catch (e: unknown) {
+      message.error((e as Error).message || 'Resync failed')
+    } finally {
+      setResyncing(false)
+    }
   }
 
   // Group company datas by template group
@@ -510,9 +531,20 @@ export default function CompanyDetailContent({
               <Title level={2} style={{ margin: 0 }}>
                 {companyData.name}
               </Title>
-              <Button type="primary" icon={<EditOutlined />} onClick={() => void openEditCompanyModal()}>
-                Edit company
-              </Button>
+              <Space>
+                {companyData.freshdesk_id && (
+                  <Button
+                    icon={<SyncOutlined spin={resyncing} />}
+                    loading={resyncing}
+                    onClick={() => void handleResync()}
+                  >
+                    Resync from Freshdesk
+                  </Button>
+                )}
+                <Button type="primary" icon={<EditOutlined />} onClick={() => void openEditCompanyModal()}>
+                  Edit company
+                </Button>
+              </Space>
             </Flex>
 
             <Modal

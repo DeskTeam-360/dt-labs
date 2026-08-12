@@ -62,6 +62,7 @@ export const companies = pgTable('companies', {
   activeManagerId: uuid('active_manager_id'),
   activeTime: integer('active_time').notNull().default(0),
   isCustomer: boolean('is_customer').notNull().default(false),
+  freshdeskId: bigint('freshdesk_id', { mode: 'number' }),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
