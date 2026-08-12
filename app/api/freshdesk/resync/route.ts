@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { appSettings, companies, companyUsers, db, ticketComments, tickets, users } from '@/lib/db'
+import { FD_STATUS_MAP, FD_TYPE_MAP } from '@/lib/freshdesk-maps'
 
 function sessionRole(s: { user?: { role?: string } } | null) {
   return (s?.user as { role?: string } | undefined)?.role ?? ''
@@ -53,17 +54,9 @@ async function fetchOne<T>(url: string, auth: string): Promise<T | null> {
 }
 
 type FDContact = { id: number; name: string; email: string | null; phone?: string | null; mobile?: string | null }
-type FDTicket = { id: number; subject: string; description?: string | null; description_text?: string | null; status: number; requester_id: number; created_at: string; updated_at: string }
+type FDTicket = { id: number; subject: string; description?: string | null; description_text?: string | null; status: number; type: string | null; requester_id: number; created_at: string; updated_at: string }
 type FDConversation = { id: number; body: string; body_text: string | null; incoming: boolean; private: boolean; from_email: string | null; created_at: string }
 type FDAgent = { id: number; contact: { name: string; email: string } }
-
-function mapStatus(fd: number): string {
-  if (fd === 3) return 'pending'
-  if (fd === 4) return 'resolved'
-  if (fd === 5) return 'closed'
-  return 'open'
-}
-
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -196,10 +189,13 @@ export async function POST(req: NextRequest) {
         if (detail) { description = detail.description ?? detail.description_text ?? null; descText = detail.description_text ?? null }
       }
 
+      const mappedStatus = FD_STATUS_MAP[ft.status] ?? 'open'
+      const mappedTypeId = ft.type ? (FD_TYPE_MAP[ft.type] ?? null) : null
+
       await db.execute(sql`
-        INSERT INTO tickets (id, title, description, original_description, status, priority, company_id, contact_user_id, created_by, created_via, created_at, updated_at)
+        INSERT INTO tickets (id, title, description, original_description, status, type_id, priority, company_id, contact_user_id, created_by, created_via, created_at, updated_at)
         OVERRIDING SYSTEM VALUE
-        VALUES (${ft.id}, ${ft.subject?.trim() || '(no subject)'}, ${description}, ${descText}, ${mapStatus(ft.status)}, ${null}, ${companyId}::uuid, ${contactUserId}::uuid, ${contactUserId ?? adminUserId}::uuid, ${'freshdesk'}, ${new Date(ft.created_at).toISOString()}::timestamptz, ${new Date(ft.updated_at).toISOString()}::timestamptz)
+        VALUES (${ft.id}, ${ft.subject?.trim() || '(no subject)'}, ${description}, ${descText}, ${mappedStatus}, ${mappedTypeId}, ${null}, ${companyId}::uuid, ${contactUserId}::uuid, ${contactUserId ?? adminUserId}::uuid, ${'freshdesk'}, ${new Date(ft.created_at).toISOString()}::timestamptz, ${new Date(ft.updated_at).toISOString()}::timestamptz)
       `)
       result.tickets.imported++
 

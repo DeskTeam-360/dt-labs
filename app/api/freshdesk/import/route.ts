@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { appSettings, companies, companyUsers, db, ticketComments, tickets, users } from '@/lib/db'
+import { FD_STATUS_MAP, FD_TYPE_MAP } from '@/lib/freshdesk-maps'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role ?? ''
@@ -65,8 +66,9 @@ type FreshdeskTicket = {
   subject: string
   description: string | null        // HTML
   description_text: string | null   // plain text
-  status: number                    // 2=open 3=pending 4=resolved 5=closed
+  status: number                    // 2=open 3=pending 4=resolved 5=closed + custom
   priority: number                  // 1=low 2=medium 3=high 4=urgent
+  type: string | null               // FD type string e.g. "Design", "Question"
   requester_id: number
   company_id: number | null
   created_at: string
@@ -81,13 +83,6 @@ type FreshdeskConversation = {
   private: boolean                  // true = internal note
   from_email: string | null
   created_at: string
-}
-
-function mapStatus(fd: number): string {
-  if (fd === 3) return 'pending'
-  if (fd === 4) return 'resolved'
-  if (fd === 5) return 'closed'
-  return 'open'
 }
 
 // Reset postgres identity sequence after bulk insert with overriding ids
@@ -125,14 +120,14 @@ export async function POST(req: NextRequest) {
   }
   let firstTicketError: string | null = null
 
-  // ── 0. Fetch Freshdesk agents → email:name map for comment attribution ─
+  // ── 0a. Fetch Freshdesk agents → email:name map for comment attribution ─
   const fdAgentNameByEmail: Record<string, string> = {}
   try {
     const agents = await fetchPages<FreshdeskAgent>(`${baseUrl}/api/v2/agents`, authHeader)
     for (const a of agents) {
       if (a.contact?.email) fdAgentNameByEmail[a.contact.email.toLowerCase()] = a.contact.name
     }
-  } catch { /* non-fatal — fallback to admin */ }
+  } catch { /* non-fatal */ }
 
   // ── 1. Fetch Companies from Freshdesk ─────────────────────────────
   let fdCompanies: FreshdeskCompany[] = []
@@ -291,12 +286,15 @@ export async function POST(req: NextRequest) {
             }
           }
 
+          const mappedStatus = FD_STATUS_MAP[ft.status] ?? 'open'
+          const mappedTypeId = ft.type ? (FD_TYPE_MAP[ft.type] ?? null) : null
+
           // INSERT OVERRIDING SYSTEM VALUE to preserve Freshdesk ticket ID
           // Note: dates must be ISO strings — postgres.js can't serialize Date in sql`` templates
           await db.execute(sql`
             INSERT INTO tickets (
               id, title, description, original_description,
-              status, priority, company_id,
+              status, type_id, priority, company_id,
               contact_user_id, created_by,
               created_via,
               created_at, updated_at
@@ -307,7 +305,8 @@ export async function POST(req: NextRequest) {
               ${ft.subject?.trim() || '(no subject)'},
               ${description},
               ${descriptionText},
-              ${mapStatus(ft.status)},
+              ${mappedStatus},
+              ${mappedTypeId},
               ${null},
               ${ourCompanyId}::uuid,
               ${contactUserId}::uuid,
