@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, ilike, inArray, isNotNull, isNull, lte, ne, or, type SQL,sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, ne, or, type SQL,sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
@@ -85,6 +85,7 @@ export async function GET(request: Request) {
   const search = url.searchParams.get('search')?.trim()
   const searchBy = url.searchParams.get('search_by')?.trim() || 'all' // 'all' | 'title' | 'id'
   const paginated = url.searchParams.get('paginated') === '1'
+  const sortOrder = url.searchParams.get('sort_order') === 'asc' ? 'asc' : 'desc'
   const limit = Math.min(
     Math.max(1, parseInt(url.searchParams.get('limit') || String(DEFAULT_LIMIT), 10)),
     MAX_LIMIT
@@ -218,11 +219,11 @@ export async function GET(request: Request) {
   const ticketsRows = whereClause
     ? await baseQuery
         .where(whereClause)
-        .orderBy(asc(tickets.companyId), asc(tickets.priority), asc(tickets.id))
+        .orderBy(asc(tickets.companyId), asc(tickets.priority), sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id))
         .limit(limit)
         .offset(offset)
     : await baseQuery
-        .orderBy(asc(tickets.companyId), asc(tickets.priority), asc(tickets.id))
+        .orderBy(asc(tickets.companyId), asc(tickets.priority), sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id))
         .limit(limit)
         .offset(offset)
 

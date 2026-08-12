@@ -110,6 +110,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
   const [types, setTypes] = useState<TypeOption[]>([])
   const [priorities, setPriorities] = useState<TypeOption[]>([])
   const [allTags, setAllTags] = useState<Array<{ id: string; name: string }>>([])
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [filterStatus, setFilterStatus] = useState<string[]>([])
   const [filterTypeId, setFilterTypeId] = useState<number | undefined>(undefined)
   const [filterSearch, setFilterSearch] = useState('')
@@ -152,7 +153,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
     }
   }
 
-  const fetchTickets = useCallback(async (page = currentPage, size = pageSize) => {
+  const fetchTickets = useCallback(async (page = currentPage, size = pageSize, order = sortOrder) => {
     if (!companyData?.id) return
     setLoading(true)
     try {
@@ -163,6 +164,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
       params.set('paginated', '1')
       if (filterStatus.length > 0) params.set('status', filterStatus.join(','))
       if (filterTypeId != null) params.set('type_id', String(filterTypeId))
+      params.set('sort_order', order)
       if (filterSearch.trim()) params.set('search', filterSearch.trim())
       if (filterDateRange) {
         params.set('date_from', filterDateRange[0].startOf('day').toISOString())
@@ -203,7 +205,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
     } finally {
       setLoading(false)
     }
-  }, [companyData?.id, filterDateRange, filterStatus, filterTypeId, filterSearch, currentPage, pageSize, onTotalChange])
+  }, [companyData?.id, filterDateRange, filterStatus, filterTypeId, filterSearch, currentPage, pageSize, sortOrder, onTotalChange])
 
   const fetchLookup = async () => {
     try {
@@ -364,7 +366,9 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
       title: '#',
       dataIndex: 'id',
       key: 'id',
-      width: 72,
+      width: 80,
+      sorter: true,
+      sortOrder: sortOrder === 'asc' ? 'ascend' : 'descend',
       render: (id: number) => (
         <Button
           type="link"
@@ -605,6 +609,15 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
             columns={columns}
             dataSource={tickets}
             rowKey="id"
+            onChange={(_, __, sorter) => {
+              const s = Array.isArray(sorter) ? sorter[0] : sorter
+              if (s?.columnKey === 'id') {
+                const order = s.order === 'ascend' ? 'asc' : 'desc'
+                setSortOrder(order)
+                setCurrentPage(1)
+                fetchTickets(1, pageSize, order)
+              }
+            }}
             pagination={{
               current: currentPage,
               pageSize,
