@@ -380,10 +380,12 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
+      ellipsis: true,
       render: (title: string, record: TicketRecord) => (
         <Button
           type="link"
-          style={{ padding: 0, height: 'auto', fontWeight: 500 }}
+          title={title}
+          style={{ padding: 0, height: 'auto', fontWeight: 500, maxWidth: '100%', textAlign: 'left', whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: '1.4' }}
           onClick={() => router.push(ticketDetailUrl(record.id))}
         >
           {record.has_unread_replies && (
@@ -396,6 +398,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
                 backgroundColor: '#ff4d4f',
                 marginRight: 6,
                 verticalAlign: 'middle',
+                flexShrink: 0,
               }}
               title="Unread replies"
             />
