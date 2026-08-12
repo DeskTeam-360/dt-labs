@@ -18,6 +18,7 @@ import {
   URL_PARAMS,
 } from '@/lib/ticket-filter-url'
 import { isTicketStatusInKanban, ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
+import { isClosedLikeTicketStatus } from '@/lib/ticket-status-workflow'
 import {
   buildTicketsListQueryKey,
   normalizeTicketsPageLimit,
@@ -527,8 +528,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
           const current = initialRef.current?.state.filterStatus ?? []
           const intersection = current.filter((slug: string) => validSlugs.has(slug))
           const allSlugs = list.map((s) => s.slug)
+          const nonClosedSlugs = list.filter((s) => !isClosedLikeTicketStatus(s.slug)).map((s) => s.slug)
           const resolvedStatus =
-            intersection.length > 0 ? intersection : isCustomer ? allSlugs : kanbanSlugs
+            intersection.length > 0 ? intersection : isCustomer ? nonClosedSlugs : kanbanSlugs
           setFilterStatus(resolvedStatus)
           lastKanbanSlugsRef.current = kanbanSlugs
           saveFiltersToStorage({ ...(stored || {}), filterStatus: resolvedStatus } as StoredFilter)
@@ -540,8 +542,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
             const fromStore = hasStoredStatusPreference
               ? (stored.filterStatus as string[]).filter((slug: string) => validSlugs.has(slug))
               : null
+            const nonClosedSlugs = list.filter((s) => !isClosedLikeTicketStatus(s.slug)).map((s) => s.slug)
             setFilterStatus(
-              fromStore !== null ? (fromStore.length > 0 ? fromStore : []) : allSlugs
+              fromStore !== null ? (fromStore.length > 0 ? fromStore : nonClosedSlugs) : nonClosedSlugs
             )
             lastKanbanSlugsRef.current = kanbanSlugs
           } else {
