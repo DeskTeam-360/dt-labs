@@ -115,10 +115,11 @@ export async function POST(req: NextRequest) {
 
   const emailToUserId: Record<string, string> = {}
 
+  let conversationsFetchError: string | null = null
   const conversations = await fetchPages<FDConversation>(
     `${baseUrl}/api/v2/tickets/${ticketId}/conversations`,
     authHeader,
-  ).catch(() => [] as FDConversation[])
+  ).catch((e: Error) => { conversationsFetchError = e.message; return [] as FDConversation[] })
 
   const adminUserId = session.user.id!
 
@@ -171,5 +172,5 @@ export async function POST(req: NextRequest) {
     } catch { result.comments.errors++ }
   }
 
-  return NextResponse.json({ ok: true, comments: result.comments })
+  return NextResponse.json({ ok: true, comments: result.comments, conversationsFetched: conversations.length, conversationsFetchError })
 }
