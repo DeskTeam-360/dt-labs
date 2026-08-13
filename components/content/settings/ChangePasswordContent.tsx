@@ -12,7 +12,7 @@ const { Content } = Layout
 const { Title, Text } = Typography
 
 interface ChangePasswordContentProps {
-  user: { id: string; email?: string | null; user_metadata?: { full_name?: string | null } }
+  user: { id: string; email?: string | null; role?: string; user_metadata?: { full_name?: string | null } }
 }
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
