@@ -500,7 +500,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
           </Button>
           {canMoveTicketToTrash ? (
             <Button
-              type="link"
+              type="text"
               size="small"
               danger
               icon={<DeleteOutlined />}
@@ -512,9 +512,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
                   onOk: () => handleDelete(record.id),
                 })
               }}
-            >
-              Delete
-            </Button>
+            />
           ) : null}
         </Space>
       ),
@@ -625,15 +623,17 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
           </Col>
         </Row>
 
-        <Spin spinning={loading}>
+        <Spin spinning={false}>
           <Table
             size="small"
+            loading={loading}
             columns={columns}
             dataSource={tickets}
             rowKey="id"
             onChange={(_, __, sorter) => {
               const s = Array.isArray(sorter) ? sorter[0] : sorter
               if (s?.columnKey === 'id') {
+                // cycle: ascend → descend → ascend (no unset)
                 const order = s.order === 'ascend' ? 'asc' : 'desc'
                 setSortOrder(order)
                 setCurrentPage(1)
