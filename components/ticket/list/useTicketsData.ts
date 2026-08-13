@@ -245,7 +245,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
   const prevTicketsListSearchRef = useRef<string | null>(null)
 
   const [collapsed, setCollapsed] = useState(true)
-  const [ticketsPageLimit, setTicketsPageLimitState] = useState<TicketsPageLimit>(50)
+  const [ticketsPageLimit, setTicketsPageLimitState] = useState<TicketsPageLimit>(isCustomer ? 200 : 50)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingTicket, setEditingTicket] = useState<TicketRecord | null>(null)
   const [form] = Form.useForm()

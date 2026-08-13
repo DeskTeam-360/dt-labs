@@ -202,8 +202,7 @@ export async function POST(req: NextRequest) {
       // ── Conversations ──────────────────────────────────────────────
       let conversations: FDConversation[] = []
       try {
-        const convData = await fetchOne<FDConversation[]>(`${baseUrl}/api/v2/tickets/${ft.id}/conversations`, auth_)
-        conversations = Array.isArray(convData) ? convData : []
+        conversations = await fetchPages<FDConversation>(`${baseUrl}/api/v2/tickets/${ft.id}/conversations`, auth_)
       } catch { /* non-fatal */ }
 
       for (const conv of conversations) {
@@ -234,13 +233,14 @@ export async function POST(req: NextRequest) {
             commentUserId = companyFallbackUserId
           }
 
-          const commentText = conv.body_text?.trim() || conv.body?.replace(/<[^>]+>/g, '').trim() || ''
-          if (!commentText) { result.comments.skipped++; continue }
+          const bodyHtml = conv.body?.trim() || ''
+          const commentText = conv.body_text?.trim() || bodyHtml.replace(/<[^>]+>/g, '').trim() || ''
+          if (!bodyHtml && !commentText) { result.comments.skipped++; continue }
 
           await db.insert(ticketComments).values({
             ticketId: ft.id,
             userId: commentUserId ?? adminUserId!,
-            comment: conv.body || commentText,
+            comment: bodyHtml || commentText,
             visibility: conv.private ? 'note' : 'public',
             authorType: conv.incoming ? 'customer' : 'agent',
             createdAt: new Date(conv.created_at),

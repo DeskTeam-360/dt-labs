@@ -322,11 +322,10 @@ export async function POST(req: NextRequest) {
           // — Conversations (comments) —
           let conversations: FreshdeskConversation[] = []
           try {
-            const convData = await fetchOne<FreshdeskConversation[]>(
+            conversations = await fetchPages<FreshdeskConversation>(
               `${baseUrl}/api/v2/tickets/${ft.id}/conversations`,
               authHeader,
             )
-            conversations = Array.isArray(convData) ? convData : []
           } catch {
             // Non-fatal
           }
@@ -380,13 +379,14 @@ export async function POST(req: NextRequest) {
 
               const visibility = conv.private ? 'note' : 'public'
               const authorType = conv.incoming ? 'customer' : 'agent'
-              const commentText = conv.body_text?.trim() || conv.body?.replace(/<[^>]+>/g, '').trim() || ''
-              if (!commentText) { result.comments.skipped++; continue }
+              const bodyHtml = conv.body?.trim() || ''
+              const commentText = conv.body_text?.trim() || bodyHtml.replace(/<[^>]+>/g, '').trim() || ''
+              if (!bodyHtml && !commentText) { result.comments.skipped++; continue }
 
               await db.insert(ticketComments).values({
                 ticketId: ft.id,
                 userId: commentUserId,
-                comment: conv.body || commentText,
+                comment: bodyHtml || commentText,
                 visibility,
                 authorType,
                 createdAt: new Date(conv.created_at),
