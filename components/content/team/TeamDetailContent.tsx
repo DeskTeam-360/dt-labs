@@ -39,6 +39,7 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs, { Dayjs } from 'dayjs'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo,useState } from 'react'
 
@@ -388,10 +389,12 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
       title: 'Ticket',
       key: 'ticket',
       render: (_, r) => (
-        <Space>
-          <Text strong>#{r.ticket_id}</Text>
-          {r.ticket_title ? r.ticket_title : '-'}
-        </Space>
+        <Link href={`/tickets/${r.ticket_id}`} target="_blank">
+          <Space>
+            <Text strong>#{r.ticket_id}</Text>
+            {r.ticket_title ? r.ticket_title : '-'}
+          </Space>
+        </Link>
       ),
     },
     {
