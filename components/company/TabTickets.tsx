@@ -165,6 +165,7 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
       params.set('paginated', '1')
       if (filterStatus.length > 0) params.set('status', filterStatus.join(','))
       if (filterTypeId != null) params.set('type_id', String(filterTypeId))
+      params.set('sort_by', 'id')
       params.set('sort_order', order)
       if (filterSearch.trim()) params.set('search', filterSearch.trim())
       if (filterDateRange) {
@@ -362,14 +363,26 @@ export default function TabTickets({ companyData, currentUser, viewerRole, baseP
     return s?.title || status.replace('_', ' ')
   }
 
+  const toggleSort = () => {
+    const order = sortOrder === 'desc' ? 'asc' : 'desc'
+    setSortOrder(order)
+    setCurrentPage(1)
+    fetchTickets(1, pageSize, order)
+  }
+
   const columns: ColumnsType<TicketRecord> = [
     {
-      title: '#',
+      title: (
+        <span
+          style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+          onClick={toggleSort}
+        >
+          # {sortOrder === 'asc' ? '↑' : '↓'}
+        </span>
+      ),
       dataIndex: 'id',
       key: 'id',
       width: 80,
-      sorter: true,
-      sortOrder: sortOrder === 'asc' ? 'ascend' : 'descend',
       render: (id: number) => (
         <Button
           type="link"
