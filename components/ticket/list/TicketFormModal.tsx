@@ -138,17 +138,16 @@ export default function TicketFormModal({
             <CommentWysiwyg
               ticketId={editingTicket?.id}
               placeholder="Ticket Description"
-              height="150px"
+              height="250px"
             />
           </Form.Item>
         )}
 
         {editingTicket && !showSimplifiedForm && (
-          <Form.Item name="short_note" label="Short Note" style={{ marginTop: 50 }}>
+          <Form.Item name="short_note" label="Short Note">
             <Input.TextArea placeholder="Short note (optional)" rows={2} allowClear />
           </Form.Item>
         )}
-        <br />
         {showAttachmentSection && (
           <Form.Item label="Attachments">
             <Flex vertical style={{ width: '100%' }}>
