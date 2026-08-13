@@ -13,6 +13,7 @@ export default async function ChangePasswordPage() {
       user={{
         id: session.user.id!,
         email: session.user.email ?? null,
+        role: (session.user as { role?: string }).role,
         user_metadata: { full_name: session.user.name },
       }}
     />
