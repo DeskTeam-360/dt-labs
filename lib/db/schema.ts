@@ -337,7 +337,7 @@ export const ticketComments = pgTable('ticket_comments', {
   /** Wall-clock time when the row was actually inserted into the DB. Never back-dated (unlike createdAt for email imports). Used for unread-dot logic. */
   receivedAt: ts('received_at').notNull().defaultNow(),
   /** Freshdesk conversation ID — used to dedup on re-import/resync. Null for comments created natively. */
-  fdConversationId: integer('fd_conversation_id').unique(),
+  fdConversationId: bigint('fd_conversation_id', { mode: 'number' }).unique(),
 })
 
 /** One saved AI summary per anchor (per comment, description, or ticket header). */
