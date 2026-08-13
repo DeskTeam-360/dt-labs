@@ -193,9 +193,16 @@ export async function POST(req: NextRequest) {
       const mappedTypeId = ft.type ? (FD_TYPE_MAP[ft.type] ?? null) : null
 
       await db.execute(sql`
-        INSERT INTO tickets (id, title, description, original_description, status, type_id, priority, company_id, contact_user_id, created_by, created_via, created_at, updated_at)
+        INSERT INTO tickets (id, title, description, original_description, status, type_id, priority, company_id, contact_user_id, created_by, created_via, source, created_at, updated_at)
         OVERRIDING SYSTEM VALUE
-        VALUES (${ft.id}, ${ft.subject?.trim() || '(no subject)'}, ${description}, ${descText}, ${mappedStatus}, ${mappedTypeId}, ${null}, ${companyId}::uuid, ${contactUserId}::uuid, ${contactUserId ?? adminUserId}::uuid, ${'freshdesk'}, ${new Date(ft.created_at).toISOString()}::timestamptz, ${new Date(ft.updated_at).toISOString()}::timestamptz)
+        VALUES (${ft.id}, ${ft.subject?.trim() || '(no subject)'}, ${description}, ${descText}, ${mappedStatus}, ${mappedTypeId}, ${null}, ${companyId}::uuid, ${contactUserId}::uuid, ${contactUserId ?? adminUserId}::uuid, ${'freshdesk'}, ${'freshdesk'}, ${new Date(ft.created_at).toISOString()}::timestamptz, ${new Date(ft.updated_at).toISOString()}::timestamptz)
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          status = EXCLUDED.status,
+          type_id = EXCLUDED.type_id,
+          source = 'freshdesk',
+          updated_at = EXCLUDED.updated_at
       `)
       result.tickets.imported++
 

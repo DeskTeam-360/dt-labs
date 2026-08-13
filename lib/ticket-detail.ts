@@ -354,6 +354,7 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
     project_statuses,
     created_at: t.createdAt ? new Date(t.createdAt).toISOString() : '',
     updated_at: t.updatedAt ? new Date(t.updatedAt).toISOString() : '',
+    source: t.source ?? null,
     gmail_thread_id: t.gmailThreadId,
     created_via: t.createdVia,
     last_read_at: (() => {

@@ -259,6 +259,8 @@ export const tickets = pgTable('tickets', {
   projectStatusId: integer('project_status_id').references(() => projectStatuses.id, {
     onDelete: 'set null',
   }),
+  /** Origin of the ticket: 'freshdesk' for imported tickets, null for natively created ones. */
+  source: varchar('source', { length: 32 }),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
