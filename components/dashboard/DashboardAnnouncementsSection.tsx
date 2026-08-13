@@ -1,7 +1,7 @@
 'use client'
 
 import { BellOutlined } from '@ant-design/icons'
-import { Card, Empty,List, Modal, Spin, Typography } from 'antd'
+import { Card, List, Modal, Spin, Typography } from 'antd'
 import { useCallback,useEffect, useState } from 'react'
 
 const { Text } = Typography
@@ -59,7 +59,7 @@ export default function DashboardAnnouncementsSection() {
     setDetail(null)
   }
 
-  if (!loading && items.length === 0) {
+  if (loading || items.length === 0) {
     return null
   }
 
@@ -75,15 +75,9 @@ export default function DashboardAnnouncementsSection() {
           </span>
         }
       >
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 16 }}>
-            <Spin />
-          </div>
-        ) : (
-          <List
+        <List
             size="small"
             dataSource={items}
-            locale={{ emptyText: <Empty description="No announcements" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
             renderItem={(item) => (
               <List.Item style={{ padding: '8px 0', borderBlockEnd: '1px solid var(--ticket-nav-panel-row-border, #f0f0f0)' }}>
                 <button
@@ -107,7 +101,6 @@ export default function DashboardAnnouncementsSection() {
               </List.Item>
             )}
           />
-        )}
       </Card>
 
       <Modal
