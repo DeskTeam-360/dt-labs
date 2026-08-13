@@ -383,7 +383,7 @@ export async function POST(req: NextRequest) {
               const commentText = conv.body_text?.trim() || bodyHtml.replace(/<[^>]+>/g, '').trim() || ''
               if (!bodyHtml && !commentText) { result.comments.skipped++; continue }
 
-              await db.insert(ticketComments).values({
+              const inserted = await db.insert(ticketComments).values({
                 ticketId: ft.id,
                 userId: commentUserId,
                 comment: bodyHtml || commentText,
@@ -391,9 +391,11 @@ export async function POST(req: NextRequest) {
                 authorType,
                 createdAt: new Date(conv.created_at),
                 receivedAt: new Date(conv.created_at),
-              })
+                fdConversationId: conv.id,
+              }).onConflictDoNothing({ target: [ticketComments.fdConversationId] }).returning({ id: ticketComments.id })
 
-              result.comments.imported++
+              if (inserted.length > 0) result.comments.imported++
+              else result.comments.skipped++
             } catch {
               result.comments.errors++
             }
