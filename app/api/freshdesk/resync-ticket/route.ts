@@ -1,9 +1,9 @@
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { isAdmin, isAdminOrManager } from '@/lib/auth-utils'
-import { db, ticketComments, tickets, users } from '@/lib/db'
+import { appSettings, db, ticketComments, tickets, users } from '@/lib/db'
 import { FD_STATUS_MAP, FD_TYPE_MAP } from '@/lib/freshdesk-maps'
 
 function freshdeskAuthHeader(apiKey: string) {
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const role = (session.user as { role?: string }).role?.toLowerCase() ?? ''
-  if (!isAdmin({ role }) && !isAdminOrManager({ role })) {
+  if (!isAdmin(role) && !isAdminOrManager(role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -74,13 +74,8 @@ export async function POST(req: NextRequest) {
   if (!ticketId) return NextResponse.json({ error: 'ticket_id required' }, { status: 400 })
 
   // Load FD credentials from app_settings
-  const settingsRows = await db.execute(
-    sql`SELECT key, value FROM app_settings WHERE key IN ('freshdesk_domain', 'freshdesk_api_key')`
-  )
-  const map: Record<string, string> = {}
-  for (const row of settingsRows.rows as { key: string; value: string }[]) {
-    map[row.key] = row.value
-  }
+  const settingsRows = await db.select().from(appSettings)
+  const map = Object.fromEntries(settingsRows.map((r) => [r.key, r.value ?? '']))
   const fdDomain = map['freshdesk_domain'] ?? ''
   const apiKey = map['freshdesk_api_key'] ?? ''
   if (!fdDomain || !apiKey) {
