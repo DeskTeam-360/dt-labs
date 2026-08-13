@@ -68,15 +68,22 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
   if (action === 'ticket_updated') {
     const parts: string[] = []
     const changes = m.changes
-    const entityLabels = m.entity_labels as { teams?: Record<string, string> } | undefined
+    const entityLabels = m.entity_labels as { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string> } | undefined
     const teamNames = entityLabels?.teams
+    const tagNames = entityLabels?.tags
+    const contactNames = entityLabels?.contacts
 
-    const formatTeamRef = (id: unknown): string => {
+    const resolveRef = (id: unknown, map?: Record<string, string>): string => {
       if (id == null || id === '') return 'None'
       const s = String(id)
-      const name = teamNames?.[s]
+      const name = map?.[s]
       if (name) return trunc(name.replace(/\s+/g, ' '))
       return str(id)
+    }
+
+    const resolveIds = (arr: unknown, map?: Record<string, string>): string => {
+      if (!Array.isArray(arr) || arr.length === 0) return 'None'
+      return arr.map((id) => resolveRef(id, map)).join(', ')
     }
 
     if (changes && typeof changes === 'object' && !Array.isArray(changes)) {
@@ -85,7 +92,11 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
           const ft = val as { from: unknown; to: unknown }
           const label = TICKET_FIELD_LABELS[key] ?? key
           if (key === 'teamId') {
-            parts.push(`${label}: ${formatTeamRef(ft.from)} → ${formatTeamRef(ft.to)}`)
+            parts.push(`${label}: ${resolveRef(ft.from, teamNames)} → ${resolveRef(ft.to, teamNames)}`)
+          } else if (key === 'tag_ids') {
+            parts.push(`${label}: ${resolveIds(ft.from, tagNames)} → ${resolveIds(ft.to, tagNames)}`)
+          } else if (key === 'contactUserId') {
+            parts.push(`${label}: ${resolveRef(ft.from, contactNames)} → ${resolveRef(ft.to, contactNames)}`)
           } else {
             parts.push(`${label}: ${formatScalarLabel(ft.from, key)} → ${formatScalarLabel(ft.to, key)}`)
           }

@@ -3,8 +3,9 @@ import { google } from 'googleapis'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
 import { db } from '@/lib/db'
-import { emailIntegrations, emailMessages, tickets } from '@/lib/db/schema'
+import { emailIntegrations, emailMessages, tickets, users } from '@/lib/db/schema'
 import { getObjectBuffer } from '@/lib/storage-idrive'
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -210,7 +211,21 @@ export async function POST(request: NextRequest) {
     }
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
-    const fromEmail = integration.emailAddress || 'noreply@example.com'
+    const fromEmailAddress = integration.emailAddress || 'noreply@example.com'
+
+    const agentUserId = (session.user as { id?: string }).id
+    const [appSettings, agentRow] = await Promise.all([
+      getAppSettings(),
+      agentUserId
+        ? db.select({ fullName: users.fullName }).from(users).where(eq(users.id, agentUserId)).limit(1).then(r => r[0] ?? null)
+        : Promise.resolve(null),
+    ])
+    const senderBaseName = appSettings.email_sender_name?.trim() || null
+    const agentName = agentRow?.fullName?.trim() || null
+    const displayName = senderBaseName && agentName
+      ? `${senderBaseName} - ${agentName}`
+      : senderBaseName || agentName || null
+    const fromEmail = formatFromHeader(displayName, fromEmailAddress)
 
     const [ticketRow] = await db
       .select({ gmailThreadId: tickets.gmailThreadId, title: tickets.title })

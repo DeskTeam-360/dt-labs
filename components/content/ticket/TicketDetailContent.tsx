@@ -1039,7 +1039,6 @@ export default function TicketDetailContent({
             message.success('Status updated')
             setDisplayTicket((prev: any) => ({ ...prev, status: newStatus }))
             bumpActivityRefresh()
-            router.refresh()
         } catch (err: unknown) {
             message.error(err instanceof Error ? err.message : 'Failed to update status')
         } finally {

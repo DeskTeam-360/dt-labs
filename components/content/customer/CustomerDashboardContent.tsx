@@ -420,7 +420,7 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
               
               
               {(data?.recent_tickets?.length ?? 0) > 0 ? (
-                <Flex vertical justify="center" align="center" gap={12}>
+                <Flex vertical justify="center" align="center" gap={12} style={{ marginTop: 12 }}>
                   {data!.recent_tickets.map((t) => (
                     <Flex key={t.id} justify="space-between" gap={12}
                       style={{
@@ -464,12 +464,6 @@ export default function CustomerDashboardContent({ user, withSidebar }: Customer
                             <ClockCircleOutlined style={{ fontSize: 12 }} />
                             Last Updated {dayjs(t.updated_at).format('MMM DD, YYYY')}
                           </span>
-                          {(t.total_time_seconds ?? 0) > 0 && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#13c2c2', fontWeight: 600 }}>
-                              <ClockCircleOutlined style={{ fontSize: 12 }} />
-                              {formatTime(t.total_time_seconds!)}
-                            </span>
-                          )}
                         </div>
                       </Flex>
                       <Flex justify="space-between" gap={12} align="center">

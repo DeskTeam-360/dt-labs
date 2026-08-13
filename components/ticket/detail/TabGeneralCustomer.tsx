@@ -168,6 +168,20 @@ export default function TabGeneralCustomer({
     statusOptions.find((s) => (s.title || '').trim().toLowerCase() === 'closed')?.slug ??
     null
   const canCloseTicket = Boolean(onStatusChange && closedStatusSlug && ticketData.status !== closedStatusSlug)
+  const isTicketClosed = closedStatusSlug && ticketData.status === closedStatusSlug
+  const openStatusSlug =
+    statusOptions.find((s) => s.slug === 'open')?.slug ??
+    statusOptions.find((s) => (s.title || '').trim().toLowerCase() === 'open')?.slug ??
+    'open'
+  const showReopenConfirm = () => {
+    Modal.confirm({
+      title: 'Reopen this ticket?',
+      centered: true,
+      okText: 'Yes, reopen ticket',
+      content: 'This will move the ticket back to open status so our team can continue working on it.',
+      onOk: () => onStatusChange?.(openStatusSlug),
+    })
+  }
   const showCloseTicketConfirm = () => {
     Modal.confirm({
       title: 'Close this ticket?',
@@ -589,6 +603,11 @@ export default function TabGeneralCustomer({
         {canCloseTicket ? (
           <Button type="primary" danger block loading={statusChanging} onClick={showCloseTicketConfirm}>
             Close this ticket
+          </Button>
+        ) : null}
+        {isTicketClosed ? (
+          <Button type="default" block loading={statusChanging} onClick={showReopenConfirm} style={{ marginTop: canCloseTicket ? 0 : 8 }}>
+            Reopen Ticket
           </Button>
         ) : null}
       </Col>

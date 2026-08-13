@@ -1053,13 +1053,11 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
   max-width: 100%;
 }
 
-/* Keep scroll + clip on the view so the inner <table> always matches its width */
+/* Clip on the view so the inner <table> always matches its width */
 .ticket-detail-sidebar-descriptions.ant-descriptions-bordered > .ant-descriptions-view {
   width: 100%;
   max-width: 100%;
-  max-height: calc(100vh - 120px);
   overflow-x: hidden;
-  overflow-y: auto;
   box-sizing: border-box;
 }
 

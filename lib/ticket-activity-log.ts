@@ -1,6 +1,6 @@
 import { eq, inArray } from 'drizzle-orm'
 
-import { db, teams, ticketActivityLog, ticketAssignees, tickets, ticketTags } from '@/lib/db'
+import { db, tags, teams, ticketActivityLog, ticketAssignees, tickets, ticketTags, users } from '@/lib/db'
 
 import type { TicketActivityAction } from './ticket-activity-actions'
 
@@ -111,29 +111,55 @@ export function diffTicketSnapshots(
   return changes
 }
 
-/** Resolve UUIDs in activity `changes` to display names (e.g. team) for ticket activity UI. */
+/** Resolve UUIDs in activity `changes` to display names for ticket activity UI. */
 export async function enrichActivityEntityLabels(
   changes: Record<string, { from: unknown; to: unknown }>
-): Promise<{ teams?: Record<string, string> }> {
-  const out: { teams?: Record<string, string> } = {}
+): Promise<{ teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string> }> {
+  const out: { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string> } = {}
+
+  // Teams
   const teamDelta = changes.teamId
-  if (!teamDelta) return out
-
-  const ids = new Set<string>()
-  if (teamDelta.from != null && teamDelta.from !== '') ids.add(String(teamDelta.from))
-  if (teamDelta.to != null && teamDelta.to !== '') ids.add(String(teamDelta.to))
-  if (ids.size === 0) return out
-
-  const rows = await db
-    .select({ id: teams.id, name: teams.name })
-    .from(teams)
-    .where(inArray(teams.id, [...ids]))
-
-  const map: Record<string, string> = {}
-  for (const r of rows) {
-    map[r.id] = (r.name?.trim() || r.id) as string
+  if (teamDelta) {
+    const ids = new Set<string>()
+    if (teamDelta.from != null && teamDelta.from !== '') ids.add(String(teamDelta.from))
+    if (teamDelta.to != null && teamDelta.to !== '') ids.add(String(teamDelta.to))
+    if (ids.size > 0) {
+      const rows = await db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, [...ids]))
+      const map: Record<string, string> = {}
+      for (const r of rows) map[r.id] = (r.name?.trim() || r.id) as string
+      out.teams = map
+    }
   }
-  out.teams = map
+
+  // Tags
+  const tagDelta = changes.tag_ids
+  if (tagDelta) {
+    const ids = new Set<string>()
+    for (const arr of [tagDelta.from, tagDelta.to]) {
+      if (Array.isArray(arr)) for (const id of arr) if (id) ids.add(String(id))
+    }
+    if (ids.size > 0) {
+      const rows = await db.select({ id: tags.id, name: tags.name }).from(tags).where(inArray(tags.id, [...ids]))
+      const map: Record<string, string> = {}
+      for (const r of rows) map[r.id] = (r.name?.trim() || r.id) as string
+      out.tags = map
+    }
+  }
+
+  // Contact
+  const contactDelta = changes.contactUserId
+  if (contactDelta) {
+    const ids = new Set<string>()
+    if (contactDelta.from != null && contactDelta.from !== '') ids.add(String(contactDelta.from))
+    if (contactDelta.to != null && contactDelta.to !== '') ids.add(String(contactDelta.to))
+    if (ids.size > 0) {
+      const rows = await db.select({ id: users.id, fullName: users.fullName, email: users.email }).from(users).where(inArray(users.id, [...ids]))
+      const map: Record<string, string> = {}
+      for (const r of rows) map[r.id] = (r.fullName?.trim() || r.email || r.id) as string
+      out.contacts = map
+    }
+  }
+
   return out
 }
 
