@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
   }).where(eq(tickets.id, ticketId))
 
   // Fetch & sync conversations
-  const result = { comments: { imported: 0, skipped: 0, errors: 0 } }
+  const result = { comments: { imported: 0, skipped: 0, errors: 0, firstError: '' } }
 
   // Build agent name map
   const fdAgentNameByEmail: Record<string, string> = {}
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
 
       if (inserted.length > 0) result.comments.imported++
       else result.comments.skipped++
-    } catch { result.comments.errors++ }
+    } catch (e) { result.comments.errors++; if (result.comments.errors === 1) result.comments.firstError = (e as Error).message }
   }
 
   return NextResponse.json({ ok: true, comments: result.comments, conversationsFetched: conversations.length, conversationsFetchError })
