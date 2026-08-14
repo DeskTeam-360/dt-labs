@@ -1536,6 +1536,7 @@ export async function POST(request: NextRequest) {
                 ticketTitle: title,
                 requesterEmailOverride: senderEmail,
                 inReplyToMessageId: rfcMessageId,
+                gmailThreadId: msgThreadId ?? null,
               })
               if (!sent && isDebug) {
                 debugLog.push({

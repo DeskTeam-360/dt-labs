@@ -22,6 +22,8 @@ export type SendRequesterTicketCreatedEmailParams = {
   requesterEmailOverride?: string | null
   /** RFC 822 Message-ID from the original customer email, used to thread the reply. */
   inReplyToMessageId?: string | null
+  /** Gmail thread ID from the original email, used to keep the notification in the same Gmail thread. */
+  gmailThreadId?: string | null
 }
 
 /**
@@ -31,7 +33,7 @@ export type SendRequesterTicketCreatedEmailParams = {
 export async function sendRequesterTicketCreatedEmail(
   params: SendRequesterTicketCreatedEmailParams
 ): Promise<boolean> {
-  const { creatorUserId, creatorRole, companyId, ticketId, ticketTitle, requesterEmailOverride, inReplyToMessageId } =
+  const { creatorUserId, creatorRole, companyId, ticketId, ticketTitle, requesterEmailOverride, inReplyToMessageId, gmailThreadId } =
     params
   const [creatorUser] = await db.select().from(users).where(eq(users.id, creatorUserId)).limit(1)
   const creatorRoleLower = (creatorRole || creatorUser?.role || '').toLowerCase()
@@ -205,9 +207,11 @@ export async function sendRequesterTicketCreatedEmail(
       .replace(/\//g, '_')
       .replace(/=+$/, '')
 
+    const requestBody: { raw: string; threadId?: string } = { raw }
+    if (gmailThreadId) requestBody.threadId = gmailThreadId
     await gmail.users.messages.send({
       userId: 'me',
-      requestBody: { raw },
+      requestBody,
     })
   }
 

@@ -80,19 +80,31 @@ async function getGmailSender(): Promise<GmailSender | null> {
   }
 }
 
-async function sendRawEmail(sender: GmailSender, to: string, subject: string, bodyHtml: string, fromHeader?: string) {
+async function sendRawEmail(
+  sender: GmailSender,
+  to: string,
+  subject: string,
+  bodyHtml: string,
+  fromHeader?: string,
+  opts?: { inReplyTo?: string | null; gmailThreadId?: string | null }
+) {
   const subjectMime = encodeSubjectHeader(subject)
-  const rawEmail = [
+  const lines = [
     `From: ${fromHeader ?? sender.fromEmail}`,
     `To: ${to}`,
     `Subject: ${subjectMime}`,
     'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=UTF-8',
-    '',
-    bodyHtml,
-  ].join('\r\n')
+  ]
+  if (opts?.inReplyTo) {
+    lines.push(`In-Reply-To: ${opts.inReplyTo}`)
+    lines.push(`References: ${opts.inReplyTo}`)
+  }
+  lines.push('Content-Type: text/html; charset=UTF-8', '', bodyHtml)
+  const rawEmail = lines.join('\r\n')
   const raw = Buffer.from(rawEmail).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-  await sender.gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+  const requestBody: { raw: string; threadId?: string } = { raw }
+  if (opts?.gmailThreadId) requestBody.threadId = opts.gmailThreadId
+  await sender.gmail.users.messages.send({ userId: 'me', requestBody })
 }
 
 /**
@@ -113,7 +125,7 @@ export async function sendAgentClosesTicketEmail(params: {
   if (!tpl || tpl.status !== 'active') return
 
   const [ticketRow] = await db
-    .select({ createdBy: tickets.createdBy, companyId: tickets.companyId })
+    .select({ createdBy: tickets.createdBy, companyId: tickets.companyId, gmailThreadId: tickets.gmailThreadId })
     .from(tickets)
     .where(eq(tickets.id, ticketId))
     .limit(1)
@@ -142,7 +154,7 @@ export async function sendAgentClosesTicketEmail(params: {
       `<p>Your ticket <strong>#${ticketId}: ${ticketTitle}</strong> has been closed.</p>` +
       `<p>View ticket: <a href="${ticketUrl}">${ticketUrl}</a></p>`
 
-  await sendRawEmail(gmailSender, recipient.email, subject, bodyHtml, fromHeader)
+  await sendRawEmail(gmailSender, recipient.email, subject, bodyHtml, fromHeader, { gmailThreadId: ticketRow.gmailThreadId })
 }
 
 /**
