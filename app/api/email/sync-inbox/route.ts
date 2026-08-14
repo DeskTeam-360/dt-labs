@@ -1535,6 +1535,7 @@ export async function POST(request: NextRequest) {
                 ticketId: newTicket.id,
                 ticketTitle: title,
                 requesterEmailOverride: senderEmail,
+                inReplyToMessageId: rfcMessageId,
               })
               if (!sent && isDebug) {
                 debugLog.push({

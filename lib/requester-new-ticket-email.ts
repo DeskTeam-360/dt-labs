@@ -20,6 +20,8 @@ export type SendRequesterTicketCreatedEmailParams = {
   ticketTitle: string
   /** Optional: notify this address (e.g. inbox sender) when it differs from stored user email. */
   requesterEmailOverride?: string | null
+  /** RFC 822 Message-ID from the original customer email, used to thread the reply. */
+  inReplyToMessageId?: string | null
 }
 
 /**
@@ -29,7 +31,7 @@ export type SendRequesterTicketCreatedEmailParams = {
 export async function sendRequesterTicketCreatedEmail(
   params: SendRequesterTicketCreatedEmailParams
 ): Promise<boolean> {
-  const { creatorUserId, creatorRole, companyId, ticketId, ticketTitle, requesterEmailOverride } =
+  const { creatorUserId, creatorRole, companyId, ticketId, ticketTitle, requesterEmailOverride, inReplyToMessageId } =
     params
   const [creatorUser] = await db.select().from(users).where(eq(users.id, creatorUserId)).limit(1)
   const creatorRoleLower = (creatorRole || creatorUser?.role || '').toLowerCase()
@@ -185,15 +187,17 @@ export async function sendRequesterTicketCreatedEmail(
       `<p>You can view your ticket here: <a href="${ticketUrl}">${ticketUrl}</a></p>`
 
     const bodyHtml = mergedTpl || fallbackHtml
-    const rawEmail = [
+    const rawEmailLines = [
       `From: ${fromHeader}`,
       `To: ${recipient.email}`,
       `Subject: ${subjectMime}`,
-      'MIME-Version: 1.0',
-      'Content-Type: text/html; charset=UTF-8',
-      '',
-      bodyHtml,
-    ].join('\r\n')
+    ]
+    if (inReplyToMessageId) {
+      rawEmailLines.push(`In-Reply-To: ${inReplyToMessageId}`)
+      rawEmailLines.push(`References: ${inReplyToMessageId}`)
+    }
+    rawEmailLines.push('MIME-Version: 1.0', 'Content-Type: text/html; charset=UTF-8', '', bodyHtml)
+    const rawEmail = rawEmailLines.join('\r\n')
 
     const raw = Buffer.from(rawEmail)
       .toString('base64')
