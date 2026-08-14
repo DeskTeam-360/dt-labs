@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm'
+import { and, asc, desc, eq, isNotNull, isNull } from 'drizzle-orm'
 import { google } from 'googleapis'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -236,7 +236,9 @@ export async function POST(request: NextRequest) {
     const subjectPlain = buildReplySubject(ticketIdNum, ticketTitle, ticketRow?.title)
     const subjectMime = encodeSubjectHeader(subjectPlain)
 
-    const [lastIncoming] = await db
+    // Use the FIRST incoming email's Message-ID for In-Reply-To so we always reply to
+    // the customer's original email (not a later Freshdesk or system notification).
+    const [firstIncoming] = await db
       .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId })
       .from(emailMessages)
       .where(
@@ -246,11 +248,11 @@ export async function POST(request: NextRequest) {
           isNotNull(emailMessages.rfcMessageId)
         )
       )
-      .orderBy(desc(emailMessages.syncedAt))
+      .orderBy(asc(emailMessages.syncedAt))
       .limit(1)
 
-    const threadId = ticketRow?.gmailThreadId || lastIncoming?.threadId || null
-    let inReplyTo = lastIncoming?.rfcMessageId || null
+    const threadId = ticketRow?.gmailThreadId || firstIncoming?.threadId || null
+    let inReplyTo = firstIncoming?.rfcMessageId || null
 
     if (threadId && !inReplyTo) {
       try {
