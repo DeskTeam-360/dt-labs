@@ -811,7 +811,29 @@ export async function POST(request: NextRequest) {
           isFromCc = allCc.some((e) => e?.trim() && normalizeForMatch(e.trim()) === senderNorm)
         }
 
-        if (!senderMatchesCompany && !isFromCc) {
+        // Also allow reply if sender is a registered user belonging to the ticket's company
+        let isCompanyMember = false
+        if (!senderMatchesCompany && !isFromCc && ticketRow.companyId) {
+          const [memberRow] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(and(ilike(users.email, escapeIlike(senderEmail)), eq(users.companyId, ticketRow.companyId)))
+            .limit(1)
+          if (memberRow) isCompanyMember = true
+        }
+        // Also allow if sender is the contact user on the ticket
+        let isTicketContact = false
+        if (!senderMatchesCompany && !isFromCc && !isCompanyMember) {
+          const [contactRow] = await db
+            .select({ id: tickets.id })
+            .from(tickets)
+            .innerJoin(users, eq(tickets.contactUserId, users.id))
+            .where(and(eq(tickets.id, ticketId), ilike(users.email, escapeIlike(senderEmail))))
+            .limit(1)
+          if (contactRow) isTicketContact = true
+        }
+
+        if (!senderMatchesCompany && !isFromCc && !isCompanyMember && !isTicketContact) {
           skippedCompanyMismatch++
           if (isDebug) {
             debugLog.push({ email: senderEmail, subject: subject || '', reason: `SKIP: company_mismatch (ticket company email: ${companyEmail || 'null'})` })
@@ -821,7 +843,7 @@ export async function POST(request: NextRequest) {
         }
 
         let commentUserId = userId
-        if (senderMatchesCompany) {
+        if (senderMatchesCompany || isCompanyMember || isTicketContact) {
           const [companyUser] = await db
             .select({ id: users.id })
             .from(users)
