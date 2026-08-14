@@ -332,13 +332,9 @@ export async function POST(request: NextRequest) {
       .replace(/=+$/, '')
 
     const requestBody: { raw: string; threadId?: string } = { raw }
-    /**
-     * If both threadId and In-Reply-To are sent, Gmail often keeps the *conversation* subject from
-     * the first message in the thread, so "Re: Ticket #n …" never appears in the inbox UI.
-     * Prefer threading via In-Reply-To / References only when we have a Message-ID to reply to.
-     * When there is no In-Reply-To, pass threadId so follow-ups stay in the same Gmail thread.
-     */
-    if (threadId && !inReplyTo) {
+    // threadId is required by the Gmail API to place the sent message into the correct thread.
+    // In-Reply-To/References headers handle threading in the recipient's email client.
+    if (threadId) {
       requestBody.threadId = threadId
     }
 
