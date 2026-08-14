@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, isNull } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, isNotNull, isNull } from 'drizzle-orm'
 import { google } from 'googleapis'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -227,8 +227,9 @@ export async function POST(request: NextRequest) {
     let subjectPlain = ''
     let subjectMime = ''
 
-    // Use the FIRST incoming email's Message-ID and subject for In-Reply-To so we always
-    // reply to the customer's original email with the same subject (Gmail threads by both).
+    // Find the first email FROM the customer (recipientEmail) to get the correct Message-ID
+    // for In-Reply-To. Freshdesk notification emails also land as 'incoming' with their own
+    // Amazon SES Message-IDs which the customer never received — we must exclude them.
     const [firstIncoming] = await db
       .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId })
       .from(emailMessages)
@@ -236,7 +237,8 @@ export async function POST(request: NextRequest) {
         and(
           eq(emailMessages.ticketId, ticketIdNum),
           eq(emailMessages.direction, 'incoming'),
-          isNotNull(emailMessages.rfcMessageId)
+          isNotNull(emailMessages.rfcMessageId),
+          ilike(emailMessages.fromEmail, `%${recipientEmail}%`)
         )
       )
       .orderBy(asc(emailMessages.syncedAt))
