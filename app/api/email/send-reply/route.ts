@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
     // Use the FIRST incoming email's Message-ID and subject for In-Reply-To so we always
     // reply to the customer's original email with the same subject (Gmail threads by both).
     const [firstIncoming] = await db
-      .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId, subject: emailMessages.subject })
+      .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId })
       .from(emailMessages)
       .where(
         and(
@@ -245,11 +245,10 @@ export async function POST(request: NextRequest) {
     const threadId = ticketRow?.gmailThreadId || firstIncoming?.threadId || null
     let inReplyTo = firstIncoming?.rfcMessageId || null
 
-    // Use the original customer subject (preserving the thread subject in their inbox).
-    // Strip leading Re:/Fwd: from stored subject then re-add a single "Re:" prefix.
-    const originalSubject = firstIncoming?.subject?.trim() || ''
-    const strippedOriginal = originalSubject.replace(/^(Re:|Fwd:|Fw:)\s*/gi, '').trim()
-    subjectPlain = strippedOriginal ? `Re: ${strippedOriginal}` : buildReplySubject(ticketIdNum, ticketTitle, ticketRow?.title)
+    // Use ticket title as subject with Re: prefix — it matches the original customer email
+    // subject (set by sync-inbox on ticket creation) and keeps Gmail threading intact.
+    const baseTitle = (ticketRow?.title || ticketTitle || '').trim().replace(/^(Re:|Fwd:|Fw:)\s*/gi, '').trim()
+    subjectPlain = baseTitle ? `Re: ${baseTitle}` : `Re: Ticket #${ticketIdNum}`
     subjectMime = encodeSubjectHeader(subjectPlain)
 
     if (threadId && !inReplyTo) {
