@@ -223,13 +223,14 @@ export async function POST(request: NextRequest) {
       .where(eq(tickets.id, ticketIdNum))
       .limit(1)
 
-    const subjectPlain = buildReplySubject(ticketIdNum, ticketTitle, ticketRow?.title)
-    const subjectMime = encodeSubjectHeader(subjectPlain)
+    // Subject is resolved after firstIncoming is fetched below — placeholder here.
+    let subjectPlain = ''
+    let subjectMime = ''
 
-    // Use the FIRST incoming email's Message-ID for In-Reply-To so we always reply to
-    // the customer's original email (not a later Freshdesk or system notification).
+    // Use the FIRST incoming email's Message-ID and subject for In-Reply-To so we always
+    // reply to the customer's original email with the same subject (Gmail threads by both).
     const [firstIncoming] = await db
-      .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId })
+      .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId, subject: emailMessages.subject })
       .from(emailMessages)
       .where(
         and(
@@ -243,6 +244,13 @@ export async function POST(request: NextRequest) {
 
     const threadId = ticketRow?.gmailThreadId || firstIncoming?.threadId || null
     let inReplyTo = firstIncoming?.rfcMessageId || null
+
+    // Use the original customer subject (preserving the thread subject in their inbox).
+    // Strip leading Re:/Fwd: from stored subject then re-add a single "Re:" prefix.
+    const originalSubject = firstIncoming?.subject?.trim() || ''
+    const strippedOriginal = originalSubject.replace(/^(Re:|Fwd:|Fw:)\s*/gi, '').trim()
+    subjectPlain = strippedOriginal ? `Re: ${strippedOriginal}` : buildReplySubject(ticketIdNum, ticketTitle, ticketRow?.title)
+    subjectMime = encodeSubjectHeader(subjectPlain)
 
     if (threadId && !inReplyTo) {
       try {
