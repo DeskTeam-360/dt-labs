@@ -247,10 +247,8 @@ export async function POST(request: NextRequest) {
     const threadId = ticketRow?.gmailThreadId || firstIncoming?.threadId || null
     let inReplyTo = firstIncoming?.rfcMessageId || null
 
-    // Use ticket title as subject with Re: prefix — it matches the original customer email
-    // subject (set by sync-inbox on ticket creation) and keeps Gmail threading intact.
-    const baseTitle = (ticketRow?.title || ticketTitle || '').trim().replace(/^(Re:|Fwd:|Fw:)\s*/gi, '').trim()
-    subjectPlain = baseTitle ? `Re: ${baseTitle}` : `Re: Ticket #${ticketIdNum}`
+    const rawTitle = (ticketRow?.title || ticketTitle || '').trim()
+    subjectPlain = rawTitle ? `${rawTitle} #${ticketIdNum}` : `Ticket #${ticketIdNum}`
     subjectMime = encodeSubjectHeader(subjectPlain)
 
     if (threadId && !inReplyTo) {
