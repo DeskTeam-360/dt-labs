@@ -1545,6 +1545,7 @@ export async function POST(request: NextRequest) {
                 requesterEmailOverride: senderEmail,
                 inReplyToMessageId: rfcMessageId,
                 gmailThreadId: msgThreadId ?? null,
+                originalEmailBody: body || null,
               })
               if (!notifResult.sent && isDebug) {
                 debugLog.push({
@@ -1552,6 +1553,25 @@ export async function POST(request: NextRequest) {
                   subject: title,
                   reason: 'WARN: requester_notification_new_ticket_created not sent (see server log)',
                 })
+              }
+              // Save the sent notification to email_messages so send-reply can use its
+              // RFC Message-ID as In-Reply-To (threading all agent replies to this notification).
+              if (notifResult.sent && notifResult.sentGmailMessageId) {
+                try {
+                  await db.insert(emailMessages).values({
+                    gmailMessageId: notifResult.sentGmailMessageId,
+                    threadId: notifResult.sentThreadId ?? null,
+                    fromEmail: senderEmail,
+                    toEmail: senderEmail,
+                    subject: title,
+                    snippet: null,
+                    ticketId: newTicket.id,
+                    direction: 'outgoing',
+                    ...(notifResult.sentRfcMessageId && { rfcMessageId: notifResult.sentRfcMessageId }),
+                  })
+                } catch {
+                  // Non-fatal — email was sent, only record-keeping failed
+                }
               }
             } catch (mailErr) {
               console.error(

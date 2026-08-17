@@ -227,25 +227,42 @@ export async function POST(request: NextRequest) {
     let subjectPlain = ''
     let subjectMime = ''
 
-    // Find the first email FROM the customer (recipientEmail) to get the correct Message-ID
-    // for In-Reply-To. Freshdesk notification emails also land as 'incoming' with their own
-    // Amazon SES Message-IDs which the customer never received — we must exclude them.
-    const [firstIncoming] = await db
+    // Agent replies thread to the notification email we sent when the ticket was created.
+    // This keeps all replies in the same thread as the customer's original email (the notification
+    // was sent as a reply to the customer's email, so they share a threadId).
+    const [notificationEmail] = await db
       .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId })
       .from(emailMessages)
       .where(
         and(
           eq(emailMessages.ticketId, ticketIdNum),
-          eq(emailMessages.direction, 'incoming'),
-          isNotNull(emailMessages.rfcMessageId),
-          ilike(emailMessages.fromEmail, `%${recipientEmail}%`)
+          eq(emailMessages.direction, 'outgoing'),
+          isNotNull(emailMessages.rfcMessageId)
         )
       )
       .orderBy(asc(emailMessages.syncedAt))
       .limit(1)
 
-    const threadId = ticketRow?.gmailThreadId || firstIncoming?.threadId || null
-    let inReplyTo = firstIncoming?.rfcMessageId || null
+    // Fallback: if no outgoing notification exists (e.g. ticket created via portal),
+    // use the first incoming email from the customer.
+    const [firstIncoming] = notificationEmail
+      ? [undefined]
+      : await db
+          .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId })
+          .from(emailMessages)
+          .where(
+            and(
+              eq(emailMessages.ticketId, ticketIdNum),
+              eq(emailMessages.direction, 'incoming'),
+              isNotNull(emailMessages.rfcMessageId),
+              ilike(emailMessages.fromEmail, `%${recipientEmail}%`)
+            )
+          )
+          .orderBy(asc(emailMessages.syncedAt))
+          .limit(1)
+
+    const threadId = ticketRow?.gmailThreadId || notificationEmail?.threadId || firstIncoming?.threadId || null
+    let inReplyTo = notificationEmail?.rfcMessageId || firstIncoming?.rfcMessageId || null
 
     const rawTitle = (ticketRow?.title || ticketTitle || '').trim()
     subjectPlain = rawTitle || `Ticket #${ticketIdNum}`

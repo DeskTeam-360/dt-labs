@@ -24,17 +24,19 @@ export type SendRequesterTicketCreatedEmailParams = {
   inReplyToMessageId?: string | null
   /** Gmail thread ID from the original email, used to keep the notification in the same Gmail thread. */
   gmailThreadId?: string | null
+  /** Original customer email body (HTML or plain text) to include as a quote in the notification. */
+  originalEmailBody?: string | null
 }
 
 /**
  * Sends requester_notification_new_ticket_created via active Gmail integration.
- * Returns { sent: false } when skipped, or { sent: true, sentThreadId } with the Gmail thread ID
- * of the sent message so callers can persist it on the ticket for reply matching.
+ * Returns { sent: false } when skipped, or { sent: true, sentThreadId, sentGmailMessageId, sentRfcMessageId }
+ * so callers can persist the thread ID and use the sent message as In-Reply-To for agent replies.
  */
 export async function sendRequesterTicketCreatedEmail(
   params: SendRequesterTicketCreatedEmailParams
-): Promise<{ sent: boolean; sentThreadId?: string | null }> {
-  const { creatorUserId, creatorRole, companyId, ticketId, ticketTitle, requesterEmailOverride, inReplyToMessageId, gmailThreadId } =
+): Promise<{ sent: boolean; sentThreadId?: string | null; sentGmailMessageId?: string | null; sentRfcMessageId?: string | null }> {
+  const { creatorUserId, creatorRole, companyId, ticketId, ticketTitle, requesterEmailOverride, inReplyToMessageId, gmailThreadId, originalEmailBody } =
     params
   const [creatorUser] = await db.select().from(users).where(eq(users.id, creatorUserId)).limit(1)
   const creatorRoleLower = (creatorRole || creatorUser?.role || '').toLowerCase()
@@ -189,7 +191,14 @@ export async function sendRequesterTicketCreatedEmail(
       `<p><strong>Ticket #${ticketId}</strong>: ${ticketTitle}</p>` +
       `<p>You can view your ticket here: <a href="${ticketUrl}">${ticketUrl}</a></p>`
 
-    const bodyHtml = mergedTpl || fallbackHtml
+    const notifBody = mergedTpl || fallbackHtml
+
+    // Append the customer's original email as a blockquote so agents see the full context.
+    const quoteHtml = originalEmailBody?.trim()
+      ? `<br><hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0"><blockquote style="margin:0 0 0 8px;padding-left:12px;border-left:3px solid #ccc;color:#555">${originalEmailBody.trim()}</blockquote>`
+      : ''
+
+    const bodyHtml = notifBody + quoteHtml
     const rawEmailLines = [
       `From: ${fromHeader}`,
       `To: ${recipient.email}`,
@@ -214,8 +223,30 @@ export async function sendRequesterTicketCreatedEmail(
       userId: 'me',
       requestBody,
     })
-    // Return the thread ID from the first sent message so callers can persist it on the ticket.
-    return { sent: true, sentThreadId: sendRes.data.threadId ?? null }
+
+    const sentGmailMessageId = sendRes.data.id ?? null
+    const sentThreadId = sendRes.data.threadId ?? null
+
+    // Fetch the RFC Message-ID of the sent notification so agent replies can use it as In-Reply-To.
+    let sentRfcMessageId: string | null = null
+    if (sentGmailMessageId) {
+      try {
+        const msgRes = await gmail.users.messages.get({
+          userId: 'me',
+          id: sentGmailMessageId,
+          format: 'metadata',
+          metadataHeaders: ['Message-ID'],
+        })
+        const msgIdHeader = (msgRes.data.payload?.headers || []).find(
+          (h: { name: string; value: string }) => h.name.toLowerCase() === 'message-id'
+        )
+        sentRfcMessageId = msgIdHeader?.value?.trim() ?? null
+      } catch {
+        // Non-fatal — threading degrades gracefully
+      }
+    }
+
+    return { sent: true, sentThreadId, sentGmailMessageId, sentRfcMessageId }
   }
 
   return { sent: true }
