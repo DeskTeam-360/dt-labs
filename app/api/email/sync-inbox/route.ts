@@ -1563,7 +1563,7 @@ export async function POST(request: NextRequest) {
                     threadId: notifResult.sentThreadId ?? null,
                     fromEmail: senderEmail,
                     toEmail: senderEmail,
-                    subject: title,
+                    subject: notifResult.sentSubject ?? title,
                     snippet: null,
                     ticketId: newTicket.id,
                     direction: 'outgoing',

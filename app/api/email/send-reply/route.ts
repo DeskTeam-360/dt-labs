@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
     // This keeps all replies in the same thread as the customer's original email (the notification
     // was sent as a reply to the customer's email, so they share a threadId).
     const [notificationEmail] = await db
-      .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId })
+      .select({ rfcMessageId: emailMessages.rfcMessageId, threadId: emailMessages.threadId, subject: emailMessages.subject })
       .from(emailMessages)
       .where(
         and(
@@ -264,8 +264,10 @@ export async function POST(request: NextRequest) {
     const threadId = ticketRow?.gmailThreadId || notificationEmail?.threadId || firstIncoming?.threadId || null
     let inReplyTo = notificationEmail?.rfcMessageId || firstIncoming?.rfcMessageId || null
 
+    // Use the notification email's subject so Gmail groups the reply in the same conversation.
+    // Fall back to raw ticket title if no notification subject is stored.
     const rawTitle = (ticketRow?.title || ticketTitle || '').trim()
-    subjectPlain = rawTitle || `Ticket #${ticketIdNum}`
+    subjectPlain = notificationEmail?.subject?.trim() || rawTitle || `Ticket #${ticketIdNum}`
     subjectMime = encodeSubjectHeader(subjectPlain)
 
     if (threadId && !inReplyTo) {

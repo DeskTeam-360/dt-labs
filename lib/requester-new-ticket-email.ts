@@ -35,7 +35,7 @@ export type SendRequesterTicketCreatedEmailParams = {
  */
 export async function sendRequesterTicketCreatedEmail(
   params: SendRequesterTicketCreatedEmailParams
-): Promise<{ sent: boolean; sentThreadId?: string | null; sentGmailMessageId?: string | null; sentRfcMessageId?: string | null }> {
+): Promise<{ sent: boolean; sentThreadId?: string | null; sentGmailMessageId?: string | null; sentRfcMessageId?: string | null; sentSubject?: string | null }> {
   const { creatorUserId, creatorRole, companyId, ticketId, ticketTitle, requesterEmailOverride, inReplyToMessageId, gmailThreadId, originalEmailBody } =
     params
   const [creatorUser] = await db.select().from(users).where(eq(users.id, creatorUserId)).limit(1)
@@ -246,7 +246,7 @@ export async function sendRequesterTicketCreatedEmail(
       }
     }
 
-    return { sent: true, sentThreadId, sentGmailMessageId, sentRfcMessageId }
+    return { sent: true, sentThreadId, sentGmailMessageId, sentRfcMessageId, sentSubject: subject }
   }
 
   return { sent: true }
