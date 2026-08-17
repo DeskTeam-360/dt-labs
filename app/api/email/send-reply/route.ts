@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
     let inReplyTo = firstIncoming?.rfcMessageId || null
 
     const rawTitle = (ticketRow?.title || ticketTitle || '').trim()
-    subjectPlain = rawTitle ? `${rawTitle} #${ticketIdNum}` : `Ticket #${ticketIdNum}`
+    subjectPlain = rawTitle || `Ticket #${ticketIdNum}`
     subjectMime = encodeSubjectHeader(subjectPlain)
 
     if (threadId && !inReplyTo) {

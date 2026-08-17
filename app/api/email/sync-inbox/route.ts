@@ -694,6 +694,14 @@ export async function POST(request: NextRequest) {
         continue
       }
 
+      // Skip emails sent FROM the support Gmail itself (e.g. "Ticket Received" notifications
+      // that land back in the inbox when the customer email equals the integration email).
+      if (integration.emailAddress && senderEmail === integration.emailAddress.toLowerCase().trim()) {
+        alreadyProcessed.add(gmailMessageId)
+        if (isDebug) debugLog.push({ email: senderEmail, subject: subject || '', reason: 'SKIP: sent from own support email (self-loop)' })
+        continue
+      }
+
       const textBodies = extractEmailTextBodies(msg.payload || {})
       const body = (textBodies.html || textBodies.plain || '').trim()
       const rfcMessageId = getHeader('Message-ID')?.trim() || null
