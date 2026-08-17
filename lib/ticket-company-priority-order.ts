@@ -44,6 +44,7 @@ async function loadCompanySupportTicketRows(dbTx: TicketPriorityDbExecutor, comp
     .where(
       omitTicketId !== undefined ? and(...conditions, ne(tickets.id, omitTicketId)) : and(...conditions)
     )
+    .for('update')
   return q
 }
 
@@ -64,6 +65,7 @@ async function loadCreatorSupportTicketRows(
     .where(
       omitTicketId !== undefined ? and(...conditions, ne(tickets.id, omitTicketId)) : and(...conditions)
     )
+    .for('update')
 }
 
 /** Open support ticket belongs to a company queue or a creator-only (no company) queue. */

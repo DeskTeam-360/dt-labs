@@ -49,37 +49,44 @@ export async function POST(req: NextRequest) {
 
   for (const rule of due) {
     try {
-      // Create ticket
-      const [newTicket] = await db
-        .insert(tickets)
-        .values({
-          title: rule.title,
-          description: rule.description ?? null,
-          status: rule.ticketStatus ?? 'open',
-          priority: rule.ticketPriority || null,
-          teamId: rule.teamId ?? null,
-          companyId: rule.companyId ?? null,
-          typeId: rule.ticketTypeId ?? null,
-          visibility: rule.visibility ?? 'team',
-          createdBy: rule.createdBy ?? null,
-          contactUserId: rule.contactUserId ?? null,
-          createdVia: 'recurring',
-          ticketType: 'support',
-        })
-        .returning({ id: tickets.id })
+      const desiredRank = parseCompanyTicketDesiredRank(rule.ticketPriority ?? 0)
+      let newTicket: { id: number } | undefined
+
+      await db.transaction(async (tx) => {
+        // Create ticket
+        const [row] = await tx
+          .insert(tickets)
+          .values({
+            title: rule.title,
+            description: rule.description ?? null,
+            status: rule.ticketStatus ?? 'open',
+            priority: rule.companyId ? null : (rule.ticketPriority || null),
+            teamId: rule.teamId ?? null,
+            companyId: rule.companyId ?? null,
+            typeId: rule.ticketTypeId ?? null,
+            visibility: rule.visibility ?? 'team',
+            createdBy: rule.createdBy ?? null,
+            contactUserId: rule.contactUserId ?? null,
+            createdVia: 'recurring',
+            ticketType: 'support',
+          })
+          .returning({ id: tickets.id })
+
+        if (!row) throw new Error('Failed to insert ticket')
+
+        // Assign company support queue rank inside same transaction (FOR UPDATE serializes concurrent runs)
+        const scope = await resolveSupportQueueScope(tx, row.id)
+        if (scope) {
+          if (scope.kind === 'company') {
+            await assignCompanySupportTicketRank(tx, scope.companyId, row.id, desiredRank)
+          } else {
+            await assignCreatorSupportTicketRank(tx, scope.userId, row.id, desiredRank)
+          }
+        }
+        newTicket = row
+      })
 
       if (!newTicket) throw new Error('Failed to insert ticket')
-
-      // Assign company support queue rank (append to end if priority=0/null)
-      const desiredRank = parseCompanyTicketDesiredRank(rule.ticketPriority ?? 0)
-      const scope = await resolveSupportQueueScope(db, newTicket.id)
-      if (scope) {
-        if (scope.kind === 'company') {
-          await assignCompanySupportTicketRank(db, scope.companyId, newTicket.id, desiredRank)
-        } else {
-          await assignCreatorSupportTicketRank(db, scope.userId, newTicket.id, desiredRank)
-        }
-      }
 
       // Compute next run
       const schedule = {
