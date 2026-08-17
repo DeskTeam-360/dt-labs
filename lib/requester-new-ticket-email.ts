@@ -28,11 +28,12 @@ export type SendRequesterTicketCreatedEmailParams = {
 
 /**
  * Sends requester_notification_new_ticket_created via active Gmail integration.
- * Returns false when skipped (no recipients, missing OAuth, or no integration).
+ * Returns { sent: false } when skipped, or { sent: true, sentThreadId } with the Gmail thread ID
+ * of the sent message so callers can persist it on the ticket for reply matching.
  */
 export async function sendRequesterTicketCreatedEmail(
   params: SendRequesterTicketCreatedEmailParams
-): Promise<boolean> {
+): Promise<{ sent: boolean; sentThreadId?: string | null }> {
   const { creatorUserId, creatorRole, companyId, ticketId, ticketTitle, requesterEmailOverride, inReplyToMessageId, gmailThreadId } =
     params
   const [creatorUser] = await db.select().from(users).where(eq(users.id, creatorUserId)).limit(1)
@@ -72,7 +73,7 @@ export async function sendRequesterTicketCreatedEmail(
     console.warn(
       `[requester-new-ticket-email] skip ticket #${ticketId}: no recipient email (creator=${creatorUserId})`
     )
-    return false
+    return { sent: false }
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
@@ -82,7 +83,7 @@ export async function sendRequesterTicketCreatedEmail(
     console.warn(
       `[requester-new-ticket-email] skip ticket #${ticketId}: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set`
     )
-    return false
+    return { sent: false }
   }
 
   const [integration] = await db
@@ -101,7 +102,7 @@ export async function sendRequesterTicketCreatedEmail(
     console.warn(
       `[requester-new-ticket-email] skip ticket #${ticketId}: no active Google email integration`
     )
-    return false
+    return { sent: false }
   }
 
   const oauth2Client = new google.auth.OAuth2(
@@ -153,7 +154,7 @@ export async function sendRequesterTicketCreatedEmail(
     console.warn(
       `[requester-new-ticket-email] skip ticket #${ticketId}: template ${REQUESTER_NEW_TICKET_TEMPLATE_KEY} not active`
     )
-    return false
+    return { sent: false }
   }
 
   let companyName: string | null = null
@@ -209,11 +210,13 @@ export async function sendRequesterTicketCreatedEmail(
 
     const requestBody: { raw: string; threadId?: string } = { raw }
     if (gmailThreadId) requestBody.threadId = gmailThreadId
-    await gmail.users.messages.send({
+    const sendRes = await gmail.users.messages.send({
       userId: 'me',
       requestBody,
     })
+    // Return the thread ID from the first sent message so callers can persist it on the ticket.
+    return { sent: true, sentThreadId: sendRes.data.threadId ?? null }
   }
 
-  return true
+  return { sent: true }
 }

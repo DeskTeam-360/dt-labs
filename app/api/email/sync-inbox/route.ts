@@ -1528,7 +1528,7 @@ export async function POST(request: NextRequest) {
 
           if (creatorUserId) {
             try {
-              const sent = await sendRequesterTicketCreatedEmail({
+              const notifResult = await sendRequesterTicketCreatedEmail({
                 creatorUserId,
                 creatorRole: 'customer',
                 companyId: ticketCompanyId,
@@ -1538,7 +1538,7 @@ export async function POST(request: NextRequest) {
                 inReplyToMessageId: rfcMessageId,
                 gmailThreadId: msgThreadId ?? null,
               })
-              if (!sent && isDebug) {
+              if (!notifResult.sent && isDebug) {
                 debugLog.push({
                   email: senderEmail,
                   subject: title,
