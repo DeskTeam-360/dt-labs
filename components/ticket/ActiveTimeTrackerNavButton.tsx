@@ -108,7 +108,8 @@ export default function ActiveTimeTrackerNavButton() {
     }
   }
 
-  if (status !== 'authenticated' || !userId) return null
+  const role = (session?.user as { role?: string } | undefined)?.role?.toLowerCase()
+  if (status !== 'authenticated' || !userId || role === 'customer') return null
 
   const running = activeTrackers.length > 0
   const primaryElapsed =
