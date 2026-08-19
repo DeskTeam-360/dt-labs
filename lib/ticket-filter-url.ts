@@ -13,6 +13,8 @@ export const URL_PARAMS = {
   date_from: 'date_from',
   date_to: 'date_to',
   due_date_from: 'due_date_from',
+  /** Marker added when navigating from a saved preset so all filters are reset, not just those present in the URL. */
+  preset: 'preset',
   due_date_to: 'due_date_to',
   search: 'search',
   view: 'view',
@@ -31,6 +33,8 @@ const URL_UI_ONLY_KEYS = new Set<string>([
   URL_PARAMS.order,
   /** Visibility filter removed from UI; legacy param ignored so old bookmarks don't lock the query. */
   URL_PARAMS.visibility,
+  /** Preset marker — only used for navigation signaling, not a real filter. */
+  URL_PARAMS.preset,
 ])
 
 /** True if the URL has params that affect the ticket list query (not view/sort/order/sidebar alone). */
@@ -44,6 +48,11 @@ export function hasUrlFilterParams(searchParams: URLSearchParams): boolean {
 /** True if any known ticket URL param is present (initial parse / bookmarks). */
 export function canParseTicketsUrl(searchParams: URLSearchParams): boolean {
   return Array.from(Object.values(URL_PARAMS)).some((key) => searchParams.has(key))
+}
+
+/** True if this URL was generated from a saved preset (should reset all filters, not just those present). */
+export function isPresetUrl(searchParams: URLSearchParams): boolean {
+  return searchParams.get(URL_PARAMS.preset) === '1'
 }
 
 /** Read sidebar open state from URL (`sidebar=0` = expanded). `null` = param absent. */
@@ -72,7 +81,7 @@ export function parseFiltersFromUrl(
   searchParams: URLSearchParams,
   opts?: { isCustomer?: boolean }
 ): ParsedUrlFilters | null {
-  if (!canParseTicketsUrl(searchParams)) return null
+  if (!canParseTicketsUrl(searchParams) && !isPresetUrl(searchParams)) return null
   const isCustomer = opts?.isCustomer ?? false
   const split = (s: string | null) => (s ? s.split(',').map((x) => x.trim()).filter(Boolean) : [])
   const status = split(searchParams.get(URL_PARAMS.status))
@@ -169,6 +178,8 @@ export function buildSearchStringFromFilters(state: {
     p.set(URL_PARAMS.due_date_to, state.filterDueDateRange[1].toISOString())
   }
   if (state.filterSearch.trim()) p.set(URL_PARAMS.search, state.filterSearch.trim())
+  // Always include preset marker so useTicketsData knows to apply all fields (including empty ones = "all").
+  p.set(URL_PARAMS.preset, '1')
   /** Ticket order is not persisted in the URL - always ascending priority via the API. */
   /** Sidebar open/closed is kept in localStorage only - syncing it to the URL triggered full URL re-parse and reset filters. */
   return p.toString()

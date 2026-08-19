@@ -607,7 +607,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
 
     applyingFromUrlRef.current = true
 
-    if (hasUrlFilterParams(searchParams)) {
+    if (hasUrlFilterParams(searchParams) || searchParams.get(URL_PARAMS.preset) === '1') {
       let parsed = parseFiltersFromUrl(searchParams, { isCustomer })
       if (!parsed) {
         applyingFromUrlRef.current = false
@@ -658,6 +658,18 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         setFilterSearch(parsed.filterSearch)
         setViewMode(parsed.viewMode)
         setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
+        setFilterTicketType(parsed.filterTicketType ?? null)
+      } else if (searchParams.get(URL_PARAMS.preset) === '1') {
+        // Saved preset navigation: apply ALL fields so absent params (= "all") correctly reset state.
+        applyStatusFromParsed()
+        setFilterTypeIds(parsed.filterTypeIds)
+        setFilterCompanyIds(parsed.filterCompanyIds)
+        setFilterTagIds(parsed.filterTagIds)
+        setFilterTeamIds(parsed.filterTeamIds)
+        setFilterDateRange(parsed.filterDateRange)
+        setFilterDueDateRange(parsed.filterDueDateRange ?? null)
+        setFilterSearch(parsed.filterSearch)
+        setViewMode(parsed.viewMode)
         setFilterTicketType(parsed.filterTicketType ?? null)
       } else {
         /** Only apply fields actually present in the URL. `view` alone (without `status`) used to make parsed.filterStatus [] and overwrite state → unnecessary refetch. */
