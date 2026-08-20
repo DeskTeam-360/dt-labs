@@ -263,9 +263,16 @@ export async function POST(req: NextRequest) {
             .limit(1)
 
           if (existingTicket.length > 0) {
+            // Ticket exists — sync updated_at and status from FD, then continue to process comments below.
+            await db.execute(sql`
+              UPDATE tickets
+              SET updated_at = ${new Date(ft.updated_at).toISOString()}::timestamptz,
+                  status = ${FD_STATUS_MAP[ft.status] ?? 'open'}
+              WHERE id = ${ft.id}
+            `)
             result.tickets.skipped++
-            continue
-          }
+            // Fall through to conversation sync (do not `continue` here).
+          } else {
 
           // Resolve requester → our user UUID; verify it exists to avoid FK violation
           let contactUserId: string | null = fdContactIdToOurUserId[ft.requester_id] ?? null
@@ -297,6 +304,7 @@ export async function POST(req: NextRequest) {
               status, type_id, priority, company_id,
               contact_user_id, created_by,
               created_via, source,
+              visibility,
               created_at, updated_at
             )
             OVERRIDING SYSTEM VALUE
@@ -313,12 +321,14 @@ export async function POST(req: NextRequest) {
               ${createdBy}::uuid,
               ${'freshdesk'},
               ${'freshdesk'},
+              ${'public'},
               ${new Date(ft.created_at).toISOString()}::timestamptz,
               ${new Date(ft.updated_at).toISOString()}::timestamptz
             )
           `)
 
           result.tickets.imported++
+          } // end else (new ticket)
 
           // — Conversations (comments) —
           let conversations: FreshdeskConversation[] = []
@@ -333,7 +343,7 @@ export async function POST(req: NextRequest) {
 
           for (const conv of conversations) {
             try {
-              // Resolve user: from_email → DB lookup → create placeholder (never fall back to admin)
+              // Resolve user: from_email → DB lookup → create placeholder
               let commentUserId = adminUserId
               const fromEmail = conv.from_email?.trim().toLowerCase()
               if (fromEmail) {
@@ -342,11 +352,34 @@ export async function POST(req: NextRequest) {
                 } else {
                   const found = await db.select({ id: users.id, role: users.role })
                     .from(users).where(eq(users.email, fromEmail)).limit(1)
-                  if (found.length > 0 && found[0].role !== 'admin') {
+                  if (found.length > 0) {
+                    // Use any existing user (including admin accounts) — do not fall back to a wrong user
                     commentUserId = found[0].id
                     emailToUserId[fromEmail] = found[0].id
-                  } else if (found.length === 0 && !conv.incoming) {
-                    // Agent reply → inactive placeholder with FD- prefix
+                  } else if (conv.incoming) {
+                    // Customer not in DB yet → create a customer placeholder so the comment isn't attributed to an agent
+                    try {
+                      const displayName = fromEmail.split('@')[0] || 'Customer'
+                      const [ins] = await db.insert(users).values({
+                        email: fromEmail, fullName: displayName,
+                        firstName: displayName, lastName: null,
+                        role: 'customer', status: 'active',
+                        companyId: ourCompanyId,
+                      }).returning({ id: users.id })
+                      if (ins) {
+                        commentUserId = ins.id
+                        emailToUserId[fromEmail] = ins.id
+                        if (ourCompanyId) {
+                          await db.insert(companyUsers).values({ companyId: ourCompanyId, userId: ins.id, companyRole: 'member' }).onConflictDoNothing()
+                        }
+                      }
+                    } catch { /* conflict — retry lookup */ }
+                    if (commentUserId === adminUserId) {
+                      const retry = await db.select({ id: users.id }).from(users).where(eq(users.email, fromEmail)).limit(1)
+                      if (retry.length > 0) { commentUserId = retry[0].id; emailToUserId[fromEmail] = retry[0].id }
+                    }
+                  } else {
+                    // Agent reply not in DB → inactive placeholder with FD- prefix
                     const agentName = fdAgentNameByEmail[fromEmail]
                     const fullName = agentName ? `FD - ${agentName}` : `FD - ${fromEmail}`
                     const nameParts = fullName.split(' ')
@@ -355,25 +388,29 @@ export async function POST(req: NextRequest) {
                       firstName: nameParts[0], lastName: nameParts.slice(1).join(' ') || null,
                       role: 'agent', status: 'inactive',
                     }).returning({ id: users.id })
-                    commentUserId = ins.id
-                    emailToUserId[fromEmail] = ins.id
+                    if (ins) { commentUserId = ins.id; emailToUserId[fromEmail] = ins.id }
                   }
-                  // Unknown customer email or admin found → fall through to company fallback below
                 }
               }
 
-              // If still on adminUserId and it's a customer comment → use first customer in this company
-              if (commentUserId === adminUserId && conv.incoming && ourCompanyId) {
-                if (companyFallbackUserId) {
-                  commentUserId = companyFallbackUserId
-                } else {
-                  const firstCustomer = await db.select({ id: users.id })
-                    .from(users)
-                    .where(and(eq(users.companyId, ourCompanyId), eq(users.role, 'customer')))
-                    .limit(1)
-                  if (firstCustomer.length > 0) {
-                    companyFallbackUserId = firstCustomer[0].id
-                    commentUserId = firstCustomer[0].id
+              // Last resort: if still admin and customer comment, use ticket contact or first company customer
+              if (commentUserId === adminUserId && conv.incoming) {
+                const [ticketContactRow] = await db.select({ contactUserId: tickets.contactUserId })
+                  .from(tickets).where(eq(tickets.id, ft.id)).limit(1)
+                if (ticketContactRow?.contactUserId) {
+                  commentUserId = ticketContactRow.contactUserId
+                } else if (ourCompanyId) {
+                  if (companyFallbackUserId) {
+                    commentUserId = companyFallbackUserId
+                  } else {
+                    const firstCustomer = await db.select({ id: users.id })
+                      .from(users)
+                      .where(and(eq(users.companyId, ourCompanyId), eq(users.role, 'customer')))
+                      .limit(1)
+                    if (firstCustomer.length > 0) {
+                      companyFallbackUserId = firstCustomer[0].id
+                      commentUserId = firstCustomer[0].id
+                    }
                   }
                 }
               }

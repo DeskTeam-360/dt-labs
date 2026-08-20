@@ -247,6 +247,7 @@ export default function TicketDetailContent({
     const [newAttributeValue, setNewAttributeValue] = useState('')
     const [editingDescription, setEditingDescription] = useState(false)
     const editingDescriptionRef = useRef(false)
+    const sidebarSavingRef = useRef(false)
     useEffect(() => {
         editingDescriptionRef.current = editingDescription
     }, [editingDescription])
@@ -1049,6 +1050,8 @@ export default function TicketDetailContent({
     const handleSaveSidebarAttributes = async (d: SidebarAttributesDraft) => {
         const tid = displayTicket?.id
         if (tid == null) return
+        if (sidebarSavingRef.current) return
+        sidebarSavingRef.current = true
 
         const useProjectBoard =
             displayTicket?.ticket_type === 'project' &&
@@ -1169,6 +1172,7 @@ export default function TicketDetailContent({
             message.error(e instanceof Error ? e.message : 'Failed to save ticket attributes')
         } finally {
             setSidebarAttributesSaving(false)
+            sidebarSavingRef.current = false
         }
     }
 

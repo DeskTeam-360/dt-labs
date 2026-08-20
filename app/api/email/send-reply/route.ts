@@ -53,22 +53,6 @@ function encodeSubjectHeader(subject: string): string {
   return '=?UTF-8?B?' + Buffer.from(subject, 'utf8').toString('base64') + '?='
 }
 
-/**
- * Build reply subject with ticket id first (after Re:) so inbox lists show e.g. "Re: Ticket #214 - …".
- * Plain "Ticket #n" (no brackets) tends to stay visible in threaded views better than "[Ticket #n]".
- */
-function buildReplySubject(ticketId: number, ticketTitleFromClient: string | undefined, titleFromDb: string | null | undefined): string {
-  const lead = `Ticket #${ticketId}`
-  const merged =
-    (typeof ticketTitleFromClient === 'string' ? ticketTitleFromClient.trim() : '') ||
-    (typeof titleFromDb === 'string' ? titleFromDb.trim() : '') ||
-    ''
-  let titlePart = merged.replace(/^(Re:\s*|Fwd:\s*|Fw:\s*)+/gi, '').trim()
-  titlePart = titlePart.replace(new RegExp(`^\\s*\\[Ticket\\s*#${ticketId}\\]\\s*`, 'i'), '').trim()
-  titlePart = titlePart.replace(new RegExp(`^\\s*Ticket\\s*#\\s*${ticketId}\\s*[-–—:]?\\s*`, 'i'), '').trim()
-  if (!titlePart) return `Re: ${lead}`
-  return `Re: ${lead} - ${titlePart}`
-}
 
 async function loadAttachmentBytes(a: IncomingAttachment): Promise<{
   buffer: Buffer
