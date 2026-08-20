@@ -30,7 +30,7 @@ jobs:
       NEXTAUTH_URL: http://127.0.0.1:3000
       DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?sslmode=disable
       NEXT_PUBLIC_APP_NAME: Deskteam360
-      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'https://ticket.deskteam360.com' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
