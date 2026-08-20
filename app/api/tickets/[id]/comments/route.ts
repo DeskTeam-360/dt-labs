@@ -95,7 +95,9 @@ async function sendAgentRequesterRepliesEmail(params: {
   const safeBase = baseUrl.replace(/\/$/, '')
   const ticketUrl = `${safeBase}/tickets/${ticketId}`
   const defaultSubject = `Requester replied on Ticket #${ticketId}`
-  const subject = tpl.emailSubject?.trim() || defaultSubject
+  const subject = (tpl.emailSubject?.trim() || defaultSubject)
+    .replace(/\{\{\s*ticket_id\s*\}\}/g, String(ticketId))
+    .replace(/\{\{\s*ticket\s*\}\}/g, `#${ticketId}`)
   const subjectMime = encodeSubjectHeader(subject)
 
   const clientId = process.env.GOOGLE_CLIENT_ID

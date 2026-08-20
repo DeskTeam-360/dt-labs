@@ -1606,7 +1606,7 @@ export default function TicketDetailContent({
                                                     Mark as support
                                                 </Button>
                                             )}
-                                            {displayTicket?.source === 'freshdesk' && (
+                                            {displayTicket?.source === 'freshdesk' && (currentUser as { role?: string }).role?.toLowerCase() !== 'customer' && (
                                                 <Button
                                                     icon={<ReloadOutlined />}
                                                     loading={resyncLoading}

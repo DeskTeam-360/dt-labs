@@ -9,6 +9,7 @@ import type { AutomationActions } from '@/lib/automation-actions-types'
 
 type ActionType =
   | 'team_id'
+  | 'company_id'
   | 'priority'
   | 'status_slug'
   | 'ticket_type'
@@ -17,6 +18,7 @@ type ActionType =
   | 'add_checklist_items'
 
 interface LookupData {
+  companies: { id: string; name: string }[]
   teams: { id: string; name: string }[]
   ticketTypes: { id: number; title: string; slug: string; color?: string }[]
   ticketPriorities: { id: number; title: string; slug: string; color?: string }[]
@@ -34,6 +36,7 @@ const TICKET_CLASSIFICATION_OPTIONS = [
 
 const ACTION_LABELS: Record<ActionType, string> = {
   team_id: 'Assign to Team',
+  company_id: 'Set Company',
   priority: 'Set Priority (number)',
   status_slug: 'Set Status',
   ticket_type: 'Set classification (spam / trash)',
@@ -64,6 +67,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
 
   const ORDERED_ACTION_KEYS: ActionType[] = [
     'team_id',
+    'company_id',
     'priority',
     'status_slug',
     'ticket_type',
@@ -133,6 +137,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
   const availableToAdd = (
     [
       'team_id',
+      'company_id',
       'priority',
       'status_slug',
       'ticket_type',
@@ -200,6 +205,20 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                     value={(actions as Record<string, unknown>).team_id}
                     onChange={(v) => update('team_id', v)}
                     options={lookup.teams.map((t) => ({ value: t.id, label: t.name }))}
+                  />
+                )}
+                {type === 'company_id' && (
+                  <Select
+                    allowClear
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    placeholder="Select company"
+                    style={{ width: '100%' }}
+                    value={(actions as Record<string, unknown>).company_id}
+                    onChange={(v) => update('company_id', v)}
+                    options={lookup.companies.map((c) => ({ value: c.id, label: c.name }))}
                   />
                 )}
                 {type === 'priority' && (

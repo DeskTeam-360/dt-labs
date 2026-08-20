@@ -324,11 +324,10 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
                     options={[
                       { value: 'ticket_created', label: 'Ticket Created' },
                       { value: 'ticket_updated', label: 'Ticket Updated' },
-                      {
-                        value: 'ticket_comment_added',
-                        label: 'New reply or note (thread / email / internal note)',
-                      },
-                      { value: 'time_trigger', label: 'Time Trigger (not wired yet)' },
+                      { value: 'ticket_reply_added', label: 'New Reply (thread / email / client note)' },
+                      { value: 'ticket_note_added', label: 'New Internal Note' },
+                      { value: 'ticket_comment_added', label: 'New Reply or Note (any)' },
+                      { value: 'time_trigger', label: 'Time Trigger (cron-based)' },
                     ]}
                   />
                 </Form.Item>

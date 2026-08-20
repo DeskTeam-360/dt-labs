@@ -62,13 +62,13 @@ export const CONDITION_FIELDS: Field[] = [
   { name: 'subject', label: 'Subject (ticket title)' },
   { name: 'description', label: 'Description' },
   { name: 'priority', label: 'Priority (bilangan bulat)' },
-  // { name: 'status', label: 'Status', valueEditorType: 'select', values: [
-  //   { name: 'pending', label: 'Pending' },
-  //   { name: 'open', label: 'Open' },
-  //   { name: 'in_progress', label: 'In Progress' },
-  //   { name: 'resolved', label: 'Resolved' },
-  //   { name: 'closed', label: 'Closed' },
-  // ]},
+  { name: 'status', label: 'Status', valueEditorType: 'select', values: [
+    { name: 'pending', label: 'Pending' },
+    { name: 'open', label: 'Open' },
+    { name: 'in_progress', label: 'In Progress' },
+    { name: 'resolved', label: 'Resolved' },
+    { name: 'closed', label: 'Closed' },
+  ]},
   { name: 'sender_domain', label: 'Sender Domain' },
   { name: 'sender_email', label: 'Sender Email' },
   // { name: 'assignee_id', label: 'Assignee ID' },
@@ -84,6 +84,7 @@ export const CONDITION_FIELDS: Field[] = [
     { name: 'spam', label: 'Spam' },
     { name: 'trash', label: 'Trash' },
   ]},
+  { name: 'days_since_updated', label: 'Days since last updated', inputType: 'number' },
   { name: 'comment_author_type', label: 'Comment author', valueEditorType: 'select', values: [
     { name: 'agent', label: 'Agent / staff' },
     { name: 'customer', label: 'Customer' },
@@ -97,7 +98,22 @@ interface ConditionBuilderProps {
 }
 
 export default function ConditionBuilder({ value, onChange = () => {} }: ConditionBuilderProps) {
-  const fields = CONDITION_FIELDS
+  const [statuses, setStatuses] = useState<{ name: string; label: string }[]>([])
+
+  useEffect(() => {
+    fetch('/api/tickets/lookup', { credentials: 'include' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (Array.isArray(data?.statuses)) {
+          setStatuses(data.statuses.map((s: { slug: string; title: string }) => ({ name: s.slug, label: s.title })))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const fields: Field[] = CONDITION_FIELDS.map((f) =>
+    f.name === 'status' && statuses.length > 0 ? { ...f, values: statuses } : f
+  )
 
   const [query, setQuery] = useState<RuleGroupType>(() => {
     const v = value as OurConditionGroup | undefined

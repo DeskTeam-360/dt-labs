@@ -19,6 +19,8 @@ export interface AutomationActions {
   tag_ids?: string[]
   /** @deprecated UI removed; engine still applies legacy rules */
   visibility?: string
+  /** Assign ticket to this company (uuid) */
+  company_id?: string
   /** Add an automatic note (comment) to the ticket — shown as "Automation", no user picker */
   add_note?: string
   /** @deprecated Optional: if set, the note is attributed to this user; engine default uses a placeholder */

@@ -8,6 +8,7 @@ import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import { db } from '@/lib/db'
 import {
   automationRules,
+  companies,
   teams,
   ticketAssignees,
   ticketChecklist,
@@ -62,12 +63,16 @@ export interface TicketContext {
   comment_visibility?: string | null
   /** Set for event ticket_comment_added: agent | customer | automation */
   comment_author_type?: string | null
+  /** Days since ticket was last updated (for time_trigger rules) */
+  days_since_updated?: number | null
 }
 
 export type AutomationEventType =
   | 'ticket_created'
   | 'ticket_updated'
   | 'ticket_comment_added'
+  | 'ticket_reply_added'
+  | 'ticket_note_added'
 
 function isLeaf(c: OurCondition): c is OurConditionLeaf {
   return !('conditions' in c) || !Array.isArray((c as OurConditionGroup).conditions)
@@ -125,6 +130,23 @@ function evalLeaf(leaf: OurConditionLeaf, ctx: TicketContext): boolean {
         if (slug) return slug === expectStr
         return String(ctx.priority ?? '').toLowerCase() === expectStr
       }
+    }
+  }
+
+  // Numeric comparison for days_since_updated
+  if (field === 'days_since_updated') {
+    const actual = ctx.days_since_updated ?? null
+    if (actual === null) return false
+    const expected = Number(expectVal)
+    if (!Number.isFinite(expected)) return false
+    switch (op) {
+      case '>': return actual > expected
+      case '>=': return actual >= expected
+      case '<': return actual < expected
+      case '<=': return actual <= expected
+      case '=': return actual === expected
+      case '!=': return actual !== expected
+      default: return actual > expected
     }
   }
 
@@ -270,11 +292,14 @@ export async function runTicketCommentAutomation(
   if (comment.authorType === 'automation') return
   const base = await loadAutomationTicketContext(ticketId)
   if (!base) return
-  await runAutomationRules('ticket_comment_added', {
+  const ctx = {
     ...base,
     comment_visibility: comment.visibility ?? 'reply',
     comment_author_type: comment.authorType ?? 'agent',
-  })
+  }
+  const isNote = comment.visibility === 'note'
+  await runAutomationRules('ticket_comment_added', ctx)
+  await runAutomationRules(isNote ? 'ticket_note_added' : 'ticket_reply_added', ctx)
 }
 
 export async function runAutomationRules(
@@ -353,6 +378,10 @@ export async function runAutomationRules(
     if (actions.team_id) {
       const [tm] = await db.select({ id: teams.id }).from(teams).where(eq(teams.id, actions.team_id)).limit(1)
       if (tm) updates.teamId = tm.id
+    }
+    if (actions.company_id) {
+      const [co] = await db.select({ id: companies.id }).from(companies).where(eq(companies.id, actions.company_id)).limit(1)
+      if (co) updates.companyId = co.id
     }
     if (actions.visibility) {
       updates.visibility = actions.visibility

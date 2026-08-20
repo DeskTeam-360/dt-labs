@@ -456,7 +456,6 @@ export default function TicketSearchNavbar({
             gap: 8,
             flex: 1,
             minWidth: 0,
-            maxWidth: 480,
           }}
         >
           <Text style={{ fontSize: 11, flexShrink: 0, textTransform: 'uppercase', letterSpacing: 0.03, color: 'var(--ticket-nav-muted)' }}>
