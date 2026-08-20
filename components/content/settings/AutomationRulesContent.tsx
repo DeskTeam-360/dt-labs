@@ -73,6 +73,7 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
   const [rules, setRules] = useState<AutomationRuleRecord[]>([])
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(false)
+  const [searchText, setSearchText] = useState('')
   const [modalVisible, setModalVisible] = useState(false)
   const [editingRule, setEditingRule] = useState<AutomationRuleRecord | null>(null)
   const [form] = Form.useForm()
@@ -282,15 +283,26 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
                 <ThunderboltOutlined style={{ marginRight: 8 }} />
                 Automation Rules
               </Title>
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                Add Rule
-              </Button>
+              <Space>
+                <Input.Search
+                  placeholder="Search by name…"
+                  allowClear
+                  style={{ width: 220 }}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                />
+                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                  Add Rule
+                </Button>
+              </Space>
             </div>
             <Table
               rowKey="id"
               loading={loading}
               columns={columns}
-              dataSource={rules}
+              dataSource={rules.filter((r) =>
+                !searchText || (r.name ?? '').toLowerCase().includes(searchText.toLowerCase())
+              )}
               pagination={{ pageSize: 20 }}
             />
 

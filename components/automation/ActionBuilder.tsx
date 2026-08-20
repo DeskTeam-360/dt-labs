@@ -10,6 +10,7 @@ import type { AutomationActions } from '@/lib/automation-actions-types'
 type ActionType =
   | 'team_id'
   | 'company_id'
+  | 'assignee_ids'
   | 'priority'
   | 'status_slug'
   | 'ticket_type'
@@ -37,6 +38,7 @@ const TICKET_CLASSIFICATION_OPTIONS = [
 const ACTION_LABELS: Record<ActionType, string> = {
   team_id: 'Assign to Team',
   company_id: 'Set Company',
+  assignee_ids: 'Assign to Agent(s)',
   priority: 'Set Priority (number)',
   status_slug: 'Set Status',
   ticket_type: 'Set classification (spam / trash)',
@@ -68,6 +70,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
   const ORDERED_ACTION_KEYS: ActionType[] = [
     'team_id',
     'company_id',
+    'assignee_ids',
     'priority',
     'status_slug',
     'ticket_type',
@@ -106,7 +109,9 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
 
   const addAction = (type: ActionType) => {
     const next = { ...actions }
-    if (type === 'tag_ids') {
+    if (type === 'assignee_ids') {
+      ;(next as Record<string, unknown>).assignee_ids = []
+    } else if (type === 'tag_ids') {
       ;(next as Record<string, unknown>).tag_ids = []
     } else if (type === 'add_note') {
       ;(next as Record<string, unknown>).add_note = ''
@@ -131,6 +136,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
       delete (next as Record<string, unknown>).add_note_user_id
     }
     if (type === 'add_checklist_items') delete (next as Record<string, unknown>).add_checklist_items
+    if (type === 'assignee_ids') delete (next as Record<string, unknown>).assignee_ids
     onChange(next as AutomationActions)
   }
 
@@ -138,6 +144,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
     [
       'team_id',
       'company_id',
+      'assignee_ids',
       'priority',
       'status_slug',
       'ticket_type',
@@ -219,6 +226,23 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                     value={(actions as Record<string, unknown>).company_id}
                     onChange={(v) => update('company_id', v)}
                     options={lookup.companies.map((c) => ({ value: c.id, label: c.name }))}
+                  />
+                )}
+                {type === 'assignee_ids' && (
+                  <Select
+                    mode="multiple"
+                    allowClear
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    placeholder="Select agent(s)"
+                    style={{ width: '100%' }}
+                    value={(actions as Record<string, unknown>).assignee_ids as string[] | undefined}
+                    onChange={(v) => update('assignee_ids', v?.length ? v : undefined)}
+                    options={(lookup.users ?? [])
+                      .filter((u) => u.id)
+                      .map((u) => ({ value: u.id, label: u.full_name || u.email || u.id }))}
                   />
                 )}
                 {type === 'priority' && (

@@ -15,9 +15,11 @@ import {
   Button,
   Drawer,
   Empty,
+  Input,
   Layout,
   message,
   Modal,
+  Select,
   Space,
   Switch,
   Table,
@@ -98,6 +100,9 @@ export default function RecurringTicketsContent({ user }: Props) {
   const [rows, setRows] = useState<RecurringTicketRow[]>([])
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
+  const [filterCompany, setFilterCompany] = useState<string | undefined>(undefined)
+  const [filterTitle, setFilterTitle] = useState('')
   const [editing, setEditing] = useState<RecurringTicketRow | null>(null)
   const [runsDrawer, setRunsDrawer] = useState<RecurringTicketRow | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
@@ -119,6 +124,10 @@ export default function RecurringTicketsContent({ user }: Props) {
 
   useEffect(() => {
     fetchRules()
+    fetch('/api/companies', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j) => setCompanies(j?.data ?? []))
+      .catch(() => {})
   }, [fetchRules])
 
   const handleToggle = async (row: RecurringTicketRow, active: boolean) => {
@@ -319,6 +328,25 @@ export default function RecurringTicketsContent({ user }: Props) {
               <Text type="secondary">Automatically create tickets on a recurring schedule.</Text>
             </div>
             <Space>
+              <Input.Search
+                placeholder="Search by title…"
+                allowClear
+                style={{ width: 200 }}
+                value={filterTitle}
+                onChange={(e) => setFilterTitle(e.target.value)}
+              />
+              <Select
+                allowClear
+                showSearch
+                placeholder="Filter by company"
+                style={{ width: 200 }}
+                value={filterCompany}
+                onChange={setFilterCompany}
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                options={companies.map((c) => ({ value: c.id, label: c.name }))}
+              />
               <Button icon={<ReloadOutlined />} onClick={fetchRules} loading={loading} />
               <Button
                 type="primary"
@@ -331,7 +359,11 @@ export default function RecurringTicketsContent({ user }: Props) {
           </div>
 
           <Table
-            dataSource={rows}
+            dataSource={rows.filter((r) => {
+              if (filterCompany && r.companyId !== filterCompany) return false
+              if (filterTitle && !r.title.toLowerCase().includes(filterTitle.toLowerCase())) return false
+              return true
+            })}
             columns={columns}
             rowKey="id"
             loading={loading}

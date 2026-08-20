@@ -21,6 +21,8 @@ export interface AutomationActions {
   visibility?: string
   /** Assign ticket to this company (uuid) */
   company_id?: string
+  /** Assign these agents to the ticket (array of user uuids) */
+  assignee_ids?: string[]
   /** Add an automatic note (comment) to the ticket — shown as "Automation", no user picker */
   add_note?: string
   /** @deprecated Optional: if set, the note is attributed to this user; engine default uses a placeholder */

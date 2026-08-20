@@ -448,6 +448,21 @@ export async function runAutomationRules(
       }
     }
 
+    if (actions.assignee_ids?.length) {
+      const existing = await db
+        .select({ userId: ticketAssignees.userId })
+        .from(ticketAssignees)
+        .where(eq(ticketAssignees.ticketId, ctx.id))
+      const existingIds = new Set(existing.map((r) => r.userId))
+      const toAdd = actions.assignee_ids.filter((id) => !existingIds.has(id))
+      if (toAdd.length > 0) {
+        await db.insert(ticketAssignees).values(
+          toAdd.map((userId) => ({ ticketId: ctx.id, userId }))
+        ).onConflictDoNothing()
+        requestBump()
+      }
+    }
+
     if (beforeAuto) {
       const afterAuto = await loadTicketActivitySnapshot(ctx.id)
       if (afterAuto) {

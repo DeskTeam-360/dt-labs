@@ -33,7 +33,7 @@ interface FilterSidebarProps {
   onFilterDueDateRangeChange: (dates: [Dayjs | null, Dayjs | null] | null) => void
   filterSearch: string
   onFilterSearchChange: (v: string) => void
-  allStatuses: { slug: string; title: string }[]
+  allStatuses: { slug: string; title: string; is_active?: boolean }[]
   ticketTypes: Array<{ id: number; title: string; color: string }>
   teams: Array<{ id: string; name: string }>
   companies: Array<{ id: string; name: string }>
@@ -136,7 +136,7 @@ export default function FilterSidebar({
                 style={{ width: '100%' }}
                 value={filterStatus}
                 onChange={(v) => onFilterStatusChange(v ?? [])}
-                options={allStatuses.map((s) => ({
+                options={allStatuses.filter((s) => s.is_active !== false).map((s) => ({
                   value: s.slug,
                   label: ticketStatusDisplayLabel(s),
                 }))}
