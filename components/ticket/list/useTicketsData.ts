@@ -515,7 +515,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         setStatusColumns(
           activeList.filter(inKanban).map((s) => ({ id: s.slug, title: statusTitle(s), color: s.color }))
         )
-        setAllStatusColumns(list.map((s) => ({ id: s.slug, title: statusTitle(s), color: s.color })))
+        setAllStatusColumns(activeList.map((s) => ({ id: s.slug, title: statusTitle(s), color: s.color })))
         setAllStatuses(
           list.map((s) => ({
             slug: s.slug,
