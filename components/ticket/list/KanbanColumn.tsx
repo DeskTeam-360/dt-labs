@@ -23,8 +23,10 @@ interface KanbanColumnProps {
   tickets: TicketRecord[]
   dragDisabled?: boolean
   canDeleteTicket?: boolean
+  isCustomer?: boolean
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
+  onCloseTicket?: (id: number) => void
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
   allStatusColumns?: StatusColumn[]
@@ -38,8 +40,10 @@ export default function KanbanColumn({
   tickets,
   dragDisabled = false,
   canDeleteTicket = false,
+  isCustomer = false,
   onEdit,
   onDelete,
+  onCloseTicket,
   sortBy = TICKETS_LIST_SORT_BY,
   sortOrder = TICKETS_LIST_SORT_ORDER,
   allStatusColumns,
@@ -127,8 +131,10 @@ export default function KanbanColumn({
                   ticket={ticket}
                   dragDisabled={dragDisabled}
                   canDeleteTicket={canDeleteTicket}
+                  isCustomer={isCustomer}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  onCloseTicket={onCloseTicket}
                   allStatusColumns={allStatusColumns}
                   onFilterByStatus={onFilterByStatus}
                   onFilterByTag={onFilterByTag}

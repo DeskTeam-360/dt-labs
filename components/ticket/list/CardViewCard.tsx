@@ -125,7 +125,7 @@ export default function CardViewCard({
           </Tag>
         )}
         {ticket.team_name && (
-          <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>Team {ticket.team_name}</Tag>
+          <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>{ticket.team_name}</Tag>
         )}
         {ticket.type && (
           <Tag

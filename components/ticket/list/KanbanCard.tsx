@@ -1,6 +1,6 @@
 'use client'
 
-import { CommentOutlined, DeleteOutlined, EditOutlined, FieldTimeOutlined, FlagOutlined, MoreOutlined, RobotOutlined, SyncOutlined, UserOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, CommentOutlined, DeleteOutlined, EditOutlined, FieldTimeOutlined, FlagOutlined, MoreOutlined, RobotOutlined, SyncOutlined, UserOutlined } from '@ant-design/icons'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Avatar, Button, Card, Dropdown, Flex, Modal, Tag, Tooltip, Typography } from 'antd'
@@ -20,8 +20,10 @@ interface KanbanCardProps {
   ticket: TicketRecord
   dragDisabled?: boolean
   canDeleteTicket?: boolean
+  isCustomer?: boolean
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
+  onCloseTicket?: (id: number) => void
   onFilterByStatus?: (statusSlug: string) => void
   onFilterByTag?: (tagId: string) => void
   onFilterByCompany?: (companyId: string) => void
@@ -32,8 +34,10 @@ export default function KanbanCard({
   ticket,
   dragDisabled = false,
   canDeleteTicket = false,
+  isCustomer = false,
   onEdit,
   onDelete,
+  onCloseTicket,
   onFilterByStatus,
   onFilterByTag,
   onFilterByCompany,
@@ -101,21 +105,8 @@ export default function KanbanCard({
                 P{ticket.priority}
               </Tag>
             )}
-            {ticket.visibility !== 'team' && (
-              <Tag
-                style={kanbanTagStyle({
-                  ...(ticket.visibility === 'public' ? { fillHex: KANBAN_SEMANTIC_GREEN } : { neutral: true }),
-                })}
-              >
-                {ticket.visibility === 'specific_users' || ticket.visibility === 'private'
-                  ? 'Private'
-                  : ticket.visibility === 'public'
-                    ? 'Public'
-                    : (ticket.visibility as string).toUpperCase()}
-              </Tag>
-            )}
-            {ticket.team_name && (
-              <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>Team {ticket.team_name}</Tag>
+            {!isCustomer && ticket.team_name && (
+              <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>{ticket.team_name}</Tag>
             )}
             {ticket.type && (
               <Tag
@@ -126,7 +117,7 @@ export default function KanbanCard({
                 {ticket.type.title}
               </Tag>
             )}
-            {ticket.company && (
+            {!isCustomer && ticket.company && (
               <Tag
                 style={kanbanTagStyle({
                   ...(ticket.company.color ? { fillHex: ticket.company.color } : { neutral: true }),
@@ -173,46 +164,78 @@ export default function KanbanCard({
               </Tag>
             )}
           </Flex>
-          <Dropdown
-            menu={{
-              items: [
-                {
-                  key: 'edit',
-                  label: 'Edit',
-                  icon: <EditOutlined />,
-                  onClick: () => onEdit(ticket),
-                },
-                ...(canDeleteTicket
-                  ? [
-                      {
-                        key: 'delete',
-                        label: 'Move to trash',
-                        icon: <DeleteOutlined />,
-                        danger: true,
-                        onClick: () => {
-                          Modal.confirm({
-                            title: 'Move ticket to trash?',
-                            content: 'The ticket will be hidden from the main list. You can open Trash from the sidebar to review.',
-                            okText: 'Move to trash',
-                            okButtonProps: { danger: true },
-                            cancelText: 'Cancel',
-                            onOk: () => onDelete(ticket.id),
-                          })
+          {isCustomer ? (
+            <div style={{ display: 'flex', gap: 2 }} onPointerDown={(e) => e.stopPropagation()}>
+              <Tooltip title="Edit Ticket">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined style={{ fontSize: 14, color: '#1677ff' }} />}
+                  onClick={(e) => { e.stopPropagation(); onEdit(ticket) }}
+                />
+              </Tooltip>
+              {!isClosedLikeTicketStatus(ticket.status) && onCloseTicket && (
+                <Tooltip title="Close ticket">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      Modal.confirm({
+                        title: 'Close this ticket?',
+                        content: 'Are you sure you want to close this ticket?',
+                        okText: 'Close ticket',
+                        cancelText: 'Cancel',
+                        onOk: () => onCloseTicket(ticket.id),
+                      })
+                    }}
+                  />
+                </Tooltip>
+              )}
+            </div>
+          ) : (
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'edit',
+                    label: 'Edit',
+                    icon: <EditOutlined />,
+                    onClick: () => onEdit(ticket),
+                  },
+                  ...(canDeleteTicket
+                    ? [
+                        {
+                          key: 'delete',
+                          label: 'Move to trash',
+                          icon: <DeleteOutlined />,
+                          danger: true,
+                          onClick: () => {
+                            Modal.confirm({
+                              title: 'Move ticket to trash?',
+                              content: 'The ticket will be hidden from the main list. You can open Trash from the sidebar to review.',
+                              okText: 'Move to trash',
+                              okButtonProps: { danger: true },
+                              cancelText: 'Cancel',
+                              onOk: () => onDelete(ticket.id),
+                            })
+                          },
                         },
-                      },
-                    ]
-                  : []),
-              ],
-            }}
-            trigger={['click']}
-          >
-            <Button
-              type="text"
-              size="small"
-              icon={<MoreOutlined style={{ fontSize: 16, color: 'var(--kanban-card-muted)' }} />}
-              onClick={(e) => e.stopPropagation()}
-            />
-          </Dropdown>
+                      ]
+                    : []),
+                ],
+              }}
+              trigger={['click']}
+            >
+              <Button
+                type="text"
+                size="small"
+                icon={<MoreOutlined style={{ fontSize: 16, color: 'var(--kanban-card-muted)' }} />}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </Dropdown>
+          )}
         </Flex>
 
         {/* Title + subtitle - use <a> for native right-click "Open in new tab" */}

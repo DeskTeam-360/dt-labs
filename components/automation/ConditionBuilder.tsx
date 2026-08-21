@@ -84,7 +84,12 @@ export const CONDITION_FIELDS: Field[] = [
     { name: 'spam', label: 'Spam' },
     { name: 'trash', label: 'Trash' },
   ]},
-  { name: 'days_since_updated', label: 'Days since last updated', inputType: 'number' },
+  { name: 'days_since_updated', label: 'Days since last updated', inputType: 'number', operators: [
+    { name: '>', label: '>' },
+    { name: '>=', label: '>=' },
+    { name: '<', label: '<' },
+    { name: '<=', label: '<=' },
+  ]},
   { name: 'comment_author_type', label: 'Comment author', valueEditorType: 'select', values: [
     { name: 'agent', label: 'Agent / staff' },
     { name: 'customer', label: 'Customer' },

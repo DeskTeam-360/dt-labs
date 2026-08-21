@@ -241,7 +241,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                     value={(actions as Record<string, unknown>).assignee_ids as string[] | undefined}
                     onChange={(v) => update('assignee_ids', v?.length ? v : undefined)}
                     options={(lookup.users ?? [])
-                      .filter((u) => u.id)
+                      .filter((u) => u.id && (u as { role?: string }).role?.toLowerCase() !== 'customer')
                       .map((u) => ({ value: u.id, label: u.full_name || u.email || u.id }))}
                   />
                 )}

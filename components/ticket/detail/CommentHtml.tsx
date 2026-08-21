@@ -18,6 +18,8 @@ export default function CommentHtml({ html, style, className }: CommentHtmlProps
   const [showQuote, setShowQuote] = useState(false)
 
   const sanitized = sanitizeRichHtml(html)
+    .replace(/<div[^>]*>\s*<br\s*\/?>\s*<\/div>/gi, '')  // remove <div><br></div>
+    .replace(/(<br\s*\/?>(\s*)){2,}/gi, '<br>')            // collapse multiple <br> into one
 
   // Detect if there's any blockquote or known email-quote wrapper in the HTML
   const hasQuote = /<blockquote|<div[^>]+class="[^"]*(?:gmail_quote|yahoo_quoted|OutlookMessageHeader|divRplyFwdMsg)[^"]*"/i.test(sanitized)
@@ -34,6 +36,16 @@ export default function CommentHtml({ html, style, className }: CommentHtmlProps
         }
         .comment-collapsed-quote .gmail_extra {
           display: none !important;
+        }
+        .comment-html div {
+          min-height: 0;
+        }
+        .comment-html div:empty,
+        .comment-html div > br:only-child {
+          display: none;
+        }
+        .comment-html p {
+          margin: 0 0 4px;
         }
       `}</style>
 

@@ -36,6 +36,7 @@ interface TicketsKanbanViewProps {
   onDragEnd: (event: DragEndEvent) => void | Promise<void>
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
+  onCloseTicket?: (id: number) => void
   canDeleteTicket?: boolean
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
@@ -54,6 +55,7 @@ export default function TicketsKanbanView({
   onDragEnd,
   onEdit,
   onDelete,
+  onCloseTicket,
   canDeleteTicket = false,
   sortBy = TICKETS_LIST_SORT_BY,
   sortOrder = TICKETS_LIST_SORT_ORDER,
@@ -94,8 +96,10 @@ export default function TicketsKanbanView({
           tickets={tickets}
           dragDisabled={isCustomer}
           canDeleteTicket={canDeleteTicket}
+          isCustomer={isCustomer}
           onEdit={onEdit}
           onDelete={onDelete}
+          onCloseTicket={onCloseTicket}
           sortBy={sortBy}
           sortOrder={sortOrder}
           allStatusColumns={allStatusColumns}

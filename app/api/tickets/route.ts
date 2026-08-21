@@ -75,6 +75,8 @@ export async function GET(request: Request) {
   const typeIdParam = url.searchParams.get('type_id')
   const typeIdsParam = url.searchParams.get('type_ids')
   const tagIdsParam = url.searchParams.get('tag_ids')
+  const noCompany = url.searchParams.get('no_company') === '1'
+  const noTags = url.searchParams.get('no_tags') === '1'
   const visibilityParam = url.searchParams.get('visibility')
   const teamIdParam = url.searchParams.get('team_id')
   const teamIdsParam = url.searchParams.get('team_ids')
@@ -200,6 +202,8 @@ export async function GET(request: Request) {
       sql`${tickets.id} IN (SELECT ticket_id FROM ticket_tags WHERE tag_id IN (${sql.join(tagIds.map((id) => sql`${id}`), sql`, `)}))`
     )
   }
+  if (noCompany) conditions.push(isNull(tickets.companyId))
+  if (noTags) conditions.push(sql`${tickets.id} NOT IN (SELECT ticket_id FROM ticket_tags)`)
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 

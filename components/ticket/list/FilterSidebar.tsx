@@ -200,6 +200,7 @@ export default function FilterSidebar({
                     onChange={(v) => onFilterCompanyIdsChange(v ?? [])}
                     maxTagCount="responsive"
                   >
+                    <Option key="__none__" value="__none__" label="No Company">— No Company</Option>
                     {companies.map((c) => (
                       <Option key={c.id} value={c.id} label={c.name}>{c.name}</Option>
                     ))}
@@ -219,6 +220,7 @@ export default function FilterSidebar({
                     optionLabelProp="label"
                     maxTagCount="responsive"
                   >
+                  <Option key="__none__" value="__none__" label="No Tags">— No Tags</Option>
                     {allTags.map((t) => (
                       <Option key={t.id} value={t.id} label={t.name}>{t.name}</Option>
                     ))}

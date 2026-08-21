@@ -320,7 +320,7 @@ export default function TicketsListView({
           ellipsis: true,
           render: (_: unknown, record: TicketRecord) =>
             record.team_name ? (
-              <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>Team {record.team_name}</Tag>
+              <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>{record.team_name}</Tag>
             ) : (
               '—'
             ),

@@ -129,6 +129,20 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     refetchTickets,
   } = useTicketsData(currentUser.id, isCustomer, canDeleteTicket)
 
+  const handleCloseTicket = async (id: number) => {
+    try {
+      await fetch(`/api/tickets/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'closed' }),
+      })
+      refetchTickets()
+    } catch {
+      // silent
+    }
+  }
+
   useEffect(() => {
     const id = setInterval(() => { refetchTickets() }, 2 * 60 * 1000)
     return () => clearInterval(id)
@@ -235,6 +249,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               onDragEnd={handleDragEnd}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onCloseTicket={isCustomer ? handleCloseTicket : undefined}
               canDeleteTicket={canDeleteTicket}
               sortBy={sortBy}
               sortOrder={sortOrder}

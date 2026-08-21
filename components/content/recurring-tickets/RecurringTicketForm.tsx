@@ -84,7 +84,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
       const typesArr = Array.isArray(types) ? types : (types.data ?? [])
       setTicketTypes(typesArr.map((t: { id: number | string; title?: string; name?: string; slug?: string }) => ({ label: t.title ?? t.name ?? t.slug ?? String(t.id), value: t.id })))
       const stsArr = Array.isArray(sts) ? sts : (sts.data ?? [])
-      setStatuses(stsArr.map((s: { id?: number; slug?: string; title?: string; name?: string }) => ({ label: s.title ?? s.name ?? s.slug ?? '', value: s.slug ?? String(s.id ?? '') })))
+      setStatuses(stsArr.filter((s: { is_active?: boolean }) => s.is_active !== false).map((s: { id?: number; slug?: string; title?: string; name?: string }) => ({ label: s.title ?? s.name ?? s.slug ?? '', value: s.slug ?? String(s.id ?? '') })))
       setContacts((allUsr.data ?? allUsr ?? []).map((u: { id: string; name?: string; email?: string; firstName?: string; lastName?: string }) => ({
         label: `${u.name ?? (`${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || '')} ${u.email ? `(${u.email})` : ''}`.trim(),
         value: u.id,

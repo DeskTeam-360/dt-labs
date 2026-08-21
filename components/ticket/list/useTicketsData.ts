@@ -393,10 +393,16 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
       if (inJunkFolder) params.set('ticket_type', filterTicketType!)
       if (!isCustomer) {
-        if (filterCompanyIds.length > 0) params.set('company_ids', filterCompanyIds.join(','))
+        const noCompany = filterCompanyIds.includes('__none__')
+        const realCompanyIds = filterCompanyIds.filter((id) => id !== '__none__')
+        if (noCompany) params.set('no_company', '1')
+        if (realCompanyIds.length > 0) params.set('company_ids', realCompanyIds.join(','))
         if (filterTeamIds.length > 0 && !inJunkFolder) params.set('team_ids', filterTeamIds.join(','))
       }
-      if (filterTagIds.length > 0) params.set('tag_ids', filterTagIds.join(','))
+      const noTags = filterTagIds.includes('__none__')
+      const realTagIds = filterTagIds.filter((id) => id !== '__none__')
+      if (noTags) params.set('no_tags', '1')
+      if (realTagIds.length > 0) params.set('tag_ids', realTagIds.join(','))
       const customerShowsAllStatuses =
         isCustomer &&
         lookupReady &&
