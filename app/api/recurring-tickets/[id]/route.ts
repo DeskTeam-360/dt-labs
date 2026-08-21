@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { isAdminOrManager } from '@/lib/auth-utils'
 import { db, recurringTicketRuns, recurringTickets } from '@/lib/db'
-import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
+import { computeNextRunAt, type Frequency, normalizeSpecificDates } from '@/lib/recurring-ticket-schedule'
 import { isTicketVisibilityLevel } from '@/lib/ticket-visibility'
 
 function authError() {
@@ -78,7 +78,14 @@ export async function PATCH(
     updates.frequency = body.frequency
   }
   if (body.specific_days !== undefined) updates.specificDays = body.specific_days ?? null
-  if (body.specific_date !== undefined) updates.specificDate = body.specific_date ?? null
+  if (body.specific_date !== undefined) {
+    const dates = normalizeSpecificDates(body.specific_date)
+    const nextFrequency = (body.frequency ?? existing.frequency) as Frequency
+    if (nextFrequency === 'specific_date' && dates.length === 0) {
+      return NextResponse.json({ error: 'Select at least one day of the month' }, { status: 400 })
+    }
+    updates.specificDate = nextFrequency === 'specific_date' ? dates : null
+  }
   if (body.interval_days !== undefined) updates.intervalDays = body.interval_days ?? null
   if (body.time_of_day !== undefined) updates.timeOfDay = body.time_of_day
   if (body.timezone !== undefined) updates.timezone = body.timezone

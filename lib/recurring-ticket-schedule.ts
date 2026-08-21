@@ -8,12 +8,20 @@ export type Frequency = 'daily' | 'weekdays' | 'weekends' | 'specific_days' | 's
 export interface RecurringSchedule {
   frequency: Frequency
   specificDays?: number[] | null   // 0=Sun … 6=Sat
-  specificDate?: number | null     // 1–31
+  specificDate?: number | number[] | null  // 1–31 (legacy single int or array)
   intervalDays?: number | null     // every N days
   timeOfDay: string                // 'HH:MM'
   timezone: string
   startDate: string                // 'YYYY-MM-DD'
   endDate?: string | null
+}
+
+/** Normalize stored/input monthly dates (legacy single int or int[]) to unique 1–31. */
+export function normalizeSpecificDates(value: unknown): number[] {
+  const raw = Array.isArray(value) ? value : value == null || value === '' ? [] : [value]
+  return [...new Set(
+    raw.map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 31)
+  )].sort((a, b) => a - b)
 }
 
 /** Convert 'HH:MM' + YYYY-MM-DD + timezone → UTC Date */
@@ -74,7 +82,7 @@ function dateMatchesFrequency(ymd: string, schedule: RecurringSchedule): boolean
     }
     case 'specific_date': {
       const [, , dd] = ymd.split('-').map(Number)
-      return dd === (schedule.specificDate ?? 1)
+      return normalizeSpecificDates(schedule.specificDate).includes(dd)
     }
     case 'interval':
       return true // interval is handled externally via lastRunAt
@@ -129,8 +137,12 @@ export function frequencyLabel(schedule: RecurringSchedule): string {
       const days = (schedule.specificDays ?? []).map(d => names[d]).join(', ')
       return `Every ${days}`
     }
-    case 'specific_date':
-      return `Monthly on day ${schedule.specificDate ?? 1}`
+    case 'specific_date': {
+      const dates = normalizeSpecificDates(schedule.specificDate)
+      if (dates.length === 0) return 'Monthly'
+      if (dates.length === 1) return `Monthly on day ${dates[0]}`
+      return `Monthly on days ${dates.join(', ')}`
+    }
     case 'interval':
       return `Every ${schedule.intervalDays ?? 1} day(s)`
     default:

@@ -33,6 +33,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { normalizeSpecificDates } from '@/lib/recurring-ticket-schedule'
 
 import RecurringTicketForm from './RecurringTicketForm'
 import RecurringTicketRunsDrawer from './RecurringTicketRunsDrawer'
@@ -47,7 +48,7 @@ export interface RecurringTicketRow {
   description: string | null
   frequency: string
   specificDays: number[] | null
-  specificDate: number | null
+  specificDate: number | number[] | null
   intervalDays: number | null
   timeOfDay: string
   timezone: string
@@ -82,8 +83,12 @@ function freqLabel(row: RecurringTicketRow): string {
   switch (row.frequency) {
     case 'specific_days':
       return `Every ${(row.specificDays ?? []).map((d) => DAY_NAMES[d]).join(', ')}`
-    case 'specific_date':
-      return `Monthly on day ${row.specificDate ?? 1}`
+    case 'specific_date': {
+      const dates = normalizeSpecificDates(row.specificDate)
+      if (dates.length === 0) return 'Monthly'
+      if (dates.length === 1) return `Monthly on day ${dates[0]}`
+      return `Monthly on days ${dates.join(', ')}`
+    }
     case 'interval':
       return `Every ${row.intervalDays ?? 1} day(s)`
     default:

@@ -798,7 +798,7 @@ export const aiSettings = pgTable('ai_settings', {
  * Template + schedule for auto-creating tickets on a recurring basis.
  * frequency: 'daily' | 'weekdays' | 'weekends' | 'specific_days' | 'specific_date' | 'interval'
  * - specific_days: uses specificDays int[] (0=Sun … 6=Sat)
- * - specific_date: uses specificDate int (1–31, day of month)
+ * - specific_date: uses specificDate int[] (1–31, days of month)
  * - interval: uses intervalDays int (every N days)
  */
 export const recurringTickets = pgTable('recurring_tickets', {
@@ -807,7 +807,7 @@ export const recurringTickets = pgTable('recurring_tickets', {
   description: text('description'),
   frequency: varchar('frequency', { length: 32 }).notNull().default('daily'),
   specificDays: jsonb('specific_days').$type<number[]>(),
-  specificDate: integer('specific_date'),
+  specificDate: jsonb('specific_date').$type<number[]>(),
   intervalDays: integer('interval_days'),
   timeOfDay: varchar('time_of_day', { length: 5 }).notNull().default('08:00'),
   timezone: varchar('timezone', { length: 64 }).notNull().default('UTC'),
