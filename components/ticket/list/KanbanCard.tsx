@@ -1,9 +1,9 @@
 'use client'
 
-import { CheckCircleOutlined, CommentOutlined, DeleteOutlined, EditOutlined, FieldTimeOutlined, FlagOutlined, MoreOutlined, RobotOutlined, SyncOutlined, UserOutlined } from '@ant-design/icons'
+import { CommentOutlined, DeleteOutlined, EditOutlined, FieldTimeOutlined, FlagOutlined, RobotOutlined, SyncOutlined, UserOutlined } from '@ant-design/icons'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Avatar, Button, Card, Dropdown, Flex, Modal, Tag, Tooltip, Typography } from 'antd'
+import { Avatar, Button, Card, Flex, Modal, Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
 
@@ -174,67 +174,38 @@ export default function KanbanCard({
                   onClick={(e) => { e.stopPropagation(); onEdit(ticket) }}
                 />
               </Tooltip>
-              {!isClosedLikeTicketStatus(ticket.status) && onCloseTicket && (
-                <Tooltip title="Close ticket">
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 2 }} onPointerDown={(e) => e.stopPropagation()}>
+              <Tooltip title="Edit">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined style={{ fontSize: 14, color: '#1677ff' }} />}
+                  onClick={(e) => { e.stopPropagation(); onEdit(ticket) }}
+                />
+              </Tooltip>
+              {canDeleteTicket && (
+                <Tooltip title="Move to trash">
                   <Button
                     type="text"
                     size="small"
-                    icon={<CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />}
+                    icon={<DeleteOutlined style={{ fontSize: 14, color: '#ff4d4f' }} />}
                     onClick={(e) => {
                       e.stopPropagation()
                       Modal.confirm({
-                        title: 'Close this ticket?',
-                        content: 'Are you sure you want to close this ticket?',
-                        okText: 'Close ticket',
+                        title: 'Move ticket to trash?',
+                        content: 'The ticket will be hidden from the main list. You can open Trash from the sidebar to review.',
+                        okText: 'Move to trash',
+                        okButtonProps: { danger: true },
                         cancelText: 'Cancel',
-                        onOk: () => onCloseTicket(ticket.id),
+                        onOk: () => onDelete(ticket.id),
                       })
                     }}
                   />
                 </Tooltip>
               )}
             </div>
-          ) : (
-            <Dropdown
-              menu={{
-                items: [
-                  {
-                    key: 'edit',
-                    label: 'Edit',
-                    icon: <EditOutlined />,
-                    onClick: () => onEdit(ticket),
-                  },
-                  ...(canDeleteTicket
-                    ? [
-                        {
-                          key: 'delete',
-                          label: 'Move to trash',
-                          icon: <DeleteOutlined />,
-                          danger: true,
-                          onClick: () => {
-                            Modal.confirm({
-                              title: 'Move ticket to trash?',
-                              content: 'The ticket will be hidden from the main list. You can open Trash from the sidebar to review.',
-                              okText: 'Move to trash',
-                              okButtonProps: { danger: true },
-                              cancelText: 'Cancel',
-                              onOk: () => onDelete(ticket.id),
-                            })
-                          },
-                        },
-                      ]
-                    : []),
-                ],
-              }}
-              trigger={['click']}
-            >
-              <Button
-                type="text"
-                size="small"
-                icon={<MoreOutlined style={{ fontSize: 16, color: 'var(--kanban-card-muted)' }} />}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </Dropdown>
           )}
         </Flex>
 

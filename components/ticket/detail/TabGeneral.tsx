@@ -288,6 +288,8 @@ interface TabGeneralProps {
   ticketDescriptionSaving?: boolean
   onApplyAiSummaryToDescription?: (html: string) => Promise<void>
   currentUserRole?: string | null
+  /** Hide AI summary buttons when AI is not configured in settings */
+  aiConfigured?: boolean
 }
 
 export default function TabGeneral({
@@ -359,8 +361,9 @@ export default function TabGeneral({
   ticketDescriptionSaving = false,
   onApplyAiSummaryToDescription,
   currentUserRole,
+  aiConfigured = false,
 }: TabGeneralProps) {
-  const canAccessTicketSummary = ['admin', 'manager'].includes((currentUserRole ?? '').toLowerCase())
+  const canAccessTicketSummary = aiConfigured && ['admin', 'manager'].includes((currentUserRole ?? '').toLowerCase())
   const [sidebarDraft, setSidebarDraft] = useState<SidebarAttributesDraft>(() =>
     snapshotSidebarDraft({
       ticketData,
@@ -488,11 +491,11 @@ export default function TabGeneral({
                           </Flex>
                           {ticketData?.id && !ticketDescriptionEditing && (onApplyAiSummaryToDescription || (canAccessTicketSummary && onAddAiSummaryComment) || canEditTicketDescription) ? (
                             <Flex gap={6} align="center" style={{ flexShrink: 0 }}>
-                              {onApplyAiSummaryToDescription ? (
+                              {aiConfigured && onApplyAiSummaryToDescription ? (
                                 <CommentAiSummaryTrigger
                                   ticketId={ticketData.id}
                                   summarizeAnchor={{ type: 'description' }}
-                              
+
                                   disabled={ticketDescriptionSaving}
                                   onApplyToDescription={onApplyAiSummaryToDescription}
                                   tooltip="Summarize description (AI)"
@@ -685,7 +688,7 @@ export default function TabGeneral({
                           </Space>
                           {!isAutomation && editingComment !== comment.id && (
                             <Space>
-                              {showNoteOption && onAddAiSummaryComment && ticketData?.id ? (
+                              {aiConfigured && showNoteOption && onAddAiSummaryComment && ticketData?.id ? (
                                 <CommentAiSummaryTrigger
                                   ticketId={ticketData.id}
                                   summarizeAnchor={{ type: 'comment', commentId: comment.id }}

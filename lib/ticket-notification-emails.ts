@@ -19,8 +19,10 @@ async function fetchCompanyName(companyId: string | null | undefined): Promise<s
   return row?.name ?? null
 }
 
-function mergeSubject(subject: string, ticketId: number): string {
-  return subject.replace(/\{\{\s*ticket_id\s*\}\}/g, String(ticketId))
+function mergeSubject(subject: string, ticketId: number, ticketTitle?: string): string {
+  return subject
+    .replace(/\{\{\s*ticket_id\s*\}\}/g, String(ticketId))
+    .replace(/\{\{\s*ticket_title\s*\}\}/g, ticketTitle ?? '—')
 }
 
 function encodeSubjectHeader(subject: string): string {
@@ -146,10 +148,10 @@ export async function sendAgentClosesTicketEmail(params: {
   const recipientMap = userRowToMergeMap(recipient, companyName)
   const senderMap = userRowToMergeMap(agent ?? null)
   const rawTpl = tpl.content?.trim() ?? ''
-  const subject = mergeSubject(tpl.emailSubject?.trim() || `Ticket #${ticketId} has been closed`, ticketId)
+  const subject = mergeSubject(tpl.emailSubject?.trim() || `Ticket #${ticketId} has been closed`, ticketId, ticketTitle)
 
   const bodyHtml = rawTpl
-    ? mergeMessageTemplateHtml(rawTpl, { origin: baseUrl, ticketId: String(ticketId), recipient: recipientMap, sender: senderMap, useDomMerge: false })
+    ? mergeMessageTemplateHtml(rawTpl, { origin: baseUrl, ticketId: String(ticketId), recipient: recipientMap, sender: senderMap, extra: { ticket_title: ticketTitle }, useDomMerge: false })
     : `<p>Hello ${recipientMap.full_name !== '—' ? recipientMap.full_name : ''},</p>` +
       `<p>Your ticket <strong>#${ticketId}: ${ticketTitle}</strong> has been closed.</p>` +
       `<p>View ticket: <a href="${ticketUrl}">${ticketUrl}</a></p>`
@@ -199,13 +201,13 @@ export async function sendNewTicketAgentNotificationEmail(params: {
   const fromHeader = formatFromHeader(appSettings.email_sender_name, gmailSender.fromEmail)
   const senderMap = userRowToMergeMap(creator ?? null, creatorCompanyName)
   const rawTpl = tpl.content?.trim() ?? ''
-  const subject = mergeSubject(tpl.emailSubject?.trim() || `New ticket #${ticketId} assigned to your team`, ticketId)
+  const subject = mergeSubject(tpl.emailSubject?.trim() || `New ticket #${ticketId} assigned to your team`, ticketId, ticketTitle)
 
   for (const recipient of recipients) {
     const recipientCompanyName = await fetchCompanyName(recipient.companyId)
     const recipientMap = userRowToMergeMap(recipient, recipientCompanyName)
     const bodyHtml = rawTpl
-      ? mergeMessageTemplateHtml(rawTpl, { origin: baseUrl, ticketId: String(ticketId), recipient: recipientMap, sender: senderMap, useDomMerge: false })
+      ? mergeMessageTemplateHtml(rawTpl, { origin: baseUrl, ticketId: String(ticketId), recipient: recipientMap, sender: senderMap, extra: { ticket_title: ticketTitle }, useDomMerge: false })
       : `<p>Hello ${recipientMap.full_name !== '—' ? recipientMap.full_name : ''},</p>` +
         `<p>A new ticket has been submitted: <strong>#${ticketId}: ${ticketTitle}</strong></p>` +
         `<p>View ticket: <a href="${ticketUrl}">${ticketUrl}</a></p>`
@@ -248,7 +250,7 @@ export async function sendTicketAssignedEmail(params: {
   const fromHeader = formatFromHeader(appSettings.email_sender_name, gmailSender.fromEmail)
   const senderMap = userRowToMergeMap(actor ?? null)
   const rawTpl = tpl.content?.trim() ?? ''
-  const subject = mergeSubject(tpl.emailSubject?.trim() || `You have been assigned to Ticket #${ticketId}`, ticketId)
+  const subject = mergeSubject(tpl.emailSubject?.trim() || `You have been assigned to Ticket #${ticketId}`, ticketId, ticketTitle)
 
   for (const userId of assignedUserIds) {
     if (userId === actorUserId) continue
@@ -257,7 +259,7 @@ export async function sendTicketAssignedEmail(params: {
     const recipientCompanyName = await fetchCompanyName(recipient.companyId ?? ticketRow?.companyId)
     const recipientMap = userRowToMergeMap(recipient, recipientCompanyName)
     const bodyHtml = rawTpl
-      ? mergeMessageTemplateHtml(rawTpl, { origin: baseUrl, ticketId: String(ticketId), recipient: recipientMap, sender: senderMap, useDomMerge: false })
+      ? mergeMessageTemplateHtml(rawTpl, { origin: baseUrl, ticketId: String(ticketId), recipient: recipientMap, sender: senderMap, extra: { ticket_title: ticketTitle }, useDomMerge: false })
       : `<p>Hello ${recipientMap.full_name !== '—' ? recipientMap.full_name : ''},</p>` +
         `<p>You have been assigned to <strong>Ticket #${ticketId}: ${ticketTitle}</strong> by ${senderMap.full_name !== '—' ? senderMap.full_name : 'an agent'}.</p>` +
         `<p><a href="${ticketUrl}">View Ticket</a></p>`
@@ -315,7 +317,7 @@ export async function sendNoteAddedNotificationEmail(params: {
   const fromHeader = formatFromHeader(appSettings.email_sender_name, gmailSender.fromEmail)
   const senderMap = userRowToMergeMap(actor ?? null, actorCompanyName)
   const rawTpl = tpl.content?.trim() ?? ''
-  const subject = mergeSubject(tpl.emailSubject?.trim() || `Note added on Ticket #${ticketId}`, ticketId)
+  const subject = mergeSubject(tpl.emailSubject?.trim() || `Note added on Ticket #${ticketId}`, ticketId, ticketTitle)
 
   for (const recipient of recipients) {
     const recipientCompanyName = await fetchCompanyName(recipient.companyId)
@@ -326,7 +328,7 @@ export async function sendNoteAddedNotificationEmail(params: {
           ticketId: String(ticketId),
           recipient: recipientMap,
           sender: senderMap,
-          extra: { reply_content: noteHtml ?? notePreview, reply_preview: notePreview },
+          extra: { ticket_title: ticketTitle, reply_content: noteHtml ?? notePreview, reply_preview: notePreview },
           useDomMerge: false,
         })
       : `<p>Hello ${recipientMap.full_name !== '—' ? recipientMap.full_name : ''},</p>` +

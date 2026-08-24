@@ -68,6 +68,7 @@ export function previewMessageTemplateHtml(html: string, options?: MessageTempla
     ticketId: tid,
     recipient: RECIPIENT_SAMPLE,
     sender: SENDER_SAMPLE,
+    extra: { ticket_title: 'Sample ticket subject' },
     useDomMerge: true,
   })
 }

@@ -97,6 +97,7 @@ export const MESSAGE_TEMPLATE_TICKET_PLACEHOLDERS: MessageTemplatePlaceholderDef
     description: 'Label e.g. "Ticket #123" — rendered as a link to the ticket in HTML email / rich UI',
   },
   { key: 'ticket_id', description: 'Numeric ticket id only' },
+  { key: 'ticket_title', description: 'Ticket subject / title text' },
   {
     key: 'ticket_link',
     description: 'Absolute URL to open the ticket in the app (plain text or href at merge time)',

@@ -13,8 +13,10 @@ function encodeSubjectHeader(subject: string): string {
   return '=?UTF-8?B?' + Buffer.from(subject, 'utf8').toString('base64') + '?='
 }
 
-function mergeSubject(subject: string, ticketId: number): string {
-  return subject.replace(/\{\{\s*ticket_id\s*\}\}/g, String(ticketId))
+function mergeSubject(subject: string, ticketId: number, ticketTitle?: string): string {
+  return subject
+    .replace(/\{\{\s*ticket_id\s*\}\}/g, String(ticketId))
+    .replace(/\{\{\s*ticket_title\s*\}\}/g, ticketTitle ?? '—')
 }
 
 export type SendRecurringTicketCreatedEmailParams = {
@@ -173,7 +175,8 @@ export async function sendRecurringTicketCreatedEmail(
   const rawTpl = tpl.content?.trim() ?? ''
   const subject = mergeSubject(
     tpl.emailSubject?.trim() || `Recurring ticket #{{ ticket_id }} has been created`,
-    ticketId
+    ticketId,
+    ticketTitle
   )
   const subjectMime = encodeSubjectHeader(subject)
 
@@ -183,6 +186,7 @@ export async function sendRecurringTicketCreatedEmail(
         ticketId: String(ticketId),
         recipient: recipientMap,
         sender: senderMap,
+        extra: { ticket_title: ticketTitle },
         useDomMerge: false,
       })
     : ''

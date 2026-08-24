@@ -125,6 +125,7 @@ function makeContext(origin: string, ticketId: string, recipient: Record<string,
   const replaceOfficialKey = (key: string): string | null => {
     if (key === 'ticket_id') return ticketId
     if (key === 'ticket_link') return ticketUrl
+    if (key === 'ticket_title') return extra?.ticket_title ?? '—'
     if (key === 'ticket') {
       const safe = ticketUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
       return `<a href="${safe}" target="_blank" rel="noopener noreferrer">Ticket #${ticketId}</a>`

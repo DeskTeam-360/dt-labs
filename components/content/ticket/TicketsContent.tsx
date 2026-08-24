@@ -324,6 +324,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         onSubmit={handleSubmit}
         onCancel={handleModalCancel}
         isCustomer={isCustomer}
+        onCloseTicket={isCustomer ? async (id) => { await handleCloseTicket(id); handleModalCancel() } : undefined}
       />
     </Layout>
   )

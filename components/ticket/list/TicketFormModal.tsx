@@ -14,6 +14,7 @@ import {
   Select,
   Space,
 } from 'antd'
+
 import type { FormInstance } from 'antd/es/form'
 import { useMemo,useRef } from 'react'
 
@@ -51,6 +52,9 @@ interface TicketFormModalProps {
   onCancel: () => void
   /** When true, show simplified form: Title, Description, Priority, Type only */
   isCustomer?: boolean
+  /** Customer only: close the ticket from the edit modal */
+  onCloseTicket?: (id: number) => void
+  closingTicket?: boolean
 }
 
 export default function TicketFormModal({
@@ -79,11 +83,14 @@ export default function TicketFormModal({
   onSubmit,
   onCancel,
   isCustomer = false,
+  onCloseTicket,
+  closingTicket = false,
 }: TicketFormModalProps) {
   /** Customers always use the same compact fields as create (title, description, type, priority). */
   const showSimplifiedForm = isCustomer
-  /** Customer: attachments on create + edit. Staff: attachments only when creating (full form). */
-  const showAttachmentSection = showSimplifiedForm || !editingTicket
+  /** Customer editing: hide description and attachments. Show only on create or for staff. */
+  const showDescriptionField = !editingTicket || (!isCustomer)
+  const showAttachmentSection = !editingTicket || (!isCustomer)
   const fileInputIdRef = useRef<string | null>(null)
   if (!fileInputIdRef.current) {
     fileInputIdRef.current =
@@ -133,7 +140,7 @@ export default function TicketFormModal({
           <Input placeholder="Ticket Title" />
         </Form.Item>
 
-        {(!editingTicket || showSimplifiedForm) && (
+        {showDescriptionField && (
           <Form.Item name="description" label="Description">
             <CommentWysiwyg
               ticketId={editingTicket?.id}
@@ -144,7 +151,7 @@ export default function TicketFormModal({
         )}
 
         {editingTicket && !showSimplifiedForm && (
-          <Form.Item name="short_note" label="Short Note">
+          <Form.Item name="short_note" label="Short Note (Round Robin)">
             <Input.TextArea placeholder="Short note (optional)" rows={2} allowClear />
           </Form.Item>
         )}
@@ -344,14 +351,33 @@ export default function TicketFormModal({
         </Row>
 
         <Form.Item>
-          <Space>
-            <Button type="primary" htmlType="submit" loading={submitting}>
-              {editingTicket ? 'Update' : 'Create'}
-            </Button>
-            <Button onClick={onCancel} disabled={submitting}>
-              Cancel
-            </Button>
-          </Space>
+          <Flex justify="space-between" align="center" wrap="wrap" gap={8}>
+            <Space>
+              <Button type="primary" htmlType="submit" loading={submitting}>
+                {editingTicket ? 'Update' : 'Create'}
+              </Button>
+              <Button onClick={onCancel} disabled={submitting}>
+                Cancel
+              </Button>
+            </Space>
+            {isCustomer && editingTicket && onCloseTicket && (
+              <Button
+                danger
+                loading={closingTicket}
+                onClick={() => {
+                  Modal.confirm({
+                    title: 'Close this ticket?',
+                    centered: true,
+                    okText: 'Yes, close ticket',
+                    content: 'When you close this ticket, you can still view it and leave another comment to reopen it.',
+                    onOk: () => onCloseTicket(editingTicket.id),
+                  })
+                }}
+              >
+                Close this ticket
+              </Button>
+            )}
+          </Flex>
         </Form.Item>
       </Form>
     </Modal>

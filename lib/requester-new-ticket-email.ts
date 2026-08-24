@@ -169,6 +169,7 @@ export async function sendRequesterTicketCreatedEmail(
   const rawSubject = tpl.emailSubject?.trim() || `Ticket #${ticketId} has been created`
   const subject = rawSubject
     .replace(/\{\{\s*ticket_id\s*\}\}/g, String(ticketId))
+    .replace(/\{\{\s*ticket_title\s*\}\}/g, ticketTitle)
     .replace(/\{\{\s*ticket\s*\}\}/g, `#${ticketId}`)
     .replace(/\{\{\s*ticket_link\s*\}\}/g, ticketUrl)
   const subjectMime = encodeSubjectHeader(subject)
@@ -181,6 +182,7 @@ export async function sendRequesterTicketCreatedEmail(
           ticketId: String(ticketId),
           recipient: recipientMap,
           sender: senderMap,
+          extra: { ticket_title: ticketTitle },
           useDomMerge: false,
         })
       : ''

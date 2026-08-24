@@ -382,7 +382,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                           style={{ cursor: 'pointer', color: '#1890ff' }}
                           onClick={() => router.push(`/tickets/${row.ticket_id}`)}
                         >
-                          {row.ticket?.title || `#${row.ticket_id}`}
+                          {row.ticket ? `#${row.ticket_id} ${row.ticket.title}` : `#${row.ticket_id}`}
                         </Text>
                       </div>
                       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -453,7 +453,7 @@ export default function DashboardContent({ user, stats }: DashboardContentProps)
                               onClick={(e) => e.stopPropagation()}
                               style={{ color: '#1890ff', fontWeight: 600 }}
                             >
-                              {item.ticket?.title || `Ticket #${item.ticket_id}`}
+                              {item.ticket ? `#${item.ticket_id} ${item.ticket.title}` : `#${item.ticket_id}`}
                             </Link>
                             {!item.stop_time && (
                               <Text type="secondary" style={{ fontSize: 11 }}>(running)</Text>

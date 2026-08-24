@@ -7,6 +7,15 @@ import { getCustomerCompanyId } from '@/lib/customer-company'
 import { db, tickets } from '@/lib/db'
 import { getTicketDetail } from '@/lib/ticket-detail'
 
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const ticketId = parseInt(id, 10)
+  if (Number.isNaN(ticketId)) return {}
+  const [row] = await db.select({ title: tickets.title }).from(tickets).where(eq(tickets.id, ticketId)).limit(1)
+  if (!row) return {}
+  return { title: `#${ticketId} ${row.title}` }
+}
+
 export default async function TicketDetailPage({
   params,
 }: {

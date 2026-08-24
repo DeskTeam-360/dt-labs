@@ -252,6 +252,10 @@ export default function TicketDetailContent({
         editingDescriptionRef.current = editingDescription
     }, [editingDescription])
     const [descriptionValue, setDescriptionValue] = useState(() => (typeof ticketData?.description === 'string' ? ticketData.description : '') || '')
+    const [aiConfigured, setAiConfigured] = useState(false)
+    useEffect(() => {
+        fetch('/api/ai-settings/status').then(r => r.json()).then(j => setAiConfigured(!!j.configured)).catch(() => {})
+    }, [])
     const [editModalVisible, setEditModalVisible] = useState(false)
     const [titleEditing, setTitleEditing] = useState(false)
     const [titleDraft, setTitleDraft] = useState('')
@@ -1786,6 +1790,7 @@ export default function TicketDetailContent({
                                                 setDescriptionValue(html)
                                                 setEditingDescription(true)
                                             }}
+                                            aiConfigured={aiConfigured}
                                         />
                                     ),
                                 },
