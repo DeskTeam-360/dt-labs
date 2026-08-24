@@ -16,6 +16,7 @@ interface CardViewCardProps {
   ticket: TicketRecord
   allStatusColumns?: StatusColumn[]
   canDeleteTicket?: boolean
+  isCustomer?: boolean
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
   /** Click priority / status / tag chips to apply list filters */
@@ -28,6 +29,7 @@ export default function CardViewCard({
   ticket,
   allStatusColumns,
   canDeleteTicket = false,
+  isCustomer = false,
   onEdit,
   onDelete,
   onFilterByStatus,
@@ -88,6 +90,11 @@ export default function CardViewCard({
         <Text style={{ fontSize: 13, color: '#1890ff', display: 'block' }}>
           by {ticket.by_label ?? ticket.creator_name ?? 'Unassigned'}
         </Text>
+        {!isCustomer && ticket.short_note && (
+          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 2, lineHeight: 1.3 }}>
+            {ticket.short_note}
+          </Text>
+        )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginTop: 4 }}>
           {ticket.due_date && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--kanban-card-muted)' }}>

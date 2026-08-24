@@ -3,7 +3,7 @@
 import 'dayjs/locale/en'
 
 import { CloseOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icons'
-import { Input, Select, Space, Spin, Typography } from 'antd'
+import { Input, Modal, Select, Space, Spin, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { usePathname, useRouter } from 'next/navigation'
@@ -506,7 +506,16 @@ export default function TicketSearchNavbar({
                   onClick={(e) => {
                     e.preventDefault()
                     e.stopPropagation()
-                    if (savedFiltersUserId) removeSavedTicketFilterPreset(savedFiltersUserId, p.id)
+                    Modal.confirm({
+                      title: 'Remove saved filter?',
+                      content: `"${p.name}" will be removed from your saved filters.`,
+                      okText: 'Remove',
+                      okButtonProps: { danger: true },
+                      cancelText: 'Cancel',
+                      onOk: () => {
+                        if (savedFiltersUserId) removeSavedTicketFilterPreset(savedFiltersUserId, p.id)
+                      },
+                    })
                   }}
                   style={{
                     border: 'none',

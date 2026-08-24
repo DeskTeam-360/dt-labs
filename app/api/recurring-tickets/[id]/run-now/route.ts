@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { canAccessRecurringTickets } from '@/lib/auth-utils'
-import { db, recurringTicketRuns, recurringTickets, tickets } from '@/lib/db'
+import { db, recurringTicketRuns, recurringTickets, ticketAssignees, tickets } from '@/lib/db'
 import { sendRecurringTicketCreatedEmail } from '@/lib/recurring-ticket-email'
 import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
 import { assignCompanySupportTicketRank, assignCreatorSupportTicketRank, parseCompanyTicketDesiredRank, resolveSupportQueueScope } from '@/lib/ticket-company-priority-order'
@@ -54,6 +54,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           await assignCreatorSupportTicketRank(tx, scope.userId, row.id, desiredRank)
         }
       }
+
+      const assigneeIds = Array.isArray(rule.assigneeIds) ? rule.assigneeIds as string[] : []
+      if (assigneeIds.length > 0) {
+        await tx.insert(ticketAssignees).values(assigneeIds.map((userId) => ({ ticketId: row.id, userId })))
+      }
+
       newTicket = row
     })
 

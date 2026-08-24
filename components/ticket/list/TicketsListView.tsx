@@ -200,6 +200,11 @@ export default function TicketsListView({
               {record.created_via === 'automation' && (
                 <RobotOutlined title="Created by automation" style={{ fontSize: 11, color: '#722ed1', marginLeft: 6, verticalAlign: 'middle' }} />
               )}
+              {!isCustomer && record.short_note && (
+                <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2, lineHeight: 1.3 }}>
+                  {record.short_note}
+                </div>
+              )}
             </a>
           ),
         },

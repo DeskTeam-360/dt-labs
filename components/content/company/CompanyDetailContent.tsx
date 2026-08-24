@@ -79,6 +79,7 @@ export default function CompanyDetailContent({
   currentUserRole,
 }: CompanyDetailContentProps) {
   const router = useRouter()
+  const canEdit = (() => { const r = (currentUserRole ?? '').toLowerCase(); return r === 'admin' || r === 'manager' })()
   const [collapsed, setCollapsed] = useState(false)
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
@@ -558,9 +559,11 @@ export default function CompanyDetailContent({
                     Resync from Freshdesk
                   </Button>
                 )}
-                <Button type="primary" icon={<EditOutlined />} onClick={() => void openEditCompanyModal()}>
-                  Edit company
-                </Button>
+                {canEdit && (
+                  <Button type="primary" icon={<EditOutlined />} onClick={() => void openEditCompanyModal()}>
+                    Edit company
+                  </Button>
+                )}
               </Space>
             </Flex>
 

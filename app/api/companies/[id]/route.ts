@@ -2,6 +2,7 @@ import { and, eq, ne } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { canEditCompanies } from '@/lib/auth-utils'
 import { getCompanyDetail } from '@/lib/company-detail'
 import { customerOwnsCompany, isCompanyPortalAdmin, userBelongsToCompany } from '@/lib/customer-company'
 import { companies, companyUsers, db, teams, users } from '@/lib/db'
@@ -65,6 +66,10 @@ export async function PUT(
   const isCustomerCompany = body.is_customer !== undefined ? body.is_customer === true : undefined
   const role = (session.user as { role?: string }).role?.toLowerCase()
   const isCustomer = role === 'customer'
+
+  if (!isCustomer && !canEditCompanies(role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   if (isCustomer) {
     const belongs = await userBelongsToCompany(session.user.id!, id)

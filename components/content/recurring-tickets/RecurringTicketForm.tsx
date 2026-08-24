@@ -119,6 +119,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         team_id: initialValues.teamId ?? null,
         ticket_type_id: initialValues.ticketTypeId ?? null,
         contact_user_id: initialValues.contactUserId ?? null,
+        assignee_ids: Array.isArray(initialValues.assigneeIds) ? initialValues.assigneeIds : [],
       })
     } else {
       form.setFieldsValue({
@@ -160,6 +161,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
 
         ticket_type_id: values.ticket_type_id || null,
         contact_user_id: values.contact_user_id || null,
+        assignee_ids: Array.isArray(values.assignee_ids) ? values.assignee_ids : [],
       }
 
       const url = isEdit ? `/api/recurring-tickets/${initialValues!.id}` : '/api/recurring-tickets'
@@ -301,6 +303,11 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
           tooltip="If set, recurring ticket notifications are sent to this user's email; otherwise the company email is used">
           <Select allowClear showSearch placeholder="Select contact user"
             optionFilterProp="label" options={contacts} />
+        </Form.Item>
+
+        <Form.Item name="assignee_ids" label="Assignees">
+          <Select mode="multiple" allowClear showSearch placeholder="Select assignees"
+            optionFilterProp="label" options={contacts} maxTagCount="responsive" />
         </Form.Item>
 
         <Row gutter={12}>

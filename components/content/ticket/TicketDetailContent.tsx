@@ -293,6 +293,7 @@ export default function TicketDetailContent({
     const [sidebarAttributesSaving, setSidebarAttributesSaving] = useState(false)
     const [activityRefreshKey, setActivityRefreshKey] = useState(0)
     const bumpActivityRefresh = useCallback(() => setActivityRefreshKey((k) => k + 1), [])
+
     // Mark ticket as read when user views it
     useEffect(() => {
         if (!displayTicket?.id) return
@@ -1319,7 +1320,7 @@ export default function TicketDetailContent({
                 { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket_id: tid }) },
             )
             message.success(`Resync done — ${res.comments.imported} new comment(s)`)
-            router.refresh()
+            await mergeDetailFromServer()
         } catch (e: unknown) {
             message.error(e instanceof Error ? e.message : 'Resync failed')
         } finally {

@@ -20,6 +20,7 @@ interface TicketsCardViewProps {
   onEdit: (ticket: TicketRecord) => void
   onDelete: (id: number) => void
   canDeleteTicket?: boolean
+  isCustomer?: boolean
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
   onFilterByStatus?: (statusSlug: string) => void
@@ -33,6 +34,7 @@ export default function TicketsCardView({
   onEdit,
   onDelete,
   canDeleteTicket = false,
+  isCustomer = false,
   sortBy = TICKETS_LIST_SORT_BY,
   sortOrder = TICKETS_LIST_SORT_ORDER,
   onFilterByStatus,
@@ -62,6 +64,7 @@ export default function TicketsCardView({
             onEdit={onEdit}
             onDelete={onDelete}
             canDeleteTicket={canDeleteTicket}
+            isCustomer={isCustomer}
             onFilterByStatus={onFilterByStatus}
             onFilterByTag={onFilterByTag}
             onFilterByCompany={onFilterByCompany}

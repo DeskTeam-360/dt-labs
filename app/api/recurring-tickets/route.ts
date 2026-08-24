@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
 
     ticket_type_id,
     contact_user_id,
+    assignee_ids,
     visibility = DEFAULT_RECURRING_VISIBILITY,
   } = body
 
@@ -119,6 +120,7 @@ export async function POST(req: NextRequest) {
 
       ticketTypeId: ticket_type_id ?? null,
       contactUserId: contact_user_id ?? null,
+      assigneeIds: Array.isArray(assignee_ids) ? assignee_ids : [],
       visibility,
       createdBy: session.user.id,
     })

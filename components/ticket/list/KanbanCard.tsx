@@ -238,6 +238,11 @@ export default function KanbanCard({
               by {ticket.by_label}
             </Text>
           )}
+          {!isCustomer && ticket.short_note && (
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 2, lineHeight: 1.3 }}>
+              {ticket.short_note}
+            </Text>
+          )}
         </a>
 
         {/* Bottom: due, updated, comment, avatars */}

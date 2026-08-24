@@ -28,10 +28,15 @@ export function canDeleteTickets(role: string | undefined): boolean {
   return isAdminOrManager(role)
 }
 
-/** Companies: Admin only */
+/** Companies view + resync: Admin, Manager, Staff (and Customer for own company) */
 export function canAccessCompanies(role: string | undefined): boolean {
   const r = (role ?? '').toLowerCase()
-  return r === 'admin' || r === 'customer'
+  return r === 'admin' || r === 'manager' || r === 'staff' || r === 'customer'
+}
+
+/** Companies edit (create/update/delete): Admin & Manager only */
+export function canEditCompanies(role: string | undefined): boolean {
+  return isAdminOrManager(role)
 }
 
 /** Tickets: Admin & Manager */
