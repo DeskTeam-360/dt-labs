@@ -251,7 +251,8 @@ export async function POST(request: NextRequest) {
     // Use the notification email's subject so Gmail groups the reply in the same conversation.
     // Fall back to raw ticket title if no notification subject is stored.
     const rawTitle = (ticketRow?.title || ticketTitle || '').trim()
-    subjectPlain = notificationEmail?.subject?.trim() || rawTitle || `Ticket #${ticketIdNum}`
+    const fallbackSubject = rawTitle ? `Ticket #${ticketIdNum} - ${rawTitle}` : `Ticket #${ticketIdNum}`
+    subjectPlain = notificationEmail?.subject?.trim() || fallbackSubject
     subjectMime = encodeSubjectHeader(subjectPlain)
 
     if (threadId && !inReplyTo) {
