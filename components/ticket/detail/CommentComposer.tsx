@@ -366,7 +366,6 @@ export default function CommentComposer({
         placeholder={placeholder}
         height="200px"
       />
-      <br />
       {attachments.length > 0 && (
         <Flex gap={8} wrap="wrap" align="center">
           {attachments.map((a, i) => (
@@ -379,23 +378,19 @@ export default function CommentComposer({
           ))}
         </Flex>
       )}
-      <Flex gap={8} vertical>
-        <div >
-        <input
-          type="file"
-          multiple
-          style={{ display: 'none' }}
-          id="comment-files-input"
-          onChange={(e) => {
-            const fileList = e.target.files
-            const filesArray = fileList ? Array.from(fileList) : []
-            e.target.value = ''
-            handleFilesSelected(filesArray)
-          }}
-        />
-        </div>
-        
-        <Flex gap={8} wrap="wrap">
+      <input
+        type="file"
+        multiple
+        style={{ display: 'none' }}
+        id="comment-files-input"
+        onChange={(e) => {
+          const fileList = e.target.files
+          const filesArray = fileList ? Array.from(fileList) : []
+          e.target.value = ''
+          handleFilesSelected(filesArray)
+        }}
+      />
+      <Flex gap={8} wrap="wrap">
         <Button
           icon={<PaperClipOutlined />}
           onClick={() => document.getElementById('comment-files-input')?.click()}
@@ -428,7 +423,6 @@ export default function CommentComposer({
           Cancel
         </Button>
         </Flex>
-      </Flex>
     </Flex>
   )
 }

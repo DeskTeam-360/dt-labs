@@ -45,7 +45,11 @@ export default function CommentHtml({ html, style, className }: CommentHtmlProps
           display: none;
         }
         .comment-html p {
-          margin: 0 0 4px;
+          margin: 0;
+          line-height: 1.5;
+        }
+        .comment-html p + p {
+          margin-top: 4px;
         }
       `}</style>
 

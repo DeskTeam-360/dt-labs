@@ -447,47 +447,49 @@ export default function TabGeneral({
       <Col xs={16}>
 
 
-      <Flex gap="middle" align="flex-start" style={{ padding: 10, marginBottom: 10, borderBottom: '1px solid var(--ticket-thread-divider)' }}>
-                      {(ticketData.created_via === 'recurring' || ticketData.created_via === 'automation') ? (
-                        <Avatar
-                          style={{ backgroundColor: '#722ed1', flexShrink: 0 }}
-                          icon={ticketData.created_via === 'recurring' ? <SyncOutlined /> : <RobotOutlined />}
-                        />
-                      ) : (
-                        <TicketUserMention userId={creatorId} email={creatorEmail}>
-                          <Avatar style={{ cursor: creatorId ? 'pointer' : undefined }} icon={<UserOutlined />} src={ticketData.creator?.avatar_url} />
-                        </TicketUserMention>
-                      )}
-                      <Flex vertical style={{ flex: 1, minWidth: 0 }}>
-                        <Flex justify="space-between" align="flex-start" wrap="wrap" gap="small">
-                          <Flex vertical gap={2} style={{ minWidth: 0, flex: 1 }}>
-                            {ticketData.company_id && (
-                              <Text strong>
-                                {ticketData.company?.name ||
-                                  companyOptions.find((c) => c.id === ticketData.company_id)?.name ||
-                                  '—'}
-                              </Text>
+      <Flex vertical gap={10} style={{ padding: 10, marginBottom: 10, borderBottom: '1px solid var(--ticket-thread-divider)' }}>
+                      <Flex justify="space-between" align="flex-start" wrap="wrap" gap="small">
+                          <Flex align="center" gap={8} style={{ minWidth: 0, flex: 1 }}>
+                            {(ticketData.created_via === 'recurring' || ticketData.created_via === 'automation') ? (
+                              <Avatar
+                                size="small"
+                                style={{ backgroundColor: '#722ed1', flexShrink: 0 }}
+                                icon={ticketData.created_via === 'recurring' ? <SyncOutlined /> : <RobotOutlined />}
+                              />
+                            ) : (
+                              <TicketUserMention userId={creatorId} email={creatorEmail}>
+                                <Avatar size="small" style={{ cursor: creatorId ? 'pointer' : undefined, flexShrink: 0 }} icon={<UserOutlined />} src={ticketData.creator?.avatar_url} />
+                              </TicketUserMention>
                             )}
-                            <Text
-                              type="secondary"
-                              style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}
-                            >
-                              Created By{' '}
-                              {isAutomationCreated ? (
-                                <Text style={{ color: '#722ed1', fontWeight: 500 }}>{createdByPersonLabel}</Text>
-                              ) : (
-                                <TicketUserMention userId={creatorId} email={creatorEmail} className="ml-1">
-                                  <Text
-                                    style={{ cursor: creatorId ? 'pointer' : undefined, color: 'var(--ticket-thread-text)' }}
-                                  >
-                                    {createdByPersonLabel}
-                                  </Text>
-                                </TicketUserMention>
+                            <Flex vertical gap={2} style={{ minWidth: 0 }}>
+                              {ticketData.company_id && (
+                                <Text strong>
+                                  {ticketData.company?.name ||
+                                    companyOptions.find((c) => c.id === ticketData.company_id)?.name ||
+                                    '—'}
+                                </Text>
                               )}
-                              <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)', marginLeft: 4 }}>
-                                Created At: <DateDisplay date={ticketData.created_at} />
+                              <Text
+                                type="secondary"
+                                style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}
+                              >
+                                Created By{' '}
+                                {isAutomationCreated ? (
+                                  <Text style={{ color: '#722ed1', fontWeight: 500 }}>{createdByPersonLabel}</Text>
+                                ) : (
+                                  <TicketUserMention userId={creatorId} email={creatorEmail} className="ml-1">
+                                    <Text
+                                      style={{ cursor: creatorId ? 'pointer' : undefined, color: 'var(--ticket-thread-text)' }}
+                                    >
+                                      {createdByPersonLabel}
+                                    </Text>
+                                  </TicketUserMention>
+                                )}
+                                <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)', marginLeft: 4 }}>
+                                  Created At: <DateDisplay date={ticketData.created_at} />
+                                </Text>
                               </Text>
-                            </Text>
+                            </Flex>
                           </Flex>
                           {ticketData?.id && !ticketDescriptionEditing && (onApplyAiSummaryToDescription || (canAccessTicketSummary && onAddAiSummaryComment) || canEditTicketDescription) ? (
                             <Flex gap={6} align="center" style={{ flexShrink: 0 }}>
@@ -495,7 +497,6 @@ export default function TabGeneral({
                                 <CommentAiSummaryTrigger
                                   ticketId={ticketData.id}
                                   summarizeAnchor={{ type: 'description' }}
-
                                   disabled={ticketDescriptionSaving}
                                   onApplyToDescription={onApplyAiSummaryToDescription}
                                   tooltip="Summarize description (AI)"
@@ -525,7 +526,7 @@ export default function TabGeneral({
                           ) : null}
                         </Flex>
                         {ticketDescriptionEditing && canEditTicketDescription ? (
-                          <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
+                          <Space orientation="vertical" size="small" style={{ width: '100%' }}>
                             <CommentWysiwyg
                               value={ticketDescriptionDraft}
                               onChange={onTicketDescriptionDraftChange}
@@ -557,17 +558,16 @@ export default function TabGeneral({
                             <OriginalDescriptionCollapse ticketData={ticketData} />
                           </>
                         )}
-                            {ticketAttachments.length > 0 && (
-                              <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
-                                {ticketAttachments.map((att) => (
-                                  <a key={att.id} href={att.file_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <PaperClipOutlined /> {att.file_name} 
-                                  </a>
-                                ))}
-                              </Flex>
-                            )}
+                        {ticketAttachments.length > 0 && (
+                          <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
+                            {ticketAttachments.map((att) => (
+                              <a key={att.id} href={att.file_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <PaperClipOutlined /> {att.file_name}
+                              </a>
+                            ))}
+                          </Flex>
+                        )}
                       </Flex>
-                    </Flex>
 
             <div style={{ padding: '0 16px', marginTop: 8, marginBottom: 4, textAlign: 'center' }}>
               {commentsHasOlder ? (
@@ -636,28 +636,28 @@ export default function TabGeneral({
                       key={comment.id}
                       className={`ticket-thread-bubble ticket-thread-bubble--${threadRole}`}
                       style={{
-                        padding: 20,
+                        padding: '12px 16px',
                         borderRadius: 10,
                         color: 'var(--ticket-thread-text)',
                         backgroundColor: threadBgVar,
                         ...threadBubbleBorder,
                       }}
                     >
-                    <Flex gap="middle" align="flex-start" style={{ width: '100%' }}>
-                      {isAutomation ? (
-                        <Avatar style={{ backgroundColor: '#722ed1' }} icon={<ThunderboltOutlined />} />
-                      ) : (
-                        <TicketUserMention userId={comment.user_id} email={comment.user?.email}>
-                          <Avatar
-                            style={{ cursor: comment.user_id ? 'pointer' : undefined }}
-                            icon={<UserOutlined />}
-                            src={comment.user?.avatar_url}
-                          />
-                        </TicketUserMention>
-                      )}
-                      <Flex vertical style={{ flex: 1, minWidth: 0 }}>
-                        <Flex justify="space-between" align="center" wrap="wrap" gap="small">
+                    <Flex vertical gap={10} style={{ width: '100%' }}>
+                      <Flex justify="space-between" align="center" wrap="wrap" gap="small">
                           <Space>
+                          {isAutomation ? (
+                            <Avatar size="small" style={{ backgroundColor: '#722ed1' }} icon={<ThunderboltOutlined />} />
+                          ) : (
+                            <TicketUserMention userId={comment.user_id} email={comment.user?.email}>
+                              <Avatar
+                                size="small"
+                                style={{ cursor: comment.user_id ? 'pointer' : undefined }}
+                                icon={<UserOutlined />}
+                                src={comment.user?.avatar_url}
+                              />
+                            </TicketUserMention>
+                          )}
                           {isAutomation ? (
                             <Text strong style={{ color: 'var(--ticket-thread-text)' }}>
                               {authorLabel}
@@ -805,7 +805,6 @@ export default function TabGeneral({
                           </Flex>
                         ) : null}
                         </Space>
-                      </Flex>
                     </Flex>
                     </div>
                     )
