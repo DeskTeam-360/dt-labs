@@ -91,8 +91,8 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
       setTicketTypes(typesArr.map((t: { id: number | string; title?: string; name?: string; slug?: string }) => ({ label: t.title ?? t.name ?? t.slug ?? String(t.id), value: t.id })))
       const stsArr = Array.isArray(sts) ? sts : (sts.data ?? [])
       setStatuses(stsArr.filter((s: { is_active?: boolean }) => s.is_active !== false).map((s: { id?: number; slug?: string; title?: string; name?: string }) => ({ label: s.title ?? s.name ?? s.slug ?? '', value: s.slug ?? String(s.id ?? '') })))
-      setContacts((allUsr.data ?? allUsr ?? []).map((u: { id: string; name?: string; email?: string; firstName?: string; lastName?: string }) => ({
-        label: `${u.name ?? (`${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || '')} ${u.email ? `(${u.email})` : ''}`.trim(),
+      setContacts((allUsr.data ?? allUsr ?? []).map((u: { id: string; full_name?: string; first_name?: string; last_name?: string; email?: string }) => ({
+        label: `${(u.full_name || `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || '')} ${u.email ? `(${u.email})` : ''}`.trim(),
         value: u.id,
       })))
     }).finally(() => setLoadingOptions(false))
@@ -119,7 +119,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         team_id: initialValues.teamId ?? null,
         ticket_type_id: initialValues.ticketTypeId ?? null,
         contact_user_id: initialValues.contactUserId ?? null,
-        assignee_ids: Array.isArray(initialValues.assigneeIds) ? initialValues.assigneeIds : [],
+        assignee_ids: Array.isArray(initialValues.assigneeIds) && initialValues.assigneeIds.length > 0 ? initialValues.assigneeIds[0] : null,
       })
     } else {
       form.setFieldsValue({
@@ -161,7 +161,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
 
         ticket_type_id: values.ticket_type_id || null,
         contact_user_id: values.contact_user_id || null,
-        assignee_ids: Array.isArray(values.assignee_ids) ? values.assignee_ids : [],
+        assignee_ids: values.assignee_ids ? [values.assignee_ids] : [],
       }
 
       const url = isEdit ? `/api/recurring-tickets/${initialValues!.id}` : '/api/recurring-tickets'
@@ -292,23 +292,28 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
             </Form.Item>
           </Col>
           <Col span={12}>
+            <Form.Item name="contact_user_id" label="Contact (email replies)"
+              tooltip="If set, recurring ticket notifications are sent to this user's email; otherwise the company email is used">
+              <Select allowClear showSearch placeholder="Search by name or email"
+                optionFilterProp="label" options={contacts} />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={12}>
+          <Col span={12}>
             <Form.Item name="team_id" label="Team">
               <Select allowClear showSearch placeholder="Select team"
                 optionFilterProp="label" options={teams} />
             </Form.Item>
           </Col>
+          <Col span={12}>
+            <Form.Item name="assignee_ids" label="Assignee">
+              <Select allowClear showSearch placeholder="Search by name or email"
+                optionFilterProp="label" options={contacts} />
+            </Form.Item>
+          </Col>
         </Row>
-
-        <Form.Item name="contact_user_id" label="Contact (email replies)"
-          tooltip="If set, recurring ticket notifications are sent to this user's email; otherwise the company email is used">
-          <Select allowClear showSearch placeholder="Select contact user"
-            optionFilterProp="label" options={contacts} />
-        </Form.Item>
-
-        <Form.Item name="assignee_ids" label="Assignees">
-          <Select mode="multiple" allowClear showSearch placeholder="Select assignees"
-            optionFilterProp="label" options={contacts} maxTagCount="responsive" />
-        </Form.Item>
 
         <Row gutter={12}>
           <Col span={12}>
