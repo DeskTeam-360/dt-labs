@@ -60,6 +60,7 @@ function filterFromApi(f: Record<string, unknown> | undefined) {
     on_ticket_created: raw.on_ticket_created !== false,
     on_status_changed: raw.on_status_changed === true,
     on_client_reply: raw.on_client_reply === true,
+    on_tag_added: raw.on_tag_added === true,
     team_ids: Array.isArray(raw.team_ids) ? (raw.team_ids as string[]) : [],
     priority_ids: Array.isArray(raw.priority_ids) ? (raw.priority_ids as number[]) : [],
     company_ids: Array.isArray(raw.company_ids) ? (raw.company_ids as string[]) : [],
@@ -192,6 +193,7 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       on_ticket_created: true,
       on_status_changed: false,
       on_client_reply: false,
+      on_tag_added: false,
       team_ids: [],
       priority_ids: [],
       company_ids: [],
@@ -214,6 +216,7 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       on_ticket_created: f.on_ticket_created,
       on_status_changed: f.on_status_changed,
       on_client_reply: f.on_client_reply,
+      on_tag_added: f.on_tag_added,
       team_ids: f.team_ids,
       priority_ids: f.priority_ids,
       company_ids: f.company_ids,
@@ -236,6 +239,7 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       on_ticket_created: v.on_ticket_created !== false,
       on_status_changed: v.on_status_changed === true,
       on_client_reply: v.on_client_reply === true,
+      on_tag_added: v.on_tag_added === true,
       team_ids: v.team_ids?.length ? v.team_ids : [],
       priority_ids: v.priority_ids?.length ? v.priority_ids : [],
       company_ids: v.company_ids?.length ? v.company_ids : [],
@@ -328,8 +332,9 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
             {f.on_ticket_created ? <Tag color="blue">Created</Tag> : null}
             {f.on_status_changed ? <Tag color="purple">Status</Tag> : null}
             {f.on_client_reply ? <Tag color="orange">Client reply</Tag> : null}
+            {f.on_tag_added ? <Tag color="cyan">Tag added</Tag> : null}
             {f.slack_note?.trim() ? <Tag>Note</Tag> : null}
-            {!f.on_ticket_created && !f.on_status_changed && !f.on_client_reply && !f.slack_note?.trim() ? (
+            {!f.on_ticket_created && !f.on_status_changed && !f.on_client_reply && !f.on_tag_added && !f.slack_note?.trim() ? (
               <Text type="secondary">—</Text>
             ) : null}
           </Space>
@@ -487,6 +492,9 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
           <Form.Item name="on_client_reply" valuePropName="checked">
             <Checkbox>Client / portal reply (comment)</Checkbox>
           </Form.Item>
+          <Form.Item name="on_tag_added" valuePropName="checked">
+            <Checkbox>Tag added to ticket</Checkbox>
+          </Form.Item>
           </Flex>
         
           <Title level={5}>Only if ticket matches (optional)</Title>
@@ -499,10 +507,6 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
           <Form.Item name="team_ids" label="Teams" style={{ width: '50%' }}>
             <Select mode="multiple" allowClear placeholder="Any team" options={teamOpts} optionFilterProp="label" />
           </Form.Item>
-          <Form.Item name="priority_ids" label="Priorities" style={{ width: '50%' }}>
-            <Select mode="multiple" allowClear placeholder="Any priority" options={priorityOpts} optionFilterProp="label" />
-          </Form.Item>
-          
           <Form.Item name="company_ids" label="Companies" style={{ width: '50%' }}>
             <Select mode="multiple" allowClear placeholder="Any company" options={companyOpts} optionFilterProp="label" />
           </Form.Item>

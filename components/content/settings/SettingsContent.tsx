@@ -314,6 +314,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
+                {isAdmin(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Connection Status"
+                      description="Check database, storage, Firebase, email, and AI connectivity"
+                      href="/settings/connection-status"
+                      icon={<ToolOutlined />}
+                    />
+                  </Col>
+                )}
               </Row>
             </Section>
           )}

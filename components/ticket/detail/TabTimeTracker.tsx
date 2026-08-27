@@ -96,6 +96,10 @@ export interface TabTimeTrackerProps {
   manualUserOptions?: TimeTrackerManualUserOption[]
   /** Admin/manager: override reported duration (billing) without changing tracked time */
   canAdjustReportedDuration?: boolean
+  /** Admin only: edit start/stop window in Adjust tracker */
+  canAdjustStartStop?: boolean
+  /** Admin/manager: add manual time entries */
+  canAddManual?: boolean
 }
 
 export default function TabTimeTracker({
@@ -113,6 +117,8 @@ export default function TabTimeTracker({
   canManageOthersTime = false,
   manualUserOptions = [],
   canAdjustReportedDuration = false,
+  canAdjustStartStop = false,
+  canAddManual = false,
 }: TabTimeTrackerProps) {
   const ticketId = ticketData?.id as number
   const [paused, setPaused] = useState(false)
@@ -373,9 +379,11 @@ export default function TabTimeTracker({
               Total (reported): {formatTime(totalTimeSeconds + (activeTimeTracker ? currentTime : 0))}
             </Text>
           </Space>
-          <Button type="primary"  icon={<PlusOutlined />} onClick={openManual}>
-            Add manual
-          </Button>
+          {canAddManual && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openManual}>
+              Add manual
+            </Button>
+          )}
         </Flex>
         <Space orientation="vertical" style={{ width: '100%' }} size="middle">
           <Space wrap align="center">
@@ -702,7 +710,7 @@ export default function TabTimeTracker({
           <Form.Item
             name="range"
             label="Start — Stop"
-            rules={[{ required: true, message: 'Select start and end' }]}
+            rules={[{ required: canAdjustStartStop, message: 'Select start and end' }]}
           >
             <RangePicker
               showTime
@@ -710,6 +718,7 @@ export default function TabTimeTracker({
               format="YYYY-MM-DD HH:mm"
               disabledDate={disabledDateNotAfterToday}
               disabledTime={(d) => getDisabledTimeNotAfterNow(d)}
+              disabled={!canAdjustStartStop}
             />
           </Form.Item>
           <Form.Item

@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 
 import { fetchUserSessionEligibility } from '@/lib/auth-user-session'
 import { db, users } from '@/lib/db'
@@ -23,7 +23,7 @@ export async function authorizeWithCredentials(credentials: Record<'email' | 'pa
         mustChangePassword: users.mustChangePassword,
       })
       .from(users)
-      .where(eq(users.email, email))
+      .where(eq(sql`lower(${users.email})`, email))
       .limit(1)
 
     if (!user) {

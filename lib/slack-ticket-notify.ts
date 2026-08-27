@@ -12,7 +12,7 @@ import {
   users,
 } from '@/lib/db'
 
-export type SlackTicketNotifyEvent = 'ticket_created' | 'status_changed' | 'client_reply'
+export type SlackTicketNotifyEvent = 'ticket_created' | 'status_changed' | 'client_reply' | 'tag_added'
 
 export type SlackNotifyRuleFilter = {
   /** Default true */
@@ -21,6 +21,8 @@ export type SlackNotifyRuleFilter = {
   on_status_changed?: boolean
   /** Customer / portal comment on ticket — default false */
   on_client_reply?: boolean
+  /** A tag was added to a ticket — default false */
+  on_tag_added?: boolean
   /** Non-empty = ticket must match one of these (null field on ticket = no match) */
   team_ids?: string[]
   priority_ids?: number[]
@@ -49,6 +51,8 @@ export type SlackTicketPayload = {
   /** Plain-text preview of reply (HTML stripped) */
   bodyPreview?: string
   actorName?: string
+  /** Tag names that were added (for tag_added event) */
+  addedTagNames?: string[]
 }
 
 function parseFilter(raw: unknown): SlackNotifyRuleFilter {
@@ -60,6 +64,7 @@ function eventAllowed(filter: SlackNotifyRuleFilter, event: SlackTicketNotifyEve
   if (event === 'ticket_created') return filter.on_ticket_created !== false
   if (event === 'status_changed') return filter.on_status_changed === true
   if (event === 'client_reply') return filter.on_client_reply === true
+  if (event === 'tag_added') return filter.on_tag_added === true
   return false
 }
 
@@ -235,6 +240,12 @@ function buildMessage(
       ? maskForSlack(ticket.bodyPreview.trim(), 220)
       : '(no text / attachment only)'
     return `*Client replied* ${link}\n${companyLine}${meta}\n_${who}:_ ${preview}`
+  }
+  if (event === 'tag_added') {
+    const tagList = ticket.addedTagNames && ticket.addedTagNames.length > 0
+      ? ticket.addedTagNames.map((t) => `\`${t}\``).join(', ')
+      : 'a tag'
+    return `*Tag added* ${link}\n${companyLine}${meta}\nAdded: ${tagList}`
   }
   const from = ticket.previousStatus ?? '?'
   return `*Ticket status changed* ${link}\n${companyLine}${meta}\n\`${from}\` → \`${ticket.status}\``

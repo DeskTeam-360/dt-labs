@@ -1,6 +1,6 @@
 import { eq, inArray } from 'drizzle-orm'
 
-import { db, tags, teams, ticketActivityLog, ticketAssignees, tickets, ticketTags, users } from '@/lib/db'
+import { db, tags, teams, ticketActivityLog, ticketAssignees, tickets, ticketStatuses, ticketTags, users } from '@/lib/db'
 
 import type { TicketActivityAction } from './ticket-activity-actions'
 
@@ -114,8 +114,8 @@ export function diffTicketSnapshots(
 /** Resolve UUIDs in activity `changes` to display names for ticket activity UI. */
 export async function enrichActivityEntityLabels(
   changes: Record<string, { from: unknown; to: unknown }>
-): Promise<{ teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string> }> {
-  const out: { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string> } = {}
+): Promise<{ teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string> }> {
+  const out: { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string> } = {}
 
   // Teams
   const teamDelta = changes.teamId
@@ -128,6 +128,20 @@ export async function enrichActivityEntityLabels(
       const map: Record<string, string> = {}
       for (const r of rows) map[r.id] = (r.name?.trim() || r.id) as string
       out.teams = map
+    }
+  }
+
+  // Statuses
+  const statusDelta = changes.status
+  if (statusDelta) {
+    const slugs = new Set<string>()
+    if (statusDelta.from != null && statusDelta.from !== '') slugs.add(String(statusDelta.from))
+    if (statusDelta.to != null && statusDelta.to !== '') slugs.add(String(statusDelta.to))
+    if (slugs.size > 0) {
+      const rows = await db.select({ slug: ticketStatuses.slug, title: ticketStatuses.title }).from(ticketStatuses).where(inArray(ticketStatuses.slug, [...slugs]))
+      const map: Record<string, string> = {}
+      for (const r of rows) map[r.slug] = (r.title?.trim() || r.slug) as string
+      out.statuses = map
     }
   }
 

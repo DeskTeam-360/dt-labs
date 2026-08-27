@@ -8,6 +8,7 @@ import { assertCustomerMayAccessTicket } from '@/lib/customer-ticket-access'
 import { db } from '@/lib/db'
 import {
   projectStatuses,
+  tags,
   ticketAssignees,
   ticketAttachments,
   tickets,
@@ -804,6 +805,31 @@ export async function PATCH(
             })
           } catch (e) {
             console.error('[PATCH ticket assignees] email:', e)
+          }
+        }
+      }
+
+      const tagChange = changes.tag_ids as { from: unknown; to: unknown } | undefined
+      if (tagChange && Array.isArray(tagChange.from) && Array.isArray(tagChange.to) && afterSnapshot) {
+        const prevIds = tagChange.from as string[]
+        const nextIds = tagChange.to as string[]
+        const addedIds = nextIds.filter((id) => !prevIds.includes(id))
+        if (addedIds.length > 0) {
+          try {
+            const tagRows = await db.select({ id: tags.id, name: tags.name }).from(tags).where(inArray(tags.id, addedIds))
+            const addedTagNames = tagRows.map((r) => r.name ?? r.id)
+            void notifySlackTicketEvent('tag_added', {
+              id: ticketId,
+              title: afterSnapshot.title,
+              status: afterSnapshot.status,
+              teamId: afterSnapshot.teamId,
+              priority: afterSnapshot.priority,
+              companyId: afterSnapshot.companyId,
+              typeId: afterSnapshot.typeId,
+              addedTagNames,
+            })
+          } catch (e) {
+            console.error('[PATCH ticket tag_added] slack notify:', e)
           }
         }
       }
