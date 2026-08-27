@@ -46,6 +46,7 @@ import { useEffect, useMemo,useState } from 'react'
 import DateDisplay from '@/components/common/DateDisplay'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import { canAdminTeams } from '@/lib/auth-utils'
 import {
   formatTeamVisibilityLabel,
@@ -817,7 +818,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
                 columns={reportSessionColumns}
                 dataSource={reportSessions}
                 rowKey="id"
-                pagination={{ pageSize: 10, showTotal: (t) => `Total ${t} sessions` }}
+                pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('sessions') }}
                 locale={{ emptyText: 'No time tracker data for this period' }}
               />
             )}
@@ -827,7 +828,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
                 columns={reportDayColumns}
                 dataSource={reportByDay}
                 rowKey="dateKey"
-                pagination={{ pageSize: 10, showTotal: (t) => `Total ${t} days` }}
+                pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('days') }}
                 locale={{ emptyText: 'No time tracker data for this period' }}
               />
             )}
@@ -837,7 +838,7 @@ export default function TeamDetailContent({ user: currentUser, team }: TeamDetai
                 columns={reportPersonColumns}
                 dataSource={reportByPerson}
                 rowKey="user_id"
-                pagination={{ pageSize: 10, showTotal: (t) => `Total ${t} people` }}
+                pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('people') }}
                 locale={{ emptyText: 'No time tracker data for this period' }}
               />
             )}

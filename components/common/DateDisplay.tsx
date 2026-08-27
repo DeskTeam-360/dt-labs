@@ -4,7 +4,18 @@ import { useEffect, useState } from 'react'
 
 interface DateDisplayProps {
   date: string | null | undefined
-  format?: 'default' | 'detailed' | 'date-only'
+  format?: 'default' | 'detailed' | 'date-only' | 'relative'
+}
+
+function timeAgo(d: Date): string {
+  const diff = Math.floor((Date.now() - d.getTime()) / 1000)
+  if (diff < 60) return `${diff} second${diff !== 1 ? 's' : ''} ago`
+  const mins = Math.floor(diff / 60)
+  if (mins < 60) return `${mins} minute${mins !== 1 ? 's' : ''} ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs} hour${hrs !== 1 ? 's' : ''} ago`
+  const days = Math.floor(hrs / 24)
+  return `${days} day${days !== 1 ? 's' : ''} ago`
 }
 
 export default function DateDisplay({ date, format = 'default' }: DateDisplayProps) {
@@ -32,6 +43,18 @@ export default function DateDisplay({ date, format = 'default' }: DateDisplayPro
 
       let formatted: string
       switch (format) {
+        case 'relative': {
+          const abs = dateObj.toLocaleString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+          formatted = `${timeAgo(dateObj)} (${abs})`
+          break
+        }
         case 'detailed':
           formatted = dateObj.toLocaleString('en-US', {
             year: 'numeric',

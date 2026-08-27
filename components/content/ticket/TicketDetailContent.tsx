@@ -1424,9 +1424,16 @@ export default function TicketDetailContent({
         <Layout style={{ minHeight: '100vh' }}>
             <AdminSidebar user={currentUser} collapsed={collapsed} onCollapse={setCollapsed} />
             <AdminMainColumn collapsed={collapsed} user={currentUser}>
-                <Content style={{ padding: '24px', background: 'var(--layout-bg)', minHeight: 'calc(100vh - 56px)' }}>
-                    <Card style={{ margin: '0 auto' }}>
-                        <Flex gap={16} align="center" wrap="wrap" style={{ marginBottom: 24 }}>
+                <Content style={{ padding: '0', background: 'var(--layout-bg)', minHeight: 'calc(100vh - 56px)' }}>
+                    <div style={{
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 100,
+                        background: 'var(--ant-color-bg-container, #fff)',
+                        borderBottom: '1px solid var(--ant-color-border-secondary, #f0f0f0)',
+                        padding: '12px 24px',
+                    }}>
+                        <Flex gap={16} align="center" wrap="wrap">
                             <Button
                                 icon={<ArrowLeftOutlined />}
                                 onClick={() => {
@@ -1633,9 +1640,9 @@ export default function TicketDetailContent({
                                 />
                             </div>
                         </Flex>
-
-                            
-                        <Divider />
+                    </div>
+                    <div style={{ padding: '24px' }}>
+                    <Card style={{ margin: '0 auto' }}>
 
                         {isCustomer ? (
                             <TabGeneralCustomer
@@ -1861,8 +1868,7 @@ export default function TicketDetailContent({
                         />
                         )}
                     </Card>
-
-                   
+                    </div>
                 </Content>
             </AdminMainColumn>
         </Layout>

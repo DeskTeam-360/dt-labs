@@ -10,6 +10,7 @@ import { startCrawl } from '@/app/actions/crawl'
 import DateDisplay from '@/components/common/DateDisplay'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { APP_TABLE_PAGE_SIZE_OPTIONS } from '@/lib/app-table'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -324,8 +325,9 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
                 dataSource={crawlSessions}
                 rowKey="id"
                 pagination={{
-                  pageSize: 10,
+                  pageSize: 15,
                   showSizeChanger: true,
+                  pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
                   showTotal: (total) => `Total ${total} crawl sessions`,
                 }}
               />

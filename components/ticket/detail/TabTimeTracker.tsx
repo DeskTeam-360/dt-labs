@@ -4,6 +4,7 @@ import {
   ClockCircleOutlined,
   DeleteOutlined,
   EditOutlined,
+  PauseCircleOutlined,
   PlayCircleOutlined,
   PlusOutlined,
   StopOutlined,
@@ -114,6 +115,7 @@ export default function TabTimeTracker({
   canAdjustReportedDuration = false,
 }: TabTimeTrackerProps) {
   const ticketId = ticketData?.id as number
+  const [paused, setPaused] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
   const [adjustTrackerOpen, setAdjustTrackerOpen] = useState(false)
   const [adjustTrackerSession, setAdjustTrackerSession] = useState<Record<string, unknown> | null>(null)
@@ -391,10 +393,17 @@ export default function TabTimeTracker({
             {activeTimeTracker ? (
               <>
                 <Button
+                  icon={<PauseCircleOutlined />}
+                  onClick={() => { setPaused(true); onStopTimeTracker() }}
+                  loading={timeTrackerLoading}
+                >
+                  Pause
+                </Button>
+                <Button
                   type="primary"
                   danger
                   icon={<StopOutlined />}
-                  onClick={onStopTimeTracker}
+                  onClick={() => { setPaused(false); onStopTimeTracker() }}
                   loading={timeTrackerLoading}
                 >
                   Stop
@@ -403,6 +412,25 @@ export default function TabTimeTracker({
                   {formatTime(currentTime)}
                 </Text>
                 <Text type="secondary">(running)</Text>
+              </>
+            ) : paused ? (
+              <>
+                <Button
+                  type="primary"
+                  icon={<PlayCircleOutlined />}
+                  onClick={() => { setPaused(false); void onStartTimeTracker(timerJobType) }}
+                  loading={timeTrackerLoading}
+                >
+                  Resume
+                </Button>
+                <Button
+                  danger
+                  icon={<StopOutlined />}
+                  onClick={() => setPaused(false)}
+                >
+                  Stop
+                </Button>
+                <Text type="warning" strong>Paused</Text>
               </>
             ) : (
               <Button

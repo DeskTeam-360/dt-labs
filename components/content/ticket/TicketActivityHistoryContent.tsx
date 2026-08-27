@@ -2,7 +2,7 @@
 
 import 'dayjs/locale/en'
 
-import { Card, Input, Layout, Pagination, Select, Space, Table, Typography } from 'antd'
+import { Card, Input, Layout, Pagination, Select, Space, Table, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import localizedFormat from 'dayjs/plugin/localizedFormat'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -13,6 +13,8 @@ import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import TicketActivityActorAvatar from '@/components/ticket/TicketActivityActorAvatar'
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
+import { kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 import { TICKET_ACTIVITY_ACTIONS } from '@/lib/ticket-activity-actions'
 import { formatTicketActivityAction } from '@/lib/ticket-activity-labels'
 import { summarizeTicketActivityMetadata } from '@/lib/ticket-activity-metadata'
@@ -24,12 +26,14 @@ dayjs.locale('en')
 const { Content } = Layout
 const { Title, Text } = Typography
 
-const PAGE_SIZE = 25
+const DEFAULT_PAGE_SIZE = 25
 
 export type TicketActivityRow = {
   id: string
   ticket_id: number
   ticket_title: string
+  ticket_status?: string | null
+  ticket_tags?: { id: string; name: string; color: string | null }[]
   action: string
   actor_role: string
   metadata: unknown
@@ -49,9 +53,26 @@ export default function TicketActivityHistoryContent({ user: currentUser }: Tick
   const [rows, setRows] = useState<TicketActivityRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [actionType, setActionType] = useState<string>('')
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [statusColorMap, setStatusColorMap] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    fetch('/api/ticket-statuses', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data: unknown) => {
+        if (Array.isArray(data)) {
+          const map: Record<string, string> = {}
+          for (const s of data as { slug: string; color?: string | null }[]) {
+            if (s.slug && s.color) map[s.slug] = s.color
+          }
+          setStatusColorMap(map)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const typeOptions = useMemo(
     () => [
@@ -78,9 +99,9 @@ export default function TicketActivityHistoryContent({ user: currentUser }: Tick
   const loadRows = useCallback(async () => {
     setLoading(true)
     try {
-      const offset = (page - 1) * PAGE_SIZE
+      const offset = (page - 1) * pageSize
       const params = new URLSearchParams({
-        limit: String(PAGE_SIZE),
+        limit: String(pageSize),
         offset: String(offset),
       })
       if (actionType) params.set('action', actionType)
@@ -98,7 +119,7 @@ export default function TicketActivityHistoryContent({ user: currentUser }: Tick
     } finally {
       setLoading(false)
     }
-  }, [page, actionType, debouncedSearch])
+  }, [page, pageSize, actionType, debouncedSearch])
 
   useEffect(() => {
     loadRows()
@@ -224,21 +245,28 @@ export default function TicketActivityHistoryContent({ user: currentUser }: Tick
                   title: 'Ticket',
                   key: 'ticket',
                   render: (_, r) => (
-                    <div>
-                      <Text strong>#{r.ticket_id}</Text>
-                      <div
-                        style={{
-                          color: '#595959',
-                          fontSize: 13,
-                          maxWidth: 320,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {r.ticket_title || '(No title)'}
-                      </div>
-                    </div>
+                    <Space direction="vertical" size={4}>
+                      <SpaNavLink href={`/tickets/${r.ticket_id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--ant-color-primary)', fontWeight: 500 }}>
+                        <Text strong style={{ color: 'var(--ant-color-primary)', fontSize: 13 }}>#{r.ticket_id}</Text>
+                        {' '}
+                        <Text style={{ fontSize: 13, color: 'var(--ant-color-text)' }}>{r.ticket_title || '(No title)'}</Text>
+                      </SpaNavLink>
+                      <Space size={4} wrap>
+                        {r.ticket_status && (
+                          <Tag
+                            style={kanbanTagStyle(statusColorMap[r.ticket_status] ? { fillHex: statusColorMap[r.ticket_status] } : { neutral: true })}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {r.ticket_status.split(/[-_]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                          </Tag>
+                        )}
+                        {r.ticket_tags?.map((t) => (
+                          <Tag key={t.id} style={kanbanTagStyle(t.color ? { fillHex: t.color } : { neutral: true })} onClick={(e) => e.stopPropagation()}>
+                            {t.name}
+                          </Tag>
+                        ))}
+                      </Space>
+                    </Space>
                   ),
                 },
                
@@ -255,14 +283,17 @@ export default function TicketActivityHistoryContent({ user: currentUser }: Tick
               ]}
             />
 
-            {total > PAGE_SIZE && (
+            {total > 0 && (
               <div style={{ padding: 16, display: 'flex', justifyContent: 'flex-end' }}>
                 <Pagination
                   current={page}
-                  pageSize={PAGE_SIZE}
+                  pageSize={pageSize}
                   total={total}
                   onChange={(p) => setPage(p)}
-                  showSizeChanger={false}
+                  showSizeChanger={true}
+                  pageSizeOptions={APP_TABLE_PAGE_SIZE_OPTIONS}
+                  showTotal={appTableShowTotal('activity entries')}
+                  onShowSizeChange={(_, size) => { setPageSize(size); setPage(1) }}
                 />
               </div>
             )}

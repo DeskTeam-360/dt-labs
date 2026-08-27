@@ -258,7 +258,7 @@ export default function FilterSidebar({
                 </Text>
               </>
             )}
-            {!isCustomer && onSaveViewPreset && (
+            {onSaveViewPreset && (
               <>
                 
                 <Button

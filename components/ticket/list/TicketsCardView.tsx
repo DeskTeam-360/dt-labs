@@ -1,7 +1,7 @@
 'use client'
 
-import { Col, Empty, Row } from 'antd'
-import { useMemo } from 'react'
+import { Col, Empty, Pagination, Row } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
 
 import CardViewCard from './CardViewCard'
 import {
@@ -28,6 +28,17 @@ interface TicketsCardViewProps {
   onFilterByCompany?: (companyId: string) => void
 }
 
+const DEFAULT_PAGE_SIZE = 15
+const SESSION_KEY = 'tickets_card_page'
+
+function readSessionPage(): { page: number; pageSize: number } {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch { /* ignore */ }
+  return { page: 1, pageSize: DEFAULT_PAGE_SIZE }
+}
+
 export default function TicketsCardView({
   tickets,
   allStatusColumns,
@@ -41,9 +52,30 @@ export default function TicketsCardView({
   onFilterByTag,
   onFilterByCompany,
 }: TicketsCardViewProps) {
+  const saved = readSessionPage()
+  const [page, setPage] = useState(saved.page)
+  const [pageSize, setPageSize] = useState(saved.pageSize)
+
   const sortedTickets = useMemo(
     () => sortTickets(tickets, sortBy, sortOrder),
     [tickets, sortBy, sortOrder]
+  )
+
+  // Clamp page if tickets shrink (filter applied) and persist to sessionStorage
+  useEffect(() => {
+    setPage((p) => {
+      const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize))
+      return p <= totalPages ? p : totalPages
+    })
+  }, [sortedTickets.length, pageSize])
+
+  useEffect(() => {
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ page, pageSize })) } catch { /* ignore */ }
+  }, [page, pageSize])
+
+  const paged = useMemo(
+    () => sortedTickets.slice((page - 1) * pageSize, page * pageSize),
+    [sortedTickets, page, pageSize]
   )
 
   if (sortedTickets.length === 0) {
@@ -55,22 +87,39 @@ export default function TicketsCardView({
   }
 
   return (
-    <Row gutter={24} style={{ width: '100%', paddingRight: 24, paddingLeft: 24 }}>
-      {sortedTickets.map((ticket) => (
-        <Col span={24} md={24} lg={24} xl={24} style={{ marginBottom:12 }} key={ticket.id}>
-          <CardViewCard
-            ticket={ticket}
-            allStatusColumns={allStatusColumns}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            canDeleteTicket={canDeleteTicket}
-            isCustomer={isCustomer}
-            onFilterByStatus={onFilterByStatus}
-            onFilterByTag={onFilterByTag}
-            onFilterByCompany={onFilterByCompany}
-          />
-        </Col>
-      ))}
-    </Row>
+    <div style={{ width: '100%' }}>
+      <Row gutter={24} style={{ paddingRight: 24, paddingLeft: 24 }}>
+        {paged.map((ticket) => (
+          <Col span={24} style={{ marginBottom: 12 }} key={ticket.id}>
+            <CardViewCard
+              ticket={ticket}
+              allStatusColumns={allStatusColumns}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              canDeleteTicket={canDeleteTicket}
+              isCustomer={isCustomer}
+              onFilterByStatus={onFilterByStatus}
+              onFilterByTag={onFilterByTag}
+              onFilterByCompany={onFilterByCompany}
+            />
+          </Col>
+        ))}
+      </Row>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px' }}>
+        <Pagination
+          current={page}
+          pageSize={pageSize}
+          total={sortedTickets.length}
+          showSizeChanger
+          pageSizeOptions={['10', '15', '20', '50']}
+          showTotal={(t) => `Total ${t} tickets`}
+          onChange={(p, ps) => {
+            setPage(p)
+            if (ps !== pageSize) { setPageSize(ps); setPage(1) }
+          }}
+          size="default"
+        />
+      </div>
+    </div>
   )
 }

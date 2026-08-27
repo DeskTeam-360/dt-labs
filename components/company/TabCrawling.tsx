@@ -6,6 +6,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { useRouter } from 'next/navigation'
 
 import DateDisplay from '@/components/common/DateDisplay'
+import { APP_TABLE_PAGE_SIZE_OPTIONS } from '@/lib/app-table'
 
 const { Text } = Typography
 
@@ -171,8 +172,9 @@ export default function TabCrawling({
           rowKey="id"
           columns={columns}
           pagination={{
-            pageSize: 10,
+            pageSize: 15,
             showSizeChanger: true,
+            pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
             showTotal: (total) => `Total ${total} crawl sessions`,
           }}
         />

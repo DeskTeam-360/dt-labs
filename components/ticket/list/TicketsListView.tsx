@@ -66,7 +66,14 @@ export default function TicketsListView({
   sortOrder = TICKETS_LIST_SORT_ORDER,
 }: TicketsListViewProps) {
   const router = useRouter()
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 15 })
+
+  const [pagination, setPagination] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('tickets_list_page')
+      if (raw) return JSON.parse(raw) as { current: number; pageSize: number }
+    } catch { /* ignore */ }
+    return { current: 1, pageSize: 15 }
+  })
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
 
   const sortedTickets = useMemo(
@@ -81,6 +88,10 @@ export default function TicketsListView({
       return { ...p, current: totalPages }
     })
   }, [sortedTickets.length, pagination.pageSize])
+
+  useEffect(() => {
+    try { sessionStorage.setItem('tickets_list_page', JSON.stringify(pagination)) } catch { /* ignore */ }
+  }, [pagination])
 
   const bulkEnabled = !isCustomer && (onBulkMoveToSpam || onBulkMoveToTrash)
   const inSpamFolder = filterTicketType === 'spam'

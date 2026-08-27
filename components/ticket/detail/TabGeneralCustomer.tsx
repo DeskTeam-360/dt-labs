@@ -222,7 +222,7 @@ export default function TabGeneralCustomer({
                   </Text>
                 </TicketUserMention>
                 <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}>
-                  <DateDisplay date={ticketData.created_at} />
+                  <DateDisplay date={ticketData.created_at} format="relative" />
                 </Text>
               </Space>
             </Flex>
@@ -356,7 +356,7 @@ export default function TabGeneralCustomer({
                             {isCustomer ? 'Customer' : 'Agent'}
                           </Tag> */}
                           <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}>
-                            <DateDisplay date={comment.created_at} />
+                            <DateDisplay date={comment.created_at} format="relative" />
                           </Text>
                         </Space>
                         {!isAutomation && !isCustomer && comment.user_id === currentUserId && editingComment !== comment.id && (

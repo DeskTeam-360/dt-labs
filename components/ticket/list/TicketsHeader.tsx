@@ -41,9 +41,9 @@ export default function TicketsHeader({
     filterTicketType === 'spam' ? 'Spam' : filterTicketType === 'trash' ? 'Trash' : null
   const viewOptions = [
     { label: <span style={{ marginRight: 8 }}><AppstoreOutlined /> Kanban</span>, value: 'kanban' },
+    ...(!isCustomer ? [{ label: <span style={{ marginRight: 8 }}><TeamOutlined /> Round Robin</span>, value: 'roundrobin' }] : []),
     { label: <span style={{ marginRight: 8 }}><UnorderedListOutlined /> List</span>, value: 'list' },
     { label: <span style={{ marginRight: 8 }}><IdcardOutlined /> Card</span>, value: 'card' },
-    ...(!isCustomer ? [{ label: <span style={{ marginRight: 8 }}><TeamOutlined /> Round Robin</span>, value: 'roundrobin' }] : []),
   ]
 
   return (

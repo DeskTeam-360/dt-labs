@@ -33,6 +33,7 @@ import { useCallback, useRef, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -475,7 +476,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                     columns={customerColumns}
                     dataSource={data.rows}
                     size="small"
-                    pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} customers` }}
+                    pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('customers') }}
                     locale={{ emptyText: 'No data' }}
                     expandable={{
                       expandRowByClick: true,
@@ -527,7 +528,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                     columns={userColumns}
                     dataSource={data.rows}
                     size="small"
-                    pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} users` }}
+                    pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('users') }}
                     locale={{ emptyText: 'No data' }}
                     expandable={{
                       expandRowByClick: true,
@@ -579,7 +580,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                     columns={teamColumns}
                     dataSource={data.rows}
                     size="small"
-                    pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} teams` }}
+                    pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('teams') }}
                     locale={{ emptyText: 'No data' }}
                     expandable={{
                       expandRowByClick: true,

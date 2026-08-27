@@ -33,6 +33,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import { normalizeSpecificDates } from '@/lib/recurring-ticket-schedule'
 
 import RecurringTicketForm from './RecurringTicketForm'
@@ -373,7 +374,12 @@ export default function RecurringTicketsContent({ user }: Props) {
             columns={columns}
             rowKey="id"
             loading={loading}
-            pagination={{ pageSize: 20 }}
+            pagination={{
+              pageSize: 15,
+              showSizeChanger: true,
+              pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
+              showTotal: appTableShowTotal('rules'),
+            }}
             locale={{ emptyText: <Empty description="No recurring tickets yet" /> }}
           />
         </div>

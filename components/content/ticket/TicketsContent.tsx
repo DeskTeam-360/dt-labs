@@ -292,11 +292,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
         totalCount={filteredTickets.length}
         onClearFilters={clearFilters}
         isCustomer={isCustomer}
-        onSaveViewPreset={
-          !isCustomer
-            ? (name) => addSavedTicketFilterPreset(currentUser.id, name, getFilterQueryString())
-            : undefined
-        }
+        onSaveViewPreset={(name) => addSavedTicketFilterPreset(currentUser.id, name, getFilterQueryString())}
       />
 
       <TicketFormModal

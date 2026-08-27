@@ -68,10 +68,11 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
   if (action === 'ticket_updated') {
     const parts: string[] = []
     const changes = m.changes
-    const entityLabels = m.entity_labels as { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string> } | undefined
+    const entityLabels = m.entity_labels as { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string> } | undefined
     const teamNames = entityLabels?.teams
     const tagNames = entityLabels?.tags
     const contactNames = entityLabels?.contacts
+    const assigneeNames = entityLabels?.assignees
 
     const resolveRef = (id: unknown, map?: Record<string, string>): string => {
       if (id == null || id === '') return 'None'
@@ -95,6 +96,8 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
             parts.push(`${label}: ${resolveRef(ft.from, teamNames)} → ${resolveRef(ft.to, teamNames)}`)
           } else if (key === 'tag_ids') {
             parts.push(`${label}: ${resolveIds(ft.from, tagNames)} → ${resolveIds(ft.to, tagNames)}`)
+          } else if (key === 'assignee_ids') {
+            parts.push(`${label}: ${resolveIds(ft.from, assigneeNames)} → ${resolveIds(ft.to, assigneeNames)}`)
           } else if (key === 'contactUserId') {
             parts.push(`${label}: ${resolveRef(ft.from, contactNames)} → ${resolveRef(ft.to, contactNames)}`)
           } else {

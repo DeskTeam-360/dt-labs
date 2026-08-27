@@ -25,6 +25,7 @@ import ActionBuilder from '@/components/automation/ActionBuilder'
 import ConditionBuilder from '@/components/automation/ConditionBuilder'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import type { AutomationActions } from '@/lib/automation-actions-types'
 import type { OurConditionGroup } from '@/lib/condition-builder-utils'
 
@@ -311,7 +312,12 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
                 if (filterCompany && filterCompany !== '__global__' && r.company_id !== filterCompany) return false
                 return true
               })}
-              pagination={{ pageSize: 20 }}
+              pagination={{
+                pageSize: 15,
+                showSizeChanger: true,
+                pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
+                showTotal: appTableShowTotal('rules'),
+              }}
             />
 
           <Modal

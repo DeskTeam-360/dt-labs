@@ -1,6 +1,6 @@
 'use client'
 
-import { ClockCircleOutlined, StopOutlined } from '@ant-design/icons'
+import { ClockCircleOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined } from '@ant-design/icons'
 import { App, Badge, Button, Empty, Popover, Space, Spin, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -46,6 +46,9 @@ export default function ActiveTimeTrackerNavButton() {
   const [activeTrackers, setActiveTrackers] = useState<ActiveTrackerRow[]>([])
   const [elapsedBySessionId, setElapsedBySessionId] = useState<Record<string, number>>({})
   const [stoppingId, setStoppingId] = useState<string | null>(null)
+  const [pausingId, setPausingId] = useState<string | null>(null)
+  const [resumingId, setResumingId] = useState<string | null>(null)
+  const [pausedTrackers, setPausedTrackers] = useState<{ row: ActiveTrackerRow; elapsed: number }[]>([])
 
   const loadActive = useCallback(async () => {
     if (!userId) return
@@ -90,6 +93,41 @@ export default function ActiveTimeTrackerNavButton() {
     const interval = window.setInterval(tick, 1000)
     return () => window.clearInterval(interval)
   }, [activeTrackers])
+
+  const handlePauseTracker = async (row: ActiveTrackerRow) => {
+    setPausingId(row.id)
+    try {
+      await apiFetch(`/api/tickets/${row.ticket_id}/time-tracker`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop', session_id: row.id }),
+      })
+      const elapsed = elapsedBySessionId[row.id] ?? 0
+      setActiveTrackers((prev) => prev.filter((t) => t.id !== row.id))
+      setPausedTrackers((prev) => [...prev.filter((p) => p.row.id !== row.id), { row, elapsed }])
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : 'Failed to pause tracker')
+    } finally {
+      setPausingId(null)
+    }
+  }
+
+  const handleResumeTracker = async (paused: { row: ActiveTrackerRow; elapsed: number }) => {
+    setResumingId(paused.row.id)
+    try {
+      const data = await apiFetch<ActiveTrackerRow>(`/api/tickets/${paused.row.ticket_id}/time-tracker`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      })
+      setPausedTrackers((prev) => prev.filter((p) => p.row.id !== paused.row.id))
+      setActiveTrackers((prev) => [...prev, data])
+    } catch (error: unknown) {
+      message.error(error instanceof Error ? error.message : 'Failed to resume tracker')
+    } finally {
+      setResumingId(null)
+    }
+  }
 
   const handleStopTracker = async (row: ActiveTrackerRow) => {
     setStoppingId(row.id)
@@ -136,62 +174,53 @@ export default function ActiveTimeTrackerNavButton() {
           </Text>
         ) : null}
       </div>
-      {loading && activeTrackers.length === 0 ? (
+      {loading && activeTrackers.length === 0 && pausedTrackers.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 16 }}>
           <Spin size="small" />
         </div>
-      ) : running ? (
+      ) : running || pausedTrackers.length > 0 ? (
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           {activeTrackers.map((row) => (
             <div
               key={row.id}
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-              }}
+              style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
             >
               <div style={{ minWidth: 0, flex: 1 }}>
-                
-                <Text
-                  strong
-                  style={{ cursor: 'pointer', color: 'var(--ant-color-primary)' }}
-                  ellipsis
-                  onClick={() => {
-                    setOpen(false)
-                    router.push(`/tickets/${row.ticket_id}`)
-                  }}
-                >
+                <Text strong style={{ cursor: 'pointer', color: 'var(--ant-color-primary)' }} ellipsis
+                  onClick={() => { setOpen(false); router.push(`/tickets/${row.ticket_id}`) }}>
                   #{row.ticket_id} {row.ticket?.title}
                 </Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  Elapsed:{' '}
-                  <Text strong>{formatTime(elapsedBySessionId[row.id] ?? 0)}</Text>
+                  Elapsed: <Text strong>{formatTime(elapsedBySessionId[row.id] ?? 0)}</Text>
                 </Text>
               </div>
               <Space size="small" wrap>
-                <Button
-                  size="small"
-                  onClick={() => {
-                    setOpen(false)
-                    router.push(`/tickets/${row.ticket_id}`)
-                  }}
-                >
-                  Open
-                </Button>
-                <Button
-                  size="small"
-                  type="primary"
-                  danger
-                  icon={<StopOutlined />}
-                  loading={stoppingId === row.id}
-                  onClick={() => void handleStopTracker(row)}
-                >
-                  Stop
-                </Button>
+                <Button size="small" onClick={() => { setOpen(false); router.push(`/tickets/${row.ticket_id}`) }}>Open</Button>
+                <Button size="small" icon={<PauseCircleOutlined />} loading={pausingId === row.id} onClick={() => void handlePauseTracker(row)}>Pause</Button>
+                <Button size="small" type="primary" danger icon={<StopOutlined />} loading={stoppingId === row.id} onClick={() => void handleStopTracker(row)}>Stop</Button>
+              </Space>
+            </div>
+          ))}
+          {pausedTrackers.map((p) => (
+            <div
+              key={p.row.id}
+              style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, opacity: 0.8 }}
+            >
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <Text strong style={{ cursor: 'pointer', color: 'var(--ant-color-primary)' }} ellipsis
+                  onClick={() => { setOpen(false); router.push(`/tickets/${p.row.ticket_id}`) }}>
+                  #{p.row.ticket_id} {p.row.ticket?.title}
+                </Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Paused at: <Text strong>{formatTime(p.elapsed)}</Text>
+                </Text>
+              </div>
+              <Space size="small" wrap>
+                <Button size="small" onClick={() => { setOpen(false); router.push(`/tickets/${p.row.ticket_id}`) }}>Open</Button>
+                <Button size="small" type="primary" icon={<PlayCircleOutlined />} loading={resumingId === p.row.id} onClick={() => void handleResumeTracker(p)}>Resume</Button>
+                <Button size="small" danger icon={<StopOutlined />} onClick={() => setPausedTrackers((prev) => prev.filter((x) => x.row.id !== p.row.id))}>Stop</Button>
               </Space>
             </div>
           ))}

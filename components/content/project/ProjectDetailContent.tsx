@@ -27,6 +27,7 @@ import ProjectKanbanTab from '@/components/content/project/ProjectKanbanTab'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import type { TicketRecord } from '@/components/ticket/list/types'
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -263,7 +264,7 @@ export default function ProjectDetailContent({ user: currentUser, projectId }: P
                 size="small"
                 columns={activityColumns}
                 dataSource={boardTickets}
-                pagination={{ pageSize: 20 }}
+                pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('entries') }}
               />
             </Card>
           ),

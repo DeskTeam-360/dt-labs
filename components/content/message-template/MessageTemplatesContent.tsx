@@ -30,6 +30,7 @@ import { shouldOpenHrefInNewTab } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import MessageTemplatePreviewModal from '@/components/message-template/MessageTemplatePreviewModal'
+import { APP_TABLE_PAGE_SIZE_OPTIONS } from '@/lib/app-table'
 
 const { Content } = Layout
 const { Title, Text, Paragraph } = Typography
@@ -149,7 +150,7 @@ function GroupTabPanel({
           loading={loading}
           columns={columns}
           dataSource={rows}
-          pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} in this group` }}
+          pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: (t) => `${t} in this group` }}
           scroll={{ x: 1100 }}
           size="middle"
         />

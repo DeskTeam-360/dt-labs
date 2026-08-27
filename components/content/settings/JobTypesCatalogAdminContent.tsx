@@ -34,6 +34,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -347,7 +348,7 @@ export default function JobTypesCatalogAdminContent({ user: currentUser }: JobTy
               loading={listLoading}
               columns={columns}
               dataSource={rows}
-              pagination={{ pageSize: 20, showSizeChanger: true }}
+              pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('job types') }}
               size="small"
             />
 

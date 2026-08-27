@@ -114,8 +114,8 @@ export function diffTicketSnapshots(
 /** Resolve UUIDs in activity `changes` to display names for ticket activity UI. */
 export async function enrichActivityEntityLabels(
   changes: Record<string, { from: unknown; to: unknown }>
-): Promise<{ teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string> }> {
-  const out: { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string> } = {}
+): Promise<{ teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string> }> {
+  const out: { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string> } = {}
 
   // Teams
   const teamDelta = changes.teamId
@@ -143,6 +143,21 @@ export async function enrichActivityEntityLabels(
       const map: Record<string, string> = {}
       for (const r of rows) map[r.id] = (r.name?.trim() || r.id) as string
       out.tags = map
+    }
+  }
+
+  // Assignees
+  const assigneeDelta = changes.assignee_ids
+  if (assigneeDelta) {
+    const ids = new Set<string>()
+    for (const arr of [assigneeDelta.from, assigneeDelta.to]) {
+      if (Array.isArray(arr)) for (const id of arr) if (id) ids.add(String(id))
+    }
+    if (ids.size > 0) {
+      const rows = await db.select({ id: users.id, fullName: users.fullName, email: users.email }).from(users).where(inArray(users.id, [...ids]))
+      const map: Record<string, string> = {}
+      for (const r of rows) map[r.id] = (r.fullName?.trim() || r.email || r.id) as string
+      out.assignees = map
     }
   }
 

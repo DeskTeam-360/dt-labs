@@ -5,7 +5,7 @@ import { auth } from '@/auth'
 import { isAdmin } from '@/lib/auth-utils'
 import { getCustomerCompanyId } from '@/lib/customer-company'
 import { customerTicketsAccessCondition } from '@/lib/customer-ticket-access'
-import { db, ticketActivityLog, tickets, users } from '@/lib/db'
+import { db, tags, ticketActivityLog, tickets, ticketTags, users } from '@/lib/db'
 import { TICKET_ACTIVITY_ACTIONS, type TicketActivityAction } from '@/lib/ticket-activity-actions'
 import { buildTicketVisibilityAccessSql } from '@/lib/ticket-visibility-server'
 
@@ -59,6 +59,7 @@ export async function GET(request: Request) {
     id: ticketActivityLog.id,
     ticket_id: tickets.id,
     ticket_title: tickets.title,
+    ticket_status: tickets.status,
     action: ticketActivityLog.action,
     actor_role: ticketActivityLog.actorRole,
     metadata: ticketActivityLog.metadata,
@@ -119,10 +120,27 @@ export async function GET(request: Request) {
 
   const total = Number(countRow?.total ?? 0)
 
+  // Fetch tags for all ticket IDs in this page
+  const ticketIds = [...new Set(rows.map((r) => r.ticket_id))]
+  const tagRows = ticketIds.length > 0
+    ? await db
+        .select({ ticketId: ticketTags.ticketId, tagId: tags.id, tagName: tags.name, tagColor: tags.color })
+        .from(ticketTags)
+        .innerJoin(tags, eq(ticketTags.tagId, tags.id))
+        .where(inArray(ticketTags.ticketId, ticketIds))
+    : []
+  const tagsByTicket: Record<number, { id: string; name: string; color: string | null }[]> = {}
+  for (const t of tagRows) {
+    if (!tagsByTicket[t.ticketId]) tagsByTicket[t.ticketId] = []
+    tagsByTicket[t.ticketId].push({ id: t.tagId, name: t.tagName ?? '', color: t.tagColor ?? null })
+  }
+
   const data = rows.map((r) => ({
     id: r.id,
     ticket_id: r.ticket_id,
     ticket_title: r.ticket_title,
+    ticket_status: r.ticket_status ?? null,
+    ticket_tags: tagsByTicket[r.ticket_id] ?? [],
     action: r.action,
     actor_role: r.actor_role,
     metadata: r.metadata,

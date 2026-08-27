@@ -5,6 +5,8 @@ import { Avatar, Badge, Empty, Space, Spin, Table, Tooltip, Typography } from 'a
 import dayjs from 'dayjs'
 import { useEffect, useState } from 'react'
 
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
+
 const { Text } = Typography
 
 interface Run {
@@ -91,7 +93,7 @@ export default function RecurringTicketRunsDrawer({ ruleId }: { ruleId: string }
       dataSource={runs}
       columns={columns}
       rowKey="id"
-      pagination={{ pageSize: 10 }}
+      pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('runs') }}
       locale={{ emptyText: <Empty description="No runs yet" /> }}
       size="small"
     />

@@ -39,6 +39,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 import type { ColumnsType } from 'antd/es/table'
 
 import DateDisplay from '@/components/common/DateDisplay'
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import { canAdminTeams } from '@/lib/auth-utils'
 import {
   formatTeamVisibilityLabel,
@@ -477,9 +478,10 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
               rowKey="id"
               loading={loading}
               pagination={{
-                pageSize: 10,
+                pageSize: 15,
                 showSizeChanger: true,
-                showTotal: (total) => `Total ${total} teams`,
+                pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
+                showTotal: appTableShowTotal('teams'),
               }}
             />
             <Divider />

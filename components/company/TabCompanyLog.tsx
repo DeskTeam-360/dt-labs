@@ -19,6 +19,8 @@ import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
+
 const { RangePicker } = DatePicker
 const { Text, Paragraph } = Typography
 
@@ -309,7 +311,7 @@ export default function TabCompanyLog({ companyId, forceCanManage, layout = 'def
           loading={loading}
           columns={columns}
           dataSource={rows}
-          pagination={{ pageSize: 20, showSizeChanger: true }}
+          pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('logs') }}
           scroll={isFull ? { x: 'max-content' } : { x: 1400 }}
           tableLayout={isFull ? 'auto' : undefined}
           style={isFull ? { width: '100%' } : undefined}

@@ -486,7 +486,7 @@ export default function TabGeneral({
                                   </TicketUserMention>
                                 )}
                                 <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)', marginLeft: 4 }}>
-                                  Created At: <DateDisplay date={ticketData.created_at} />
+                                  Created At: <DateDisplay date={ticketData.created_at} format="relative" />
                                 </Text>
                               </Text>
                             </Flex>
@@ -683,7 +683,7 @@ export default function TabGeneral({
                               </Tag>
                             )}
                             <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}>
-                              <DateDisplay date={comment.created_at} />
+                              <DateDisplay date={comment.created_at} format="relative" />
                             </Text>
                           </Space>
                           {!isAutomation && editingComment !== comment.id && (
@@ -830,9 +830,9 @@ export default function TabGeneral({
           {/* </Card> */}
         </Col>
 
-        <Col xs={8} className="ticket-detail-sidebar-sticky">
+        <Col xs={8} style={{ position: 'sticky', top: 70, alignSelf: 'flex-start', minWidth: 0, maxWidth: '100%' }}>
           <div style={{ width: '100%', minWidth: 0, maxWidth: '100%' }}>
-          <Flex justify="flex-end" gap={8} wrap="wrap" style={{ marginBottom: 12 }}>
+          <Flex justify="flex-end" gap={8} wrap="wrap" style={{ marginBottom: 8 }}>
             <Button
               type="primary"
               disabled={!sidebarDirty || sidebarAttributesSaving}
@@ -858,21 +858,6 @@ export default function TabGeneral({
               content: { width: '62%', overflow: 'hidden' },
             }}
           >
-            <Descriptions.Item label="Short Note">
-              <Input.TextArea
-                value={sidebarDraft.shortNote}
-                onChange={(e) =>
-                  setSidebarDraft((d) => ({
-                    ...d,
-                    shortNote: e.target.value,
-                  }))
-                }
-                placeholder="Short note (optional)"
-                rows={2}
-                disabled={sidebarAttributesSaving}
-                style={{ resize: 'vertical' }}
-              />
-            </Descriptions.Item>
             <Descriptions.Item label={useProjectBoardStatus ? 'Project status' : 'Status'}>
               {useProjectBoardStatus ? (
                 <Select
@@ -1042,9 +1027,6 @@ export default function TabGeneral({
                   showSearch
                   optionFilterProp="label"
                 />
-                <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 12 }}>
-                  Agent replies are sent to this person when set; otherwise to Created By.
-                </Text>
                 {contactCrossCompanyHint ? (
                   <Alert
                     type="warning"
@@ -1064,13 +1046,11 @@ export default function TabGeneral({
                 </TicketUserMention>
               </Descriptions.Item>
             ) : null}
-            <Descriptions.Item label="CC Recipients">
-              {ticketCcEmails?.length ? (
+            {ticketCcEmails?.length ? (
+              <Descriptions.Item label="CC Recipients">
                 <Text style={{ fontSize: 12 }}>{ticketCcEmails.join(', ')}</Text>
-              ) : (
-                <Text type="secondary">—</Text>
-              )}
-            </Descriptions.Item>
+              </Descriptions.Item>
+            ) : null}
             <Descriptions.Item label="Due Date">
               <DatePicker
                 value={sidebarDraft.dueDate ? dayjs(sidebarDraft.dueDate) : null}

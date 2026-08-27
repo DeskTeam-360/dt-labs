@@ -24,6 +24,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import { KNOWLEDGE_BASE_ARTICLE_ROLES, labelForKnowledgeBaseRoles } from '@/lib/knowledge-base-article-roles'
 
 const { Content } = Layout
@@ -261,7 +262,7 @@ export default function DashboardAnnouncementsSettingsContent({
                 loading={loading}
                 columns={columns}
                 dataSource={rows}
-                pagination={{ pageSize: 10, showSizeChanger: true }}
+                pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('announcements') }}
               />
             </Space>
           </Card>

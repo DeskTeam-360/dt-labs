@@ -349,11 +349,14 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
 
   const queryClient = useQueryClient()
 
+  // list/card have built-in pagination so fetch all; kanban/RR show cards at once → use user limit
+  const effectiveTicketsLimit = (viewMode === 'list' || viewMode === 'card') ? 9999 : ticketsPageLimit
+
   const ticketsListQueryKey = useMemo(
     () =>
       buildTicketsListQueryKey({
         isCustomer,
-        ticketsPageLimit,
+        ticketsPageLimit: effectiveTicketsLimit,
         filterCompanyIds,
         filterStatus,
         filterTypeIds,
@@ -367,7 +370,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       }),
     [
       isCustomer,
-      ticketsPageLimit,
+      effectiveTicketsLimit,
       filterCompanyIds,
       filterStatus,
       filterTypeIds,
@@ -428,7 +431,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         const sb = searchParams.get('search_by')
         if (sb && (sb === 'title' || sb === 'id')) params.set('search_by', sb)
       }
-      params.set('limit', String(ticketsPageLimit))
+      params.set('limit', String(effectiveTicketsLimit))
 
       const qs = params.toString()
       const url = qs ? `/api/tickets?${qs}` : '/api/tickets'
@@ -675,7 +678,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         setFilterDateRange(parsed.filterDateRange)
         setFilterDueDateRange(parsed.filterDueDateRange ?? null)
         setFilterSearch(parsed.filterSearch)
-        setViewMode(parsed.viewMode)
+        // Only apply viewMode if explicitly present in URL — preset=1 is always added by the save
+        // effect even without a view param, so absent view means "keep current / localStorage value".
+        if (searchParams.has(URL_PARAMS.view)) setViewMode(parsed.viewMode)
         setFilterTicketType(parsed.filterTicketType ?? null)
       } else {
         /** Only apply fields actually present in the URL. `view` alone (without `status`) used to make parsed.filterStatus [] and overwrite state → unnecessary refetch. */

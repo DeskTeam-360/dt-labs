@@ -16,6 +16,7 @@ import { useEffect,useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { APP_TABLE_PAGE_SIZE_OPTIONS } from '@/lib/app-table'
 import { labelForKnowledgeBaseRoles } from '@/lib/knowledge-base-article-roles'
 
 const { Content } = Layout
@@ -172,7 +173,7 @@ export default function KnowledgeBaseContent({ user: currentUser }: KnowledgeBas
             dataSource={articles}
             columns={columns}
             loading={loading}
-            pagination={{ pageSize: 15, showSizeChanger: true, showTotal: (t) => `Total ${t} articles` }}
+            pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: (t) => `Total ${t} articles` }}
           />
         </Content>
       </AdminMainColumn>

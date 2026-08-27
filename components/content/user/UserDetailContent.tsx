@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo,useRef, useState } from 'react'
 
+import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import {
   getUserDepartmentAccentColor,
   getUserPositionAccentColor,
@@ -1221,9 +1222,10 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           loading={timeTrackerLoading}
                           dataSource={drawerEntryTimesForTicket}
                           pagination={{
-                            pageSize: 20,
+                            pageSize: 15,
                             showSizeChanger: true,
-                            showTotal: (total) => `${total} entries for this ticket in this period`,
+                            pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
+                            showTotal: appTableShowTotal('entries'),
                           }}
                           scroll={{ x: 'max-content' }}
                           columns={[
@@ -1415,9 +1417,10 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         rowKey="id"
                         loading={timeTrackerLoading}
                         pagination={{
-                          pageSize: 10,
+                          pageSize: 15,
                           showSizeChanger: true,
-                          showTotal: (total) => `Total ${total} time tracker records`,
+                          pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
+                          showTotal: appTableShowTotal('records'),
                         }}
                         locale={{
                           emptyText: 'No time tracker records found',
