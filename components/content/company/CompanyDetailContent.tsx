@@ -597,11 +597,12 @@ export default function CompanyDetailContent({
                     <Form.Item
                       name="leader_user_id"
                       label="Company leader"
-                      rules={[{ required: true, message: 'Please select a company leader' }]}
+                      extra="Kosongkan untuk company internal (tanpa customer leader)"
                     >
                       <Select
                         showSearch
-                        placeholder="Customer user as leader"
+                        allowClear
+                        placeholder="Customer user as leader (optional)"
                         optionFilterProp="label"
                         options={companyEditLeaderOptions.map((u) => ({
                           value: u.id,

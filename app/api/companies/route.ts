@@ -110,20 +110,21 @@ export async function POST(request: Request) {
   if (!name) {
     return NextResponse.json({ error: 'Name is required' }, { status: 400 })
   }
-  if (!leader_user_id || typeof leader_user_id !== 'string') {
-    return NextResponse.json({ error: 'Company leader is required' }, { status: 400 })
-  }
-
-  const [leader] = await db
-    .select({ id: users.id, role: users.role })
-    .from(users)
-    .where(eq(users.id, leader_user_id))
-    .limit(1)
-  if (!leader) {
-    return NextResponse.json({ error: 'Company leader not found' }, { status: 404 })
-  }
-  if ((leader.role || '').toLowerCase() !== 'customer') {
-    return NextResponse.json({ error: 'Company leader must be a customer user' }, { status: 400 })
+  if (leader_user_id) {
+    if (typeof leader_user_id !== 'string') {
+      return NextResponse.json({ error: 'Invalid leader_user_id' }, { status: 400 })
+    }
+    const [leader] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, leader_user_id))
+      .limit(1)
+    if (!leader) {
+      return NextResponse.json({ error: 'Company leader not found' }, { status: 404 })
+    }
+    if ((leader.role || '').toLowerCase() !== 'customer') {
+      return NextResponse.json({ error: 'Company leader must be a customer user' }, { status: 400 })
+    }
   }
 
   if (activeTeamId) {
@@ -165,15 +166,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create company' }, { status: 500 })
   }
 
-  await db
-    .update(users)
-    .set({ companyId: row.id, updatedAt: new Date() })
-    .where(eq(users.id, leader_user_id))
-  await upsertCompanyUserMembership({
-    companyId: row.id,
-    userId: leader_user_id,
-    companyRole: 'company_admin',
-  })
+  if (leader_user_id) {
+    await db
+      .update(users)
+      .set({ companyId: row.id, updatedAt: new Date() })
+      .where(eq(users.id, leader_user_id))
+    await upsertCompanyUserMembership({
+      companyId: row.id,
+      userId: leader_user_id,
+      companyRole: 'company_admin',
+    })
+  }
 
   revalidateTicketsLookupCatalog()
   return NextResponse.json(
@@ -182,7 +185,7 @@ export async function POST(request: Request) {
         id: row.id,
         name: row.name,
         email: row.email,
-        created_by: leader_user_id,
+        created_by: leader_user_id ?? null,
         color: row.color,
         is_active: row.isActive ?? true,
         active_team_id: row.activeTeamId ?? null,

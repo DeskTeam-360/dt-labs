@@ -8,6 +8,7 @@ import { runTicketCommentAutomation } from '@/lib/automation-engine'
 import { assertCustomerMayAccessTicket } from '@/lib/customer-ticket-access'
 import {
   commentAttachments,
+  companies,
   companyUsers,
   db,
   emailIntegrations,
@@ -62,7 +63,7 @@ async function sendAgentRequesterRepliesEmail(params: {
   const { ticketId, actorUserId, ticketTitle, bodyPreview, replyHtml } = params
 
   const [ticketRow] = await db
-    .select({ teamId: tickets.teamId })
+    .select({ teamId: tickets.teamId, companyId: tickets.companyId })
     .from(tickets)
     .where(eq(tickets.id, ticketId))
     .limit(1)
@@ -74,10 +75,29 @@ async function sendAgentRequesterRepliesEmail(params: {
     .leftJoin(users, eq(teamMembers.userId, users.id))
     .where(eq(teamMembers.teamId, ticketRow.teamId))
 
-  const recipients = memberRows
-    .map((r) => r.user)
-    .filter((u): u is NonNullable<typeof memberRows[number]['user']> => Boolean(u?.email))
-    .filter((u) => u.id !== actorUserId)
+  const recipientMap = new Map<string, NonNullable<typeof memberRows[number]['user']>>()
+  for (const r of memberRows) {
+    if (r.user?.id && r.user.email) recipientMap.set(r.user.id, r.user)
+  }
+
+  // Also include the company's active manager if set and not already in the list
+  if (ticketRow.companyId) {
+    const [companyRow] = await db
+      .select({ activeManagerId: companies.activeManagerId })
+      .from(companies)
+      .where(eq(companies.id, ticketRow.companyId))
+      .limit(1)
+    if (companyRow?.activeManagerId && !recipientMap.has(companyRow.activeManagerId)) {
+      const [managerUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, companyRow.activeManagerId))
+        .limit(1)
+      if (managerUser?.email) recipientMap.set(managerUser.id, managerUser)
+    }
+  }
+
+  const recipients = Array.from(recipientMap.values()).filter((u) => u.id !== actorUserId)
 
   if (recipients.length === 0) return
 

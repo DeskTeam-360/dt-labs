@@ -120,19 +120,21 @@ export async function PUT(
     if (isCustomer) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
-    if (!leader_user_id || typeof leader_user_id !== 'string') {
-      return NextResponse.json({ error: 'Company leader is required' }, { status: 400 })
-    }
-    const [leader] = await db
-      .select({ id: users.id, role: users.role })
-      .from(users)
-      .where(eq(users.id, leader_user_id))
-      .limit(1)
-    if (!leader) {
-      return NextResponse.json({ error: 'Company leader not found' }, { status: 404 })
-    }
-    if ((leader.role || '').toLowerCase() !== 'customer') {
-      return NextResponse.json({ error: 'Company leader must be a customer user' }, { status: 400 })
+    if (leader_user_id) {
+      if (typeof leader_user_id !== 'string') {
+        return NextResponse.json({ error: 'Invalid leader_user_id' }, { status: 400 })
+      }
+      const [leader] = await db
+        .select({ id: users.id, role: users.role })
+        .from(users)
+        .where(eq(users.id, leader_user_id))
+        .limit(1)
+      if (!leader) {
+        return NextResponse.json({ error: 'Company leader not found' }, { status: 404 })
+      }
+      if ((leader.role || '').toLowerCase() !== 'customer') {
+        return NextResponse.json({ error: 'Company leader must be a customer user' }, { status: 400 })
+      }
     }
   }
 
@@ -146,7 +148,7 @@ export async function PUT(
     return NextResponse.json({ error: 'Company not found' }, { status: 404 })
   }
 
-  if (leader_user_id !== undefined && !isCustomer) {
+  if (leader_user_id && !isCustomer) {
     await db
       .update(companyUsers)
       .set({ companyRole: 'member', updatedAt: new Date() })
