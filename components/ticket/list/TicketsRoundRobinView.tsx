@@ -79,9 +79,6 @@ export default function TicketsRoundRobinView({
         if (!ticket) return null
         const bgColor = getStatusColor(ticket.status, statusColumns)
         const textColor = ticket.type?.color ?? '#000'
-        const p = Number(ticket.priority ?? 0)
-        const priorityColor =
-          p > 0 ? `2px solid ${p <= 1 ? '#52c41a' : p <= 2 ? '#faad14' : '#ff4d4f'}` : 'none'
         return (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', }}>
             <Flex align="center" gap={4} justify="center" style={{ width: '100%' }}>
@@ -108,7 +105,6 @@ export default function TicketsRoundRobinView({
                   textDecoration: 'none',
                   backgroundColor: bgColor,
                   color: textColor,
-                  border: priorityColor,
                   padding: '4px 8px',
                   borderRadius: 40,
                   cursor: 'pointer',
