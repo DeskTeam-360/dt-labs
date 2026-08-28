@@ -6,6 +6,25 @@ import { useCallback,useEffect, useState } from 'react'
 
 const { Text } = Typography
 
+const URL_REGEX = /(https?:\/\/[^\s]+)/g
+
+function TextWithLinks({ text, style }: { text: string; style?: React.CSSProperties }) {
+  const parts = text.split(URL_REGEX)
+  return (
+    <Text style={{ whiteSpace: 'pre-wrap', display: 'block', ...style }}>
+      {parts.map((part, i) =>
+        URL_REGEX.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>
+            {part}
+          </a>
+        ) : (
+          part
+        )
+      )}
+    </Text>
+  )
+}
+
 type ListItem = { id: string; title: string }
 
 async function apiFetch<T>(url: string): Promise<T> {
@@ -118,9 +137,7 @@ export default function DashboardAnnouncementsSection() {
             <Spin />
           </div>
         ) : detail ? (
-          <Text style={{ whiteSpace: 'pre-wrap', display: 'block', fontSize: 15, lineHeight: 1.65 }}>
-            {detail.body || '—'}
-          </Text>
+          <TextWithLinks text={detail.body || '—'} style={{ fontSize: 15, lineHeight: 1.65 }} />
         ) : (
           <Text type="secondary">Could not load this announcement.</Text>
         )}

@@ -5,6 +5,39 @@ import { Button, Col, Descriptions, Empty, Input, Popconfirm,Row, Space, Typogra
 
 const { Text } = Typography
 
+function isUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim())
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function shortenUrl(value: string): string {
+  try {
+    const url = new URL(value.trim())
+    const host = url.hostname.replace(/^www\./, '')
+    const path = url.pathname.replace(/\/$/, '')
+    const short = path && path !== '/' ? `${host}${path.length > 24 ? path.slice(0, 24) + '…' : path}` : host
+    return short
+  } catch {
+    return value
+  }
+}
+
+function AttributeValue({ value }: { value: string | null }) {
+  if (!value) return <Text type="secondary">(empty)</Text>
+  if (isUrl(value)) {
+    return (
+      <a href={value.trim()} target="_blank" rel="noopener noreferrer" title={value.trim()}>
+        {shortenUrl(value)}
+      </a>
+    )
+  }
+  return <Text>{value}</Text>
+}
+
 interface Attribute {
   id: string
   ticket_id: number
@@ -143,7 +176,7 @@ export default function TabAttributes({
                   />
                 </Space.Compact>
               ) : (
-                <Text>{attr.meta_value || <Text type="secondary">(empty)</Text>}</Text>
+                <AttributeValue value={attr.meta_value} />
               )}
             </Descriptions.Item>
           ))}
