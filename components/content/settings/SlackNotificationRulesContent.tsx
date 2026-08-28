@@ -463,9 +463,6 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
           <Form.Item name="is_enabled" label="Enabled" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item name="sort_order" label="Sort order">
-            <InputNumber className="w-full" min={0} style={{ width: '100%' }} />
-          </Form.Item>
           </Flex>
 
         
