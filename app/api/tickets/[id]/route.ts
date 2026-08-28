@@ -184,6 +184,7 @@ export async function PATCH(
         changes.priority = { from: priorFromSnap, to: priToSnap }
       }
 
+      const statusEntityLabels = await enrichActivityEntityLabels(changes)
       await logTicketActivity({
         ticketId,
         actorUserId,
@@ -192,6 +193,7 @@ export async function PATCH(
         metadata: {
           changed_keys: changedKeys,
           changes,
+          ...(Object.keys(statusEntityLabels).length > 0 ? { entity_labels: statusEntityLabels } : {}),
         },
       })
       try {
@@ -325,6 +327,8 @@ export async function PATCH(
       .set({ projectStatusId: nextPs, updatedAt: new Date() })
       .where(eq(tickets.id, ticketId))
     if (cur && (cur.projectStatusId ?? null) !== nextPs) {
+      const psChanges = { project_status_id: { from: cur.projectStatusId, to: nextPs } }
+      const psEntityLabels = await enrichActivityEntityLabels(psChanges)
       await logTicketActivity({
         ticketId,
         actorUserId,
@@ -332,7 +336,8 @@ export async function PATCH(
         action: 'ticket_updated',
         metadata: {
           changed_keys: ['project_status_id'],
-          changes: { project_status_id: { from: cur.projectStatusId, to: nextPs } },
+          changes: psChanges,
+          ...(Object.keys(psEntityLabels).length > 0 ? { entity_labels: psEntityLabels } : {}),
         },
       })
     }
@@ -698,7 +703,7 @@ export async function PATCH(
       if (Object.keys(changes).length > 0) meta.changes = changes
       const changedKeys = Object.keys(changes)
       if (changedKeys.length > 0) meta.changed_keys = changedKeys
-      if (changes.teamId) {
+      if (changedKeys.length > 0) {
         const entityLabels = await enrichActivityEntityLabels(changes)
         if (Object.keys(entityLabels).length > 0) {
           meta.entity_labels = entityLabels

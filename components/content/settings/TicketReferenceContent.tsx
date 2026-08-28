@@ -1,8 +1,8 @@
 'use client'
 
-import { ReadOutlined } from '@ant-design/icons'
-import { Card, Collapse, Empty, Layout, Spin, Tabs, Typography } from 'antd'
-import { useEffect, useMemo,useState } from 'react'
+import { EyeOutlined, ReadOutlined } from '@ant-design/icons'
+import { Card, Collapse, Empty, Layout, Spin, Switch, Tabs, Typography } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
@@ -156,12 +156,14 @@ function GlossaryBlock({
   body,
   descriptionAsHtml = false,
   emptyDescriptionHint = 'No description yet. Admins can add one in Settings → Ticket attributes.',
+  clientLabel,
 }: {
   title: string
   color: string
   body: string
   descriptionAsHtml?: boolean
   emptyDescriptionHint?: string
+  clientLabel?: string
 }) {
   const stripe = glossaryStripeColor(color)
   const hasBody = body.trim().length > 0
@@ -179,9 +181,16 @@ function GlossaryBlock({
           aria-hidden
         />
         <div style={{ flex: 1, minWidth: 200 }}>
-          <Text strong style={{ fontSize: 15, display: 'block', marginBottom: hasBody ? 8 : 0 }}>
-            {title}
-          </Text>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: hasBody ? 6 : 0, flexWrap: 'wrap' }}>
+            <Text strong style={{ fontSize: 15 }}>
+              {title}
+            </Text>
+            {clientLabel !== undefined && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Client sees as: <Text style={{ fontSize: 12, color: stripe }}>{clientLabel}</Text>
+              </Text>
+            )}
+          </div>
           <GlossaryBodyContent
             body={body}
             descriptionAsHtml={descriptionAsHtml}
@@ -199,8 +208,10 @@ export default function TicketReferenceContent({ user: currentUser }: TicketRefe
   const [types, setTypes] = useState<TypeRow[]>([])
   const [statuses, setStatuses] = useState<StatusRow[]>([])
   const [knowledgeArticles, setKnowledgeArticles] = useState<KnowledgeArticleRow[]>([])
+  const [viewAsClient, setViewAsClient] = useState(false)
 
   const isCustomer = (currentUser.role ?? '').toLowerCase() === 'customer'
+  const showClientView = isCustomer || viewAsClient
 
   useEffect(() => {
     let cancelled = false
@@ -234,8 +245,8 @@ export default function TicketReferenceContent({ user: currentUser }: TicketRefe
 
   const statusTitle = useMemo(
     () => (row: StatusRow) =>
-      isCustomer && row.customer_title?.trim() ? row.customer_title.trim() : row.title,
-    [isCustomer]
+      showClientView && row.customer_title?.trim() ? row.customer_title.trim() : row.title,
+    [showClientView]
   )
 
   const sortedFaqArticles = useMemo(() => {
@@ -289,14 +300,28 @@ export default function TicketReferenceContent({ user: currentUser }: TicketRefe
       ) : statuses.length === 0 ? (
         <Empty description="No statuses defined" />
       ) : (
-        statuses.map((row) => (
-          <GlossaryBlock
-            key={row.id}
-            title={statusTitle(row)}
-            color={row.color}
-            body={row.description ?? ''}
-          />
-        ))
+        <>
+          {!isCustomer && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <EyeOutlined style={{ color: viewAsClient ? '#1677ff' : undefined }} />
+              <span style={{ fontSize: 13 }}>View as client</span>
+              <Switch size="small" checked={viewAsClient} onChange={setViewAsClient} />
+            </div>
+          )}
+          {statuses.map((row) => (
+            <GlossaryBlock
+              key={row.id}
+              title={statusTitle(row)}
+              color={row.color}
+              body={row.description ?? ''}
+              clientLabel={
+                !isCustomer && !viewAsClient
+                  ? row.customer_title?.trim() || row.title
+                  : undefined
+              }
+            />
+          ))}
+        </>
       ),
     },
   ]

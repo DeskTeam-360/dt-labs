@@ -1,6 +1,6 @@
 import { eq, inArray } from 'drizzle-orm'
 
-import { db, tags, teams, ticketActivityLog, ticketAssignees, tickets, ticketStatuses, ticketTags, users } from '@/lib/db'
+import { db, projectStatuses, tags, teams, ticketActivityLog, ticketAssignees, tickets, ticketStatuses, ticketTags, users } from '@/lib/db'
 
 import type { TicketActivityAction } from './ticket-activity-actions'
 
@@ -114,8 +114,8 @@ export function diffTicketSnapshots(
 /** Resolve UUIDs in activity `changes` to display names for ticket activity UI. */
 export async function enrichActivityEntityLabels(
   changes: Record<string, { from: unknown; to: unknown }>
-): Promise<{ teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string> }> {
-  const out: { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string> } = {}
+): Promise<{ teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string> }> {
+  const out: { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string> } = {}
 
   // Teams
   const teamDelta = changes.teamId
@@ -186,6 +186,22 @@ export async function enrichActivityEntityLabels(
       const map: Record<string, string> = {}
       for (const r of rows) map[r.id] = (r.fullName?.trim() || r.email || r.id) as string
       out.contacts = map
+    }
+  }
+
+  // Project statuses
+  const projectStatusDelta = changes.project_status_id
+  if (projectStatusDelta) {
+    const ids = new Set<number>()
+    for (const v of [projectStatusDelta.from, projectStatusDelta.to]) {
+      const n = Number(v)
+      if (v != null && v !== '' && !isNaN(n)) ids.add(n)
+    }
+    if (ids.size > 0) {
+      const rows = await db.select({ id: projectStatuses.id, title: projectStatuses.title }).from(projectStatuses).where(inArray(projectStatuses.id, [...ids]))
+      const map: Record<string, string> = {}
+      for (const r of rows) map[String(r.id)] = (r.title?.trim() || String(r.id)) as string
+      out.project_statuses = map
     }
   }
 
