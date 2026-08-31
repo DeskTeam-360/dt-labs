@@ -182,6 +182,7 @@ export default function FilterSidebar({
                     onChange={(v) => onFilterTeamIdsChange(v ?? [])}
                     maxTagCount="responsive"
                   >
+                    <Option key="__none__" value="__none__" label="No Team">— No Team</Option>
                     {teams.map((t) => (
                       <Option key={t.id} value={t.id} label={t.name}>{t.name}</Option>
                     ))}

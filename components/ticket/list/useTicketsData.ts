@@ -400,7 +400,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         const realCompanyIds = filterCompanyIds.filter((id) => id !== '__none__')
         if (noCompany) params.set('no_company', '1')
         if (realCompanyIds.length > 0) params.set('company_ids', realCompanyIds.join(','))
-        if (filterTeamIds.length > 0 && !inJunkFolder) params.set('team_ids', filterTeamIds.join(','))
+        const noTeam = filterTeamIds.includes('__none__')
+        const realTeamIds = filterTeamIds.filter((id) => id !== '__none__')
+        if (noTeam && !inJunkFolder) params.set('no_team', '1')
+        if (realTeamIds.length > 0 && !inJunkFolder) params.set('team_ids', realTeamIds.join(','))
       }
       const noTags = filterTagIds.includes('__none__')
       const realTagIds = filterTagIds.filter((id) => id !== '__none__')

@@ -32,7 +32,6 @@ const QUILL_FORMATS = [
   'header',
   'size',
   'color',
-  'background',
   'bold',
   'italic',
   'underline',
@@ -111,7 +110,7 @@ export default function CommentWysiwyg({
       container: [
         [{ header: [1, 2, 3, false] }],
         [{ size: ['small', false, 'large', 'huge'] }],
-        [{ color: [] }, { background: [] }],
+        [{ color: [] }],
         ['bold', 'italic', 'underline', 'strike'],
         [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }],
         ['link', 'image'],

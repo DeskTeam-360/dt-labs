@@ -51,6 +51,10 @@ export default function CommentHtml({ html, style, className }: CommentHtmlProps
         .comment-html p + p {
           margin-top: 4px;
         }
+        .comment-html *[style] {
+          background-color: transparent !important;
+          color: inherit !important;
+        }
       `}</style>
 
       <div

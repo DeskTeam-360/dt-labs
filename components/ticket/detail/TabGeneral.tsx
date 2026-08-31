@@ -26,8 +26,10 @@ import {
   Col,
   DatePicker,
   Descriptions,
+  Drawer,
   Empty,
   Flex,
+  Grid,
   Input,
   InputNumber,
   Layout,
@@ -40,6 +42,8 @@ import {
   Tooltip,
   Typography,
 } from 'antd'
+
+const { useBreakpoint } = Grid
 import dayjs from 'dayjs'
 import React, { useEffect, useMemo,useState } from 'react'
 
@@ -380,13 +384,18 @@ export default function TabGeneral({
     onRightCollapsedChange?.(next)
   }
   const [companyCollapsed, setCompanyCollapsed] = useState(false)
+  const screens = useBreakpoint()
+  const isMobile = !screens.md
+  const [drawerAttrOpen, setDrawerAttrOpen] = useState(false)
+  const [drawerCompanyOpen, setDrawerCompanyOpen] = useState(false)
   const ATTR_W = rightCollapsed ? 75 : 280
   const COMP_W = companyCollapsed ? 75 : 220
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--attr-sidebar-width', `${ATTR_W + COMP_W}px`)
+    const width = isMobile ? 0 : ATTR_W + COMP_W
+    document.documentElement.style.setProperty('--attr-sidebar-width', `${width}px`)
     return () => { document.documentElement.style.removeProperty('--attr-sidebar-width') }
-  }, [ATTR_W, COMP_W])
+  }, [ATTR_W, COMP_W, isMobile])
 
   const [sidebarDraft, setSidebarDraft] = useState<SidebarAttributesDraft>(() =>
     snapshotSidebarDraft({
@@ -433,9 +442,6 @@ export default function TabGeneral({
   } | null>(null)
   const [companyAttrs, setCompanyAttrs] = useState<CompanyAttr[]>([])
   const [topTickets, setTopTickets] = useState<TopTicket[]>([])
-  const [newAttrKey, setNewAttrKey] = useState('')
-  const [newAttrVal, setNewAttrVal] = useState('')
-  const [attrLoading, setAttrLoading] = useState(false)
 
   useEffect(() => {
     const cid = ticketData?.company_id
@@ -732,9 +738,7 @@ export default function TabGeneral({
                               </Text>
                             </TicketUserMention>
                           )}
-                            {isAutomation ? (
-                              <Tag color="purple">Automation</Tag>
-                            ) : (
+                            {!isAutomation && (
                               <Tag color={isCustomer ? 'cyan' : 'gold'}>{isCustomer ? 'Customer' : 'Agent'}</Tag>
                             )}
                             {showNoteOption && (
@@ -892,8 +896,18 @@ export default function TabGeneral({
       </Row>
     </Space>
 
+        {/* Mobile drawer trigger buttons */}
+        {isMobile && (
+          <div style={{ position: 'fixed', bottom: 80, right: 16, zIndex: 200, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Button shape="circle" icon={<ProfileOutlined />} onClick={() => setDrawerAttrOpen(true)} style={{ background: '#001529', color: '#fff', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }} />
+            {ticketData?.company_id && (
+              <Button shape="circle" icon={<UserOutlined />} onClick={() => setDrawerCompanyOpen(true)} style={{ background: '#001529', color: '#fff', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }} />
+            )}
+          </div>
+        )}
+
         {/* Attributes sidebar — left of company */}
-        <div style={{
+        {!isMobile && <div style={{
             width: ATTR_W,
             position: 'fixed',
             right: COMP_W,
@@ -1166,10 +1180,10 @@ export default function TabGeneral({
           </div>
           </>
           )}
-        </div>
+        </div>}
 
         {/* Company Info sidebar — paling kanan, right: 0 */}
-        <div style={{
+        {!isMobile && <div style={{
             width: COMP_W,
             position: 'fixed',
             right: 0,
@@ -1290,66 +1304,19 @@ export default function TabGeneral({
                   <div>
                     <Text style={{ fontSize: 11, display: 'block', marginBottom: 6, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Custom Attributes</Text>
                     <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                      {companyAttrs.length === 0 && (
+                        <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>—</Text>
+                      )}
                       {companyAttrs.map(attr => (
-                        <div key={attr.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 4, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', display: 'block' }}>{attr.meta_key}</Text>
-                            {attr.meta_value && isUrl(attr.meta_value) ? (
-                              <a href={attr.meta_value} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, wordBreak: 'break-all' }}>{shortenUrl(attr.meta_value)}</a>
-                            ) : (
-                              <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11 }}>{attr.meta_value || '—'}</Text>
-                            )}
-                          </div>
-                          <Button
-                            type="text"
-                            size="small"
-                            danger
-                            style={{ flexShrink: 0, color: 'rgba(255,100,100,0.7)', padding: '0 4px' }}
-                            onClick={async () => {
-                              const cid = ticketData.company_id
-                              await fetch(`/api/companies/${cid}/attributes/${attr.id}`, { method: 'DELETE', credentials: 'include' })
-                              setCompanyAttrs(prev => prev.filter(a => a.id !== attr.id))
-                            }}
-                          >×</Button>
+                        <div key={attr.id} style={{ padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', display: 'block' }}>{attr.meta_key}</Text>
+                          {attr.meta_value && isUrl(attr.meta_value) ? (
+                            <a href={attr.meta_value} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, wordBreak: 'break-all' }}>{shortenUrl(attr.meta_value)}</a>
+                          ) : (
+                            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11 }}>{attr.meta_value || '—'}</Text>
+                          )}
                         </div>
                       ))}
-                      <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                        <input
-                          placeholder="Key"
-                          value={newAttrKey}
-                          onChange={e => setNewAttrKey(e.target.value)}
-                          style={{ flex: 1, minWidth: 0, padding: '3px 6px', fontSize: 11, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, color: '#fff', outline: 'none' }}
-                        />
-                        <input
-                          placeholder="Value"
-                          value={newAttrVal}
-                          onChange={e => setNewAttrVal(e.target.value)}
-                          style={{ flex: 1, minWidth: 0, padding: '3px 6px', fontSize: 11, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, color: '#fff', outline: 'none' }}
-                        />
-                        <Button
-                          size="small"
-                          loading={attrLoading}
-                          style={{ flexShrink: 0, background: '#1677ff', borderColor: '#1677ff', color: '#fff', padding: '0 8px' }}
-                          onClick={async () => {
-                            if (!newAttrKey.trim()) return
-                            setAttrLoading(true)
-                            const cid = ticketData.company_id
-                            const res = await fetch(`/api/companies/${cid}/attributes`, {
-                              method: 'POST',
-                              credentials: 'include',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ meta_key: newAttrKey.trim(), meta_value: newAttrVal.trim() || null }),
-                            })
-                            if (res.ok) {
-                              const row = await res.json()
-                              setCompanyAttrs(prev => [...prev, row])
-                              setNewAttrKey('')
-                              setNewAttrVal('')
-                            }
-                            setAttrLoading(false)
-                          }}
-                        >+</Button>
-                      </div>
                     </Space>
                   </div>
 
@@ -1364,7 +1331,36 @@ export default function TabGeneral({
               )}
             </div>
           )}
-        </div>
+        </div>}
+
+        {/* Mobile Drawers */}
+        <Drawer
+          title={<span style={{ color: '#fff' }}>Attributes</span>}
+          placement="right"
+          open={isMobile && drawerAttrOpen}
+          onClose={() => setDrawerAttrOpen(false)}
+          width={Math.min(320, window?.innerWidth ?? 320)}
+          styles={{ body: { background: '#001529', padding: 16 }, header: { background: '#001529', borderBottom: '1px solid rgba(255,255,255,0.1)' }, wrapper: { background: '#001529' } }}
+          closeIcon={<span style={{ color: '#fff' }}>✕</span>}
+        >
+          <div style={{ color: '#fff' }}>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Sidebar attributes visible on desktop only</Text>
+          </div>
+        </Drawer>
+
+        <Drawer
+          title={<span style={{ color: '#fff' }}>Company Info</span>}
+          placement="right"
+          open={isMobile && drawerCompanyOpen}
+          onClose={() => setDrawerCompanyOpen(false)}
+          width={Math.min(320, window?.innerWidth ?? 320)}
+          styles={{ body: { background: '#0a1f3d', padding: 16 }, header: { background: '#0a1f3d', borderBottom: '1px solid rgba(255,255,255,0.1)' }, wrapper: { background: '#0a1f3d' } }}
+          closeIcon={<span style={{ color: '#fff' }}>✕</span>}
+        >
+          <div style={{ color: '#fff' }}>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Company info visible on desktop only</Text>
+          </div>
+        </Drawer>
     </>
   )
 }

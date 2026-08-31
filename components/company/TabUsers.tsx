@@ -1,7 +1,7 @@
 'use client'
 
 import { DeleteOutlined, EditOutlined,EyeOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Descriptions, message, Modal, Popconfirm, Select, Space, Switch, Tag,Typography } from 'antd'
+import { Button, Card, Descriptions, message, Modal, Popconfirm, Select, Space, Switch, Tag,Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -135,8 +135,8 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
           Assign a customer to this company
         </Button>
       </Space>
-      <br />
 
+      <Card>
       {companyUsers.length > 0 ? (
         <Descriptions bordered column={1}>
           {companyUsers.map((cu) => (
@@ -231,6 +231,7 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
       ) : (
         <Text type="secondary">No users assigned to this company</Text>
       )}
+      </Card>
 
       <Modal
         title="Assign customer"

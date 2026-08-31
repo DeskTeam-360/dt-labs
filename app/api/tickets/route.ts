@@ -77,6 +77,7 @@ export async function GET(request: Request) {
   const tagIdsParam = url.searchParams.get('tag_ids')
   const noCompany = url.searchParams.get('no_company') === '1'
   const noTags = url.searchParams.get('no_tags') === '1'
+  const noTeam = url.searchParams.get('no_team') === '1'
   const visibilityParam = url.searchParams.get('visibility')
   const teamIdParam = url.searchParams.get('team_id')
   const teamIdsParam = url.searchParams.get('team_ids')
@@ -204,6 +205,7 @@ export async function GET(request: Request) {
   }
   if (noCompany) conditions.push(isNull(tickets.companyId))
   if (noTags) conditions.push(sql`${tickets.id} NOT IN (SELECT ticket_id FROM ticket_tags)`)
+  if (noTeam) conditions.push(isNull(tickets.teamId))
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 

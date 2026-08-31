@@ -20,8 +20,8 @@ export default function TabInfo({ companyData, canEdit = false }: TabInfoProps) 
       <Row gutter={[24, 24]}>
         <Col xs={24} lg={24}>
           <Text strong style={{ fontSize: 18, textTransform: 'uppercase' }}>Basic Information</Text>
-          <br />
-          <Descriptions column={1} bordered style={{ marginTop: 16 }}>
+          <Card style={{ marginTop: 16 }}>
+          <Descriptions column={1} bordered>
             <Descriptions.Item label="Company Name">
               <Text strong>{companyData.name}</Text>
             </Descriptions.Item>
@@ -88,13 +88,14 @@ export default function TabInfo({ companyData, canEdit = false }: TabInfoProps) 
               </Space>
             </Descriptions.Item>
           </Descriptions>
+          </Card>
         </Col>
       </Row>
 
       <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
         <Col xs={24}>
           <Text strong style={{ fontSize: 18, textTransform: 'uppercase' }}>Custom Information</Text>
-          <Card style={{ marginTop: 16, background: '#fff' }}>
+          <Card style={{ marginTop: 16 }}>
             <TabCompanyAttributes companyId={companyData.id} canEdit={canEdit} />
           </Card>
         </Col>
