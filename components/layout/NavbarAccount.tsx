@@ -39,7 +39,8 @@ export default function NavbarAccount({ user }: Props) {
       menu={{ items: adminNavbarAccountMenuItems(handleLogout) }}
       placement="bottomRight"
       trigger={['click']}
-      getPopupContainer={(n) => n.parentElement ?? document.body}
+      getPopupContainer={() => document.body}
+      overlayStyle={{ zIndex: 500 }}
     >
       <button
         type="button"

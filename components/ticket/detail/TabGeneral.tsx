@@ -7,9 +7,12 @@ import {
   DeleteOutlined,
   EditOutlined,
   ForwardFilled,
+  LeftOutlined,
   MessageOutlined,
   PaperClipOutlined,
   PlusOutlined,
+  ProfileOutlined,
+  RightOutlined,
   RobotOutlined,
   SendOutlined,
   SyncOutlined,
@@ -27,6 +30,7 @@ import {
   Flex,
   Input,
   InputNumber,
+  Layout,
   Popconfirm,
   Row,
   Segmented,
@@ -37,7 +41,7 @@ import {
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
-import { useEffect, useMemo,useState } from 'react'
+import React, { useEffect, useMemo,useState } from 'react'
 
 import DateDisplay from '@/components/common/DateDisplay'
 import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
@@ -290,6 +294,8 @@ interface TabGeneralProps {
   currentUserRole?: string | null
   /** Hide AI summary buttons when AI is not configured in settings */
   aiConfigured?: boolean
+  rightCollapsed?: boolean
+  onRightCollapsedChange?: (v: boolean) => void
 }
 
 export default function TabGeneral({
@@ -362,8 +368,26 @@ export default function TabGeneral({
   onApplyAiSummaryToDescription,
   currentUserRole,
   aiConfigured = false,
+  rightCollapsed: rightCollapsedProp,
+  onRightCollapsedChange,
 }: TabGeneralProps) {
   const canAccessTicketSummary = aiConfigured && ['admin', 'manager'].includes((currentUserRole ?? '').toLowerCase())
+  const [rightCollapsedLocal, setRightCollapsedLocal] = useState(false)
+  const rightCollapsed = rightCollapsedProp ?? rightCollapsedLocal
+  const setRightCollapsed = (v: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof v === 'function' ? v(rightCollapsed) : v
+    setRightCollapsedLocal(next)
+    onRightCollapsedChange?.(next)
+  }
+  const [companyCollapsed, setCompanyCollapsed] = useState(false)
+  const ATTR_W = rightCollapsed ? 75 : 280
+  const COMP_W = companyCollapsed ? 75 : 220
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--attr-sidebar-width', `${ATTR_W + COMP_W}px`)
+    return () => { document.documentElement.style.removeProperty('--attr-sidebar-width') }
+  }, [ATTR_W, COMP_W])
+
   const [sidebarDraft, setSidebarDraft] = useState<SidebarAttributesDraft>(() =>
     snapshotSidebarDraft({
       ticketData,
@@ -399,6 +423,36 @@ export default function TabGeneral({
     () => !sidebarDraftEquals(sidebarDraft, sidebarBaseline),
     [sidebarDraft, sidebarBaseline],
   )
+
+  type CompanyAttr = { id: string; meta_key: string; meta_value: string | null }
+  type TopTicket = { id: number; title: string; status: string; priority: number | null }
+
+  const [companyDetail, setCompanyDetail] = useState<{
+    name: string; email?: string | null; active_manager_id?: string | null
+    active_team_id?: string | null; domainList?: string[]; active_time?: number
+  } | null>(null)
+  const [companyAttrs, setCompanyAttrs] = useState<CompanyAttr[]>([])
+  const [topTickets, setTopTickets] = useState<TopTicket[]>([])
+  const [newAttrKey, setNewAttrKey] = useState('')
+  const [newAttrVal, setNewAttrVal] = useState('')
+  const [attrLoading, setAttrLoading] = useState(false)
+
+  useEffect(() => {
+    const cid = ticketData?.company_id
+    if (!cid || companyCollapsed) return
+    fetch(`/api/companies/${cid}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.data) setCompanyDetail(j.data) })
+      .catch(() => {})
+    fetch(`/api/companies/${cid}/attributes`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.data) setCompanyAttrs(j.data) })
+      .catch(() => {})
+    fetch(`/api/companies/${cid}/tickets?limit=5`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.data) setTopTickets(j.data) })
+      .catch(() => {})
+  }, [ticketData?.company_id, companyCollapsed])
 
   const statusSelectOptions = useMemo(() => {
     const cur = sidebarDraft.status as string | undefined
@@ -441,10 +495,16 @@ export default function TabGeneral({
     ? automationLabel
     : ticketData.creator?.full_name || ticketData.creator?.email || '—'
 
+  const LBL: React.CSSProperties = { fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }
+  const VAL: React.CSSProperties = { color: 'rgba(255,255,255,0.85)' }
+  const isUrl = (v: string) => { try { const u = new URL(v.trim()); return u.protocol === 'http:' || u.protocol === 'https:' } catch { return false } }
+  const shortenUrl = (v: string) => { try { const u = new URL(v.trim()); const host = u.hostname.replace(/^www\./, ''); const path = u.pathname.replace(/\/$/, ''); return path && path !== '/' ? `${host}${path.length > 28 ? path.slice(0, 28) + '…' : path}` : host } catch { return v } }
+
   return (
+    <>
     <Space orientation="vertical" style={{ width: '100%' }} size="middle">
       <Row gutter={[24, 24]} align="top">
-      <Col xs={16}>
+      <Col xs={24}>
 
 
       <Flex vertical gap={10} style={{ padding: 10, marginBottom: 10, borderBottom: '1px solid var(--ticket-thread-divider)' }}>
@@ -829,419 +889,482 @@ export default function TabGeneral({
             </Flex>
           {/* </Card> */}
         </Col>
+      </Row>
+    </Space>
 
-        <Col xs={8} style={{ position: 'sticky', top: 70, alignSelf: 'flex-start', minWidth: 0, maxWidth: '100%' }}>
-          <div style={{ width: '100%', minWidth: 0, maxWidth: '100%' }}>
-          <Flex justify="flex-end" gap={8} wrap="wrap" style={{ marginBottom: 8 }}>
+        {/* Attributes sidebar — left of company */}
+        <div style={{
+            width: ATTR_W,
+            position: 'fixed',
+            right: COMP_W,
+            top: 0,
+            bottom: 0,
+            background: '#001529',
+            zIndex: 200,
+            overflow: 'hidden',
+            transition: 'width 0.2s, right 0.2s',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+          <div style={{
+            height: 64,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: rightCollapsed ? 'center' : 'space-between',
+            padding: rightCollapsed ? '0 16px' : '0 12px 0 20px',
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
+          }}>
+            {rightCollapsed && <ProfileOutlined style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14 }} />}
+            {!rightCollapsed && (
+              <span style={{ color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ProfileOutlined />
+                Attributes
+              </span>
+            )}
             <Button
-              type="primary"
-              disabled={!sidebarDirty || sidebarAttributesSaving}
-              loading={sidebarAttributesSaving}
-              onClick={() => void onSaveSidebarAttributes(sidebarDraft)}
-            >
-              {sidebarAttributesSaving ? 'Saving…' : 'Save changes'}
-            </Button>
-            <Button
-              disabled={!sidebarDirty || sidebarAttributesSaving}
-              onClick={() => setSidebarDraft(sidebarBaseline)}
-            >
-              Reset
-            </Button>
-          </Flex>
-          <Descriptions
-            column={1}
-            bordered
-            className="ticket-detail-sidebar-descriptions"
-            style={{ width: '100%', maxWidth: '100%' }}
-            styles={{
-              label: { width: '38%', whiteSpace: 'normal' },
-              content: { width: '62%', overflow: 'hidden' },
-            }}
-          >
-            <Descriptions.Item label={useProjectBoardStatus ? 'Project status' : 'Status'}>
+              type="text"
+              icon={rightCollapsed ? <LeftOutlined /> : <RightOutlined />}
+              onClick={() => setRightCollapsed((v) => !v)}
+              style={{ color: 'rgba(255,255,255,0.85)', fontSize: 16 }}
+            />
+          </div>
+          {!rightCollapsed && (
+          <>
+          {sidebarDirty && (
+            <div style={{ padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+              <Flex gap={8}>
+                <Button type="primary" block loading={sidebarAttributesSaving} onClick={() => void onSaveSidebarAttributes(sidebarDraft)} style={{ background: '#1677ff', borderColor: '#1677ff', color: '#fff' }}>
+                  {sidebarAttributesSaving ? 'Saving…' : 'Save changes'}
+                </Button>
+                <Button block disabled={sidebarAttributesSaving} onClick={() => setSidebarDraft(sidebarBaseline)} style={{ background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.2)', color: '#fff' }}>Reset</Button>
+              </Flex>
+            </div>
+          )}
+          <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+
+            {/* Status / Project status */}
+            <div>
+              <Text style={LBL}>{useProjectBoardStatus ? 'Project status' : 'Status'}</Text>
               {useProjectBoardStatus ? (
                 <Select
                   value={sidebarDraft.projectStatusId ?? undefined}
-                  onChange={(v) =>
-                    setSidebarDraft((d) => ({
-                      ...d,
-                      projectStatusId: v ?? null,
-                    }))
-                  }
+                  onChange={(v) => setSidebarDraft((d) => ({ ...d, projectStatusId: v ?? null }))}
                   loading={sidebarAttributesSaving}
-                  options={(projectStatusOptions ?? []).map((s) => ({
-                    value: s.id,
-                    label: (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Tag color={s.color} style={{ margin: 0 }}>
-                          {s.title}
-                        </Tag>
-                      </span>
-                    ),
-                  }))}
-                  style={{ width: '100%' }}
-                  allowClear
-                  placeholder="Board column"
+                  options={(projectStatusOptions ?? []).map((s) => ({ value: s.id, label: <Tag color={s.color} style={{ margin: 0 }}>{s.title}</Tag> }))}
+                  style={{ width: '100%' }} allowClear placeholder="Board column"
                 />
               ) : (
                 <Select
                   value={sidebarDraft.status ?? undefined}
-                  onChange={(value) =>
-                    value &&
-                    setSidebarDraft((d) => ({
-                      ...d,
-                      status: String(value),
-                    }))
-                  }
+                  onChange={(value) => value && setSidebarDraft((d) => ({ ...d, status: String(value) }))}
                   loading={sidebarAttributesSaving}
-                  options={statusSelectOptions.map((s) => ({
-                    value: s.slug,
-                    label: (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Tag color={s.color} style={{ margin: 0 }}>
-                          {s.title}
-                        </Tag>
-                      </span>
-                    ),
-                  }))}
-                  style={{ width: '100%' }}
-                  allowClear={false}
+                  options={statusSelectOptions.map((s) => ({ value: s.slug, label: <Tag color={s.color} style={{ margin: 0 }}>{s.title}</Tag> }))}
+                  style={{ width: '100%' }} allowClear={false}
                 />
               )}
-            </Descriptions.Item>
-            <Descriptions.Item label="Type">
+            </div>
+
+            {/* Type */}
+            <div>
+              <Text style={LBL}>Type</Text>
               <Select
                 value={sidebarDraft.typeId ?? undefined}
-                onChange={(v) =>
-                  setSidebarDraft((d) => ({
-                    ...d,
-                    typeId: v ?? null,
-                  }))
-                }
+                onChange={(v) => setSidebarDraft((d) => ({ ...d, typeId: v ?? null }))}
                 loading={sidebarAttributesSaving || (sidebarDraft.typeId != null && typeOptions.length === 0)}
-                options={typeOptions.map((t) => ({
-                  value: t.id,
-                  label: <Tag color={t.color} style={{ margin: 0 }}>{t.title}</Tag>,
-                }))}
+                options={typeOptions.map((t) => ({ value: t.id, label: <Tag color={t.color} style={{ margin: 0 }}>{t.title}</Tag> }))}
                 labelRender={(props) => {
                   const found = typeOptions.find((t) => t.id === (props.value as number))
-                  if (!found) return <span style={{ color: '#999' }}>Loading…</span>
-                  return <Tag color={found.color} style={{ margin: 0 }}>{found.title}</Tag>
+                  return found ? <Tag color={found.color} style={{ margin: 0 }}>{found.title}</Tag> : <span style={{ color: '#999' }}>Loading…</span>
                 }}
-                style={{ width: '100%' }}
-                allowClear
-                placeholder="Select type"
+                style={{ width: '100%' }} allowClear placeholder="Select type"
               />
-            </Descriptions.Item>
-            <Descriptions.Item label="Priority">
-              <Tooltip
-                title="Integer rank within the company support queue (1 = highest). Leave empty for unranked."
-              >
+            </div>
+
+            {/* Priority */}
+            <div>
+              <Text style={LBL}>Priority</Text>
+              <Tooltip title="Integer rank within the company support queue (1 = highest). Leave empty for unranked.">
                 <InputNumber
-                  min={1}
-                  precision={0}
+                  min={1} precision={0}
                   value={sidebarDraft.priority ?? undefined}
-                  onChange={(v) =>
-                    setSidebarDraft((d) => ({
-                      ...d,
-                      priority:
-                        v == null || !Number.isFinite(Number(v))
-                          ? null
-                          : Math.max(1, Math.floor(Number(v))),
-                    }))
-                  }
+                  onChange={(v) => setSidebarDraft((d) => ({ ...d, priority: v == null || !Number.isFinite(Number(v)) ? null : Math.max(1, Math.floor(Number(v))) }))}
                   disabled={sidebarAttributesSaving}
-                  placeholder="Rank"
-                  style={{ width: '100%' }}
+                  placeholder="Rank" style={{ width: '100%' }}
                 />
               </Tooltip>
-            </Descriptions.Item>
-            <Descriptions.Item label="Company">
+            </div>
+
+            {/* Company */}
+            <div>
+              <Text style={LBL}>Company</Text>
               {canEditCompanyAndTags ? (
                 <Select
                   value={sidebarDraft.companyId ?? undefined}
-                  onChange={(v) =>
-                    setSidebarDraft((d) => ({
-                      ...d,
-                      companyId: v ?? null,
-                    }))
-                  }
+                  onChange={(v) => setSidebarDraft((d) => ({ ...d, companyId: v ?? null }))}
                   loading={sidebarAttributesSaving}
-                  options={companyOptions.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                  }))}
-                  showSearch
-                  optionFilterProp="label"
-                  style={{ width: '100%' }}
-                  allowClear
-                  placeholder="Select company"
+                  options={companyOptions.map((c) => ({ value: c.id, label: c.name }))}
+                  showSearch optionFilterProp="label" style={{ width: '100%' }} allowClear placeholder="Select company"
                 />
               ) : (
-                <Text>{companyOptions.find((c) => c.id === ticketData.company_id)?.name ?? (ticketData.company?.name || '—')}</Text>
+                <Text style={VAL}>{companyOptions.find((c) => c.id === ticketData.company_id)?.name ?? (ticketData.company?.name || '—')}</Text>
               )}
-            </Descriptions.Item>
-            <Descriptions.Item label="Tags">
+            </div>
+
+            {/* Tags */}
+            <div>
+              <Text style={LBL}>Tags</Text>
               {canEditCompanyAndTags ? (
                 <Select
                   mode="multiple"
                   value={sidebarDraft.tagIds}
-                  onChange={(v) =>
-                    setSidebarDraft((d) => ({
-                      ...d,
-                      tagIds: v ?? [],
-                    }))
-                  }
+                  onChange={(v) => setSidebarDraft((d) => ({ ...d, tagIds: v ?? [] }))}
                   loading={sidebarAttributesSaving}
                   options={tagOptions.map((t) => ({ value: t.id, label: t.name }))}
-                  style={{ width: '100%' }}
-                  placeholder="Select tags"
-                  allowClear
+                  style={{ width: '100%' }} placeholder="Select tags" allowClear
                 />
               ) : (
-                <Text>
-                  {selectedTagIds.length > 0
-                    ? tagOptions.filter((t) => selectedTagIds.includes(t.id)).map((t) => t.name).join(', ')
-                    : '—'}
-                </Text>
+                <Text style={VAL}>{selectedTagIds.length > 0 ? tagOptions.filter((t) => selectedTagIds.includes(t.id)).map((t) => t.name).join(', ') : '—'}</Text>
               )}
-            </Descriptions.Item>
+            </div>
+
+            {/* Contact */}
             {canEditCompanyAndTags ? (
-              <Descriptions.Item label="Contact (email replies)">
+              <div>
+                <Text style={LBL}>Contact (email replies)</Text>
                 <Select
                   value={sidebarDraft.contactUserId ?? undefined}
-                  allowClear
-                  placeholder="Same as Created By"
+                  allowClear placeholder="Same as Created By"
                   loading={sidebarAttributesSaving}
-                  onChange={(v) =>
-                    setSidebarDraft((d) => ({
-                      ...d,
-                      contactUserId: (v as string | undefined) ?? null,
-                    }))
-                  }
-                  options={contactUserOptions.map((u) => ({
-                    value: u.id,
-                    label: u.full_name ? `${u.full_name} (${u.email})` : u.email,
-                  }))}
-                  style={{ width: '100%' }}
-                  showSearch
-                  optionFilterProp="label"
+                  onChange={(v) => setSidebarDraft((d) => ({ ...d, contactUserId: (v as string | undefined) ?? null }))}
+                  options={contactUserOptions.map((u) => ({ value: u.id, label: u.full_name ? `${u.full_name} (${u.email})` : u.email }))}
+                  style={{ width: '100%' }} showSearch optionFilterProp="label"
                 />
-                {contactCrossCompanyHint ? (
-                  <Alert
-                    type="warning"
-                    showIcon
-                    message={contactCrossCompanyHint}
-                    style={{ marginTop: 8 }}
-                  />
-                ) : null}
-              </Descriptions.Item>
+                {contactCrossCompanyHint ? <Alert type="warning" showIcon message={contactCrossCompanyHint} style={{ marginTop: 8 }} /> : null}
+              </div>
             ) : ticketData.contact?.id && ticketData.contact.id !== creatorId ? (
-              <Descriptions.Item label="Contact">
+              <div>
+                <Text style={LBL}>Contact</Text>
                 <TicketUserMention userId={ticketData.contact.id} email={ticketData.contact.email}>
                   <Space style={{ cursor: 'pointer' }}>
-                    <UserOutlined />
-                    <Text>{ticketData.contact.full_name || ticketData.contact.email}</Text>
+                    <UserOutlined style={{ color: 'rgba(255,255,255,0.65)' }} />
+                    <Text style={VAL}>{ticketData.contact.full_name || ticketData.contact.email}</Text>
                   </Space>
                 </TicketUserMention>
-              </Descriptions.Item>
+              </div>
             ) : null}
+
+            {/* CC */}
             {ticketCcEmails?.length ? (
-              <Descriptions.Item label="CC Recipients">
-                <Text style={{ fontSize: 12 }}>{ticketCcEmails.join(', ')}</Text>
-              </Descriptions.Item>
+              <div>
+                <Text style={LBL}>CC Recipients</Text>
+                <Text style={{ ...VAL, fontSize: 12 }}>{ticketCcEmails.join(', ')}</Text>
+              </div>
             ) : null}
-            <Descriptions.Item label="Due Date">
+
+            {/* Due Date */}
+            <div>
+              <Text style={LBL}>Due Date</Text>
               <DatePicker
                 value={sidebarDraft.dueDate ? dayjs(sidebarDraft.dueDate) : null}
-                onChange={(dt) =>
-                  setSidebarDraft((d) => ({
-                    ...d,
-                    dueDate: dt ? dt.toISOString() : null,
-                  }))
-                }
-                allowClear
-                showTime
-                format="YYYY-MM-DD HH:mm"
-                style={{ width: '100%' }}
-                disabled={sidebarAttributesSaving}
+                onChange={(dt) => setSidebarDraft((d) => ({ ...d, dueDate: dt ? dt.toISOString() : null }))}
+                allowClear showTime format="YYYY-MM-DD HH:mm"
+                style={{ width: '100%' }} disabled={sidebarAttributesSaving}
               />
-            </Descriptions.Item>
-            <Descriptions.Item label="Team">
+            </div>
+
+            {/* Team */}
+            <div>
+              <Text style={LBL}>Team</Text>
               {canEditAssignees ? (
                 <Select
                   value={sidebarDraft.teamId ?? undefined}
-                  onChange={(teamId) =>
-                    setSidebarDraft((d) => ({
-                      ...d,
-                      teamId: teamId ?? null,
-                    }))
-                  }
+                  onChange={(teamId) => setSidebarDraft((d) => ({ ...d, teamId: teamId ?? null }))}
                   loading={sidebarAttributesSaving}
                   options={teamOptions.map((t) => ({ value: t.id, label: t.name }))}
-                  style={{ width: '100%' }}
-                  placeholder="Select team"
-                  allowClear
+                  style={{ width: '100%' }} placeholder="Select team" allowClear
                 />
               ) : (
-                <Text>{ticketData.team?.name ?? '—'}</Text>
+                <Text style={VAL}>{ticketData.team?.name ?? '—'}</Text>
               )}
-            </Descriptions.Item>
-            <Descriptions.Item label="Assignees">
+            </div>
+
+            {/* Assignees */}
+            <div>
+              <Text style={LBL}>Assignees</Text>
               {canEditAssignees ? (
                 <Select
                   mode="multiple"
                   value={sidebarDraft.assigneeIds}
-                  onChange={(ids) =>
-                    setSidebarDraft((d) => ({ ...d, assigneeIds: ids ?? [] }))
-                  }
+                  onChange={(ids) => setSidebarDraft((d) => ({ ...d, assigneeIds: ids ?? [] }))}
                   loading={sidebarAttributesSaving}
-                  options={(nonCustomerUsers ?? []).map((u) => ({
-                    value: u.id,
-                    label: u.full_name ? `${u.full_name} (${u.email})` : u.email,
-                  }))}
-                  style={{ width: '100%' }}
-                  placeholder="Select assignees"
-                  allowClear
-                  showSearch
-                  optionFilterProp="label"
+                  options={(nonCustomerUsers ?? []).map((u) => ({ value: u.id, label: u.full_name ? `${u.full_name} (${u.email})` : u.email }))}
+                  style={{ width: '100%' }} placeholder="Select assignees" allowClear showSearch optionFilterProp="label"
                 />
               ) : (
-                <Text>
+                <Text style={VAL}>
                   {sidebarDraft.assigneeIds.length > 0
-                    ? (nonCustomerUsers ?? [])
-                        .filter((u) => sidebarDraft.assigneeIds.includes(u.id))
-                        .map((u) => u.full_name || u.email)
-                        .join(', ') || '—'
+                    ? (nonCustomerUsers ?? []).filter((u) => sidebarDraft.assigneeIds.includes(u.id)).map((u) => u.full_name || u.email).join(', ') || '—'
                     : '—'}
                 </Text>
               )}
-            </Descriptions.Item>
-            {/* <Descriptions.Item label="Created At">
-              <Space>
-                <ClockCircleOutlined />
-                <DateDisplay date={ticketData.created_at} />
-              </Space>
-            </Descriptions.Item>
-            <Descriptions.Item label="Updated At">
-              <Space>
-                <ClockCircleOutlined />
-                <DateDisplay date={ticketData.updated_at} />
-              </Space>
-            </Descriptions.Item> */}
-            <Descriptions.Item label="Total Time Tracked">
-              <Space>
-                <ClockCircleOutlined />
-                <Text strong>{formatTime(totalTimeSeconds + (activeTimeTracker ? currentTime : 0))}</Text>
-              </Space>
-            </Descriptions.Item>
-            {attributes.length > 0 ? (
-                <>{attributes.map((attr) => (
-                    <Descriptions.Item
-                      key={attr.id}
-                      label={
-                        <Flex style={{ width: '100%', justifyContent: 'space-between' }}>
-                          <Text strong>{attr.meta_key}</Text>
-                          <Flex gap={5}>
-                            
-                          </Flex>
-                        </Flex>
-                      }
-                    >
-                      <Flex justify="space-between" align="center">
-                        
-                      {editingAttribute === attr.id ? (
-                        <Flex style={{ width: '100%' }}>
-                          <Input
-                            defaultValue={attr.meta_value || ''}
-                            onPressEnter={(e) => {
-                              onUpdateAttribute(attr.id, e.currentTarget.value)
-                            }}
-                            onBlur={(e) => {
-                              onUpdateAttribute(attr.id, e.target.value)
-                            }}
-                            autoFocus
-                            style={{ width: '100%' }}
-                          />
-                        </Flex>
-                      ) : (
-                        <Text>{attr.meta_value || <Text type="secondary">(empty)</Text>}</Text>
-                      )}
+            </div>
 
-{editingAttribute === attr.id ? (
-                              <Button
-                                type="text"
-                                size="small"
-                                onClick={() => onEditingAttributeChange(null)}
-                              >
-                                Cancel
-                              </Button>
-                            ) : (
-                              <Flex gap={5}>
-                                <Button
-                                  type="text"
-                                  icon={<EditOutlined />}
-                                  size="middle"
-                                  onClick={() => onEditingAttributeChange(attr.id)}
-                                />
-                                <Popconfirm
-                                  title="Delete attribute"
-                                  description="Are you sure?"
-                                  onConfirm={() => onDeleteAttribute(attr.id)}
-                                  okText="Yes"
-                                  cancelText="No"
-                                >
-                                  <Button
-                                    danger
-                                    icon={<DeleteOutlined />}
-                                    size="middle"
-                                  />
-                                </Popconfirm>
-                              </Flex>
-                            )}
-                      </Flex>
-                    </Descriptions.Item>
-                  ))}
-                </>
-              ) : (
-                <></>
-              )}
-          {/* Input fields for adding a new attribute */}
-          
-          <Descriptions.Item label="Add new attribute">
-            <Flex align="center" style={{ width: '100%', minWidth: 0 }} gap={8} wrap="wrap">
-              <Input
-                placeholder="Key"
-                value={newAttributeKey}
-                onChange={e => onNewAttributeKeyChange(e.target.value)}
-                style={{ width: 100, maxWidth: '100%', flex: '0 1 100px' }}
-              />
-              <Input
-                placeholder="Value"
-                value={newAttributeValue}
-                onChange={e => onNewAttributeValueChange(e.target.value)}
-                onPressEnter={onAddAttribute}
-                style={{ flex: '1 1 80px', minWidth: 0 }}
-              />
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={onAddAttribute}
-                disabled={!newAttributeKey.trim()}
-                loading={attributesLoading}
-              >
-                Add
-              </Button>
-            </Flex>
-          </Descriptions.Item>
-          </Descriptions>
+            {/* Total Time */}
+            <div>
+              <Text style={LBL}>Total Time Tracked</Text>
+              <Space>
+                <ClockCircleOutlined style={{ color: 'rgba(255,255,255,0.65)' }} />
+                <Text style={{ color: '#fff', fontWeight: 600 }}>{formatTime(totalTimeSeconds + (activeTimeTracker ? currentTime : 0))}</Text>
+              </Space>
+            </div>
+
+            {/* Custom attributes */}
+            {attributes.map((attr) => (
+              <div key={attr.id}>
+                <Flex justify="space-between" align="center" style={{ marginBottom: 4 }}>
+                  <Text style={LBL}>{attr.meta_key}</Text>
+                  {editingAttribute === attr.id ? (
+                    <Button type="text" size="small" onClick={() => onEditingAttributeChange(null)} style={{ color: 'rgba(255,255,255,0.65)', padding: '0 4px' }}>Cancel</Button>
+                  ) : (
+                    <Flex gap={4}>
+                      <Button type="text" size="small" icon={<EditOutlined />} onClick={() => onEditingAttributeChange(attr.id)} style={{ color: 'rgba(255,255,255,0.65)' }} />
+                      <Popconfirm title="Delete attribute" description="Are you sure?" onConfirm={() => onDeleteAttribute(attr.id)} okText="Yes" cancelText="No">
+                        <Button danger type="text" size="small" icon={<DeleteOutlined />} />
+                      </Popconfirm>
+                    </Flex>
+                  )}
+                </Flex>
+                {editingAttribute === attr.id ? (
+                  <Input
+                    defaultValue={attr.meta_value || ''}
+                    onPressEnter={(e) => onUpdateAttribute(attr.id, e.currentTarget.value)}
+                    onBlur={(e) => onUpdateAttribute(attr.id, e.target.value)}
+                    autoFocus style={{ width: '100%' }}
+                  />
+                ) : attr.meta_value && isUrl(attr.meta_value) ? (
+                  <a href={attr.meta_value.trim()} target="_blank" rel="noopener noreferrer" title={attr.meta_value.trim()} style={{ color: '#4096ff', wordBreak: 'break-all' }}>
+                    {shortenUrl(attr.meta_value)}
+                  </a>
+                ) : (
+                  <Text style={VAL}>{attr.meta_value || '—'}</Text>
+                )}
+              </div>
+            ))}
+
+            {/* Add new attribute */}
+            <div>
+              <Text style={LBL}>Add attribute</Text>
+              <Flex gap={6} vertical>
+                <Input placeholder="Key" value={newAttributeKey} onChange={e => onNewAttributeKeyChange(e.target.value)} />
+                <Input placeholder="Value" value={newAttributeValue} onChange={e => onNewAttributeValueChange(e.target.value)} onPressEnter={onAddAttribute} />
+                <Button type="primary" icon={<PlusOutlined />} onClick={onAddAttribute} disabled={!newAttributeKey.trim()} loading={attributesLoading} block style={{ background: '#1677ff', borderColor: '#1677ff', color: '#fff' }}>Add</Button>
+              </Flex>
+            </div>
+
+          </Space>
           </div>
-        </Col>
-   
-        
-      </Row>
+          </>
+          )}
+        </div>
 
-     
-    </Space>
+        {/* Company Info sidebar — paling kanan, right: 0 */}
+        <div style={{
+            width: COMP_W,
+            position: 'fixed',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            background: '#0a1f3d',  /* sedikit lebih terang dari Attributes agar bisa dibedakan */
+            zIndex: 199,
+            overflow: 'hidden',
+            transition: 'width 0.2s',
+            display: 'flex',
+            flexDirection: 'column',
+            borderLeft: '1px solid rgba(255,255,255,0.08)',
+          }}>
+          <div style={{
+            height: 64,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: companyCollapsed ? 'center' : 'space-between',
+            padding: companyCollapsed ? '0 16px' : '0 12px 0 20px',
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
+            flexShrink: 0,
+          }}>
+            {!companyCollapsed && (
+              <span style={{ color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <UserOutlined />
+                Company Info
+              </span>
+            )}
+            {companyCollapsed && <UserOutlined style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14 }} />}
+            <Button
+              type="text"
+              icon={companyCollapsed ? <LeftOutlined /> : <RightOutlined />}
+              onClick={() => setCompanyCollapsed(v => !v)}
+              style={{ color: 'rgba(255,255,255,0.85)', fontSize: 16 }}
+            />
+          </div>
+          {!companyCollapsed && (
+            <div style={{ padding: 16, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {!ticketData?.company_id ? (
+                <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>No company linked</Text>
+              ) : !companyDetail ? (
+                <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>Loading...</Text>
+              ) : (
+                <>
+                  {/* Core info */}
+                  <Space direction="vertical" style={{ width: '100%' }} size={10}>
+                    <div>
+                      <Text style={{ fontSize: 11, display: 'block', marginBottom: 2, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Company</Text>
+                      <Text style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>{companyDetail.name}</Text>
+                    </div>
+                    {companyDetail.email && (
+                      <div>
+                        <Text style={{ fontSize: 11, display: 'block', marginBottom: 2, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Email</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.85)', wordBreak: 'break-all', fontSize: 12 }}>{companyDetail.email}</Text>
+                      </div>
+                    )}
+                    {companyDetail.active_manager_id && (
+                      <div>
+                        <Text style={{ fontSize: 11, display: 'block', marginBottom: 2, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Manager</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>
+                          {nonCustomerUsers?.find(u => u.id === companyDetail!.active_manager_id)?.full_name ||
+                           nonCustomerUsers?.find(u => u.id === companyDetail!.active_manager_id)?.email || '—'}
+                        </Text>
+                      </div>
+                    )}
+                    {companyDetail.active_team_id && (
+                      <div>
+                        <Text style={{ fontSize: 11, display: 'block', marginBottom: 2, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Team</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>
+                          {teamOptions?.find(t => t.id === companyDetail!.active_team_id)?.name || '—'}
+                        </Text>
+                      </div>
+                    )}
+                    {(companyDetail.active_time ?? 0) > 0 && (
+                      <div>
+                        <Text style={{ fontSize: 11, display: 'block', marginBottom: 2, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Active Time</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>{companyDetail.active_time} h</Text>
+                      </div>
+                    )}
+                    {companyDetail.domainList && companyDetail.domainList.length > 0 && (
+                      <div>
+                        <Text style={{ fontSize: 11, display: 'block', marginBottom: 2, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Domains</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>{companyDetail.domainList.join(', ')}</Text>
+                      </div>
+                    )}
+                  </Space>
+
+                  {/* Top tickets */}
+                  {topTickets.length > 0 && (
+                    <div>
+                      <Text style={{ fontSize: 11, display: 'block', marginBottom: 6, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Top Tickets</Text>
+                      <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                        {topTickets.map(t => (
+                          <div
+                            key={t.id}
+                            onClick={() => window.open(`/tickets/${t.id}`, '_blank')}
+                            style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.06)', borderRadius: 4, cursor: 'pointer' }}
+                          >
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 3 }}>
+                              <Text style={{ color: '#1677ff', fontSize: 11, flexShrink: 0, fontWeight: 600 }}>#{t.id}</Text>
+                              {t.priority != null && (
+                                <span style={{ fontSize: 10, background: 'rgba(22,119,255,0.2)', color: '#69b1ff', borderRadius: 3, padding: '0 4px', flexShrink: 0 }}>
+                                  P{t.priority}
+                                </span>
+                              )}
+                              <span style={{ fontSize: 10, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.55)', borderRadius: 3, padding: '0 4px', flexShrink: 0, textTransform: 'capitalize' }}>
+                                {t.status}
+                              </span>
+                            </div>
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, lineHeight: '15px', display: 'block' }} ellipsis={{ tooltip: t.title }}>{t.title}</Text>
+                          </div>
+                        ))}
+                      </Space>
+                    </div>
+                  )}
+
+                  {/* Custom attributes */}
+                  <div>
+                    <Text style={{ fontSize: 11, display: 'block', marginBottom: 6, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Custom Attributes</Text>
+                    <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                      {companyAttrs.map(attr => (
+                        <div key={attr.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 4, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', display: 'block' }}>{attr.meta_key}</Text>
+                            {attr.meta_value && isUrl(attr.meta_value) ? (
+                              <a href={attr.meta_value} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, wordBreak: 'break-all' }}>{shortenUrl(attr.meta_value)}</a>
+                            ) : (
+                              <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11 }}>{attr.meta_value || '—'}</Text>
+                            )}
+                          </div>
+                          <Button
+                            type="text"
+                            size="small"
+                            danger
+                            style={{ flexShrink: 0, color: 'rgba(255,100,100,0.7)', padding: '0 4px' }}
+                            onClick={async () => {
+                              const cid = ticketData.company_id
+                              await fetch(`/api/companies/${cid}/attributes/${attr.id}`, { method: 'DELETE', credentials: 'include' })
+                              setCompanyAttrs(prev => prev.filter(a => a.id !== attr.id))
+                            }}
+                          >×</Button>
+                        </div>
+                      ))}
+                      <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                        <input
+                          placeholder="Key"
+                          value={newAttrKey}
+                          onChange={e => setNewAttrKey(e.target.value)}
+                          style={{ flex: 1, minWidth: 0, padding: '3px 6px', fontSize: 11, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, color: '#fff', outline: 'none' }}
+                        />
+                        <input
+                          placeholder="Value"
+                          value={newAttrVal}
+                          onChange={e => setNewAttrVal(e.target.value)}
+                          style={{ flex: 1, minWidth: 0, padding: '3px 6px', fontSize: 11, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, color: '#fff', outline: 'none' }}
+                        />
+                        <Button
+                          size="small"
+                          loading={attrLoading}
+                          style={{ flexShrink: 0, background: '#1677ff', borderColor: '#1677ff', color: '#fff', padding: '0 8px' }}
+                          onClick={async () => {
+                            if (!newAttrKey.trim()) return
+                            setAttrLoading(true)
+                            const cid = ticketData.company_id
+                            const res = await fetch(`/api/companies/${cid}/attributes`, {
+                              method: 'POST',
+                              credentials: 'include',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ meta_key: newAttrKey.trim(), meta_value: newAttrVal.trim() || null }),
+                            })
+                            if (res.ok) {
+                              const row = await res.json()
+                              setCompanyAttrs(prev => [...prev, row])
+                              setNewAttrKey('')
+                              setNewAttrVal('')
+                            }
+                            setAttrLoading(false)
+                          }}
+                        >+</Button>
+                      </div>
+                    </Space>
+                  </div>
+
+                  <Button
+                    block
+                    onClick={() => window.open(`/companies/${ticketData.company_id}`, '_blank')}
+                    style={{ marginTop: 'auto', background: '#1677ff', borderColor: '#1677ff', color: '#fff' }}
+                  >
+                    View Company →
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+    </>
   )
 }

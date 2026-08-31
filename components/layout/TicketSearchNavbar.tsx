@@ -8,6 +8,7 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import ThemeToggle from '@/components/common/ThemeToggle'
@@ -89,6 +90,7 @@ export default function TicketSearchNavbar({
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyRows, setHistoryRows] = useState<ActivityPeekRow[]>([])
+  const [historyPos, setHistoryPos] = useState({ top: 56, right: 0 })
   const [appTitle, setAppTitle] = useState(DEFAULT_TITLE)
 
   useEffect(() => {
@@ -236,6 +238,10 @@ export default function TicketSearchNavbar({
       clearTimeout(historyLeaveTimer.current)
       historyLeaveTimer.current = null
     }
+    if (historyWrapRef.current) {
+      const rect = historyWrapRef.current.getBoundingClientRect()
+      setHistoryPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right })
+    }
     setHistoryOpen(true)
     void loadHistoryPeek()
   }, [loadHistoryPeek])
@@ -253,6 +259,8 @@ export default function TicketSearchNavbar({
         alignItems: 'center',
         gap: 8,
         padding: '0 16px',
+        paddingRight: 'calc(var(--attr-sidebar-width, 0px) + 16px)',
+        transition: 'padding-right 0.2s',
         height: NAV_HEIGHT,
         minHeight: NAV_HEIGHT,
         background: 'var(--ticket-nav-bg)',
@@ -583,21 +591,20 @@ export default function TicketSearchNavbar({
           >
             <HistoryOutlined style={{ fontSize: 18 }} />
           </button>
-          {historyOpen && (
+          {historyOpen && typeof document !== 'undefined' && createPortal(
           <div
             role="menu"
             style={{
-              position: 'absolute',
-              top: '100%',
-              right: 0,
-              marginTop: 6,
+              position: 'fixed',
+              top: historyPos.top,
+              right: historyPos.right,
               width: 380,
               maxWidth: 'calc(100vw - 32px)',
               background: 'var(--ticket-nav-panel-bg)',
               borderRadius: 8,
               boxShadow: '0 4px 12px var(--ticket-nav-shadow)',
               border: '1px solid var(--ticket-nav-panel-border)',
-              zIndex: 220,
+              zIndex: 500,
               overflow: 'hidden',
             }}
             onMouseDown={(e) => e.preventDefault()}
@@ -689,7 +696,8 @@ export default function TicketSearchNavbar({
                 See all
               </SpaNavLink>
             </div>
-          </div>
+          </div>,
+          document.body
           )}
         </div>
 

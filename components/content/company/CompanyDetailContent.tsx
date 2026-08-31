@@ -438,7 +438,7 @@ export default function CompanyDetailContent({
     {
       key: 'info',
       label: 'Company Information',
-      children: <TabInfo companyData={companyData} />,
+      children: <TabInfo companyData={companyData} canEdit={canEdit} />,
     },
     {
       key: 'users',

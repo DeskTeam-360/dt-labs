@@ -365,7 +365,7 @@ export async function PATCH(
       .limit(1)
     await db
       .update(tickets)
-      .set({ ticketType: cls, updatedAt: new Date() })
+      .set({ ticketType: cls, updatedAt: new Date(), ...(cls === 'trash' && { priority: null }) })
       .where(eq(tickets.id, ticketId))
     if (
       cur?.companyId &&
@@ -587,6 +587,7 @@ export async function PATCH(
     ...(companyIdUpdate !== undefined && { companyId: companyIdUpdate }),
     ...(due_date !== undefined && { dueDate: due_date ? new Date(due_date) : null }),
     ...(ticketTypeUpdate !== undefined && { ticketType: ticketTypeUpdate }),
+    ...(ticketTypeUpdate === 'trash' && { priority: null }),
     ...(contact_user_id !== undefined && {
       contactUserId:
         contact_user_id === null || contact_user_id === '' ? null : String(contact_user_id),

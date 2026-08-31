@@ -198,6 +198,7 @@ export default function TicketDetailContent({
     variant = 'admin',
 }: TicketDetailContentProps) {
     const router = useRouter()
+    const [attrSidebarCollapsed, setAttrSidebarCollapsed] = useState(false)
     const [displayTicket, setDisplayTicket] = useState(ticketData)
     const liveSyncTicketIdRef = useRef<number | undefined>(ticketData?.id)
     liveSyncTicketIdRef.current = displayTicket?.id
@@ -1432,6 +1433,8 @@ export default function TicketDetailContent({
                         background: 'var(--ant-color-bg-container, #fff)',
                         borderBottom: '1px solid var(--ant-color-border-secondary, #f0f0f0)',
                         padding: '12px 24px',
+                        paddingRight: 'calc(var(--attr-sidebar-width, 0px) + 24px)',
+                        transition: 'padding-right 0.2s',
                     }}>
                         <Flex gap={16} align="center" wrap="wrap">
                             <Button
@@ -1641,7 +1644,7 @@ export default function TicketDetailContent({
                             </div>
                         </Flex>
                     </div>
-                    <div style={{ padding: '24px' }}>
+                    <div style={{ padding: '24px', paddingRight: 'calc(var(--attr-sidebar-width, 0px) + 24px)', transition: 'padding-right 0.2s' }}>
                     <Card style={{ margin: '0 auto' }}>
 
                         {isCustomer ? (
@@ -1799,6 +1802,8 @@ export default function TicketDetailContent({
                                                 setEditingDescription(true)
                                             }}
                                             aiConfigured={aiConfigured}
+                                            rightCollapsed={attrSidebarCollapsed}
+                                            onRightCollapsedChange={setAttrSidebarCollapsed}
                                         />
                                     ),
                                 },

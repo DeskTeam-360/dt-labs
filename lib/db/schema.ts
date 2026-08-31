@@ -421,6 +421,19 @@ export const ticketAttributs = pgTable(
   (t) => [unique('ticket_attributs_ticket_id_meta_key_key').on(t.ticketId, t.metaKey)]
 )
 
+export const companyAttributes = pgTable(
+  'company_attributes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id').notNull(),
+    metaKey: varchar('meta_key', { length: 255 }).notNull(),
+    metaValue: text('meta_value'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [unique('company_attributes_company_id_meta_key_key').on(t.companyId, t.metaKey)]
+)
+
 /** timer = start/stop clock; manual = user-entered duration (always completed rows) */
 export const ticketTimeTrackerTypes = ['timer', 'manual'] as const
 export type TicketTimeTrackerType = (typeof ticketTimeTrackerTypes)[number]

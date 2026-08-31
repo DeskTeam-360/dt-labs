@@ -1,17 +1,20 @@
 'use client'
 
 import { CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
-import { Col, Descriptions, Row, Space,Tag, Typography } from 'antd'
+import { Card, Col, Descriptions, Row, Space, Tag, Typography } from 'antd'
 
 import DateDisplay from '@/components/common/DateDisplay'
+
+import TabCompanyAttributes from './TabCompanyAttributes'
 
 const { Text } = Typography
 
 interface TabInfoProps {
   companyData: any
+  canEdit?: boolean
 }
 
-export default function TabInfo({ companyData }: TabInfoProps) {
+export default function TabInfo({ companyData, canEdit = false }: TabInfoProps) {
   return (
     <>
       <Row gutter={[24, 24]}>
@@ -67,11 +70,6 @@ export default function TabInfo({ companyData }: TabInfoProps) {
             <Descriptions.Item label="Active time">
               <Text>{`${companyData.active_time ?? 0} H`}</Text>
             </Descriptions.Item>
-            {/* <Descriptions.Item label="Is customer">
-              <Tag color={companyData.is_customer ? 'blue' : 'default'}>
-                {companyData.is_customer ? 'Yes' : 'No'}
-              </Tag>
-            </Descriptions.Item> */}
             <Descriptions.Item label="Company ID">
               <Text code style={{ fontSize: 12 }}>
                 {companyData.id}
@@ -92,8 +90,15 @@ export default function TabInfo({ companyData }: TabInfoProps) {
           </Descriptions>
         </Col>
       </Row>
-      <br />
-   
+
+      <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+        <Col xs={24}>
+          <Text strong style={{ fontSize: 18, textTransform: 'uppercase' }}>Custom Information</Text>
+          <Card style={{ marginTop: 16, background: '#fff' }}>
+            <TabCompanyAttributes companyId={companyData.id} canEdit={canEdit} />
+          </Card>
+        </Col>
+      </Row>
     </>
   )
 }
