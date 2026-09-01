@@ -30,7 +30,7 @@ async function loadTicketsLookupCatalog() {
     tagsData,
     statusesData,
   ] = await Promise.all([
-    db.select({ id: teams.id, name: teams.name }).from(teams).orderBy(asc(teams.name)),
+    db.select({ id: teams.id, name: teams.name, type: teams.type }).from(teams).orderBy(asc(teams.name)),
     db
       .select({
         id: users.id,

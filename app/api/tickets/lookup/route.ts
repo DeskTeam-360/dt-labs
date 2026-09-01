@@ -34,10 +34,10 @@ export async function GET() {
     const ticketTypesFiltered = catalog.ticketTypes
       .filter((t) => role !== 'customer' || !t.isAgentOnly)
       .map(({ id, title, slug, color }) => ({ id, title, slug, color }))
-    // Admin sees all teams; other roles see only teams they belong to
+    // Admin sees all teams; non-admin sees public teams + teams they belong to
     const visibleTeams = role === 'admin'
       ? catalog.teams
-      : catalog.teams.filter((t) => userTeamIds.includes(t.id))
+      : catalog.teams.filter((t) => t.type === 'public' || userTeamIds.includes(t.id))
 
     const body = {
       userCompanyId,
