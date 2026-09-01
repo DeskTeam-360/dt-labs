@@ -1,7 +1,10 @@
+import { and, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { isAdmin } from '@/lib/auth-utils'
 import { getCustomerCompanyId } from '@/lib/customer-company'
+import { db, teamMembers, teams, tickets } from '@/lib/db'
 import { getTicketDetail } from '@/lib/ticket-detail'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +28,33 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const role = (session.user as { role?: string }).role?.toLowerCase()
   const userId = session.user.id!
+
+  // Team access control: non-admin staff can only view tickets in public teams or their own teams (or unassigned)
+  if (!isAdmin(role) && role !== 'customer') {
+    const [ticketRow] = await db
+      .select({ teamId: tickets.teamId })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1)
+    if (ticketRow?.teamId) {
+      const [teamRow] = await db
+        .select({ type: teams.type })
+        .from(teams)
+        .where(eq(teams.id, ticketRow.teamId))
+        .limit(1)
+      if (teamRow?.type !== 'public') {
+        const [isMember] = await db
+          .select({ teamId: teamMembers.teamId })
+          .from(teamMembers)
+          .where(and(eq(teamMembers.userId, userId), eq(teamMembers.teamId, ticketRow.teamId)))
+          .limit(1)
+        if (!isMember) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_CACHE_HEADERS })
+        }
+      }
+    }
+  }
+
   const detailOptions =
     role === 'customer'
       ? {

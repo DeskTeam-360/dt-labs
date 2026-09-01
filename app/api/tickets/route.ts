@@ -13,6 +13,7 @@ import {
   projects,
   projectStatuses,
   tags,
+  teamMembers,
   teams,
   ticketAssignees,
   ticketAttachments,
@@ -120,6 +121,16 @@ export async function GET(request: Request) {
   const isCustomerList = role === 'customer'
   const isAdminList = isAdmin(role as string | undefined)
 
+  // Fetch the teams this user belongs to (for team-based ticket access control)
+  let userTeamIds: string[] = []
+  if (!isAdminList && !isCustomerList) {
+    const teamRows = await db
+      .select({ teamId: teamMembers.teamId })
+      .from(teamMembers)
+      .where(eq(teamMembers.userId, userId))
+    userTeamIds = teamRows.map((r) => r.teamId)
+  }
+
   /** When filter visibility=private (or old specific_users), include both - Private filter shows tickets for creator/assignees */
   let visibilityFilterValues = visibilityValues
   if (visibilityValues.includes('private') || visibilityValues.includes('specific_users')) {
@@ -136,6 +147,12 @@ export async function GET(request: Request) {
   } else {
     conditions.push(visibilityAccess)
     if (companyIds.length > 0) conditions.push(inArray(tickets.companyId, companyIds))
+    // Team access: unassigned OR public team OR user is a member of the ticket's team
+    const publicTeamSubq = sql`(SELECT id FROM teams WHERE type = 'public')`
+    const teamAccessCond = userTeamIds.length > 0
+      ? or(isNull(tickets.teamId), sql`${tickets.teamId} IN ${publicTeamSubq}`, inArray(tickets.teamId, userTeamIds))!
+      : or(isNull(tickets.teamId), sql`${tickets.teamId} IN ${publicTeamSubq}`)!
+    conditions.push(teamAccessCond)
   }
   if (statusSlugs.length > 0) conditions.push(inArray(tickets.status, statusSlugs))
   if (typeIds.length > 0) conditions.push(inArray(tickets.typeId, typeIds))
