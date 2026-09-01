@@ -30,6 +30,8 @@ export type TicketActivityEntry = {
   actor: { name: string | null; email: string | null; avatar_url?: string | null } | null
 }
 
+const PAGE_SIZE = 20
+
 export default function TabActivity({
   ticketId,
   refreshKey = 0,
@@ -40,16 +42,22 @@ export default function TabActivity({
 }) {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<TicketActivityEntry[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       setLoading(true)
       try {
-        const res = await fetch(`/api/tickets/${ticketId}/activity`, { credentials: 'include' })
+        const offset = (page - 1) * PAGE_SIZE
+        const res = await fetch(`/api/tickets/${ticketId}/activity?limit=${PAGE_SIZE}&offset=${offset}`, { credentials: 'include' })
         if (!res.ok) throw new Error('fetch failed')
-        const body = (await res.json()) as { data?: TicketActivityEntry[] }
-        if (!cancelled) setRows(Array.isArray(body.data) ? body.data : [])
+        const body = (await res.json()) as { data?: TicketActivityEntry[]; total?: number }
+        if (!cancelled) {
+          setRows(Array.isArray(body.data) ? body.data : [])
+          setTotal(typeof body.total === 'number' ? body.total : 0)
+        }
       } catch {
         if (!cancelled) setRows([])
       } finally {
@@ -59,13 +67,20 @@ export default function TabActivity({
     return () => {
       cancelled = true
     }
-  }, [ticketId, refreshKey])
+  }, [ticketId, refreshKey, page])
 
   return (
     <Table<TicketActivityEntry>
       rowKey="id"
       loading={loading}
-      pagination={false}
+      pagination={{
+        current: page,
+        pageSize: PAGE_SIZE,
+        total,
+        onChange: (p) => setPage(p),
+        showSizeChanger: false,
+        showTotal: (t) => `${t} activities`,
+      }}
       size="small"
       dataSource={rows}
       locale={{ emptyText: 'No activity yet' }}

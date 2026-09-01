@@ -1,12 +1,14 @@
-import { desc, eq } from 'drizzle-orm'
+import { count, desc, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { db, ticketActivityLog, users } from '@/lib/db'
 
+const DEFAULT_LIMIT = 20
+
 /** GET /api/tickets/[id]/activity - Append-only activity log for this ticket */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth()
@@ -20,24 +22,33 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid ticket ID' }, { status: 400 })
   }
 
-  const rows = await db
-    .select({
-      id: ticketActivityLog.id,
-      ticket_id: ticketActivityLog.ticketId,
-      actor_user_id: ticketActivityLog.actorUserId,
-      actor_role: ticketActivityLog.actorRole,
-      action: ticketActivityLog.action,
-      metadata: ticketActivityLog.metadata,
-      related_comment_id: ticketActivityLog.relatedCommentId,
-      created_at: ticketActivityLog.createdAt,
-      actor_name: users.fullName,
-      actor_email: users.email,
-      actor_avatar_url: users.avatarUrl,
-    })
-    .from(ticketActivityLog)
-    .leftJoin(users, eq(ticketActivityLog.actorUserId, users.id))
-    .where(eq(ticketActivityLog.ticketId, ticketId))
-    .orderBy(desc(ticketActivityLog.createdAt))
+  const url = new URL(request.url)
+  const limit = Math.min(Math.max(1, parseInt(url.searchParams.get('limit') || String(DEFAULT_LIMIT), 10)), 100)
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10))
+
+  const [[{ total }], rows] = await Promise.all([
+    db.select({ total: count() }).from(ticketActivityLog).where(eq(ticketActivityLog.ticketId, ticketId)),
+    db
+      .select({
+        id: ticketActivityLog.id,
+        ticket_id: ticketActivityLog.ticketId,
+        actor_user_id: ticketActivityLog.actorUserId,
+        actor_role: ticketActivityLog.actorRole,
+        action: ticketActivityLog.action,
+        metadata: ticketActivityLog.metadata,
+        related_comment_id: ticketActivityLog.relatedCommentId,
+        created_at: ticketActivityLog.createdAt,
+        actor_name: users.fullName,
+        actor_email: users.email,
+        actor_avatar_url: users.avatarUrl,
+      })
+      .from(ticketActivityLog)
+      .leftJoin(users, eq(ticketActivityLog.actorUserId, users.id))
+      .where(eq(ticketActivityLog.ticketId, ticketId))
+      .orderBy(desc(ticketActivityLog.createdAt))
+      .limit(limit)
+      .offset(offset),
+  ])
 
   const data = rows.map((r) => ({
     id: r.id,
@@ -57,5 +68,5 @@ export async function GET(
       : null,
   }))
 
-  return NextResponse.json({ data })
+  return NextResponse.json({ data, total, limit, offset })
 }

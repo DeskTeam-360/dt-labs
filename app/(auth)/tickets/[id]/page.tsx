@@ -1,10 +1,11 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
 import TicketDetailContentClient from '@/components/ticket/TicketDetailContentClient'
+import { isAdmin } from '@/lib/auth-utils'
 import { getCustomerCompanyId } from '@/lib/customer-company'
-import { db, tickets } from '@/lib/db'
+import { db, teamMembers, teams, tickets } from '@/lib/db'
 import { getTicketDetail } from '@/lib/ticket-detail'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -35,9 +36,28 @@ export default async function TicketDetailPage({
   const role = (session.user as { role?: string }).role?.toLowerCase()
   const userId = session.user.id!
 
-  const [ticketExists] = await db.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)).limit(1)
+  const [ticketExists] = await db.select({ id: tickets.id, teamId: tickets.teamId }).from(tickets).where(eq(tickets.id, ticketId)).limit(1)
   if (!ticketExists) {
     redirect('/tickets?ticket_error=not_found')
+  }
+
+  // Team access control for non-admin staff
+  if (!isAdmin(role) && role !== 'customer' && ticketExists.teamId) {
+    const [teamRow] = await db
+      .select({ type: teams.type })
+      .from(teams)
+      .where(eq(teams.id, ticketExists.teamId))
+      .limit(1)
+    if (teamRow?.type !== 'public') {
+      const [isMember] = await db
+        .select({ teamId: teamMembers.teamId })
+        .from(teamMembers)
+        .where(and(eq(teamMembers.userId, userId), eq(teamMembers.teamId, ticketExists.teamId)))
+        .limit(1)
+      if (!isMember) {
+        redirect('/tickets?ticket_error=no_access')
+      }
+    }
   }
 
   const data = await getTicketDetail(ticketId, {
