@@ -29,6 +29,9 @@ export function normalizeSlackRuleFilter(body: Record<string, unknown>) {
       : [],
     to_status_slugs: toSlugs,
     tag_ids: tagIds,
+    account_manager_ids: Array.isArray(f.account_manager_ids)
+      ? f.account_manager_ids.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+      : [],
   }
   if (slackNote.length > 0) {
     out.slack_note = slackNote

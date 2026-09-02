@@ -35,6 +35,8 @@ export type SlackNotifyRuleFilter = {
   to_status_slugs?: string[]
   /** When non-empty, the ticket must have at least one of these tag IDs (`ticket_tags`). */
   tag_ids?: string[]
+  /** When non-empty, the ticket's company must have one of these users as active_manager_id. */
+  account_manager_ids?: string[]
   /** Optional line(s) prepended to the Slack message for this rule (plain text; shortened when posting). */
   slack_note?: string
 }
@@ -68,13 +70,13 @@ function eventAllowed(filter: SlackNotifyRuleFilter, event: SlackTicketNotifyEve
   return false
 }
 
-function matchesDimensions(
+async function matchesDimensions(
   filter: SlackNotifyRuleFilter,
   ticket: SlackTicketPayload,
   event: SlackTicketNotifyEvent,
   ticketTagIds: string[]
-): boolean {
-  const { team_ids, priority_ids, company_ids, type_ids, to_status_slugs, tag_ids } = filter
+): Promise<boolean> {
+  const { team_ids, priority_ids, company_ids, type_ids, to_status_slugs, tag_ids, account_manager_ids } = filter
   if (team_ids && team_ids.length > 0) {
     if (!ticket.teamId || !team_ids.includes(ticket.teamId)) return false
   }
@@ -94,6 +96,15 @@ function matchesDimensions(
   if (tag_ids && tag_ids.length > 0) {
     const has = tag_ids.some((id) => ticketTagIds.includes(id))
     if (!has) return false
+  }
+  if (account_manager_ids && account_manager_ids.length > 0) {
+    if (!ticket.companyId) return false
+    const [c] = await db
+      .select({ activeManagerId: companies.activeManagerId })
+      .from(companies)
+      .where(eq(companies.id, ticket.companyId))
+      .limit(1)
+    if (!c?.activeManagerId || !account_manager_ids.includes(c.activeManagerId)) return false
   }
   return true
 }
@@ -283,11 +294,14 @@ export async function notifySlackTicketEvent(
     })
     const ticketTagIds = needTagLookup ? await loadTicketTagIds(ticket.id) : []
 
-    const matched = rules.filter((r) => {
-      const f = parseFilter(r.filter)
-      if (!eventAllowed(f, event)) return false
-      return matchesDimensions(f, ticket, event, ticketTagIds)
-    })
+    const matchResults = await Promise.all(
+      rules.map(async (r) => {
+        const f = parseFilter(r.filter)
+        if (!eventAllowed(f, event)) return false
+        return matchesDimensions(f, ticket, event, ticketTagIds)
+      })
+    )
+    const matched = rules.filter((_, i) => matchResults[i])
     if (matched.length === 0) return
 
     const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '') || 'http://localhost:3000'

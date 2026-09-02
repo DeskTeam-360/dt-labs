@@ -67,6 +67,9 @@ function filterFromApi(f: Record<string, unknown> | undefined) {
     type_ids: Array.isArray(raw.type_ids) ? (raw.type_ids as number[]) : [],
     to_status_slugs: toSlugs,
     tag_ids: tagIds,
+    account_manager_ids: Array.isArray(raw.account_manager_ids)
+      ? (raw.account_manager_ids as unknown[]).filter((id): id is string => typeof id === 'string' && id.length > 0)
+      : [],
     slack_note: slackNote,
   }
 }
@@ -86,6 +89,7 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
   const [typeOpts, setTypeOpts] = useState<Option[]>([])
   const [statusOpts, setStatusOpts] = useState<Option[]>([])
   const [tagOpts, setTagOpts] = useState<Option[]>([])
+  const [managerOpts, setManagerOpts] = useState<Option[]>([])
 
   const loadRules = useCallback(async () => {
     setLoading(true)
@@ -118,13 +122,14 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
 
   const loadSelectData = useCallback(async () => {
     try {
-      const [teamsRes, priRes, compRes, typRes, statusRes, tagsRes] = await Promise.all([
+      const [teamsRes, priRes, compRes, typRes, statusRes, tagsRes, usersRes] = await Promise.all([
         fetch('/api/teams', { credentials: 'include' }),
         fetch('/api/ticket-priorities', { credentials: 'include' }),
         fetch('/api/companies', { credentials: 'include' }),
         fetch('/api/ticket-types', { credentials: 'include' }),
         fetch('/api/ticket-statuses', { credentials: 'include' }),
         fetch('/api/tags', { credentials: 'include' }),
+        fetch('/api/users', { credentials: 'include' }),
       ])
       const teamsJson = teamsRes.ok ? await teamsRes.json() : []
       const priJson = priRes.ok ? await priRes.json() : []
@@ -132,7 +137,9 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       const typJson = typRes.ok ? await typRes.json() : []
       const statusJson = statusRes.ok ? await statusRes.json() : []
       const tagsJson = tagsRes.ok ? await tagsRes.json() : []
+      const usersJson = usersRes.ok ? await usersRes.json() : []
       const compList = Array.isArray(compWrap.data) ? compWrap.data : []
+      const usersList = Array.isArray(usersJson) ? usersJson : []
 
       setTeamOpts(
         (Array.isArray(teamsJson) ? teamsJson : []).map((t: { id: string; name: string }) => ({
@@ -172,6 +179,14 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
           value: t.id,
         }))
       )
+      setManagerOpts(
+        usersList
+          .filter((u: { role?: string }) => !['customer'].includes((u.role ?? '').toLowerCase()))
+          .map((u: { id: string; full_name?: string; email?: string }) => ({
+            label: u.full_name?.trim() || u.email || u.id,
+            value: u.id,
+          }))
+      )
     } catch {
       /* non-fatal */
     }
@@ -200,6 +215,7 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       type_ids: [],
       to_status_slugs: [],
       tag_ids: [],
+      account_manager_ids: [],
       slack_note: '',
     })
     setModalOpen(true)
@@ -223,6 +239,7 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       type_ids: f.type_ids,
       to_status_slugs: f.to_status_slugs,
       tag_ids: f.tag_ids,
+      account_manager_ids: f.account_manager_ids,
       slack_note: f.slack_note,
     })
     setModalOpen(true)
@@ -246,6 +263,7 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
       type_ids: v.type_ids?.length ? v.type_ids : [],
       to_status_slugs: v.to_status_slugs?.length ? v.to_status_slugs : [],
       tag_ids: v.tag_ids?.length ? v.tag_ids : [],
+      account_manager_ids: v.account_manager_ids?.length ? v.account_manager_ids : [],
       slack_note: typeof v.slack_note === 'string' ? v.slack_note.trim().slice(0, 1000) : '',
     }
     setSaving(true)
@@ -352,6 +370,7 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
         if (f.company_ids.length) parts.push(`${f.company_ids.length} company`)
         if (f.type_ids.length) parts.push(`${f.type_ids.length} type`)
         if (f.to_status_slugs.length) parts.push(`${f.to_status_slugs.length} new status`)
+        if (f.account_manager_ids.length) parts.push(`${f.account_manager_ids.length} manager(s)`)
         return parts.length > 0 ? (
           <Text type="secondary">{parts.join(' · ')}</Text>
         ) : (
@@ -509,6 +528,9 @@ export default function SlackNotificationRulesContent({ user }: SlackNotificatio
           </Form.Item>
           <Form.Item name="type_ids" label="Ticket types" style={{ width: '50%' }}>
             <Select mode="multiple" allowClear placeholder="Any type" options={typeOpts} optionFilterProp="label" />
+          </Form.Item>
+          <Form.Item name="account_manager_ids" label="Account Manager" style={{ width: '50%' }}>
+            <Select mode="multiple" allowClear placeholder="Any manager" options={managerOpts} optionFilterProp="label" />
           </Form.Item>
           </Flex>
           <Form.Item
