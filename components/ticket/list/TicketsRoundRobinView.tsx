@@ -1,18 +1,28 @@
 'use client'
 
 import { DeleteOutlined, EditOutlined, MoreOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Flex, Modal,Table, Typography } from 'antd'
+import { Button, Dropdown, Flex, Modal, Table, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+
+import type { CompanyTimeStat } from '@/app/api/tickets/company-time-stats/route'
 
 import type { StatusColumn, TicketRecord } from './types'
-import { DEFAULT_ALL_STATUS_COLUMNS, sortTickets,TICKETS_LIST_SORT_BY, TICKETS_LIST_SORT_ORDER } from './types'
+import { DEFAULT_ALL_STATUS_COLUMNS, sortTickets, TICKETS_LIST_SORT_BY, TICKETS_LIST_SORT_ORDER } from './types'
 
 interface RoundRobinRow {
   key: string
   companyName: string
   company: string
   tickets: TicketRecord[]
+}
+
+function fmtSeconds(s: number): string {
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  if (h === 0 && m === 0) return '0.00H'
+  return `${h}.${String(m).padStart(2, '0')}H`
 }
 
 interface TicketsRoundRobinViewProps {
@@ -36,6 +46,8 @@ export default function TicketsRoundRobinView({
   canDeleteTicket = false,
 }: TicketsRoundRobinViewProps) {
   const router = useRouter()
+  const [companyStats, setCompanyStats] = useState<Map<string, CompanyTimeStat>>(new Map())
+
   // Group tickets by company
   const byCompany = new Map<string, TicketRecord[]>()
   for (const t of tickets) {
@@ -56,18 +68,51 @@ export default function TicketsRoundRobinView({
   })
   const maxSlots = Math.max(1, ...Array.from(byCompany.values()).map((a) => a.length))
 
+  const realCompanyIds = companyIds.filter((id) => id !== '__no_company__')
+
+  useEffect(() => {
+    if (realCompanyIds.length === 0) return
+    const ids = realCompanyIds.join(',')
+    fetch(`/api/tickets/company-time-stats?company_ids=${ids}`)
+      .then((r) => r.json())
+      .then((data: CompanyTimeStat[]) => {
+        const map = new Map<string, CompanyTimeStat>()
+        for (const s of data) map.set(s.company_id, s)
+        setCompanyStats(map)
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickets])
+
   const columns: ColumnsType<RoundRobinRow> = [
     {
       title: 'Company',
       dataIndex: 'company',
       key: 'company',
       fixed: 'left',
-      width: 220,
-      render: (_, row) => (
-        <Typography.Text strong style={{ whiteSpace: 'nowrap' }}>
-          {row.companyName}
-        </Typography.Text>
-      ),
+      width: 240,
+      render: (_, row) => {
+        const stat = companyStats.get(row.company)
+        const amName = stat?.active_manager_name ?? null
+        return (
+          <div>
+            <Typography.Text strong style={{ whiteSpace: 'nowrap' }}>
+              {row.companyName}
+              {stat && stat.active_time_hours > 0 && (
+                <span style={{ fontWeight: 400, color: 'var(--ant-color-text-secondary, #8c8c8c)', marginLeft: 4 }}>
+                  ({stat.active_time_hours})
+                </span>
+              )}
+            </Typography.Text>
+            {stat && (
+              <div style={{ fontSize: 11, color: 'var(--ant-color-text-secondary, #8c8c8c)', marginTop: 2 }}>
+                Total Spend Time : {fmtSeconds(stat.today_seconds)}
+                {'  '}AM: {amName ?? 'NA'}
+              </div>
+            )}
+          </div>
+        )
+      },
     },
     ...Array.from({ length: maxSlots }, (_, i) => ({
       title: `Ticket ${i + 1}`,
