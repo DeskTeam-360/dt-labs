@@ -37,6 +37,9 @@ export default function CommentHtml({ html, style, className }: CommentHtmlProps
         .comment-collapsed-quote .gmail_extra {
           display: none !important;
         }
+        .comment-html {
+          user-select: text !important;
+        }
         .comment-html div {
           min-height: 0;
         }
@@ -54,6 +57,7 @@ export default function CommentHtml({ html, style, className }: CommentHtmlProps
         .comment-html *[style] {
           background-color: transparent !important;
           color: inherit !important;
+          user-select: text !important;
         }
       `}</style>
 
