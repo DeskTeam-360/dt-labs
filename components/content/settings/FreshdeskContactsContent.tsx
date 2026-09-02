@@ -28,8 +28,8 @@ export default function FreshdeskContactsContent() {
       if (!res.ok) { setError(body.error ?? 'Failed'); return }
       setContacts(body.no_company ?? [])
       setTotalFetched(body.total_fetched ?? 0)
-    } catch {
-      setError('Request failed')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Request failed')
     } finally {
       setLoading(false)
     }

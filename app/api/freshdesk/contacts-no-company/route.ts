@@ -19,22 +19,34 @@ async function fetchFdPage(baseUrl: string, authHeader: string, page: number) {
   }>>
 }
 
+function buildBaseUrl(domain: string) {
+  if (domain.startsWith('http')) return domain.replace(/\/$/, '')
+  if (domain.includes('.freshdesk.com')) return `https://${domain}`
+  return `https://${domain}.freshdesk.com`
+}
+
 export async function GET() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const role = (session.user as { role?: string }).role?.toLowerCase()
   if (role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const rows = await db.select().from(appSettings)
-  const map = Object.fromEntries(rows.map((r) => [r.key, r.value ?? '']))
-  const domain = map['freshdesk_domain'] ?? ''
-  const apiKey = map['freshdesk_api_key'] ?? ''
+  // Try env vars first (same as proxy route), fallback to DB settings
+  let domain = process.env.FRESHDESK_DOMAIN ?? ''
+  let apiKey = process.env.FRESHDESK_API_KEY ?? ''
+
+  if (!domain || !apiKey) {
+    const rows = await db.select().from(appSettings)
+    const map = Object.fromEntries(rows.map((r) => [r.key, r.value ?? '']))
+    domain = map['freshdesk_domain'] ?? ''
+    apiKey = map['freshdesk_api_key'] ?? ''
+  }
 
   if (!domain || !apiKey) {
     return NextResponse.json({ error: 'Freshdesk not configured' }, { status: 503 })
   }
 
-  const baseUrl = domain.startsWith('http') ? domain : `https://${domain}.freshdesk.com`
+  const baseUrl = buildBaseUrl(domain)
   const authHeader = 'Basic ' + Buffer.from(`${apiKey}:X`).toString('base64')
 
   const noCompany: Array<{ id: number; name: string; email: string | null; phone: string | null; created_at: string }> = []
