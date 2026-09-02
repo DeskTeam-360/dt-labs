@@ -24,8 +24,12 @@ export default function FreshdeskContactsContent() {
     setError(null)
     try {
       const res = await fetch('/api/freshdesk/contacts-no-company', { credentials: 'include' })
+      if (!res.ok) {
+        const text = await res.text()
+        setError(`HTTP ${res.status} — ${text.slice(0, 200)}`)
+        return
+      }
       const body = await res.json()
-      if (!res.ok) { setError(body.error ?? 'Failed'); return }
       setContacts(body.no_company ?? [])
       setTotalFetched(body.total_fetched ?? 0)
     } catch (e) {
