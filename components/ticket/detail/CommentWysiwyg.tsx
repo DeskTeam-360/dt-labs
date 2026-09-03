@@ -37,10 +37,14 @@ const QUILL_FORMATS = [
   'underline',
   'strike',
   'list',
+  /** Enables Tab / Shift+Tab to create sub-bullets and sub-numbering inside lists */
+  'indent',
   'link',
   'image',
   /** Custom blot from `registerCommentWysiwygQuill()` — must be whitelisted or embed is stripped */
   'divider',
+  /** Soft line break blot — Shift+Enter; renders as <br> within the same <p> */
+  'linebreak',
 ]
 
 interface CommentWysiwygProps {
@@ -112,7 +116,7 @@ export default function CommentWysiwyg({
         [{ size: ['small', false, 'large', 'huge'] }],
         [{ color: [] }],
         ['bold', 'italic', 'underline', 'strike'],
-        [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }],
+        [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }, { indent: '-1' }, { indent: '+1' }],
         ['link', 'image'],
         ['divider'],
         ['clean'],
@@ -145,6 +149,50 @@ export default function CommentWysiwyg({
             quill.setSelection(idx + 1, 0, 'user')
           }
           input.click()
+        },
+      },
+    },
+    keyboard: {
+      bindings: {
+        /** Tab inside a list item → indent (sub-bullet / sub-numbering). */
+        listTab: {
+          key: 'Tab',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          handler(this: { quill: any }, range: unknown, context: { format?: { list?: unknown } }) {
+            if (context.format?.list) {
+              this.quill.format('indent', '+1', 'user')
+              return false
+            }
+            return true
+          },
+        },
+        /** Shift+Tab inside a list item → un-indent. */
+        listShiftTab: {
+          key: 'Tab',
+          shiftKey: true,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          handler(this: { quill: any }, range: unknown, context: { format?: { list?: unknown } }) {
+            if (context.format?.list) {
+              this.quill.format('indent', '-1', 'user')
+              return false
+            }
+            return true
+          },
+        },
+        /**
+         * Shift+Enter: insert a linebreak blot (<br> within the same <p>),
+         * visually distinct from Enter which creates a new <p> paragraph.
+         */
+        shiftEnter: {
+          key: 'Enter',
+          shiftKey: true,
+          handler(this: { quill: { getSelection: (f: boolean) => { index: number; length: number } | null; insertEmbed: (i: number, t: string, v: unknown, s: string) => void; setSelection: (i: number, l: number, s: string) => void } }) {
+            const range = this.quill.getSelection(true)
+            if (!range) return true
+            this.quill.insertEmbed(range.index, 'linebreak', true, 'user')
+            this.quill.setSelection(range.index + 1, 0, 'user')
+            return false
+          },
         },
       },
     },
@@ -310,6 +358,7 @@ export default function CommentWysiwyg({
     <style>{`
       .comment-wysiwyg-wrapper {
         position: relative;
+        resize: vertical;
         overflow: hidden;
       }
       .comment-wysiwyg-wrapper .quill {
@@ -326,6 +375,11 @@ export default function CommentWysiwyg({
         min-height: ${editorMinPx}px;
         height: 100%;
         box-sizing: border-box;
+        overflow-y: hidden;
+      }
+      /* Paragraph gap in editor: Enter creates new <p> (visible gap), Shift+Enter stays in same <p> (tight br) */
+      .comment-wysiwyg-wrapper .ql-editor p + p {
+        margin-top: 10px !important;
       }
       /* Toolbar: size / color pickers need room; dropdowns above sibling controls */
       .comment-wysiwyg-wrapper .ql-toolbar.ql-snow {
@@ -364,7 +418,7 @@ export default function CommentWysiwyg({
       }
     `}</style>
 
-    <div className="comment-wysiwyg-wrapper" style={{ marginBottom: 20, height: height, display: 'flex', flexDirection: 'column' }}>
+    <div className="comment-wysiwyg-wrapper" style={{ marginBottom: 8, height: height, minHeight: editorMinPx + 42, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* key remounts Quill when HTML is injected into a blank editor; react-quill-new types omit ref */}
       <ReactQuill key={quillEpoch} {...(quillProps as React.ComponentProps<typeof ReactQuill>)} />
     </div>

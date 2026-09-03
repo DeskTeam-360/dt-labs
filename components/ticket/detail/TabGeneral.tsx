@@ -805,7 +805,7 @@ export default function TabGeneral({
                         <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 4 }}>
                         
                           {editingComment === comment.id ? (
-                            <Flex vertical gap={40} style={{ width: '100%' }}>
+                            <Flex vertical gap={8} style={{ width: '100%' }}>
                               <CommentWysiwyg
                                 ticketId={ticketData?.id}
                                 value={editingCommentValue}

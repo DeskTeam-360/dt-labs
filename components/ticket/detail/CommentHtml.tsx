@@ -52,7 +52,7 @@ function CommentHtml({ html, style, className }: CommentHtmlProps) {
           line-height: 1.5;
         }
         .comment-html p + p {
-          margin-top: 4px;
+          margin-top: 8px;
         }
         .comment-html *[style] {
           background-color: transparent !important;
