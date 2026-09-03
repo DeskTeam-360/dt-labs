@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { memo, useState } from 'react'
 
 import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
@@ -14,7 +14,7 @@ interface CommentHtmlProps {
  * Renders comment HTML and collapses quoted email history (blockquotes) behind a toggle,
  * similar to how Freshdesk/Gmail minimize previous email thread content.
  */
-export default function CommentHtml({ html, style, className }: CommentHtmlProps) {
+function CommentHtml({ html, style, className }: CommentHtmlProps) {
   const [showQuote, setShowQuote] = useState(false)
 
   const sanitized = sanitizeRichHtml(html)
@@ -93,3 +93,5 @@ export default function CommentHtml({ html, style, className }: CommentHtmlProps
     </div>
   )
 }
+
+export default memo(CommentHtml)
