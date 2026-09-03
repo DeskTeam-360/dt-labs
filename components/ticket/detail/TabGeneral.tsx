@@ -45,7 +45,8 @@ import {
 
 const { useBreakpoint } = Grid
 import dayjs from 'dayjs'
-import React, { useEffect, useMemo,useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import DateDisplay from '@/components/common/DateDisplay'
 import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
@@ -907,7 +908,7 @@ export default function TabGeneral({
         )}
 
         {/* Attributes sidebar — left of company */}
-        {!isMobile && <div style={{
+        {!isMobile && createPortal(<div style={{
             width: ATTR_W,
             position: 'fixed',
             right: COMP_W,
@@ -1180,10 +1181,10 @@ export default function TabGeneral({
           </div>
           </>
           )}
-        </div>}
+        </div>, document.body)}
 
         {/* Company Info sidebar — paling kanan, right: 0 */}
-        {!isMobile && <div style={{
+        {!isMobile && createPortal(<div style={{
             width: COMP_W,
             position: 'fixed',
             right: 0,
@@ -1331,7 +1332,7 @@ export default function TabGeneral({
               )}
             </div>
           )}
-        </div>}
+        </div>, document.body)}
 
         {/* Mobile Drawers */}
         <Drawer
