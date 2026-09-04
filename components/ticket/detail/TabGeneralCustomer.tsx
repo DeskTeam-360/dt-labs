@@ -102,7 +102,6 @@ interface TabGeneralCustomerProps {
   ticketCcEmails?: string[]
   totalTimeSeconds: number
   activeTimeTracker: any
-  currentTime: number
   formatTime: (seconds: number) => string
 }
 
@@ -137,7 +136,6 @@ export default function TabGeneralCustomer({
   ticketCcEmails = [],
   totalTimeSeconds,
   activeTimeTracker,
-  currentTime,
   formatTime,
 }: TabGeneralCustomerProps) {
   const [typeDraft, setTypeDraft] = useState<number | null>(() => ticketData?.type_id ?? null)

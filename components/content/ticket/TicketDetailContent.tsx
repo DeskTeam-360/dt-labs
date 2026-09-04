@@ -1664,7 +1664,6 @@ export default function TicketDetailContent({
                                 savingChanges={customerChangesSaving}
                                 totalTimeSeconds={totalTimeSeconds}
                                 activeTimeTracker={activeTimeTracker}
-                                currentTime={currentTime}
                                 formatTime={formatTime}
                                 comments={comments}
                                 currentUserId={currentUser.id}
@@ -1739,7 +1738,6 @@ export default function TicketDetailContent({
                                             onSaveSidebarAttributes={handleSaveSidebarAttributes}
                                             totalTimeSeconds={totalTimeSeconds}
                                             activeTimeTracker={activeTimeTracker}
-                                            currentTime={currentTime}
                                             formatTime={formatTime}
                                             comments={comments}
                                             currentUserId={currentUser.id}

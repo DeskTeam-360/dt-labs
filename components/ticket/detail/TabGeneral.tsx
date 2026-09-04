@@ -58,6 +58,7 @@ import CommentTaggedCcLines from './CommentTaggedCcLines'
 import CommentWysiwyg from './CommentWysiwyg'
 import CompanyTodayTotal from './CompanyTodayTotal'
 import TicketUserMention from './TicketUserMention'
+import TrackerElapsed from './TrackerElapsed'
 
 const { Text, Paragraph } = Typography
 
@@ -238,7 +239,6 @@ interface TabGeneralProps {
   onSaveSidebarAttributes: (draft: SidebarAttributesDraft) => Promise<void>
   totalTimeSeconds: number
   activeTimeTracker: any
-  currentTime: number
   formatTime: (seconds: number) => string
   comments: Comment[]
   currentUserId: string
@@ -324,7 +324,6 @@ export default function TabGeneral({
   onSaveSidebarAttributes,
   totalTimeSeconds,
   activeTimeTracker,
-  currentTime,
   formatTime,
   comments,
   currentUserId,
@@ -1147,7 +1146,9 @@ export default function TabGeneral({
               <Text style={LBL}>Total Time Tracked</Text>
               <Space>
                 <ClockCircleOutlined style={{ color: 'rgba(255,255,255,0.65)' }} />
-                <Text style={{ color: '#fff', fontWeight: 600 }}>{formatTime(totalTimeSeconds + (activeTimeTracker ? currentTime : 0))}</Text>
+                <Text style={{ color: '#fff', fontWeight: 600 }}>
+                  <TrackerElapsed totalTimeSeconds={totalTimeSeconds} activeTimeTracker={activeTimeTracker} formatTime={formatTime} />
+                </Text>
               </Space>
             </div>
 
