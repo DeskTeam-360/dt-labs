@@ -56,6 +56,7 @@ import CommentComposer from './CommentComposer'
 import CommentHtml from './CommentHtml'
 import CommentTaggedCcLines from './CommentTaggedCcLines'
 import CommentWysiwyg from './CommentWysiwyg'
+import CompanyTodayTotal from './CompanyTodayTotal'
 import TicketUserMention from './TicketUserMention'
 
 const { Text, Paragraph } = Typography
@@ -447,7 +448,6 @@ export default function TabGeneral({
   const [companyHasActiveTracker, setCompanyHasActiveTracker] = useState(false)
   const [companyActiveTrackerUser, setCompanyActiveTrackerUser] = useState<string | null>(null)
   const [companyActiveTrackerStart, setCompanyActiveTrackerStart] = useState<string | null>(null)
-  const [, forceTickCompany] = useState(0)
 
   useEffect(() => {
     const cid = ticketData?.company_id
@@ -477,12 +477,6 @@ export default function TabGeneral({
       .catch(() => {})
   }, [ticketData?.company_id, companyCollapsed])
 
-  // Live tick every second while there's an active tracker
-  useEffect(() => {
-    if (!companyHasActiveTracker) return
-    const id = window.setInterval(() => forceTickCompany(n => n + 1), 1000)
-    return () => window.clearInterval(id)
-  }, [companyHasActiveTracker])
 
   const statusSelectOptions = useMemo(() => {
     const cur = sidebarDraft.status as string | undefined
@@ -1295,48 +1289,14 @@ export default function TabGeneral({
                     )}
                   </Space>
 
-                  {/* Today total hours + active tracker */}
+                  {/* Today total hours + active tracker — isolated component owns its own 1s timer */}
                   {companyTodaySeconds !== null && (
-                    <div style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: 4 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: companyHasActiveTracker ? 6 : 0 }}>
-                        <div>
-                          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 1 }}>Today Total</Text>
-                          <Text style={{ fontSize: 13, fontWeight: 600, color: '#69b1ff', display: 'block', marginTop: 2 }}>
-                            {(() => {
-                              const activeSecs = companyActiveTrackerStart
-                                ? Math.floor((Date.now() - new Date(companyActiveTrackerStart).getTime()) / 1000)
-                                : 0
-                              const total = companyTodaySeconds + activeSecs
-                              const h = Math.floor(total / 3600)
-                              const m = Math.floor((total % 3600) / 60)
-                              return `${h}.${String(m).padStart(2, '0')}H`
-                            })()}
-                          </Text>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: companyHasActiveTracker ? '#52c41a' : 'rgba(255,255,255,0.2)', display: 'inline-block', boxShadow: companyHasActiveTracker ? '0 0 6px #52c41a' : 'none' }} />
-                          <Text style={{ fontSize: 10, color: companyHasActiveTracker ? '#95de64' : 'rgba(255,255,255,0.3)' }}>
-                            {companyHasActiveTracker ? 'Active' : 'No tracker'}
-                          </Text>
-                        </div>
-                      </div>
-                      {companyHasActiveTracker && companyActiveTrackerUser && companyActiveTrackerStart && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px', background: 'rgba(82,196,26,0.08)', borderRadius: 3, borderLeft: '2px solid #52c41a' }}>
-                          <Text style={{ fontSize: 10, color: '#95de64', fontWeight: 500 }}>{companyActiveTrackerUser}</Text>
-                          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontVariantNumeric: 'tabular-nums' }}>
-                            {(() => {
-                              const s = Math.floor((Date.now() - new Date(companyActiveTrackerStart).getTime()) / 1000)
-                              const h = Math.floor(s / 3600)
-                              const m = Math.floor((s % 3600) / 60)
-                              const sec = s % 60
-                              return h > 0
-                                ? `${h}h ${String(m).padStart(2, '0')}m`
-                                : `${m}m ${String(sec).padStart(2, '0')}s`
-                            })()}
-                          </Text>
-                        </div>
-                      )}
-                    </div>
+                    <CompanyTodayTotal
+                      completedSeconds={companyTodaySeconds}
+                      hasActiveTracker={companyHasActiveTracker}
+                      activeTrackerUserName={companyActiveTrackerUser}
+                      activeTrackerStartTime={companyActiveTrackerStart}
+                    />
                   )}
 
                   {/* Top tickets */}
