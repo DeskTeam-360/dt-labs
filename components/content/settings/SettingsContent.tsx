@@ -33,6 +33,7 @@ import AdminSidebar from '@/components/layout/AdminSidebar'
 import {
   canAccessAiSettings,
   canAccessAutomationRules,
+  canAccessChecklistTemplates,
   canAccessCompanies,
   canAccessCompanyLog,
   canAccessCustomerTimeReport,
@@ -186,7 +187,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
-                {isAdmin(role) && (
+                {canAccessChecklistTemplates(role) && (
                   <Col xs={24} sm={12} md={8}>
                     <HubTile
                       title="Checklist Templates"

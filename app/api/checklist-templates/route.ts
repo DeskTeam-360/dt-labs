@@ -2,11 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { canAccessChecklistTemplates } from '@/lib/auth-utils'
 import { checklistTemplateGroups, checklistTemplateItems, checklistTemplates, db } from '@/lib/db'
-
-function sessionRole(session: { user?: { role?: string } } | null) {
-  return (session?.user as { role?: string } | undefined)?.role ?? ''
-}
 
 export async function GET() {
   const session = await auth()
@@ -29,7 +26,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (sessionRole(session).toLowerCase() !== 'admin')
+  if (!canAccessChecklistTemplates((session.user as { role?: string }).role))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json().catch(() => ({}))

@@ -49,9 +49,14 @@ export function canAccessTicketAttributes(role: string | undefined): boolean {
   return isAdminOrManager(role)
 }
 
-/** Automation rules UI & API: Admin only */
+/** Automation rules UI & API: Admin & Manager */
 export function canAccessAutomationRules(role: string | undefined): boolean {
-  return isAdmin(role)
+  return isAdminOrManager(role)
+}
+
+/** Checklist templates (create/edit/delete): Admin & Manager */
+export function canAccessChecklistTemplates(role: string | undefined): boolean {
+  return isAdminOrManager(role)
 }
 
 /** Teams settings: Admin & Manager (view list/detail & reports; Manager cannot create teams) */
@@ -169,7 +174,8 @@ export function canAccessSettingsHub(role: string | undefined): boolean {
     canAccessCustomerWeeklyRecap(role) ||
     canAccessAiSettings(role) ||
     canAccessRecurringTickets(role) ||
-    canAccessTicketVisibilitySettings(role)
+    canAccessTicketVisibilitySettings(role) ||
+    canAccessChecklistTemplates(role)
   )
 }
 

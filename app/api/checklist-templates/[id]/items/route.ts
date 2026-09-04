@@ -2,11 +2,8 @@ import { eq } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { canAccessChecklistTemplates } from '@/lib/auth-utils'
 import { checklistTemplateItems, db } from '@/lib/db'
-
-function sessionRole(session: { user?: { role?: string } } | null) {
-  return (session?.user as { role?: string } | undefined)?.role ?? ''
-}
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -27,7 +24,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function POST(request: NextRequest, { params }: Params) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (sessionRole(session).toLowerCase() !== 'admin')
+  if (!canAccessChecklistTemplates((session.user as { role?: string }).role))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await params

@@ -443,6 +443,8 @@ export default function TabGeneral({
   } | null>(null)
   const [companyAttrs, setCompanyAttrs] = useState<CompanyAttr[]>([])
   const [topTickets, setTopTickets] = useState<TopTicket[]>([])
+  const [companyTodaySeconds, setCompanyTodaySeconds] = useState<number | null>(null)
+  const [companyHasActiveTracker, setCompanyHasActiveTracker] = useState(false)
 
   useEffect(() => {
     const cid = ticketData?.company_id
@@ -458,6 +460,10 @@ export default function TabGeneral({
     fetch(`/api/companies/${cid}/tickets?limit=5`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(j => { if (j?.data) setTopTickets(j.data) })
+      .catch(() => {})
+    fetch(`/api/tickets/company-time-stats?company_ids=${cid}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (Array.isArray(j) && j[0]) { setCompanyTodaySeconds(j[0].today_seconds); setCompanyHasActiveTracker(j[0].has_active_tracker ?? false) } })
       .catch(() => {})
   }, [ticketData?.company_id, companyCollapsed])
 
@@ -1272,12 +1278,30 @@ export default function TabGeneral({
                     )}
                   </Space>
 
+                  {/* Today total hours + active tracker */}
+                  {companyTodaySeconds !== null && (
+                    <div style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 1 }}>Today Total</Text>
+                        <Text style={{ fontSize: 13, fontWeight: 600, color: '#69b1ff', display: 'block', marginTop: 2 }}>
+                          {(() => { const h = Math.floor(companyTodaySeconds / 3600); const m = Math.floor((companyTodaySeconds % 3600) / 60); return `${h}.${String(m).padStart(2, '0')}H` })()}
+                        </Text>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: companyHasActiveTracker ? '#52c41a' : 'rgba(255,255,255,0.2)', display: 'inline-block', boxShadow: companyHasActiveTracker ? '0 0 6px #52c41a' : 'none' }} />
+                        <Text style={{ fontSize: 10, color: companyHasActiveTracker ? '#95de64' : 'rgba(255,255,255,0.3)' }}>
+                          {companyHasActiveTracker ? 'Active' : 'No tracker'}
+                        </Text>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Top tickets */}
-                  {topTickets.length > 0 && (
+                  {topTickets.filter(t => t.status !== 'client_review' && t.status !== 'close').length > 0 && (
                     <div>
                       <Text style={{ fontSize: 11, display: 'block', marginBottom: 6, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Top Tickets</Text>
                       <Space direction="vertical" style={{ width: '100%' }} size={4}>
-                        {topTickets.map(t => (
+                        {topTickets.filter(t => t.status !== 'client_review' && t.status !== 'close').map(t => (
                           <div
                             key={t.id}
                             onClick={() => window.open(`/tickets/${t.id}`, '_blank')}

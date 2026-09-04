@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
@@ -10,6 +10,7 @@ export type CompanyTimeStat = {
   today_seconds: number
   active_time_hours: number
   active_manager_name: string | null
+  has_active_tracker: boolean
 }
 
 /** GET /api/tickets/company-time-stats?company_ids=id1,id2,... */
@@ -58,6 +59,22 @@ export async function GET(request: Request) {
     )
     .groupBy(tickets.companyId)
 
+  // Active trackers (stopTime IS NULL) per company
+  const activeRows = await db
+    .select({ companyId: tickets.companyId })
+    .from(ticketTimeTracker)
+    .innerJoin(tickets, eq(ticketTimeTracker.ticketId, tickets.id))
+    .where(
+      and(
+        isNotNull(tickets.companyId),
+        inArray(tickets.companyId, companyIds),
+        isNull(ticketTimeTracker.stopTime),
+      )
+    )
+    .groupBy(tickets.companyId)
+
+  const activeSet = new Set(activeRows.map(r => r.companyId).filter(Boolean) as string[])
+
   // Company active_time + active_manager_id
   const companyRows = await db
     .select({
@@ -94,6 +111,7 @@ export async function GET(request: Request) {
     today_seconds: timeMap.get(c.id) ?? 0,
     active_time_hours: c.activeTime ?? 0,
     active_manager_name: c.activeManagerId ? (managerMap.get(c.activeManagerId) ?? null) : null,
+    has_active_tracker: activeSet.has(c.id),
   }))
 
   return NextResponse.json(result)
