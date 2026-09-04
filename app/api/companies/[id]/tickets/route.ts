@@ -1,4 +1,4 @@
-import { and, asc, eq, ne } from 'drizzle-orm'
+import { and, asc, eq, ne, notInArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
@@ -14,7 +14,16 @@ export async function GET(
 
   const { id } = await params
   const url = new URL(request.url)
-  const limit = Math.min(10, Math.max(1, parseInt(url.searchParams.get('limit') ?? '5', 10)))
+  const limit = Math.min(20, Math.max(1, parseInt(url.searchParams.get('limit') ?? '5', 10)))
+  const excludeSlugs = (url.searchParams.get('exclude') ?? '')
+    .split(',').map(s => s.trim()).filter(Boolean)
+
+  const whereClause = and(
+    eq(tickets.companyId, id),
+    ne(tickets.ticketType, 'trash'),
+    ne(tickets.ticketType, 'spam'),
+    excludeSlugs.length > 0 ? notInArray(tickets.status, excludeSlugs) : undefined,
+  )
 
   const rows = await db
     .select({
@@ -26,7 +35,7 @@ export async function GET(
     })
     .from(tickets)
     .leftJoin(ticketStatuses, eq(tickets.status, ticketStatuses.slug))
-    .where(and(eq(tickets.companyId, id), ne(tickets.ticketType, 'trash'), ne(tickets.ticketType, 'spam')))
+    .where(whereClause)
     .orderBy(asc(tickets.priority))
     .limit(limit)
 
@@ -35,6 +44,7 @@ export async function GET(
       id: r.id,
       title: r.title,
       status: r.statusLabel ?? r.status,
+      slug: r.status,
       priority: r.priority,
     })),
   })

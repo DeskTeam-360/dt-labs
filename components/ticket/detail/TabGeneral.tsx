@@ -460,7 +460,7 @@ export default function TabGeneral({
       .then(r => r.ok ? r.json() : null)
       .then(j => { if (j?.data) setCompanyAttrs(j.data) })
       .catch(() => {})
-    fetch(`/api/companies/${cid}/tickets?limit=5`, { credentials: 'include' })
+    fetch(`/api/companies/${cid}/tickets?limit=5&exclude=client_review,closed,pending`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(j => { if (j?.data) setTopTickets(j.data) })
       .catch(() => {})
@@ -1340,11 +1340,11 @@ export default function TabGeneral({
                   )}
 
                   {/* Top tickets */}
-                  {topTickets.filter(t => t.status !== 'client_review' && t.status !== 'closed' && t.status !== 'pending').length > 0 && (
+                  {topTickets.length > 0 && (
                     <div>
                       <Text style={{ fontSize: 11, display: 'block', marginBottom: 6, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Top Tickets</Text>
                       <Space direction="vertical" style={{ width: '100%' }} size={4}>
-                        {topTickets.filter(t => t.status !== 'client_review' && t.status !== 'closed' && t.status !== 'pending').map(t => (
+                        {topTickets.map(t => (
                           <div
                             key={t.id}
                             onClick={() => window.open(`/tickets/${t.id}`, '_blank')}
