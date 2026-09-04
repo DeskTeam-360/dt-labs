@@ -11,6 +11,8 @@ export type CompanyTimeStat = {
   active_time_hours: number
   active_manager_name: string | null
   has_active_tracker: boolean
+  active_tracker_user_name: string | null
+  active_tracker_start_time: string | null
 }
 
 /** GET /api/tickets/company-time-stats?company_ids=id1,id2,... */
@@ -31,7 +33,7 @@ export async function GET(request: Request) {
     return NextResponse.json([])
   }
 
-  // Start of today in UTC
+  // Start of today in UTC (UTC midnight = 07:00 WIB, which naturally covers overnight shifts ending before 07:00 WIB)
   const todayStart = new Date()
   todayStart.setUTCHours(0, 0, 0, 0)
 
@@ -59,9 +61,13 @@ export async function GET(request: Request) {
     )
     .groupBy(tickets.companyId)
 
-  // Active trackers (stopTime IS NULL) per company
+  // Active trackers (stopTime IS NULL) — get the earliest running session per company with user info
   const activeRows = await db
-    .select({ companyId: tickets.companyId })
+    .select({
+      companyId: tickets.companyId,
+      userId: ticketTimeTracker.userId,
+      startTime: ticketTimeTracker.startTime,
+    })
     .from(ticketTimeTracker)
     .innerJoin(tickets, eq(ticketTimeTracker.ticketId, tickets.id))
     .where(
@@ -71,9 +77,27 @@ export async function GET(request: Request) {
         isNull(ticketTimeTracker.stopTime),
       )
     )
-    .groupBy(tickets.companyId)
 
-  const activeSet = new Set(activeRows.map(r => r.companyId).filter(Boolean) as string[])
+  // Resolve active tracker user names
+  const activeUserIds = [...new Set(activeRows.map(r => r.userId).filter(Boolean))]
+  const activeUserMap = new Map<string, string>()
+  if (activeUserIds.length > 0) {
+    const activeUserRows = await db
+      .select({ id: users.id, fullName: users.fullName })
+      .from(users)
+      .where(inArray(users.id, activeUserIds))
+    for (const u of activeUserRows) activeUserMap.set(u.id, u.fullName ?? u.id)
+  }
+
+  // Keep earliest startTime per company (longest running session)
+  const activeMap = new Map<string, { userId: string; startTime: Date }>()
+  for (const r of activeRows) {
+    if (!r.companyId) continue
+    const existing = activeMap.get(r.companyId)
+    if (!existing || r.startTime < existing.startTime) {
+      activeMap.set(r.companyId, { userId: r.userId, startTime: r.startTime })
+    }
+  }
 
   // Company active_time + active_manager_id
   const companyRows = await db
@@ -106,13 +130,18 @@ export async function GET(request: Request) {
     if (r.companyId) timeMap.set(r.companyId, r.totalSeconds)
   }
 
-  const result: CompanyTimeStat[] = companyRows.map((c) => ({
-    company_id: c.id,
-    today_seconds: timeMap.get(c.id) ?? 0,
-    active_time_hours: c.activeTime ?? 0,
-    active_manager_name: c.activeManagerId ? (managerMap.get(c.activeManagerId) ?? null) : null,
-    has_active_tracker: activeSet.has(c.id),
-  }))
+  const result: CompanyTimeStat[] = companyRows.map((c) => {
+    const active = activeMap.get(c.id) ?? null
+    return {
+      company_id: c.id,
+      today_seconds: timeMap.get(c.id) ?? 0,
+      active_time_hours: c.activeTime ?? 0,
+      active_manager_name: c.activeManagerId ? (managerMap.get(c.activeManagerId) ?? null) : null,
+      has_active_tracker: !!active,
+      active_tracker_user_name: active ? (activeUserMap.get(active.userId) ?? null) : null,
+      active_tracker_start_time: active ? active.startTime.toISOString() : null,
+    }
+  })
 
   return NextResponse.json(result)
 }
