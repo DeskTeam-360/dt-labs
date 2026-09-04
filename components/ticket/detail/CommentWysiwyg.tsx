@@ -373,9 +373,7 @@ export default function CommentWysiwyg({
       }
       .comment-wysiwyg-wrapper .ql-editor {
         min-height: ${editorMinPx}px;
-        height: 100%;
         box-sizing: border-box;
-        overflow-y: hidden;
       }
       /* Paragraph gap in editor: Enter creates new <p> (visible gap), Shift+Enter stays in same <p> (tight br) */
       .comment-wysiwyg-wrapper .ql-editor p + p {
