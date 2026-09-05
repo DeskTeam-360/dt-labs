@@ -291,7 +291,6 @@ export default function TicketDetailContent({
     const [activeTimeTracker, setActiveTimeTracker] = useState<any>(null)
     const [timeTrackerSessions, setTimeTrackerSessions] = useState<any[]>([])
     const [totalTimeSeconds, setTotalTimeSeconds] = useState<number>(0)
-    const [currentTime, setCurrentTime] = useState<number>(0)
     const [statusesFromDb, setStatusesFromDb] = useState<
         { slug: string; title: string; customer_title?: string; color: string; is_active?: boolean }[]
     >([])
@@ -444,18 +443,6 @@ export default function TicketDetailContent({
         fetchCompanyUsers()
     }, [displayTicket?.id, displayTicket?.company_id])
 
-    // Check for active time tracker and update current time
-    useEffect(() => {
-        if (activeTimeTracker) {
-            const interval = setInterval(() => {
-                const elapsed = Math.floor((new Date().getTime() - new Date(activeTimeTracker.start_time).getTime()) / 1000)
-                setCurrentTime(elapsed)
-            }, 1000)
-            return () => clearInterval(interval)
-        } else {
-            setCurrentTime(0)
-        }
-    }, [activeTimeTracker])
 
     const fetchTimeTrackerSessions = async () => {
         try {
@@ -588,7 +575,6 @@ export default function TicketDetailContent({
                 body: JSON.stringify({ action: 'stop', session_id: activeTimeTracker.id }),
             })
             setActiveTimeTracker(null)
-            setCurrentTime(0)
             message.success('Time tracker stopped')
             fetchTimeTrackerSessions()
         } catch (err: any) {
@@ -1843,7 +1829,6 @@ export default function TicketDetailContent({
                                             ticketData={displayTicket}
                                             totalTimeSeconds={totalTimeSeconds}
                                             activeTimeTracker={activeTimeTracker}
-                                            currentTime={currentTime}
                                             formatTime={formatTime}
                                             timeTrackerSessions={timeTrackerSessions}
                                             timeTrackerLoading={loading}

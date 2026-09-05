@@ -83,7 +83,6 @@ export interface TabTimeTrackerProps {
   ticketData: { id: number }
   totalTimeSeconds: number
   activeTimeTracker: unknown
-  currentTime: number
   formatTime: (seconds: number) => string
   timeTrackerSessions: unknown[]
   timeTrackerLoading?: boolean
@@ -106,7 +105,6 @@ export default function TabTimeTracker({
   ticketData,
   totalTimeSeconds,
   activeTimeTracker,
-  currentTime,
   formatTime,
   timeTrackerSessions,
   timeTrackerLoading = false,
@@ -121,6 +119,17 @@ export default function TabTimeTracker({
   canAddManual = false,
 }: TabTimeTrackerProps) {
   const ticketId = ticketData?.id as number
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    const tracker = activeTimeTracker as { start_time: string } | null | undefined
+    if (!tracker) { setElapsed(0); return }
+    const calc = () => Math.floor((Date.now() - new Date(tracker.start_time).getTime()) / 1000)
+    setElapsed(calc())
+    const id = window.setInterval(() => setElapsed(calc()), 1000)
+    return () => window.clearInterval(id)
+  }, [activeTimeTracker])
+
   const [paused, setPaused] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
   const [adjustTrackerOpen, setAdjustTrackerOpen] = useState(false)
@@ -376,7 +385,7 @@ export default function TabTimeTracker({
             <ClockCircleOutlined />
             <Text strong>Time Tracker</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Total (reported): {formatTime(totalTimeSeconds + (activeTimeTracker ? currentTime : 0))}
+              Total (reported): {formatTime(totalTimeSeconds + (activeTimeTracker ? elapsed : 0))}
             </Text>
           </Space>
           {canAddManual && (
@@ -417,7 +426,7 @@ export default function TabTimeTracker({
                   Stop
                 </Button>
                 <Text strong style={{ fontSize: 18 }}>
-                  {formatTime(currentTime)}
+                  {formatTime(elapsed)}
                 </Text>
                 <Text type="secondary">(running)</Text>
               </>
