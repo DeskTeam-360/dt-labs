@@ -24,6 +24,13 @@ export async function POST(request: Request) {
     )
   }
 
+  if (file.size > 50 * 1024 * 1024) {
+    return NextResponse.json(
+      { error: 'File too large (max 50 MB)' },
+      { status: 413 }
+    )
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer())
   const contentType = file.type || 'application/octet-stream'
 
