@@ -1081,3 +1081,11 @@ html.dark .deskteam-app-sidebar .ant-menu-dark .ant-menu-item-selected .admin-si
 .ticket-detail-sidebar-descriptions textarea.ant-input {
   max-width: 100%;
 }
+
+.tickets-view-segmented .ant-segmented-item-selected {
+  background: #1677ff !important;
+  color: #fff !important;
+}
+.tickets-view-segmented .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #fff !important;
+}

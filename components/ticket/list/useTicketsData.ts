@@ -288,7 +288,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
 
   const [debouncedSearch, setDebouncedSearch] = useState(initialState.filterSearch)
   useEffect(() => {
-    const delay = filterSearch.trim() ? 350 : 0
+    const delay = filterSearch.trim() ? 500 : 0
     const t = window.setTimeout(() => setDebouncedSearch(filterSearch), delay)
     return () => window.clearTimeout(t)
   }, [filterSearch])

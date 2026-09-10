@@ -207,11 +207,12 @@ export async function GET(request: Request) {
     } else if (searchBy === 'title') {
       conditions.push(ilike(tickets.title, pattern)!)
     } else {
-      // 'all' — default: id OR title OR description
+      // 'all' — default: id OR title OR description OR comment body
+      const commentSubquery = sql`${tickets.id} IN (SELECT ticket_id FROM ticket_comments WHERE comment ILIKE ${pattern})`
       if (searchAsId !== null) {
-        conditions.push(or(eq(tickets.id, searchAsId), ilike(tickets.title, pattern), ilike(tickets.description, pattern))!)
+        conditions.push(or(eq(tickets.id, searchAsId), ilike(tickets.title, pattern), ilike(tickets.description, pattern), commentSubquery)!)
       } else {
-        conditions.push(or(ilike(tickets.title, pattern), ilike(tickets.description, pattern))!)
+        conditions.push(or(ilike(tickets.title, pattern), ilike(tickets.description, pattern), commentSubquery)!)
       }
     }
   }
