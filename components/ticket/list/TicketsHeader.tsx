@@ -2,7 +2,6 @@
 
 import { AppstoreOutlined, IdcardOutlined, LoadingOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Flex, Input, Segmented, Select, Tooltip, Typography } from 'antd'
-import { useEffect, useRef, useState } from 'react'
 
 import { TICKETS_PAGE_LIMIT_OPTIONS, type TicketsPageLimit } from '@/lib/tickets-list-query'
 
@@ -37,20 +36,7 @@ export default function TicketsHeader({
   onTicketsPageLimitChange,
   onRefresh,
 }: TicketsHeaderProps) {
-  const [searchPending, setSearchPending] = useState(false)
-  const prevSearch = useRef(filterSearch)
-
-  useEffect(() => {
-    if (filterSearch !== prevSearch.current) {
-      prevSearch.current = filterSearch
-      if (filterSearch.trim()) setSearchPending(true)
-      else setSearchPending(false)
-    }
-  }, [filterSearch])
-
-  useEffect(() => {
-    if (!loading) setSearchPending(false)
-  }, [loading])
+  const searchPending = loading && !!filterSearch.trim()
 
   const inJunkFolder = !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
   const junkTitle =
