@@ -488,7 +488,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
               <Form.Item
                 name="leader_user_id"
                 label="Company Leader"
-                extra="Kosongkan untuk company internal (tanpa customer leader)"
+                extra="Leave blank for internal companies (no customer leader)"
               >
                 <Select
                   showSearch

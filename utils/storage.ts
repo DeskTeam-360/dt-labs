@@ -22,9 +22,15 @@ export async function uploadFile(
       credentials: 'include',
       body: formData,
     })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) return { url: null, error: data?.error || 'Upload failed' }
-    return { url: data.url ?? null, error: null }
+    const text = await res.text()
+    let data: Record<string, unknown> = {}
+    try { data = JSON.parse(text) } catch { /* non-JSON response */ }
+    if (!res.ok) {
+      const msg = (data?.error as string) || `Upload failed (HTTP ${res.status})`
+      console.error('[upload]', res.status, text)
+      return { url: null, error: msg }
+    }
+    return { url: (data.url as string) ?? null, error: null }
   } catch (error: unknown) {
     console.error('Failed to upload file:', error)
     return {
