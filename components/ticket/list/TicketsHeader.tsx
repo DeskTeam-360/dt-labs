@@ -1,7 +1,7 @@
 'use client'
 
 import { AppstoreOutlined, IdcardOutlined, LoadingOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Flex, Input, Segmented, Select, Tooltip, Typography } from 'antd'
+import { Button, ConfigProvider, Flex, Input, Segmented, Select, theme,Tooltip, Typography } from 'antd'
 
 import { TICKETS_PAGE_LIMIT_OPTIONS, type TicketsPageLimit } from '@/lib/tickets-list-query'
 
@@ -36,6 +36,7 @@ export default function TicketsHeader({
   onTicketsPageLimitChange,
   onRefresh,
 }: TicketsHeaderProps) {
+  const { token } = theme.useToken()
   const searchPending = loading && !!filterSearch.trim()
 
   function handleViewModeChange(v: ViewMode) {
@@ -64,23 +65,13 @@ export default function TicketsHeader({
       {!inJunkFolder && (
         <Flex align="center" justify="space-between" gap={12} wrap="wrap">
           <Flex align="center" gap={12} wrap="wrap">
-            <ConfigProvider
-              theme={{
-                components: {
-                  Segmented: {
-                    trackBg: '#fff',
-                    itemSelectedBg: '#667eea',
-                    itemSelectedColor: '#fff',
-                  },
-                },
-              }}
-            >
+            <ConfigProvider theme={{ components: { Segmented: { trackBg: token.colorBgContainer, itemSelectedBg: '#667eea', itemSelectedColor: '#fff' } } }}>
               <Segmented
                 value={isCustomer && viewMode === 'roundrobin' ? 'kanban' : viewMode}
                 onChange={(v) => handleViewModeChange(v as ViewMode)}
                 options={viewOptions}
                 size="middle"
-                style={{ border: '1px solid #d9d9d9' }}
+                style={{ border: '1px solid var(--ant-color-border)' }}
               />
             </ConfigProvider>
             {(viewMode === 'list' || viewMode === 'card') && (
