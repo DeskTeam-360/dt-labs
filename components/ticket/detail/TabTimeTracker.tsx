@@ -468,13 +468,13 @@ export default function TabTimeTracker({
                 const owner = isOwner(session)
                 const completed = !!session.stop_time
                 const canMutate = owner || canManageOthersTime
-                const showRowStop =
-                  canManageOthersTime &&
-                  !completed &&
-                  session.tracker_type === 'timer' &&
-                  !owner
+                const showRowStop = false
                 return (
                   <List.Item
+                    style={!completed ? {
+                      background: 'rgba(82,196,26,0.05)',
+                      borderRadius: 4,
+                    } : {}}
                     actions={
                       canMutate
                         ? [
@@ -505,14 +505,9 @@ export default function TabTimeTracker({
                                   </Button>,
                                 ]
                               : []),
-                            <Popconfirm
+                            ...(completed ? [<Popconfirm
                               key="del"
                               title="Remove this time entry?"
-                              description={
-                                completed
-                                  ? undefined
-                                  : 'This will discard the running timer without saving duration.'
-                              }
                               onConfirm={() => deleteSession(session)}
                               okText="Remove"
                               okButtonProps={{ danger: true }}
@@ -520,18 +515,26 @@ export default function TabTimeTracker({
                               <Button type="primary" danger icon={<DeleteOutlined />} disabled={mutating}>
                                 Delete
                               </Button>
-                            </Popconfirm>,
+                            </Popconfirm>] : []),
                           ]
                         : []
                     }
                   >
                     <List.Item.Meta
                       avatar={
-                        <Avatar
-                          icon={<UserOutlined />}
-                          size="small"
-                          src={(session.user as { avatar_url?: string } | undefined)?.avatar_url}
-                        />
+                        !completed ? (
+                          <Avatar
+                            size="small"
+                            style={{ background: '#52c41a' }}
+                            icon={<ClockCircleOutlined spin />}
+                          />
+                        ) : (
+                          <Avatar
+                            icon={<UserOutlined />}
+                            size="small"
+                            src={(session.user as { avatar_url?: string } | undefined)?.avatar_url}
+                          />
+                        )
                       }
                       title={
                         <Space size="small" wrap>

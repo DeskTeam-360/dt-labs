@@ -273,111 +273,144 @@ export default function CommentComposer({
   }
 
   const isNote = showNoteOption && mode === 'note'
-  const bgColor = isNote ? '#fffbe6' : '#e6f7ff'
-  const borderColor = isNote ? '#ffe5b4' : '#91caff'
 
   const modePicker =
     showNoteOption && onCommentVisibilityChange ? (
       <Flex gap={8} wrap="wrap">
         <Button
-          type={mode === 'note' ? 'primary' : 'default'}
+          className="cc-btn-note"
           icon={<CommentOutlined />}
           onClick={() => handleModeChange('note')}
+          style={mode === 'note' ? { background: '#faad14', borderColor: '#faad14', color: '#fff' } : {}}
         >
           Add note
         </Button>
         <Button
-          type={mode === 'reply' ? 'primary' : 'default'}
+          className="cc-btn-reply"
           icon={<SendOutlined />}
           onClick={() => handleModeChange('reply')}
+          style={mode === 'note' ? {} : { background: '#1677ff', borderColor: '#1677ff', color: '#fff' }}
         >
           Reply
         </Button>
       </Flex>
     ) : null
 
+  const modePickerStyle = (
+    <style>{`
+      .cc-btn-note:not([disabled]):hover { background: #faad14 !important; border-color: #faad14 !important; color: #fff !important; }
+      .cc-btn-reply:not([disabled]):hover { background: #1677ff !important; border-color: #1677ff !important; color: #fff !important; }
+    `}</style>
+  )
+
   if (showNoteOption && mode == null) {
     return (
       <Flex vertical gap={8} style={{ marginTop: 8 }}>
+        {modePickerStyle}
         {modePicker}
       </Flex>
     )
   }
 
+  const accentColor = isNote ? '#faad14' : '#1677ff'
+
   return (
-    <Flex vertical gap={8} style={{ marginTop: 8, backgroundColor: bgColor, padding: 16, borderRadius: 8, border: `1px solid ${borderColor}` }}>
-      {modePicker}
+    <div style={{ marginTop: 12, border: `1px solid ${accentColor}`, borderRadius: 8, overflow: 'hidden' }}>
+      {modePickerStyle}
+      {/* Mode picker row */}
+      <div style={{ padding: '8px 12px', borderBottom: `1px solid ${accentColor}` }}>
+        {modePicker}
+      </div>
+
+      {/* Tag agents (note) */}
       {showNoteOption && mode === 'note' && nonCustomerUsers.length > 0 && (
-        <Flex align="center" gap={8}>
-          <UserAddOutlined style={{ color: '#666' }} />
-          <Select
-            mode="multiple"
-            placeholder="Tag agents (optional) — search by name or email"
-            value={taggedUserIds}
-            onChange={setTaggedUserIds}
-            options={tagAgentOptions}
-            allowClear
-            showSearch
-            filterOption={filterTagAgents}
-            style={{ minWidth: 200, flex: 1 }}
-            maxTagCount="responsive"
-          />
-        </Flex>
-      )}
-      {showReplyCcBcc && ((showNoteOption && mode === 'reply') || !showNoteOption) && (
-        <Flex vertical gap={6}>
+        <div style={{ padding: '6px 12px', borderBottom: `1px solid ${accentColor}` }}>
           <Flex align="center" gap={8}>
-            <span style={{ fontSize: 12, color: '#666', minWidth: 36 }}>CC</span>
+            <UserAddOutlined style={{ color: '#666' }} />
             <Select
-              mode="tags"
-              placeholder="Optional: select from company or type email"
-              value={ccEmails}
-              onChange={(v) => setCcEmails(Array.isArray(v) ? v : [])}
-              options={ccOptions}
+              mode="multiple"
+              placeholder="Tag agents (optional) — search by name or email"
+              value={taggedUserIds}
+              onChange={setTaggedUserIds}
+              options={tagAgentOptions}
               allowClear
-              style={{ flex: 1, minWidth: 200 }}
+              showSearch
+              filterOption={filterTagAgents}
+              style={{ flex: 1 }}
               maxTagCount="responsive"
-              tokenSeparators={[',', ';', ' ']}
+              variant="borderless"
             />
           </Flex>
-          {showNoteOption && (
+        </div>
+      )}
+
+      {/* CC / BCC (reply) */}
+      {showReplyCcBcc && ((showNoteOption && mode === 'reply') || !showNoteOption) && (
+        <div style={{ padding: '6px 12px', borderBottom: `1px solid ${accentColor}` }}>
+          <Flex vertical gap={4}>
             <Flex align="center" gap={8}>
-              <span style={{ fontSize: 12, color: '#666', minWidth: 36 }}>BCC</span>
+              <span style={{ fontSize: 12, color: '#666', minWidth: 36 }}>CC</span>
               <Select
                 mode="tags"
-                placeholder="Optional: type email (BCC, no company preselect)"
-                value={bccEmails}
-                onChange={(v) => setBccEmails(Array.isArray(v) ? v : [])}
-                options={[]}
+                placeholder="Optional: select from company or type email"
+                value={ccEmails}
+                onChange={(v) => setCcEmails(Array.isArray(v) ? v : [])}
+                options={ccOptions}
                 allowClear
-                style={{ flex: 1, minWidth: 200 }}
+                style={{ flex: 1 }}
                 maxTagCount="responsive"
                 tokenSeparators={[',', ';', ' ']}
+                variant="borderless"
               />
             </Flex>
-          )}
-        </Flex>
+            {showNoteOption && (
+              <Flex align="center" gap={8}>
+                <span style={{ fontSize: 12, color: '#666', minWidth: 36 }}>BCC</span>
+                <Select
+                  mode="tags"
+                  placeholder="Optional: type email"
+                  value={bccEmails}
+                  onChange={(v) => setBccEmails(Array.isArray(v) ? v : [])}
+                  options={[]}
+                  allowClear
+                  style={{ flex: 1 }}
+                  maxTagCount="responsive"
+                  tokenSeparators={[',', ';', ' ']}
+                  variant="borderless"
+                />
+              </Flex>
+            )}
+          </Flex>
+        </div>
       )}
+
+      {/* Editor — no padding so Quill fills full width */}
       <CommentWysiwyg
         key={mode ?? 'composer'}
         ticketId={ticketId}
         value={draft}
         onChange={setDraft}
         placeholder={placeholder}
-        height="200px"
+        height="310px"
+        noBorder
       />
+
+      {/* Attachments */}
       {attachments.length > 0 && (
-        <Flex gap={8} wrap="wrap" align="center">
-          {attachments.map((a, i) => (
-            <Flex key={i} align="center" gap={4} style={{ padding: '4px 8px', background: '#f5f5f5', borderRadius: 6 }}>
-              <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <PaperClipOutlined /> {a.file_name}
-              </a>
-              <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))} />
-            </Flex>
-          ))}
-        </Flex>
+        <div style={{ padding: '6px 12px', borderTop: `1px solid ${accentColor}` }}>
+          <Flex gap={8} wrap="wrap" align="center">
+            {attachments.map((a, i) => (
+              <Flex key={i} align="center" gap={4} style={{ padding: '4px 8px', background: '#f5f5f5', borderRadius: 6 }}>
+                <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <PaperClipOutlined /> {a.file_name}
+                </a>
+                <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))} />
+              </Flex>
+            ))}
+          </Flex>
+        </div>
       )}
+
       <input
         type="file"
         multiple
@@ -390,39 +423,47 @@ export default function CommentComposer({
           handleFilesSelected(filesArray)
         }}
       />
-      <Flex gap={8} wrap="wrap">
-        <Button
-          icon={<PaperClipOutlined />}
-          onClick={() => document.getElementById('comment-files-input')?.click()}
-          loading={uploading}
-        >
-          Attach files
-        </Button>
-        <Button
-          type="primary"
-          style={{ width: '200px' }}
-          icon={<PlusOutlined />}
-          onClick={handleSubmit}
-          loading={loading}
-          disabled={loading}
-        >
-          {showNoteOption ? (mode === 'note' ? 'Add note' : 'Reply') : 'Reply'}
-        </Button>
-        <Button
-          onClick={() => {
-            setDraft('')
-            setAttachments([])
-            setTaggedUserIds([])
-            if (showNoteOption) {
-              onCommentVisibilityChange?.(null as any)
-            }
-            onCancel?.()
-          }}
-          disabled={loading}
-        >
-          Cancel
-        </Button>
+
+      {/* Action bar */}
+      <div style={{ padding: '8px 12px', borderTop: `1px solid ${accentColor}` }}>
+        <Flex justify="space-between" align="center">
+          <Button
+            icon={<PaperClipOutlined />}
+            onClick={() => document.getElementById('comment-files-input')?.click()}
+            loading={uploading}
+          >
+            Attach files
+          </Button>
+          <Flex gap={8}>
+            <Button
+              onClick={() => {
+                setDraft('')
+                setAttachments([])
+                setTaggedUserIds([])
+                if (showNoteOption) {
+                  onCommentVisibilityChange?.(null as any)
+                }
+                onCancel?.()
+              }}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              icon={<PlusOutlined />}
+              onClick={handleSubmit}
+              loading={loading}
+              disabled={loading}
+              style={isNote
+                ? { background: '#faad14', borderColor: '#faad14', color: '#fff', width: 160 }
+                : { background: '#1677ff', borderColor: '#1677ff', color: '#fff', width: 160 }}
+              type={undefined}
+            >
+              {showNoteOption ? (mode === 'note' ? 'Add note' : 'Reply') : 'Reply'}
+            </Button>
+          </Flex>
         </Flex>
-    </Flex>
+      </div>
+    </div>
   )
 }

@@ -40,7 +40,7 @@ export default function NavbarAccount({ user }: Props) {
       placement="bottomRight"
       trigger={['click']}
       getPopupContainer={() => document.body}
-      overlayStyle={{ zIndex: 500 }}
+      styles={{ root: { zIndex: 500 } }}
     >
       <button
         type="button"

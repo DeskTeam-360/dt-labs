@@ -150,6 +150,10 @@ export async function PATCH(
     if (closingSupportQueue) {
       setPayload.priority = null
     }
+    // Clear priority when moving to closed-like or pending status
+    if (isClosedLikeTicketStatus(nextStatus) || nextStatus === 'pending') {
+      setPayload.priority = null
+    }
 
     if (reopenSupportQueue) {
       await db.transaction(async (tx) => {

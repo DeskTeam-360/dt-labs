@@ -1,5 +1,5 @@
 /** Slugs treated as finished for metrics, overdue highlighting, and legacy DB rows. */
-const CLOSED_LIKE = new Set(['resolved', 'closed', 'completed', 'cancel', 'archived'])
+const CLOSED_LIKE = new Set(['resolved', 'closed', 'completed', 'cancel', 'archived', 'pending'])
 
 export function isClosedLikeTicketStatus(status: string | null | undefined): boolean {
   if (!status) return false

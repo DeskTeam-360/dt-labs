@@ -29,6 +29,7 @@ import {
 } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
@@ -36,7 +37,6 @@ import AdminSidebar from '@/components/layout/AdminSidebar'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import { normalizeSpecificDates } from '@/lib/recurring-ticket-schedule'
 
-import RecurringTicketForm from './RecurringTicketForm'
 import RecurringTicketRunsDrawer from './RecurringTicketRunsDrawer'
 
 dayjs.extend(relativeTime)
@@ -103,14 +103,13 @@ interface Props {
 }
 
 export default function RecurringTicketsContent({ user }: Props) {
+  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [rows, setRows] = useState<RecurringTicketRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [formOpen, setFormOpen] = useState(false)
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
   const [filterCompany, setFilterCompany] = useState<string | undefined>(undefined)
   const [filterTitle, setFilterTitle] = useState('')
-  const [editing, setEditing] = useState<RecurringTicketRow | null>(null)
   const [runsDrawer, setRunsDrawer] = useState<RecurringTicketRow | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
   const [running, setRunning] = useState<string | null>(null)
@@ -173,11 +172,6 @@ export default function RecurringTicketsContent({ user }: Props) {
     })
   }
 
-  const handleSaved = () => {
-    setFormOpen(false)
-    setEditing(null)
-    fetchRules()
-  }
 
   const handleRunNow = async (row: RecurringTicketRow) => {
     setRunning(row.id)
@@ -308,7 +302,7 @@ export default function RecurringTicketsContent({ user }: Props) {
           <Tooltip title="Edit">
             <Button
               icon={<EditOutlined />}
-              onClick={() => { setEditing(row); setFormOpen(true) }}
+              onClick={() => router.push(`/settings/recurring-tickets/${row.id}/edit`)}
             />
           </Tooltip>
           <Tooltip title="Delete">
@@ -358,7 +352,7 @@ export default function RecurringTicketsContent({ user }: Props) {
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                onClick={() => { setEditing(null); setFormOpen(true) }}
+                onClick={() => router.push('/settings/recurring-tickets/new')}
               >
                 New recurring ticket
               </Button>
@@ -384,20 +378,6 @@ export default function RecurringTicketsContent({ user }: Props) {
           />
         </div>
 
-        <Modal
-          open={formOpen}
-          onCancel={() => { setFormOpen(false); setEditing(null) }}
-          title={editing ? 'Edit recurring ticket' : 'New recurring ticket'}
-          footer={null}
-          width={620}
-          destroyOnHidden
-        >
-          <RecurringTicketForm
-            initialValues={editing}
-            onSaved={handleSaved}
-            onCancel={() => { setFormOpen(false); setEditing(null) }}
-          />
-        </Modal>
 
         <Drawer
           open={!!runsDrawer}

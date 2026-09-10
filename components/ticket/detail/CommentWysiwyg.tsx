@@ -65,6 +65,8 @@ interface CommentWysiwygProps {
   autoLinkify?: boolean
   /** Focus the editor immediately after it mounts (default false). */
   autoFocus?: boolean
+  /** Remove Quill toolbar/container borders (use when wrapped in an outer bordered container). */
+  noBorder?: boolean
 }
 
 export default function CommentWysiwyg({
@@ -77,6 +79,7 @@ export default function CommentWysiwyg({
   useSemanticHTML = false,
   autoLinkify = true,
   autoFocus = false,
+  noBorder = false,
 }: CommentWysiwygProps) {
   const { resolved } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -414,6 +417,12 @@ export default function CommentWysiwyg({
         width: 18px;
         height: 18px;
       }
+      ${noBorder ? `
+      .comment-wysiwyg-wrapper .ql-toolbar.ql-snow,
+      .comment-wysiwyg-wrapper .ql-container.ql-snow {
+        border-color: transparent;
+      }
+      ` : ''}
     `}</style>
 
     <div className="comment-wysiwyg-wrapper" style={{ marginBottom: 8, height: height, minHeight: editorMinPx + 42, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
