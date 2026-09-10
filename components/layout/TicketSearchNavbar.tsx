@@ -349,8 +349,6 @@ export default function TicketSearchNavbar({
               borderRadius: 8,
               boxShadow: '0 4px 12px var(--ticket-nav-shadow)',
               border: '1px solid var(--ticket-nav-panel-border)',
-              maxHeight: 360,
-              overflow: 'auto',
               zIndex: 200,
             }}
           >
@@ -450,6 +448,31 @@ export default function TicketSearchNavbar({
               ))
             ) : (
               <div style={{ padding: 12, color: 'var(--ticket-nav-muted)', fontSize: 13 }}>No tickets found</div>
+            )}
+            {!previewLoading && preview.length > 0 && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setPanelVisible(false)
+                  router.push(`/tickets?search=${encodeURIComponent(q.trim())}&search_by=${searchBy}&view=list`)
+                }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: '10px 14px',
+                  border: 'none',
+                  borderTop: '1px solid var(--ticket-nav-panel-border)',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  fontSize: 13,
+                  color: '#1677ff',
+                  fontWeight: 500,
+                }}
+              >
+                Show all results →
+              </button>
             )}
           </div>
         )}
