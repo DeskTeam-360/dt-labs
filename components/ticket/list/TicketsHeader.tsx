@@ -38,6 +38,13 @@ export default function TicketsHeader({
 }: TicketsHeaderProps) {
   const searchPending = loading && !!filterSearch.trim()
 
+  function handleViewModeChange(v: ViewMode) {
+    if ((v === 'kanban' || v === 'roundrobin') && filterSearch.trim()) {
+      onFilterSearchChange?.('')
+    }
+    onViewModeChange(isCustomer && v === 'roundrobin' ? 'kanban' : (v as ViewMode))
+  }
+
   const inJunkFolder = !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
   const junkTitle =
     filterTicketType === 'spam' ? 'Spam' : filterTicketType === 'trash' ? 'Trash' : null
@@ -70,7 +77,7 @@ export default function TicketsHeader({
             >
               <Segmented
                 value={isCustomer && viewMode === 'roundrobin' ? 'kanban' : viewMode}
-                onChange={(v) => onViewModeChange(isCustomer && v === 'roundrobin' ? 'kanban' : (v as ViewMode))}
+                onChange={(v) => handleViewModeChange(v as ViewMode)}
                 options={viewOptions}
                 size="middle"
                 style={{ border: '1px solid #d9d9d9' }}
