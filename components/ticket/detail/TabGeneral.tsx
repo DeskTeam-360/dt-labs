@@ -427,7 +427,7 @@ export default function TabGeneral({
     })
     setSidebarBaseline(s)
     setSidebarDraft(s)
-  }, [ticketData?.id, ticketData?.priority, ticketData?.short_note, sidebarBaselineTick])
+  }, [ticketData?.id, ticketData?.priority, ticketData?.short_note, ticketData?.company_id, sidebarBaselineTick])
 
   const sidebarDirty = useMemo(
     () => !sidebarDraftEquals(sidebarDraft, sidebarBaseline),
