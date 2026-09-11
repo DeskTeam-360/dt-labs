@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
@@ -23,7 +23,7 @@ export async function GET(
     db
       .select({ id: users.id, fullName: users.fullName, email: users.email })
       .from(users)
-      .where(eq(users.companyId, companyId)),
+      .where(and(eq(users.companyId, companyId), eq(users.role, 'customer'))),
     db
       .select({ userId: companyUsers.userId })
       .from(companyUsers)
@@ -36,7 +36,7 @@ export async function GET(
       ? await db
           .select({ id: users.id, fullName: users.fullName, email: users.email })
           .from(users)
-          .where(inArray(users.id, userIdsFromCu))
+          .where(and(inArray(users.id, userIdsFromCu), eq(users.role, 'customer')))
       : []
 
   const seen = new Set<string>()

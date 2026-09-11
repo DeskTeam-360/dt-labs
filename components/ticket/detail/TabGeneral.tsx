@@ -224,6 +224,7 @@ interface TabGeneralProps {
     full_name: string | null
     email: string
     company_id?: string | null
+    _type?: 'agent' | 'customer'
   }>
   selectedContactUserId?: string | null
   tagOptions: { id: string; name: string; slug: string }[]
@@ -1070,7 +1071,10 @@ export default function TabGeneral({
                   allowClear placeholder="Same as Created By"
                   loading={sidebarAttributesSaving}
                   onChange={(v) => setSidebarDraft((d) => ({ ...d, contactUserId: (v as string | undefined) ?? null }))}
-                  options={contactUserOptions.map((u) => ({ value: u.id, label: u.full_name ? `${u.full_name} (${u.email})` : u.email }))}
+                  options={contactUserOptions.map((u) => ({
+                    value: u.id,
+                    label: `${u.full_name ? `${u.full_name} (${u.email})` : u.email}${u._type === 'customer' ? ' [Customer]' : ''}`,
+                  }))}
                   style={{ width: '100%' }} showSearch optionFilterProp="label"
                 />
                 {contactCrossCompanyHint ? <Alert type="warning" showIcon message={contactCrossCompanyHint} style={{ marginTop: 8 }} /> : null}

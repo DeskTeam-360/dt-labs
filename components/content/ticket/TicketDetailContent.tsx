@@ -311,29 +311,33 @@ export default function TicketDetailContent({
     }, [displayTicket?.id])
 
     const contactUserOptionsForTicket = useMemo(() => {
-        const withEmail = (users || []).filter((u: { email?: string }) => String(u?.email || '').trim()) as Array<{
-            id: string
-            full_name?: string | null
-            email: string
-            company_id?: string | null
-        }>
-        const mapped = withEmail.map((u) => ({
-            id: u.id,
-            full_name: u.full_name ?? null,
-            email: u.email,
-            company_id: u.company_id ?? null,
-        }))
-        const cid = displayTicket?.company_id
-        if (!cid) return mapped
-        return [...mapped].sort((a, b) => {
-            const as = a.company_id === cid ? 0 : 1
-            const bs = b.company_id === cid ? 0 : 1
-            if (as !== bs) return as - bs
-            const al = (a.full_name || a.email).toLowerCase()
-            const bl = (b.full_name || b.email).toLowerCase()
-            return al.localeCompare(bl)
+        const agentUsers = (users || [])
+            .filter((u: { email?: string }) => String(u?.email || '').trim())
+            .map((u: any) => ({
+                id: u.id as string,
+                full_name: (u.full_name ?? null) as string | null,
+                email: u.email as string,
+                company_id: (u.company_id ?? null) as string | null,
+                _type: 'agent' as const,
+            }))
+        const customerUsers = (companyCustomers || [])
+            .filter((u) => String(u?.email || '').trim())
+            .map((u) => ({
+                id: u.id,
+                full_name: u.full_name ?? null,
+                email: u.email,
+                company_id: displayTicket?.company_id ?? null,
+                _type: 'customer' as const,
+            }))
+        // Customers first, then agents; deduplicate by id (customer wins if same id)
+        const seen = new Set<string>()
+        const merged = [...customerUsers, ...agentUsers].filter((u) => {
+            if (seen.has(u.id)) return false
+            seen.add(u.id)
+            return true
         })
-    }, [users, displayTicket?.company_id])
+        return merged
+    }, [users, companyCustomers, displayTicket?.company_id])
 
     // Default status labels/colors when DB has no ticket_statuses (matches seeded slugs)
     const DEFAULT_STATUS_MAP: Record<string, { title: string; color: string }> = {
