@@ -1085,6 +1085,7 @@ export default function TicketDetailContent({
             const res = await apiFetch<{
                 ticket_cross_company_warning?: string
                 company_id?: string | null
+                contact_user_id?: string | null
             }>(`/api/tickets/${tid}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -1113,11 +1114,15 @@ export default function TicketDetailContent({
 
             const syncedCompanyId =
                 res && typeof res === 'object' && 'company_id' in res ? res.company_id : undefined
+            const contactClearedByServer =
+                res && typeof res === 'object' && 'contact_user_id' in res && res.contact_user_id === null
 
             setDisplayTicket((prev: any) => {
                 if (!prev) return prev
                 const nextCompanyId =
                     syncedCompanyId !== undefined ? syncedCompanyId : (d.companyId ?? prev.company_id)
+                const nextContactId = contactClearedByServer ? null : d.contactUserId
+                const nextContactRow = nextContactId ? fromLists.find((u) => u.id === nextContactId) : null
 
                 return {
                     ...prev,
@@ -1139,13 +1144,13 @@ export default function TicketDetailContent({
                     priority: priorityPayload,
                     company_id: nextCompanyId,
                     company: nextCompanyId ? companies.find((c) => c.id === nextCompanyId) ?? prev.company : null,
-                    contact_user_id: d.contactUserId,
-                    contact: contactRow
+                    contact_user_id: nextContactId,
+                    contact: nextContactRow
                         ? {
-                              id: contactRow.id,
-                              full_name: contactRow.full_name ?? null,
-                              email: contactRow.email,
-                              avatar_url: contactRow.avatar_url ?? null,
+                              id: nextContactRow.id,
+                              full_name: nextContactRow.full_name ?? null,
+                              email: nextContactRow.email,
+                              avatar_url: nextContactRow.avatar_url ?? null,
                           }
                         : null,
                     due_date: d.dueDate,

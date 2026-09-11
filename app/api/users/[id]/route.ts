@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
-import { companies, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
+import { companies, companyUsers, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 import {
   actorRoleFromSession,
@@ -405,6 +405,7 @@ export async function PATCH(
     }
   }
   if (body.company_id !== undefined) updateData.companyId = body.company_id || null
+  const removingFromCompany = body.company_id === null || body.company_id === ''
   if (body.avatar_url !== undefined) updateData.avatarUrl = body.avatar_url
   if (body.phone !== undefined) updateData.phone = body.phone || null
   if (body.department !== undefined) updateData.department = body.department || null
@@ -424,6 +425,9 @@ export async function PATCH(
 
   const passwordChanged = Boolean(isAdmin && body.password)
   await db.update(users).set({ ...updateData, updatedAt: new Date() }).where(eq(users.id, id))
+  if (removingFromCompany) {
+    await db.delete(companyUsers).where(eq(companyUsers.userId, id))
+  }
 
   const [afterRow] = await db.select().from(users).where(eq(users.id, id)).limit(1)
   if (afterRow) {
