@@ -312,7 +312,7 @@ export default function TicketDetailContent({
 
     const contactUserOptionsForTicket = useMemo(() => {
         const agentUsers = (users || [])
-            .filter((u: { email?: string }) => String(u?.email || '').trim())
+            .filter((u: { email?: string; role?: string }) => String(u?.email || '').trim() && (u?.role ?? '').toLowerCase() !== 'customer')
             .map((u: any) => ({
                 id: u.id as string,
                 full_name: (u.full_name ?? null) as string | null,
