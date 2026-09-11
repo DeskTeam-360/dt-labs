@@ -9,6 +9,7 @@ import {
     EditOutlined,
     FolderOutlined,
     LeftOutlined,
+    PrinterOutlined,
     ReloadOutlined,
     RightOutlined,
     WarningOutlined,
@@ -1621,6 +1622,12 @@ export default function TicketDetailContent({
                                                     Resync FD
                                                 </Button>
                                             )}
+                                            <Tooltip title="Print ticket">
+                                                <Button
+                                                    icon={<PrinterOutlined />}
+                                                    onClick={() => window.open(`/tickets/${displayTicket.id}/print`, '_blank')}
+                                                />
+                                            </Tooltip>
                                         </div>
                                     )}
                                 </div>
