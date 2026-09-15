@@ -1035,7 +1035,7 @@ export default function TabGeneral({
               <Tooltip title="Integer rank within the company support queue (1 = highest). Leave empty for unranked.">
                 <InputNumber
                   min={1} precision={0}
-                  value={sidebarDraft.priority ?? undefined}
+                  value={sidebarDraft.priority}
                   onChange={(v) => setSidebarDraft((d) => ({ ...d, priority: v == null || !Number.isFinite(Number(v)) ? null : Math.max(1, Math.floor(Number(v))) }))}
                   disabled={sidebarAttributesSaving}
                   placeholder="Rank" style={{ width: '100%' }}
