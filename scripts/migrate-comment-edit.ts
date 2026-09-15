@@ -1,5 +1,6 @@
-import { db } from '../lib/db/index'
 import { sql } from 'drizzle-orm'
+
+import { db } from '../lib/db/index'
 
 async function main() {
   await db.execute(sql`
