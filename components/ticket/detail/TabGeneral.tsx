@@ -130,6 +130,9 @@ interface Comment {
   tagged_users?: { id: string; full_name: string | null; email: string }[]
   cc_emails?: string[]
   bcc_emails?: string[]
+  edited_by_user_id?: string | null
+  edited_at?: string | null
+  edited_by_user?: { id: string; full_name: string | null; email: string } | null
 }
 
 interface Attribute {
@@ -783,7 +786,7 @@ export default function TabGeneral({
                                   onAddChecklistItems={onAddChecklistItemsBulk}
                                 />
                               ) : null}
-                              {!isCustomer && comment.user_id === currentUserId ? (
+                              {!isCustomer && (comment.user_id === currentUserId || comment.visibility === 'note') ? (
                                 <>
                                   <Button
                                     icon={<EditOutlined />}
@@ -852,6 +855,17 @@ export default function TabGeneral({
                           ) : (
                             <Paragraph style={{ margin: 0, color: 'var(--ticket-thread-text)' }}>{comment.comment}</Paragraph>
                           )}
+                        {comment.edited_at && editingComment !== comment.id && (
+                          <Text style={{ fontSize: 11, color: 'var(--ticket-thread-meta)', fontStyle: 'italic', display: 'block', marginTop: 4 }}>
+                            Edited
+                            {comment.edited_by_user
+                              ? ` by ${comment.edited_by_user.full_name || comment.edited_by_user.email}`
+                              : comment.edited_by_user_id && comment.edited_by_user_id !== comment.user_id
+                                ? ' by another agent'
+                                : ''}
+                            {' · '}<DateDisplay date={comment.edited_at} format="relative" />
+                          </Text>
+                        )}
                         {comment.comment_attachments?.length ? (
                           <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
                             {comment.comment_attachments.map((att) => {

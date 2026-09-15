@@ -289,7 +289,7 @@ export default function CommentComposer({
           className="cc-btn-reply"
           icon={<SendOutlined />}
           onClick={() => handleModeChange('reply')}
-          style={mode === 'note' ? {} : { background: '#1677ff', borderColor: '#1677ff', color: '#fff' }}
+          style={mode === 'reply' ? { background: '#1677ff', borderColor: '#1677ff', color: '#fff' } : {}}
         >
           Reply
         </Button>

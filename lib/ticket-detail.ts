@@ -31,6 +31,7 @@ import { coerceTicketType } from '@/lib/ticket-classification'
 
 const ticketCreator = alias(users, 'ticket_creator')
 const ticketContactUser = alias(users, 'ticket_contact_user')
+const commentEditor = alias(users, 'comment_editor')
 
 /** Initial / per-page comment batch size (newest-first window; UI shows oldest-at-top within batch). */
 export const TICKET_COMMENTS_PAGE_SIZE = 10
@@ -49,6 +50,7 @@ export interface TicketDetailOptions {
 type CommentRowJoined = {
   comment: (typeof ticketComments.$inferSelect)
   user: typeof users.$inferSelect | null
+  editor: typeof users.$inferSelect | null
 }
 
 function isCustomerPortalView(options?: TicketDetailOptions): boolean {
@@ -122,6 +124,11 @@ async function mapCommentRowsToClient(rows: CommentRowJoined[]) {
       ? { id: r.user.id, full_name: r.user.fullName, email: r.user.email, avatar_url: r.user.avatarUrl }
       : null,
     comment_attachments: commentAttachByCommentId[r.comment.id] || [],
+    edited_by_user_id: r.comment.editedByUserId ?? null,
+    edited_at: r.comment.editedAt ? new Date(r.comment.editedAt).toISOString() : null,
+    edited_by_user: r.editor
+      ? { id: r.editor.id, full_name: r.editor.fullName, email: r.editor.email }
+      : null,
   }))
 }
 
@@ -150,9 +157,11 @@ export async function fetchTicketCommentsWindow(
     .select({
       comment: ticketComments,
       user: users,
+      editor: commentEditor,
     })
     .from(ticketComments)
     .leftJoin(users, eq(ticketComments.userId, users.id))
+    .leftJoin(commentEditor, eq(ticketComments.editedByUserId, commentEditor.id))
     .where(whereClause)
     .orderBy(desc(ticketComments.createdAt), desc(ticketComments.id))
     .limit(pageSize + 1)

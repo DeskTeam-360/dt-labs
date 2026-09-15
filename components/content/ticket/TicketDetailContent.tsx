@@ -176,6 +176,9 @@ interface Comment {
     tagged_users?: { id: string; full_name: string | null; email: string }[]
     cc_emails?: string[]
     bcc_emails?: string[]
+    edited_by_user_id?: string | null
+    edited_at?: string | null
+    edited_by_user?: { id: string; full_name: string | null; email: string } | null
 }
 
 interface Attribute {
@@ -870,13 +873,31 @@ export default function TicketDetailContent({
         }
         setLoading(true)
         try {
-            await apiFetch(`/api/tickets/${displayTicket.id}/comments/${commentId}`, {
+            const res = await apiFetch<{ ok: boolean; editedByUserId?: string; editedAt?: string }>(
+              `/api/tickets/${displayTicket.id}/comments/${commentId}`,
+              {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ comment: linkifyRichHtml(editingCommentValue.trim()) }),
-            })
+              }
+            )
             const linkedComment = linkifyRichHtml(editingCommentValue.trim())
-            setComments(comments.map((c) => (c.id === commentId ? { ...c, comment: linkedComment } : c)))
+            const editorUser = res.editedByUserId
+              ? (users.find((u: any) => u.id === res.editedByUserId) ?? null)
+              : null
+            setComments(comments.map((c) =>
+              c.id === commentId
+                ? {
+                    ...c,
+                    comment: linkedComment,
+                    edited_by_user_id: res.editedByUserId ?? null,
+                    edited_at: res.editedAt ?? null,
+                    edited_by_user: editorUser
+                      ? { id: editorUser.id, full_name: (editorUser as any).full_name ?? null, email: editorUser.email }
+                      : null,
+                  }
+                : c
+            ))
             setEditingComment(null)
             setEditingCommentValue('')
             message.success('Comment updated')
@@ -1631,14 +1652,14 @@ export default function TicketDetailContent({
                                                     Resync FD
                                                 </Button>
                                             )}
-                                            <Tooltip title="Print ticket">
-                                                <Button
-                                                    icon={<PrinterOutlined />}
-                                                    onClick={() => window.open(`/tickets/${displayTicket.id}/print`, '_blank')}
-                                                />
-                                            </Tooltip>
                                         </div>
                                     )}
+                                    <Tooltip title="Print ticket">
+                                        <Button
+                                            icon={<PrinterOutlined />}
+                                            onClick={() => window.open(`/tickets/${displayTicket.id}/print`, '_blank')}
+                                        />
+                                    </Tooltip>
                                 </div>
                                 <TicketPresenceBar
                                     ticketId={displayTicket.id}

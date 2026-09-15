@@ -338,6 +338,10 @@ export const ticketComments = pgTable('ticket_comments', {
   receivedAt: ts('received_at').notNull().defaultNow(),
   /** Freshdesk conversation ID — used to dedup on re-import/resync. Null for comments created natively. */
   fdConversationId: bigint('fd_conversation_id', { mode: 'number' }).unique(),
+  /** Last editor (agent who edited the comment, may differ from original author). */
+  editedByUserId: uuid('edited_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  /** When the comment was last edited. */
+  editedAt: ts('edited_at'),
 })
 
 /** One saved AI summary per anchor (per comment, description, or ticket header). */
