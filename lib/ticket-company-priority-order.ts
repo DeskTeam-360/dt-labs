@@ -1,9 +1,11 @@
-import { and, eq, isNull, ne } from 'drizzle-orm'
+import { and, eq, isNull, ne, notInArray } from 'drizzle-orm'
 import type { PostgresJsDatabase, PostgresJsTransaction } from 'drizzle-orm/postgres-js'
 
 import type * as schema from '@/lib/db/schema'
 import { tickets } from '@/lib/db/schema'
 import { coerceTicketType, DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
+
+const CLOSED_LIKE_STATUSES = ['resolved', 'closed', 'completed', 'cancel', 'archived', 'pending'] as const
 
 type AppFullSchema = typeof schema
 /** Executor is `db` or a `db.transaction` `tx`, not merely `typeof db`, so callers can pass a transaction through. */
@@ -36,7 +38,7 @@ async function loadCompanySupportTicketRows(dbTx: TicketPriorityDbExecutor, comp
   const conditions = [
     eq(tickets.companyId, companyId),
     eq(tickets.ticketType, DEFAULT_TICKET_TYPE),
-    ne(tickets.status, 'closed'),
+    notInArray(tickets.status, CLOSED_LIKE_STATUSES),
   ] as const
   const q = dbTx
     .select({ id: tickets.id, priority: tickets.priority })
@@ -57,7 +59,7 @@ async function loadCreatorSupportTicketRows(
     isNull(tickets.companyId),
     eq(tickets.createdBy, creatorUserId),
     eq(tickets.ticketType, DEFAULT_TICKET_TYPE),
-    ne(tickets.status, 'closed'),
+    notInArray(tickets.status, CLOSED_LIKE_STATUSES),
   ] as const
   return dbTx
     .select({ id: tickets.id, priority: tickets.priority })
@@ -85,7 +87,7 @@ export async function resolveSupportQueueScope(
     .limit(1)
   if (!row) return null
   if (coerceTicketType(row.ticketType) !== DEFAULT_TICKET_TYPE) return null
-  if (row.status === 'closed') return null
+  if (CLOSED_LIKE_STATUSES.includes(row.status as typeof CLOSED_LIKE_STATUSES[number])) return null
   if (row.companyId) return { kind: 'company', companyId: row.companyId }
   if (row.createdBy) return { kind: 'creator', userId: row.createdBy }
   return null
