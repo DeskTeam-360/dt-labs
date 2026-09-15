@@ -1061,7 +1061,10 @@ export default function TicketDetailContent({
                 body: JSON.stringify({ status: newStatus }),
             })
             message.success('Status updated')
-            setDisplayTicket((prev: any) => ({ ...prev, status: newStatus }))
+            const CLOSED_LIKE = new Set(['resolved', 'closed', 'completed', 'cancel', 'archived', 'pending'])
+            const priorityCleared = CLOSED_LIKE.has(newStatus.toLowerCase())
+            setDisplayTicket((prev: any) => ({ ...prev, status: newStatus, ...(priorityCleared ? { priority: null } : {}) }))
+            if (priorityCleared) setSidebarBaselineTick((x) => x + 1)
             bumpActivityRefresh()
         } catch (err: unknown) {
             message.error(err instanceof Error ? err.message : 'Failed to update status')

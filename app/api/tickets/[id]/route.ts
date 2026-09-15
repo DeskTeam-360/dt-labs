@@ -137,12 +137,17 @@ export async function PATCH(
       Boolean(
         isSupport &&
           companyId &&
-          nextStatus === 'closed' &&
+          isClosedLikeTicketStatus(nextStatus) &&
           cur.status !== nextStatus &&
-          cur.status !== 'closed'
+          !isClosedLikeTicketStatus(cur.status)
       )
 
-    const reopenSupportQueue = Boolean(isSupport && companyId && cur?.status === 'closed' && nextStatus !== 'closed')
+    const reopenSupportQueue = Boolean(
+      isSupport &&
+        companyId &&
+        isClosedLikeTicketStatus(cur?.status) &&
+        !isClosedLikeTicketStatus(nextStatus)
+    )
 
     const setPayload: { status: string; updatedAt: Date; priority?: number | null } = {
       status: nextStatus,

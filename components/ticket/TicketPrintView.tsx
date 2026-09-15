@@ -52,8 +52,8 @@ export default function TicketPrintView({ ticketData: t, comments }: TicketPrint
         .meta-item label { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #666; display: block; margin-bottom: 2px; }
         .meta-item span { font-size: 13px; }
         .section-title { font-size: 13px; font-weight: bold; text-transform: uppercase; color: #333; margin: 20px 0 8px; letter-spacing: 0.5px; }
-        .description-box { border: 1px solid #ddd; border-radius: 4px; padding: 14px 16px; margin-bottom: 24px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
-        .comment-block { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 14px; overflow: hidden; page-break-inside: avoid; }
+        .description-box { border: 1px solid #ddd; border-radius: 4px; padding: 14px 16px; margin-bottom: 24px; line-height: 1.6; word-break: break-word; }
+        .comment-block { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 14px; overflow: hidden; }
         .comment-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: #f5f5f5; border-bottom: 1px solid #ddd; }
         .comment-header.note { background: #fffbe6; border-bottom-color: #ffe58f; }
         .comment-header.reply { background: #e6f4ff; border-bottom-color: #91caff; }
@@ -62,7 +62,10 @@ export default function TicketPrintView({ ticketData: t, comments }: TicketPrint
         .comment-header .badge { font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: bold; text-transform: uppercase; }
         .badge-note { background: #faad14; color: #fff; }
         .badge-reply { background: #1677ff; color: #fff; }
-        .comment-body { padding: 12px 14px; line-height: 1.6; word-break: break-word; white-space: pre-wrap; }
+        .comment-body { padding: 12px 14px; line-height: 1.6; word-break: break-word; }
+        .description-box ul, .description-box ol, .comment-body ul, .comment-body ol { padding-left: 20px; margin: 8px 0; }
+        .description-box li, .comment-body li { margin-bottom: 6px; }
+        .description-box p, .comment-body p { margin: 0 0 8px; }
         .print-footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 11px; color: #999; display: flex; justify-content: space-between; }
         @media print {
           @page { margin: 16mm 12mm; }
