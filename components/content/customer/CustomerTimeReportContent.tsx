@@ -27,7 +27,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bar,
   BarChart,
-  Cell,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -58,9 +57,6 @@ const { Content } = Layout
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
 
-/** Bar colors aligned with RoundRobin horizontal bar / MUI-style palette */
-const CHART_BAR_COLORS = ['#9155FD', '#01C4C4', '#56CA00', '#FFB400', '#FF4C51', '#16B1FF']
-
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
@@ -70,11 +66,6 @@ function formatDuration(seconds: number): string {
 
 function hoursFromSeconds(seconds: number): number {
   return Math.round((seconds / 3600) * 100) / 100
-}
-
-function truncateLabel(s: string, max = 42): string {
-  if (!s) return `Ticket`
-  return s.length <= max ? s : `${s.slice(0, max - 1)}…`
 }
 
 function presetsSortedNewestFirst(presets: CustomerTimeReportPresetDTO[]): CustomerTimeReportPresetDTO[] {
@@ -896,23 +887,6 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
 
   const multiCompany = (report?.companies?.length ?? 0) > 1
 
-  const chartRows = useMemo(() => {
-    if (!report?.tickets?.length) return []
-    return [...report.tickets]
-      .sort((a, b) => b.reported_seconds - a.reported_seconds)
-      .slice(0, 12)
-      .map((t) => {
-        const base = t.title || `Ticket #${t.id}`
-        const prefix = multiCompany && t.company_name ? `${t.company_name} · ` : ''
-        return {
-          key: String(t.id),
-          label: truncateLabel('#'+t.id+' '+ base, 42),
-          hours: hoursFromSeconds(t.reported_seconds),
-          fullTitle: prefix + base,
-        }
-      })
-  }, [report, multiCompany])
-
   const tableData = useMemo(() => {
     if (!report?.tickets) return []
     return [...report.tickets].sort((a, b) => b.reported_seconds - a.reported_seconds)
@@ -1563,48 +1537,6 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                   />
                 </div>
 
-                {chartRows.length > 0 ? (
-                  <>
-                    <div className="customer-time-report-section-title">
-                      <Text strong>Reported time by ticket (top 12)</Text>
-                    </div>
-                    <div style={{ marginBottom: 24 }}>
-                      {chartRows.map((row, i) => (
-                        <Flex
-                          key={row.key}
-                          align="center"
-                          gap={12}
-                          style={{
-                            padding: '6px 0',
-                            borderBottom: i < chartRows.length - 1 ? '1px solid var(--ant-color-border-secondary, #f0f0f0)' : undefined,
-                          }}
-                        >
-                          <Text
-                            type="secondary"
-                            style={{ width: 20, textAlign: 'right', fontSize: 12, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
-                          >
-                            {i + 1}
-                          </Text>
-                          <div
-                            style={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: '50%',
-                              background: CHART_BAR_COLORS[i % CHART_BAR_COLORS.length],
-                              flexShrink: 0,
-                            }}
-                          />
-                          <Text ellipsis={{ tooltip: row.fullTitle }} style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
-                            {row.label}
-                          </Text>
-                          <Text strong style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
-                            {row.hours}h
-                          </Text>
-                        </Flex>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
 
                 {avgCustomerTimeRows.length > 0 ? (
                   <>
