@@ -194,7 +194,10 @@ export async function GET(request: Request) {
 
   const hasDateWindow = startDate != null || endDate != null
 
-  const logConds = [inArray(companyDailyActiveAssignments.companyId, companyIds)]
+  const logConds = [
+    inArray(companyDailyActiveAssignments.companyId, companyIds),
+    sql`extract(dow from ${companyDailyActiveAssignments.snapshotDate}::date) not in (0, 6)`,
+  ]
   if (startDate) {
     logConds.push(gte(companyDailyActiveAssignments.snapshotDate, startDate.toISOString().slice(0, 10)))
   }
