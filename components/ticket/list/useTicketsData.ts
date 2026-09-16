@@ -913,7 +913,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         const isSupportScoped =
           (t.ticket_type ?? 'support') === 'support' && t.company_id != null
         const droppingFromQueue =
-          isSupportScoped && newStatus === 'closed' && t.status !== 'closed'
+          isSupportScoped && isClosedLikeTicketStatus(newStatus) && !isClosedLikeTicketStatus(t.status)
         return {
           ...t,
           status: newStatus as TicketRecord['status'],
@@ -934,8 +934,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         prevTicket &&
         (prevTicket.ticket_type ?? 'support') === 'support' &&
         prevTicket.company_id &&
-        ((newStatus === 'closed' && prevSt !== 'closed') ||
-          (prevSt === 'closed' && newStatus !== 'closed'))
+        (isClosedLikeTicketStatus(newStatus) !== isClosedLikeTicketStatus(prevSt ?? ''))
       if (reopenOrCloseSupport) {
         void invalidateTicketsList()
       }
