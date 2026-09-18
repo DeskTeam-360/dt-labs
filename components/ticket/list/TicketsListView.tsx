@@ -4,7 +4,6 @@ import {
   DeleteOutlined,
   EditOutlined,
   InboxOutlined,
-  MoreOutlined,
   RobotOutlined,
   SyncOutlined,
   WarningOutlined,
@@ -81,17 +80,14 @@ export default function TicketsListView({
     [tickets, sortBy, sortOrder]
   )
 
-  useEffect(() => {
-    setPagination((p) => {
-      const totalPages = Math.max(1, Math.ceil(sortedTickets.length / p.pageSize))
-      if (p.current <= totalPages) return p
-      return { ...p, current: totalPages }
-    })
-  }, [sortedTickets.length, pagination.pageSize])
+  const effectivePagination = useMemo(() => {
+    const totalListPages = Math.max(1, Math.ceil(sortedTickets.length / pagination.pageSize))
+    return pagination.current > totalListPages ? { ...pagination, current: totalListPages } : pagination
+  }, [sortedTickets.length, pagination])
 
   useEffect(() => {
-    try { sessionStorage.setItem('tickets_list_page', JSON.stringify(pagination)) } catch { /* ignore */ }
-  }, [pagination])
+    try { sessionStorage.setItem('tickets_list_page', JSON.stringify(effectivePagination)) } catch { /* ignore */ }
+  }, [effectivePagination])
 
   const bulkEnabled = !isCustomer && (onBulkMoveToSpam || onBulkMoveToTrash)
   const inSpamFolder = filterTicketType === 'spam'
@@ -165,8 +161,8 @@ export default function TicketsListView({
           : undefined
       }
       pagination={{
-        current: pagination.current,
-        pageSize: pagination.pageSize,
+        current: effectivePagination.current,
+        pageSize: effectivePagination.pageSize,
         total: sortedTickets.length,
         showSizeChanger: true,
         pageSizeOptions: ['10', '15', '20', '50'],

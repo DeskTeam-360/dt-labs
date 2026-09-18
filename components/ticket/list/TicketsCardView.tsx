@@ -61,21 +61,16 @@ export default function TicketsCardView({
     [tickets, sortBy, sortOrder]
   )
 
-  // Clamp page if tickets shrink (filter applied) and persist to sessionStorage
-  useEffect(() => {
-    setPage((p) => {
-      const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize))
-      return p <= totalPages ? p : totalPages
-    })
-  }, [sortedTickets.length, pageSize])
+  const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize))
+  const effectivePage = page > totalPages ? totalPages : page
 
   useEffect(() => {
-    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ page, pageSize })) } catch { /* ignore */ }
-  }, [page, pageSize])
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ page: effectivePage, pageSize })) } catch { /* ignore */ }
+  }, [effectivePage, pageSize])
 
   const paged = useMemo(
-    () => sortedTickets.slice((page - 1) * pageSize, page * pageSize),
-    [sortedTickets, page, pageSize]
+    () => sortedTickets.slice((effectivePage - 1) * pageSize, effectivePage * pageSize),
+    [sortedTickets, effectivePage, pageSize]
   )
 
   if (sortedTickets.length === 0) {
@@ -107,7 +102,7 @@ export default function TicketsCardView({
       </Row>
       <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px' }}>
         <Pagination
-          current={page}
+          current={effectivePage}
           pageSize={pageSize}
           total={sortedTickets.length}
           showSizeChanger

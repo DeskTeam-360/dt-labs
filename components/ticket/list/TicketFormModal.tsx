@@ -15,7 +15,7 @@ import {
   Space,
 } from 'antd'
 import type { FormInstance } from 'antd/es/form'
-import { useMemo,useRef } from 'react'
+import { useId, useMemo } from 'react'
 
 import CommentWysiwyg from '@/components/ticket/detail/CommentWysiwyg'
 
@@ -66,8 +66,8 @@ export default function TicketFormModal({
   companies,
   allTags,
   allStatuses,
-  selectedAssignees,
-  onSelectedAssigneesChange,
+  selectedAssignees: _selectedAssignees,
+  onSelectedAssigneesChange: _onSelectedAssigneesChange,
   selectedTagIds,
   onSelectedTagIdsChange,
   ticketAttachmentsFromDb = [],
@@ -90,14 +90,8 @@ export default function TicketFormModal({
   /** Customer editing: hide description and attachments. Show only on create or for staff. */
   const showDescriptionField = !editingTicket || (!isCustomer)
   const showAttachmentSection = !editingTicket || (!isCustomer)
-  const fileInputIdRef = useRef<string | null>(null)
-  if (!fileInputIdRef.current) {
-    fileInputIdRef.current =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? `ticket-files-${crypto.randomUUID()}`
-        : `ticket-files-${Math.random().toString(36).slice(2)}`
-  }
-  const fileInputId = fileInputIdRef.current
+  const rawId = useId()
+  const fileInputId = `ticket-files-${rawId.replace(/:/g, '')}`
   const watchedContactUserId = Form.useWatch('contact_user_id', form)
   const watchedCompanyId = Form.useWatch('company_id', form)
   const contactCompanyMismatchHint = useMemo(() => {
@@ -119,7 +113,7 @@ export default function TicketFormModal({
       return row ? [...active, row] : active
     }
     return active
-  }, [allStatuses, editingTicket, editingTicket?.status, showSimplifiedForm])
+  }, [allStatuses, editingTicket, showSimplifiedForm])
 
   return (
     <Modal
