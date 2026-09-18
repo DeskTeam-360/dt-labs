@@ -1073,6 +1073,56 @@ export default function TicketDetailContent({
         }
     }
 
+    const downloadTicketMd = useCallback(() => {
+        const t = displayTicket
+        if (!t) return
+        const htmlToText = (html: string) => {
+            const el = document.createElement('div')
+            el.innerHTML = html
+            return el.innerText ?? el.textContent ?? ''
+        }
+        const fmt = (d: string) => d ? new Date(d).toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+        const createdBy = t.creator?.full_name || t.creator?.email || '—'
+        const company = t.company?.name || '—'
+        const team = t.team?.name || '—'
+        const agent = t.assignees?.[0]?.user?.full_name || t.assignees?.[0]?.user?.email || '—'
+        const lines: string[] = []
+        lines.push(`# [#${t.id}] ${t.title ?? ''}`, '')
+        lines.push('## Details')
+        lines.push('| Field | Value |', '|-------|-------|')
+        lines.push(`| Status | ${t.status ?? '—'} |`)
+        lines.push(`| Priority | ${t.priority ?? '—'} |`)
+        lines.push(`| Source | ${t.source ?? '—'} |`)
+        lines.push(`| Type | ${t.ticket_type ?? '—'} |`)
+        lines.push(`| Company | ${company} |`)
+        lines.push(`| Team | ${team} |`)
+        lines.push(`| Agent | ${agent} |`)
+        lines.push(`| Created by | ${createdBy} |`)
+        lines.push(`| Created at | ${fmt(t.created_at)} |`)
+        if (t.due_date) lines.push(`| Due date | ${fmt(t.due_date)} |`)
+        lines.push('')
+        if (t.description) {
+            lines.push('## Description', '', htmlToText(t.description), '')
+        }
+        if (comments.length > 0) {
+            lines.push(`## Comments (${comments.length})`, '')
+            for (const c of comments) {
+                const author = (c as any).user?.full_name || (c as any).user?.email || 'Unknown'
+                const badge = (c as any).visibility === 'note' ? ' `Note`' : (c as any).visibility === 'reply' ? ' `Reply`' : ''
+                lines.push(`### ${author}${badge} — ${fmt((c as any).created_at)}`, '')
+                lines.push(htmlToText((c as any).comment), '')
+            }
+        }
+        lines.push('---', `*DeskTeam360 — Ticket #${t.id} — Exported ${new Date().toLocaleString()}*`)
+        const blob = new Blob([lines.join('\n')], { type: 'text/markdown' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `ticket-${t.id}.md`
+        a.click()
+        URL.revokeObjectURL(url)
+    }, [displayTicket, comments])
+
     const handleSaveSidebarAttributes = async (d: SidebarAttributesDraft) => {
         const tid = displayTicket?.id
         if (tid == null) return
@@ -1602,6 +1652,15 @@ export default function TicketDetailContent({
                                                 gap: 8,
                                             }}
                                         >
+                                            <Tooltip title="Download as MD">
+                                                <Button onClick={downloadTicketMd}>⬇ MD</Button>
+                                            </Tooltip>
+                                            <Tooltip title="Print ticket">
+                                                <Button
+                                                    icon={<PrinterOutlined />}
+                                                    onClick={() => window.open(`/tickets/${displayTicket.id}/print`, '_blank')}
+                                                />
+                                            </Tooltip>
                                             {rowTicketType !== 'support' && (
                                                 <Tag color={rowTicketType === 'spam' ? 'red' : 'orange'}>
                                                     {rowTicketType === 'spam' ? 'Spam ticket' : 'Trash ticket'}
@@ -1657,12 +1716,6 @@ export default function TicketDetailContent({
                                             )}
                                         </div>
                                     )}
-                                    <Tooltip title="Print ticket">
-                                        <Button
-                                            icon={<PrinterOutlined />}
-                                            onClick={() => window.open(`/tickets/${displayTicket.id}/print`, '_blank')}
-                                        />
-                                    </Tooltip>
                                 </div>
                                 <TicketPresenceBar
                                     ticketId={displayTicket.id}
