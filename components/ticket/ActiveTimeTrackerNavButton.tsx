@@ -146,10 +146,17 @@ export default function ActiveTimeTrackerNavButton() {
     }
   }
 
+  const running = activeTrackers.length > 0
+
+  useEffect(() => {
+    if (!running) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [running])
+
   const role = (session?.user as { role?: string } | undefined)?.role?.toLowerCase()
   if (status !== 'authenticated' || !userId || role === 'customer') return null
-
-  const running = activeTrackers.length > 0
   const primaryElapsed =
     running && activeTrackers[0] ? formatTime(elapsedBySessionId[activeTrackers[0].id] ?? 0) : null
 

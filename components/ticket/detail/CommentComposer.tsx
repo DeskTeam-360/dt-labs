@@ -95,6 +95,13 @@ export default function CommentComposer({
   const [bccEmails, setBccEmails] = useState<string[]>([])
   const isReplyMode = (showNoteOption && mode === 'reply') || !showNoteOption
 
+  useEffect(() => {
+    if (isBlankEditorValue(draft) && attachments.length === 0) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [draft, attachments])
+
   /** One fetch per ticket per "reply session"; reset after successful send or ticket change. */
   const agentReplyTemplateConsumedRef = useRef(false)
   const agentReplyTemplateHtmlRef = useRef('')
