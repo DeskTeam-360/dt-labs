@@ -9,6 +9,7 @@ import {
     EditOutlined,
     FolderOutlined,
     LeftOutlined,
+    FileMarkdownOutlined,
     PrinterOutlined,
     ReloadOutlined,
     RightOutlined,
@@ -1652,8 +1653,8 @@ export default function TicketDetailContent({
                                                 gap: 8,
                                             }}
                                         >
-                                            <Tooltip title="Download as MD">
-                                                <Button onClick={downloadTicketMd}>⬇ MD</Button>
+                                            <Tooltip title="Download as Markdown">
+                                                <Button icon={<FileMarkdownOutlined />} onClick={downloadTicketMd} />
                                             </Tooltip>
                                             <Tooltip title="Print ticket">
                                                 <Button
