@@ -40,5 +40,5 @@ export default async function TicketPrintPage({ params }: { params: Promise<{ id
   const data = await getTicketDetail(ticketId, options)
   if (!data) redirect('/tickets?ticket_error=no_access')
 
-  return <TicketPrintView ticketData={data.ticketData} comments={data.comments} />
+  return <TicketPrintView ticketData={data.ticketData} comments={data.comments} isAgent={!isCustomer} />
 }

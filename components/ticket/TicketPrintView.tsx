@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 
 interface Comment {
   id: string
@@ -15,6 +15,14 @@ interface TicketPrintViewProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ticketData: Record<string, any>
   comments: Comment[]
+  isAgent?: boolean
+}
+
+function htmlToText(html: string): string {
+  if (typeof document === 'undefined') return html
+  const el = document.createElement('div')
+  el.innerHTML = html
+  return el.innerText ?? el.textContent ?? ''
 }
 
 function formatDate(dateStr: string) {
@@ -29,7 +37,7 @@ function formatDate(dateStr: string) {
   })
 }
 
-export default function TicketPrintView({ ticketData: t, comments }: TicketPrintViewProps) {
+export default function TicketPrintView({ ticketData: t, comments, isAgent }: TicketPrintViewProps) {
   useEffect(() => {
     window.print()
   }, [])
@@ -38,6 +46,54 @@ export default function TicketPrintView({ ticketData: t, comments }: TicketPrint
   const company = t?.company?.name || '—'
   const team = t?.team?.name || '—'
   const agent = t?.assignees?.[0]?.user?.full_name || t?.assignees?.[0]?.user?.email || '—'
+
+  const downloadMd = useCallback(() => {
+    const lines: string[] = []
+    lines.push(`# [#${t?.id}] ${t?.title ?? ''}`)
+    lines.push('')
+    lines.push('## Details')
+    lines.push(`| Field | Value |`)
+    lines.push(`|-------|-------|`)
+    lines.push(`| Status | ${t?.status ?? '—'} |`)
+    lines.push(`| Priority | ${t?.priority ?? '—'} |`)
+    lines.push(`| Source | ${t?.source ?? '—'} |`)
+    lines.push(`| Type | ${t?.ticket_type ?? '—'} |`)
+    lines.push(`| Company | ${company} |`)
+    lines.push(`| Team | ${team} |`)
+    lines.push(`| Agent | ${agent} |`)
+    lines.push(`| Created by | ${createdBy} |`)
+    lines.push(`| Created at | ${t?.created_at ? formatDate(t.created_at) : '—'} |`)
+    if (t?.due_date) lines.push(`| Due date | ${formatDate(t.due_date)} |`)
+    lines.push('')
+    if (t?.description) {
+      lines.push('## Description')
+      lines.push('')
+      lines.push(htmlToText(t.description))
+      lines.push('')
+    }
+    if (comments.length > 0) {
+      lines.push(`## Comments (${comments.length})`)
+      lines.push('')
+      for (const c of comments) {
+        const author = c.user?.full_name || c.user?.email || 'Unknown'
+        const badge = c.visibility === 'note' ? ' `Note`' : c.visibility === 'reply' ? ' `Reply`' : ''
+        lines.push(`### ${author}${badge} — ${formatDate(c.created_at)}`)
+        lines.push('')
+        lines.push(htmlToText(c.comment))
+        lines.push('')
+      }
+    }
+    lines.push('---')
+    lines.push(`*DeskTeam360 — Ticket #${t?.id} — Exported ${new Date().toLocaleString()}*`)
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ticket-${t?.id}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [t, comments, createdBy, company, team, agent])
 
   return (
     <>
@@ -75,6 +131,16 @@ export default function TicketPrintView({ ticketData: t, comments }: TicketPrint
       `}</style>
 
       <div className="print-wrap">
+        {isAgent && (
+          <div className="no-print" style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={downloadMd}
+              style={{ padding: '6px 16px', fontSize: 13, cursor: 'pointer', borderRadius: 4, border: '1px solid #d9d9d9', background: '#fff', fontFamily: 'Arial, sans-serif' }}
+            >
+              ⬇ Download as MD
+            </button>
+          </div>
+        )}
         {/* Header */}
         <div className="print-header">
           <div>
