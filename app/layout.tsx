@@ -30,13 +30,32 @@ const themeInitScript = `
 //   subsets: ["latin"],
 // });
 
+const SITE_URL = 'https://ticket.deskteam360.com'
+const OG_TITLE = 'DeskTeam360 — Stop Outsourcing, Start Insourcing'
+const OG_DESCRIPTION = 'Stop uncontrolled outsourcing. Build a dedicated insourcing team—developers, designers, and AI specialists—with clear process, fast SLA, and direct contact.'
+
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getAppSettings()
   const appName = settings.app_name || process.env.NEXT_PUBLIC_APP_NAME || 'DeskTeam360'
   return {
+    metadataBase: new URL(SITE_URL),
     title: { default: appName, template: `%s | ${appName}` },
-    description: process.env.NEXT_PUBLIC_APP_DESCRIPTION,
+    description: OG_DESCRIPTION,
     icons: settings.app_favicon_url ? [{ url: settings.app_favicon_url }] : undefined,
+    openGraph: {
+      title: OG_TITLE,
+      description: OG_DESCRIPTION,
+      url: SITE_URL,
+      siteName: appName,
+      images: [{ url: '/og-image.png', width: 1200, height: 630, alt: OG_TITLE }],
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: OG_TITLE,
+      description: OG_DESCRIPTION,
+      images: ['/og-image.png'],
+    },
   }
 }
 
