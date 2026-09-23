@@ -4,10 +4,22 @@ import { memo, useState } from 'react'
 
 import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
+import EmailIframe from './EmailIframe'
+
 interface CommentHtmlProps {
   html: string
   style?: React.CSSProperties
   className?: string
+}
+
+/** True when HTML looks like an email (has table layout, style blocks, or email client classes). */
+function isEmailHtml(html: string): boolean {
+  return (
+    /<table[\s>]/i.test(html) ||
+    /<style[\s>]/i.test(html) ||
+    /class="[^"]*(?:gmail_|yahoo_|MsoNormal|WordSection|ExternalClass)/i.test(html) ||
+    /font-family\s*:/i.test(html)
+  )
 }
 
 /**
@@ -16,6 +28,12 @@ interface CommentHtmlProps {
  */
 function CommentHtml({ html, style, className }: CommentHtmlProps) {
   const [showQuote, setShowQuote] = useState(false)
+
+  // Email HTML (tables, inline styles, email client classes) is rendered in an
+  // isolated iframe so the app's global CSS cannot corrupt button colours, etc.
+  if (isEmailHtml(html)) {
+    return <EmailIframe html={html} className={className} />
+  }
 
   const sanitized = sanitizeRichHtml(html)
     .replace(/<div[^>]*>\s*<br\s*\/?>\s*<\/div>/gi, '')  // remove <div><br></div>
