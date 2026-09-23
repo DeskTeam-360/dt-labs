@@ -116,6 +116,12 @@ export default function TicketsClient({ tickets, isAgent, companies, teams }: Pr
               <button onClick={() => setDrawerOpen(false)} style={{ background: 'none', border: 'none', color: '#8c8c8c', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+              <FilterSection label="Team">
+                <FilterOption label="All Teams" active={!team} onClick={() => setTeam('')} />
+                {teams.map((t) => (
+                  <FilterOption key={t.id} label={t.name} active={team === t.name} onClick={() => setTeam(t.name)} />
+                ))}
+              </FilterSection>
               <FilterSection label="Company">
                 <input
                   value={companySearch}
@@ -129,12 +135,6 @@ export default function TicketsClient({ tickets, isAgent, companies, teams }: Pr
                   .map((c) => (
                     <FilterOption key={c.id} label={c.name} active={company === c.name} onClick={() => setCompany(c.name)} />
                   ))}
-              </FilterSection>
-              <FilterSection label="Team">
-                <FilterOption label="All Teams" active={!team} onClick={() => setTeam('')} />
-                {teams.map((t) => (
-                  <FilterOption key={t.id} label={t.name} active={team === t.name} onClick={() => setTeam(t.name)} />
-                ))}
               </FilterSection>
             </div>
             <div style={{ padding: '12px 16px', borderTop: '1px solid #2a2a3e', display: 'flex', gap: 10 }}>
