@@ -53,10 +53,11 @@ import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
 import CommentAiSummaryTrigger from './CommentAiSummaryTrigger'
 import CommentComposer from './CommentComposer'
-import CommentHtml from './CommentHtml'
+import CommentHtml, { isEmailHtml } from './CommentHtml'
 import CommentTaggedCcLines from './CommentTaggedCcLines'
 import CommentWysiwyg from './CommentWysiwyg'
 import CompanyTodayTotal from './CompanyTodayTotal'
+import EmailIframe from './EmailIframe'
 import TicketUserMention from './TicketUserMention'
 import TrackerElapsed from './TrackerElapsed'
 
@@ -637,13 +638,17 @@ export default function TabGeneral({
                           </Space>
                         ) : (
                           <>
-                            <div
-                              className="ql-editor comment-html"
-                              style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
-                              dangerouslySetInnerHTML={{
-                                __html: sanitizeRichHtml(ticketData.description || ''),
-                              }}
-                            />
+                            {isEmailHtml(ticketData.description || '') ? (
+                              <EmailIframe html={ticketData.description || ''} />
+                            ) : (
+                              <div
+                                className="ql-editor comment-html"
+                                style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
+                                dangerouslySetInnerHTML={{
+                                  __html: sanitizeRichHtml(ticketData.description || ''),
+                                }}
+                              />
+                            )}
                             <OriginalDescriptionCollapse ticketData={ticketData} />
                           </>
                         )}

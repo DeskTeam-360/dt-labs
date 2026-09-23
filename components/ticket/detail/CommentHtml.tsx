@@ -13,7 +13,7 @@ interface CommentHtmlProps {
 }
 
 /** True when HTML looks like an email (has table layout, style blocks, or email client classes). */
-function isEmailHtml(html: string): boolean {
+export function isEmailHtml(html: string): boolean {
   return (
     /<table[\s>]/i.test(html) ||
     /<style[\s>]/i.test(html) ||
