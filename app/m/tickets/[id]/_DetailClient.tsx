@@ -105,9 +105,10 @@ export default function DetailClient({ ticket, isCustomer }: Props) {
         {ticket.description && (
           <div>
             <SectionLabel>Description</SectionLabel>
-            <div style={{ background: '#1a1a2e', borderRadius: 10, border: '1px solid #2a2a3e', padding: '12px 14px', fontSize: 13, color: '#d0d0d0', lineHeight: 1.6 }}>
-              {ticket.description.replace(/<[^>]*>/g, '').trim() || ticket.description}
-            </div>
+            <div
+              style={{ background: '#1a1a2e', borderRadius: 10, border: '1px solid #2a2a3e', padding: '12px 14px', fontSize: 13, color: '#d0d0d0', lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'break-word' }}
+              dangerouslySetInnerHTML={{ __html: ticket.description }}
+            />
           </div>
         )}
 
@@ -126,9 +127,10 @@ export default function DetailClient({ ticket, isCustomer }: Props) {
                     {c.author} · {c.createdAt}
                     {c.isNote && <span style={{ marginLeft: 6, fontSize: 10, color: '#fa8c16', background: '#fa8c1622', border: '1px solid #fa8c1644', borderRadius: 4, padding: '1px 5px' }}>Note</span>}
                   </div>
-                  <div style={{ maxWidth: '85%', background: isMe ? '#3b2d6e' : c.isNote ? '#2a1f0a' : '#1a1a2e', border: `1px solid ${isMe ? '#7c3aed44' : c.isNote ? '#fa8c1644' : '#2a2a3e'}`, borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px', padding: '10px 12px', fontSize: 13, color: '#e0e0e0', lineHeight: 1.5 }}>
-                    {c.body}
-                  </div>
+                  <div
+                    style={{ maxWidth: '85%', background: isMe ? '#3b2d6e' : c.isNote ? '#2a1f0a' : '#1a1a2e', border: `1px solid ${isMe ? '#7c3aed44' : c.isNote ? '#fa8c1644' : '#2a2a3e'}`, borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px', padding: '10px 12px', fontSize: 13, color: '#e0e0e0', lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                    dangerouslySetInnerHTML={{ __html: c.body }}
+                  />
                 </div>
               )
             })}
