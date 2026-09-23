@@ -110,11 +110,11 @@ export async function getMobileTicketDetail(ticketId: number) {
     ticket.companyId
       ? db.select({ name: companies.name }).from(companies).where(eq(companies.id, ticket.companyId)).limit(1)
       : Promise.resolve([] as { name: string }[]),
-    db.select({ name: users.name })
+    db.select({ name: users.fullName })
       .from(ticketAssignees)
       .leftJoin(users, eq(ticketAssignees.userId, users.id))
       .where(eq(ticketAssignees.ticketId, ticketId)),
-    db.select({ id: ticketComments.id, body: ticketComments.comment, visibility: ticketComments.visibility, authorType: ticketComments.authorType, createdAt: ticketComments.createdAt, authorName: users.name })
+    db.select({ id: ticketComments.id, body: ticketComments.comment, visibility: ticketComments.visibility, authorType: ticketComments.authorType, createdAt: ticketComments.createdAt, authorName: users.fullName })
       .from(ticketComments)
       .leftJoin(users, eq(ticketComments.userId, users.id))
       .where(
