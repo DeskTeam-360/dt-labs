@@ -114,12 +114,12 @@ export async function getMobileTicketDetail(ticketId: number) {
       .from(ticketAssignees)
       .leftJoin(users, eq(ticketAssignees.userId, users.id))
       .where(eq(ticketAssignees.ticketId, ticketId)),
-    db.select({ id: ticketComments.id, body: ticketComments.body, isNote: ticketComments.isNote, createdAt: ticketComments.createdAt, authorName: users.name, authorRole: users.role })
+    db.select({ id: ticketComments.id, body: ticketComments.comment, visibility: ticketComments.visibility, authorType: ticketComments.authorType, createdAt: ticketComments.createdAt, authorName: users.name })
       .from(ticketComments)
       .leftJoin(users, eq(ticketComments.userId, users.id))
       .where(
         isCustomer
-          ? and(eq(ticketComments.ticketId, ticketId), eq(ticketComments.isNote, false))
+          ? and(eq(ticketComments.ticketId, ticketId), eq(ticketComments.visibility, 'reply'))
           : eq(ticketComments.ticketId, ticketId)
       )
       .orderBy(ticketComments.createdAt),
@@ -138,9 +138,9 @@ export async function getMobileTicketDetail(ticketId: number) {
     comments: commentRows.map((c) => ({
       id: c.id,
       author: c.authorName ?? 'Unknown',
-      role: (c.authorRole?.toLowerCase() === 'customer' ? 'customer' : 'agent') as 'customer' | 'agent',
+      role: (c.authorType === 'customer' ? 'customer' : 'agent') as 'customer' | 'agent',
       body: c.body ?? '',
-      isNote: c.isNote ?? false,
+      isNote: c.visibility === 'note',
       createdAt: c.createdAt ? new Date(c.createdAt).toLocaleTimeString('id', { hour: '2-digit', minute: '2-digit' }) : '',
     })),
   }
