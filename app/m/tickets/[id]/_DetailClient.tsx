@@ -122,18 +122,19 @@ export default function DetailClient({ ticket, isCustomer }: Props) {
             {comments.map((c) => {
               const isMe = (isCustomer && c.role === 'customer') || (!isCustomer && c.role === 'agent')
               const authorLabel = c.author !== 'Unknown' ? c.author : c.role === 'agent' ? 'Agent' : c.role === 'customer' ? 'Customer' : 'System'
-              // Notes: light amber bg; my messages: light purple; others: white
-              const bg = c.isNote ? '#fffbf0' : isMe ? '#ede9fb' : '#fff'
-              const border = c.isNote ? '#f5d88a' : isMe ? '#c4b5fd' : '#e0e0e0'
-              const textColor = '#1a1a1a'
+              // replies: white bg dark text; notes: dark purple like desktop; my replies: light purple
+              const isDark = c.isNote
+              const bg = c.isNote ? '#2d1b5e' : isMe ? '#ede9fb' : '#fff'
+              const border = c.isNote ? '#7c3aed44' : isMe ? '#c4b5fd' : '#e0e0e0'
               return (
                 <div key={c.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
                   <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 3, paddingLeft: 4, paddingRight: 4 }}>
                     {authorLabel} · {c.createdAt}
-                    {c.isNote && <span style={{ marginLeft: 6, fontSize: 10, color: '#d48806', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, padding: '1px 5px' }}>Note</span>}
+                    {c.isNote && <span style={{ marginLeft: 6, fontSize: 10, color: '#fa8c16', background: '#fa8c1622', border: '1px solid #fa8c1644', borderRadius: 4, padding: '1px 5px' }}>Note</span>}
                   </div>
                   <div
-                    style={{ maxWidth: '90%', background: bg, border: `1px solid ${border}`, borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px', padding: '10px 12px', fontSize: 13, color: textColor, lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                    className={isDark ? 'mobile-note-bubble' : undefined}
+                    style={{ maxWidth: '90%', background: bg, border: `1px solid ${border}`, borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px', padding: '10px 12px', fontSize: 13, color: isDark ? '#e8e0ff' : '#1a1a1a', lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'break-word' }}
                     dangerouslySetInnerHTML={{ __html: c.body }}
                   />
                 </div>
