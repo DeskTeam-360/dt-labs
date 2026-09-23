@@ -194,8 +194,13 @@ export async function getMobileDashboardStats() {
 
 export async function getMobileCompaniesAndTeams() {
   const [companyRows, teamRows] = await Promise.all([
-    db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(companies.name).limit(50),
-    db.select({ id: teams.id, name: teams.name }).from(teams).orderBy(teams.name).limit(50),
+    db.select({ id: companies.id, name: companies.name })
+      .from(companies)
+      .leftJoin(tickets, eq(tickets.companyId, companies.id))
+      .groupBy(companies.id, companies.name)
+      .orderBy(desc(sql`count(${tickets.id})`))
+      .limit(10),
+    db.select({ id: teams.id, name: teams.name }).from(teams).orderBy(teams.name),
   ])
   return { companies: companyRows, teams: teamRows }
 }
