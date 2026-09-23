@@ -5,12 +5,11 @@ import { getCustomerCompanyId } from '@/lib/customer-company'
 import {
   companies,
   db,
-  projectStatuses,
-  teamMembers,
   teams,
   ticketAssignees,
   ticketComments,
   tickets,
+  ticketStatuses,
   users,
 } from '@/lib/db'
 
@@ -27,26 +26,20 @@ export function slugToGroup(slug: string): MobileStatusGroup {
 export async function getMobileSession() {
   const session = await auth()
   if (!session?.user?.id) return null
-  return session.user as { id: string; name?: string | null; email?: string | null; role?: string; image?: string | null }
+  return session.user as { id: string; name?: string | null; email?: string | null; role?: string }
 }
 
-export async function getMobileTickets(statusGroup?: MobileStatusGroup) {
+export async function getMobileTickets() {
   const user = await getMobileSession()
   if (!user) return null
 
   const isCustomer = user.role?.toLowerCase() === 'customer'
 
-  // projectStatuses is the status table linked via tickets.projectStatusId
+  // ticketStatuses catalog: slug → title/color
   const allStatuses = await db
-    .select({ id: projectStatuses.id, slug: projectStatuses.slug, name: projectStatuses.name, color: projectStatuses.color })
-    .from(projectStatuses)
-
-  let statusIds: number[] | undefined
-  if (statusGroup) {
-    const matching = allStatuses.filter((s) => slugToGroup(s.slug) === statusGroup).map((s) => s.id)
-    if (matching.length === 0) return []
-    statusIds = matching
-  }
+    .select({ slug: ticketStatuses.slug, title: ticketStatuses.title, color: ticketStatuses.color })
+    .from(ticketStatuses)
+  const statusMap = Object.fromEntries(allStatuses.map((s) => [s.slug, s]))
 
   const conditions = []
 
@@ -64,16 +57,12 @@ export async function getMobileTickets(statusGroup?: MobileStatusGroup) {
     }
   }
 
-  if (statusIds) conditions.push(inArray(tickets.projectStatusId, statusIds))
-
   const rows = await db
-    .select({ id: tickets.id, title: tickets.title, priority: tickets.priority, companyId: tickets.companyId, projectStatusId: tickets.projectStatusId, createdAt: tickets.createdAt })
+    .select({ id: tickets.id, title: tickets.title, priority: tickets.priority, status: tickets.status, companyId: tickets.companyId, createdAt: tickets.createdAt })
     .from(tickets)
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(tickets.createdAt))
     .limit(50)
-
-  const statusMap = Object.fromEntries(allStatuses.map((s) => [s.id, s]))
 
   const companyIds = [...new Set(rows.map((r) => r.companyId).filter(Boolean))] as string[]
   const companyRows = companyIds.length
@@ -81,25 +70,16 @@ export async function getMobileTickets(statusGroup?: MobileStatusGroup) {
     : []
   const companyMap = Object.fromEntries(companyRows.map((c) => [c.id, c.name]))
 
-  const priorityLabel = (p: number | null): 'P1' | 'P2' | 'P3' | 'P4' | 'P5' => {
-    if (!p) return 'P5'
-    if (p <= 1) return 'P1'
-    if (p <= 2) return 'P2'
-    if (p <= 3) return 'P3'
-    if (p <= 4) return 'P4'
-    return 'P5'
-  }
-
   return rows.map((r) => {
-    const status = r.projectStatusId ? statusMap[r.projectStatusId] : null
+    const st = statusMap[r.status] ?? { title: r.status, color: '#8c8c8c' }
     return {
       id: r.id,
       title: r.title,
-      priority: priorityLabel(r.priority),
-      status: status?.name ?? 'Unknown',
-      statusSlug: status?.slug ?? '',
-      statusColor: status?.color ?? '#8c8c8c',
-      statusGroup: status ? slugToGroup(status.slug) : ('open' as MobileStatusGroup),
+      priority: numToPriority(r.priority),
+      status: st.title,
+      statusSlug: r.status,
+      statusColor: st.color,
+      statusGroup: slugToGroup(r.status),
       company: r.companyId ? (companyMap[r.companyId] ?? '—') : '—',
       createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('id', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
     }
@@ -113,7 +93,7 @@ export async function getMobileTicketDetail(ticketId: number) {
   const isCustomer = user.role?.toLowerCase() === 'customer'
 
   const [ticket] = await db
-    .select({ id: tickets.id, title: tickets.title, priority: tickets.priority, description: tickets.description, companyId: tickets.companyId, projectStatusId: tickets.projectStatusId, createdAt: tickets.createdAt })
+    .select({ id: tickets.id, title: tickets.title, priority: tickets.priority, description: tickets.description, status: tickets.status, companyId: tickets.companyId, createdAt: tickets.createdAt })
     .from(tickets)
     .where(eq(tickets.id, ticketId))
     .limit(1)
@@ -121,15 +101,15 @@ export async function getMobileTicketDetail(ticketId: number) {
   if (!ticket) return null
 
   const allStatuses = await db
-    .select({ id: projectStatuses.id, slug: projectStatuses.slug, name: projectStatuses.name, color: projectStatuses.color })
-    .from(projectStatuses)
-  const statusMap = Object.fromEntries(allStatuses.map((s) => [s.id, s]))
-  const status = ticket.projectStatusId ? statusMap[ticket.projectStatusId] : null
+    .select({ slug: ticketStatuses.slug, title: ticketStatuses.title, color: ticketStatuses.color })
+    .from(ticketStatuses)
+  const statusMap = Object.fromEntries(allStatuses.map((s) => [s.slug, s]))
+  const st = statusMap[ticket.status] ?? { title: ticket.status, color: '#8c8c8c' }
 
   const [companyRow, assigneeRows, commentRows] = await Promise.all([
     ticket.companyId
       ? db.select({ name: companies.name }).from(companies).where(eq(companies.id, ticket.companyId)).limit(1)
-      : Promise.resolve([]),
+      : Promise.resolve([] as { name: string }[]),
     db.select({ name: users.name })
       .from(ticketAssignees)
       .leftJoin(users, eq(ticketAssignees.userId, users.id))
@@ -145,23 +125,14 @@ export async function getMobileTicketDetail(ticketId: number) {
       .orderBy(ticketComments.createdAt),
   ])
 
-  const priorityLabel = (p: number | null): 'P1' | 'P2' | 'P3' | 'P4' | 'P5' => {
-    if (!p) return 'P5'
-    if (p <= 1) return 'P1'
-    if (p <= 2) return 'P2'
-    if (p <= 3) return 'P3'
-    if (p <= 4) return 'P4'
-    return 'P5'
-  }
-
   return {
     id: ticket.id,
     title: ticket.title,
-    priority: priorityLabel(ticket.priority),
+    priority: numToPriority(ticket.priority),
     description: ticket.description ?? '',
-    status: status?.name ?? 'Unknown',
-    statusColor: status?.color ?? '#8c8c8c',
-    company: (companyRow as { name: string }[])[0]?.name ?? '—',
+    status: st.title,
+    statusColor: st.color,
+    company: companyRow[0]?.name ?? '—',
     assignee: assigneeRows.map((a) => a.name).filter(Boolean).join(', ') || '—',
     createdAt: ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('id', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
     comments: commentRows.map((c) => ({
@@ -181,43 +152,44 @@ export async function getMobileDashboardStats() {
 
   const isCustomer = user.role?.toLowerCase() === 'customer'
 
-  const allStatuses = await db.select({ id: projectStatuses.id, slug: projectStatuses.slug }).from(projectStatuses)
-
-  const openIds = allStatuses.filter((s) => slugToGroup(s.slug) === 'open').map((s) => s.id)
-  const inProgressIds = allStatuses.filter((s) => slugToGroup(s.slug) === 'in_progress').map((s) => s.id)
-  const needResponseIds = allStatuses.filter((s) => slugToGroup(s.slug) === 'need_response').map((s) => s.id)
-  const completedIds = allStatuses.filter((s) => slugToGroup(s.slug) === 'completed').map((s) => s.id)
-
   let baseWhere: ReturnType<typeof eq> | ReturnType<typeof and> | undefined
   if (isCustomer) {
     const companyId = await getCustomerCompanyId(user.id)
     baseWhere = companyId ? eq(tickets.companyId, companyId) : eq(tickets.createdBy, user.id)
   }
 
-  const countByStatus = async (ids: number[]) => {
-    if (!ids.length) return 0
+  const allStatuses = await db.select({ slug: ticketStatuses.slug }).from(ticketStatuses)
+  const slugsByGroup = (group: MobileStatusGroup) => allStatuses.filter((s) => slugToGroup(s.slug) === group).map((s) => s.slug)
+
+  const openSlugs = slugsByGroup('open')
+  const inProgressSlugs = slugsByGroup('in_progress')
+  const needResponseSlugs = slugsByGroup('need_response')
+  const completedSlugs = slugsByGroup('completed')
+
+  const countBySlugs = async (slugs: string[]) => {
+    if (!slugs.length) return 0
     const [r] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(tickets)
-      .where(baseWhere ? and(baseWhere, inArray(tickets.projectStatusId, ids)) : inArray(tickets.projectStatusId, ids))
+      .where(baseWhere ? and(baseWhere, inArray(tickets.status, slugs)) : inArray(tickets.status, slugs))
     return r?.count ?? 0
   }
 
   const weekAgo = new Date()
   weekAgo.setDate(weekAgo.getDate() - 7)
 
-  const [open, inProgress, needResponse, completedWeekRow] = await Promise.all([
-    countByStatus(openIds),
-    countByStatus(inProgressIds),
-    countByStatus(needResponseIds),
-    completedIds.length
-      ? db.select({ count: sql<number>`count(*)::int` }).from(tickets).where(
-          and(baseWhere ?? undefined, inArray(tickets.projectStatusId, completedIds), gte(tickets.updatedAt, weekAgo))
-        ).then((r) => r[0])
-      : Promise.resolve({ count: 0 }),
+  const [open, inProgress, needResponse, completedWeek] = await Promise.all([
+    countBySlugs(openSlugs),
+    countBySlugs(inProgressSlugs),
+    countBySlugs(needResponseSlugs),
+    completedSlugs.length
+      ? db.select({ count: sql<number>`count(*)::int` }).from(tickets)
+          .where(and(baseWhere ?? undefined, inArray(tickets.status, completedSlugs), gte(tickets.updatedAt, weekAgo)))
+          .then((r) => r[0]?.count ?? 0)
+      : Promise.resolve(0),
   ])
 
-  return { open, inProgress, needResponse, completedThisWeek: completedWeekRow?.count ?? 0 }
+  return { open, inProgress, needResponse, completedThisWeek: completedWeek }
 }
 
 export async function getMobileCompaniesAndTeams() {
@@ -226,4 +198,13 @@ export async function getMobileCompaniesAndTeams() {
     db.select({ id: teams.id, name: teams.name }).from(teams).orderBy(teams.name).limit(50),
   ])
   return { companies: companyRows, teams: teamRows }
+}
+
+function numToPriority(p: number | null): 'P1' | 'P2' | 'P3' | 'P4' | 'P5' {
+  if (!p) return 'P5'
+  if (p <= 1) return 'P1'
+  if (p <= 2) return 'P2'
+  if (p <= 3) return 'P3'
+  if (p <= 4) return 'P4'
+  return 'P5'
 }
