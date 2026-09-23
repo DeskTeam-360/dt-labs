@@ -41,6 +41,7 @@ export default function TicketsClient({ tickets, isAgent, companies, teams }: Pr
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [company, setCompany] = useState('')
   const [team, setTeam] = useState('')
+  const [companySearch, setCompanySearch] = useState('')
 
   const filtered = tickets.filter((t) => {
     const matchGroup = t.statusGroup === filter
@@ -116,10 +117,18 @@ export default function TicketsClient({ tickets, isAgent, companies, teams }: Pr
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
               <FilterSection label="Company">
+                <input
+                  value={companySearch}
+                  onChange={(e) => setCompanySearch(e.target.value)}
+                  placeholder="Search company..."
+                  style={{ width: '100%', background: '#0f1117', border: '1px solid #2a2a3e', borderRadius: 8, padding: '7px 10px', color: '#f0f0f0', fontSize: 13, boxSizing: 'border-box', outline: 'none', marginBottom: 6 }}
+                />
                 <FilterOption label="All Companies" active={!company} onClick={() => setCompany('')} />
-                {companies.map((c) => (
-                  <FilterOption key={c.id} label={c.name} active={company === c.name} onClick={() => setCompany(c.name)} />
-                ))}
+                {companies
+                  .filter((c) => !companySearch || c.name.toLowerCase().includes(companySearch.toLowerCase()))
+                  .map((c) => (
+                    <FilterOption key={c.id} label={c.name} active={company === c.name} onClick={() => setCompany(c.name)} />
+                  ))}
               </FilterSection>
               <FilterSection label="Team">
                 <FilterOption label="All Teams" active={!team} onClick={() => setTeam('')} />
@@ -129,7 +138,7 @@ export default function TicketsClient({ tickets, isAgent, companies, teams }: Pr
               </FilterSection>
             </div>
             <div style={{ padding: '12px 16px', borderTop: '1px solid #2a2a3e', display: 'flex', gap: 10 }}>
-              <button onClick={() => { setCompany(''); setTeam('') }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #2a2a3e', background: 'transparent', color: '#8c8c8c', fontSize: 13, cursor: 'pointer' }}>
+              <button onClick={() => { setCompany(''); setTeam(''); setCompanySearch('') }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #2a2a3e', background: 'transparent', color: '#8c8c8c', fontSize: 13, cursor: 'pointer' }}>
                 Reset
               </button>
               <button onClick={() => setDrawerOpen(false)} style={{ flex: 2, padding: '10px', borderRadius: 8, border: 'none', background: '#7c3aed', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
