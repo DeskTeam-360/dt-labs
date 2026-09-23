@@ -106,7 +106,7 @@ export default function DetailClient({ ticket, isCustomer }: Props) {
           <div>
             <SectionLabel>Description</SectionLabel>
             <div
-              style={{ background: '#1a1a2e', borderRadius: 10, border: '1px solid #2a2a3e', padding: '12px 14px', fontSize: 13, color: '#d0d0d0', lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'break-word' }}
+              style={{ background: '#fff', borderRadius: 10, border: '1px solid #e0e0e0', padding: '12px 14px', fontSize: 13, color: '#222', lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'break-word' }}
               dangerouslySetInnerHTML={{ __html: ticket.description }}
             />
           </div>
@@ -121,14 +121,19 @@ export default function DetailClient({ ticket, isCustomer }: Props) {
             )}
             {comments.map((c) => {
               const isMe = (isCustomer && c.role === 'customer') || (!isCustomer && c.role === 'agent')
+              const authorLabel = c.author !== 'Unknown' ? c.author : c.role === 'agent' ? 'Agent' : c.role === 'customer' ? 'Customer' : 'System'
+              // Notes: light amber bg; my messages: light purple; others: white
+              const bg = c.isNote ? '#fffbf0' : isMe ? '#ede9fb' : '#fff'
+              const border = c.isNote ? '#f5d88a' : isMe ? '#c4b5fd' : '#e0e0e0'
+              const textColor = '#1a1a1a'
               return (
                 <div key={c.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
                   <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 3, paddingLeft: 4, paddingRight: 4 }}>
-                    {c.author} · {c.createdAt}
-                    {c.isNote && <span style={{ marginLeft: 6, fontSize: 10, color: '#fa8c16', background: '#fa8c1622', border: '1px solid #fa8c1644', borderRadius: 4, padding: '1px 5px' }}>Note</span>}
+                    {authorLabel} · {c.createdAt}
+                    {c.isNote && <span style={{ marginLeft: 6, fontSize: 10, color: '#d48806', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, padding: '1px 5px' }}>Note</span>}
                   </div>
                   <div
-                    style={{ maxWidth: '85%', background: isMe ? '#3b2d6e' : c.isNote ? '#2a1f0a' : '#1a1a2e', border: `1px solid ${isMe ? '#7c3aed44' : c.isNote ? '#fa8c1644' : '#2a2a3e'}`, borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px', padding: '10px 12px', fontSize: 13, color: '#e0e0e0', lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                    style={{ maxWidth: '90%', background: bg, border: `1px solid ${border}`, borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px', padding: '10px 12px', fontSize: 13, color: textColor, lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'break-word' }}
                     dangerouslySetInnerHTML={{ __html: c.body }}
                   />
                 </div>
