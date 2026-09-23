@@ -1,12 +1,24 @@
 'use client'
 
+import DOMPurify from 'isomorphic-dompurify'
 import { memo, useEffect, useRef, useState } from 'react'
-
-import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
 interface EmailIframeProps {
   html: string
   className?: string
+}
+
+/** Sanitize email HTML permissively — keep <style>, <table>, inline styles intact. */
+function sanitizeEmail(html: string): string {
+  return String(
+    DOMPurify.sanitize(html, {
+      USE_PROFILES: { html: true },
+      ADD_ATTR: ['target', 'class', 'style', 'width', 'height', 'align', 'valign', 'bgcolor', 'cellpadding', 'cellspacing', 'border'],
+      ADD_TAGS: ['style'],
+      FORBID_TAGS: ['script', 'object', 'embed', 'base', 'form', 'input', 'button', 'textarea', 'select'],
+      FORCE_BODY: true,
+    })
+  )
 }
 
 /**
@@ -18,7 +30,7 @@ function EmailIframe({ html, className }: EmailIframeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [height, setHeight] = useState(120)
 
-  const sanitized = sanitizeRichHtml(html)
+  const sanitized = sanitizeEmail(html)
 
   const doc = `<!DOCTYPE html>
 <html>
