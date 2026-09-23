@@ -46,17 +46,21 @@ const LS_KEY = 'tickets_list_col_config'
 
 interface ColConfig { order: ColKey[]; hidden: ColKey[] }
 
-function readColConfig(): ColConfig {
+const CUSTOMER_HIDDEN_COLS: ColKey[] = ['company', 'team']
+
+function readColConfig(isCustomer = false): ColConfig {
+  const defaultHidden = isCustomer ? [...CUSTOMER_HIDDEN_COLS] : []
   try {
-    const raw = localStorage.getItem(LS_KEY)
+    const key = isCustomer ? `${LS_KEY}_customer` : LS_KEY
+    const raw = localStorage.getItem(key)
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<ColConfig>
       const order = (parsed.order ?? ALL_COL_KEYS).filter((k): k is ColKey => ALL_COL_KEYS.includes(k as ColKey))
-      const hidden = (parsed.hidden ?? []).filter((k): k is ColKey => ALL_COL_KEYS.includes(k as ColKey))
+      const hidden = (parsed.hidden ?? defaultHidden).filter((k): k is ColKey => ALL_COL_KEYS.includes(k as ColKey))
       return { order, hidden }
     }
   } catch { /* ignore */ }
-  return { order: [...ALL_COL_KEYS], hidden: [] }
+  return { order: [...ALL_COL_KEYS], hidden: defaultHidden }
 }
 
 interface TicketsListViewProps {
@@ -102,14 +106,15 @@ export default function TicketsListView({
     return { current: 1, pageSize: 15 }
   })
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
-  const [colConfig, setColConfig] = useState<ColConfig>(readColConfig)
+  const lsKey = isCustomer ? `${LS_KEY}_customer` : LS_KEY
+  const [colConfig, setColConfig] = useState<ColConfig>(() => readColConfig(isCustomer))
   const [colPopoverOpen, setColPopoverOpen] = useState(false)
   const dragKey = useRef<ColKey | null>(null)
 
   const saveColConfig = useCallback((cfg: ColConfig) => {
     setColConfig(cfg)
-    try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)) } catch { /* ignore */ }
-  }, [])
+    try { localStorage.setItem(lsKey, JSON.stringify(cfg)) } catch { /* ignore */ }
+  }, [lsKey])
 
   const toggleCol = useCallback((key: ColKey) => {
     setColConfig((prev) => {
@@ -117,10 +122,10 @@ export default function TicketsListView({
         ? prev.hidden.filter((k) => k !== key)
         : [...prev.hidden, key]
       const next = { ...prev, hidden }
-      try { localStorage.setItem(LS_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+      try { localStorage.setItem(lsKey, JSON.stringify(next)) } catch { /* ignore */ }
       return next
     })
-  }, [])
+  }, [lsKey])
 
   const sortedTickets = useMemo(
     () => sortTickets(tickets, sortBy, sortOrder),
