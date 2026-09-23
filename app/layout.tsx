@@ -41,6 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(SITE_URL),
     title: { default: appName, template: `%s | ${appName}` },
     description: OG_DESCRIPTION,
+    manifest: '/manifest.json',
     icons: settings.app_favicon_url ? [{ url: settings.app_favicon_url }] : undefined,
     openGraph: {
       title: OG_TITLE,
