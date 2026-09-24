@@ -1,4 +1,4 @@
-import { and, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
@@ -26,7 +26,11 @@ export async function GET(request: Request) {
   const yesterdayStart = new Date(todayStart)
   yesterdayStart.setUTCDate(yesterdayStart.getUTCDate() - 1)
 
+  const todayStartIso = todayStart.toISOString()
+  const yesterdayStartIso = yesterdayStart.toISOString()
+
   const [timeRows, yesterdayRows, activeRows] = await Promise.all([
+    // Completed sessions that STOPPED today (covers sessions started yesterday but finished today)
     db
       .select({
         ticketId: ticketTimeTracker.ticketId,
@@ -41,10 +45,11 @@ export async function GET(request: Request) {
       .from(ticketTimeTracker)
       .where(and(
         inArray(ticketTimeTracker.ticketId, ticketIds),
-        gte(ticketTimeTracker.startTime, todayStart),
+        sql`${ticketTimeTracker.stopTime} >= ${todayStartIso}`,
         isNotNull(ticketTimeTracker.stopTime),
       ))
       .groupBy(ticketTimeTracker.ticketId),
+    // Completed sessions that stopped yesterday
     db
       .select({
         ticketId: ticketTimeTracker.ticketId,
@@ -59,11 +64,12 @@ export async function GET(request: Request) {
       .from(ticketTimeTracker)
       .where(and(
         inArray(ticketTimeTracker.ticketId, ticketIds),
-        gte(ticketTimeTracker.startTime, yesterdayStart),
-        sql`${ticketTimeTracker.startTime} < ${todayStart}`,
+        sql`${ticketTimeTracker.stopTime} >= ${yesterdayStartIso}`,
+        sql`${ticketTimeTracker.stopTime} < ${todayStartIso}`,
         isNotNull(ticketTimeTracker.stopTime),
       ))
       .groupBy(ticketTimeTracker.ticketId),
+    // Active (running) sessions
     db
       .select({
         ticketId: ticketTimeTracker.ticketId,
@@ -87,6 +93,8 @@ export async function GET(request: Request) {
     for (const u of userRows) userMap.set(u.id, u.fullName ?? u.id)
   }
 
+  const nowMs = Date.now()
+
   const timeMap = new Map<number, number>()
   for (const r of timeRows) timeMap.set(r.ticketId, r.totalSeconds)
 
@@ -98,6 +106,9 @@ export async function GET(request: Request) {
     const arr = activeMap.get(r.ticketId) ?? []
     arr.push({ user_name: userMap.get(r.userId) ?? r.userId, start_time: r.startTime.toISOString() })
     activeMap.set(r.ticketId, arr)
+    // Add elapsed seconds from active session into today's total
+    const elapsedSec = Math.floor((nowMs - r.startTime.getTime()) / 1000)
+    timeMap.set(r.ticketId, (timeMap.get(r.ticketId) ?? 0) + Math.max(0, elapsedSec))
   }
 
   const result: TicketTrackerStat[] = ticketIds.map((id) => ({
