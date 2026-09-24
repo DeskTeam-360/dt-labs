@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, recurringTicketRuns, recurringTickets, ticketAssignees, tickets } from '@/lib/db'
 import { sendRecurringTicketCreatedEmail } from '@/lib/recurring-ticket-email'
 import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
+import { applyRecurringTicketTemplate } from '@/lib/recurring-ticket-template'
 import { assignCompanySupportTicketRank, assignCreatorSupportTicketRank, parseCompanyTicketDesiredRank, resolveSupportQueueScope } from '@/lib/ticket-company-priority-order'
 
 function cronAuth(req: NextRequest): boolean {
@@ -57,8 +58,8 @@ export async function POST(req: NextRequest) {
         const [row] = await tx
           .insert(tickets)
           .values({
-            title: rule.title,
-            description: rule.description ?? null,
+            title: applyRecurringTicketTemplate(rule.title, now),
+            description: rule.description ? applyRecurringTicketTemplate(rule.description, now) : null,
             status: rule.ticketStatus ?? 'open',
             priority: rule.companyId ? null : (rule.ticketPriority || null),
             teamId: rule.teamId ?? null,
