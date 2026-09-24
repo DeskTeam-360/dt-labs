@@ -62,12 +62,12 @@
   --ticket-thread-bubble-outline: rgba(0, 0, 0, 0.1);
   --ticket-thread-bubble-automation: rgba(246, 240, 255, 0.75);
   --ticket-thread-bubble-customer: rgba(230, 247, 255, 0.65);
-  --ticket-thread-bubble-agent-note: #f0f0f0;
-  --ticket-thread-bubble-agent-reply: rgba(255, 248, 220, 0.85);
+  --ticket-thread-bubble-agent-note: rgba(255, 248, 220, 0.85);
+  --ticket-thread-bubble-agent-reply: #f0f0f0;
   --ticket-thread-border-automation: rgba(179, 127, 235, 0.75);
   --ticket-thread-border-customer: rgba(100, 170, 230, 0.9);
-  --ticket-thread-border-agent-note: #bfbfbf;
-  --ticket-thread-border-agent-reply: rgba(217, 165, 32, 0.85);
+  --ticket-thread-border-agent-note: rgba(217, 165, 32, 0.85);
+  --ticket-thread-border-agent-reply: #bfbfbf;
   --ticket-thread-meta: rgba(0, 0, 0, 0.5);
   --ticket-thread-text: var(--foreground);
   /* Automation rules — ActionBuilder + ConditionBuilder panels */
@@ -135,12 +135,12 @@
   /* Solid tints — clearly distinct from --layout-bg / card (#1f1f1f) */
   --ticket-thread-bubble-automation: #3d2d55;
   --ticket-thread-bubble-customer: #1b4558;
-  --ticket-thread-bubble-agent-note: #34343f;
-  --ticket-thread-bubble-agent-reply: #4a3d2a;
+  --ticket-thread-bubble-agent-note: #4a3d2a;
+  --ticket-thread-bubble-agent-reply: #34343f;
   --ticket-thread-border-automation: rgba(200, 160, 255, 0.75);
   --ticket-thread-border-customer: rgba(120, 195, 245, 0.8);
-  --ticket-thread-border-agent-note: #71717a;
-  --ticket-thread-border-agent-reply: rgba(240, 200, 100, 0.75);
+  --ticket-thread-border-agent-note: rgba(240, 200, 100, 0.75);
+  --ticket-thread-border-agent-reply: #71717a;
   --ticket-thread-meta: rgba(255, 255, 255, 0.68);
   --ticket-thread-text: var(--foreground);
   --automation-builder-panel-bg: #1a1a1a;
