@@ -139,18 +139,11 @@ export default function TicketsRoundRobinView({
         const bgColor = getStatusColor(ticket.status, statusColumns)
         const textColor = ticket.type?.color ?? '#000'
         const tStat = ticketStats.get(ticket.id)
-        const tooltipContent = tStat ? (
+        const tooltipContent = (
           <div style={{ fontSize: 12, lineHeight: 1.6 }}>
-            {tStat.today_seconds > 0 && (
-              <div>⏱ Today: <strong>{fmtSeconds(tStat.today_seconds)}</strong></div>
-            )}
-            {tStat.yesterday_seconds > 0 && (
-              <div style={{ color: '#aaa' }}>⏱ Yesterday: {fmtSeconds(tStat.yesterday_seconds)}</div>
-            )}
-            {tStat.today_seconds === 0 && tStat.yesterday_seconds === 0 && (
-              <div style={{ color: '#aaa' }}>No time logged recently</div>
-            )}
-            {tStat.active_trackers.length > 0 ? (
+            <div>⏱ Today: <strong>{tStat && tStat.today_seconds > 0 ? fmtSeconds(tStat.today_seconds) : '—'}</strong></div>
+            <div style={{ color: '#aaa' }}>⏱ Yesterday: {tStat && tStat.yesterday_seconds > 0 ? fmtSeconds(tStat.yesterday_seconds) : '—'}</div>
+            {tStat && tStat.active_trackers.length > 0 ? (
               <div style={{ marginTop: 4 }}>
                 🟢 Active now:
                 {tStat.active_trackers.map((a, idx) => (
@@ -158,10 +151,10 @@ export default function TicketsRoundRobinView({
                 ))}
               </div>
             ) : (
-              <div style={{ color: '#aaa' }}>No active tracker</div>
+              <div style={{ color: '#aaa', marginTop: 2 }}>No active tracker</div>
             )}
           </div>
-        ) : null
+        )
         return (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', }}>
             <Flex align="center" gap={4} justify="center" style={{ width: '100%' }}>
