@@ -46,8 +46,9 @@ export default function DetailClient({ ticket, isCustomer }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          body: replyText.trim(),
-          is_note: !isCustomer,
+          comment: replyText.trim(),
+          visibility: isCustomer ? 'reply' : 'note',
+          author_type: isCustomer ? 'customer' : 'agent',
         }),
       })
       if (res.ok) {

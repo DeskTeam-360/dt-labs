@@ -1,12 +1,13 @@
 'use client'
 
 import { DeleteOutlined, EditOutlined, MoreOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Flex, Modal, Table, Typography } from 'antd'
+import { Button, Dropdown, Flex, Modal, Table, Tooltip, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import type { CompanyTimeStat } from '@/app/api/tickets/company-time-stats/route'
+import type { TicketTrackerStat } from '@/app/api/tickets/ticket-time-stats/route'
 
 import type { StatusColumn, TicketRecord } from './types'
 import { DEFAULT_ALL_STATUS_COLUMNS, sortTickets, TICKETS_LIST_SORT_BY, TICKETS_LIST_SORT_ORDER } from './types'
@@ -47,6 +48,7 @@ export default function TicketsRoundRobinView({
 }: TicketsRoundRobinViewProps) {
   const router = useRouter()
   const [companyStats, setCompanyStats] = useState<Map<string, CompanyTimeStat>>(new Map())
+  const [ticketStats, setTicketStats] = useState<Map<number, TicketTrackerStat>>(new Map())
 
   // Group tickets by company
   const byCompany = new Map<string, TicketRecord[]>()
@@ -81,6 +83,18 @@ export default function TicketsRoundRobinView({
         setCompanyStats(map)
       })
       .catch(() => {})
+
+    const allTicketIds = tickets.map((t) => t.id).join(',')
+    if (allTicketIds) {
+      fetch(`/api/tickets/ticket-time-stats?ticket_ids=${allTicketIds}`)
+        .then((r) => r.json())
+        .then((data: TicketTrackerStat[]) => {
+          const map = new Map<number, TicketTrackerStat>()
+          for (const s of data) map.set(s.ticket_id, s)
+          setTicketStats(map)
+        })
+        .catch(() => {})
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickets])
 
@@ -124,10 +138,27 @@ export default function TicketsRoundRobinView({
         if (!ticket) return null
         const bgColor = getStatusColor(ticket.status, statusColumns)
         const textColor = ticket.type?.color ?? '#000'
+        const tStat = ticketStats.get(ticket.id)
+        const tooltipContent = tStat ? (
+          <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+            <div>⏱ Today: <strong>{fmtSeconds(tStat.today_seconds)}</strong></div>
+            {tStat.active_trackers.length > 0 ? (
+              <div style={{ marginTop: 4 }}>
+                🟢 Active now:
+                {tStat.active_trackers.map((a, idx) => (
+                  <div key={idx} style={{ paddingLeft: 8 }}>• {a.user_name}</div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: '#aaa' }}>No active tracker</div>
+            )}
+          </div>
+        ) : null
         return (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', }}>
             <Flex align="center" gap={4} justify="center" style={{ width: '100%' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Tooltip title={tooltipContent} placement="top" mouseEnterDelay={0.3}>
               <a
                 href={`/tickets/${ticket.id}`}
                 role="button"
@@ -164,6 +195,7 @@ export default function TicketsRoundRobinView({
               >
                 #{ticket.id}
               </a>
+              </Tooltip>
               <p style={{ fontSize: 9, margin: 0, padding: 0 }}>
               {ticket.short_note}
             </p>

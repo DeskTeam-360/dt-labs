@@ -13,6 +13,9 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { Card, Typography } from 'antd'
+import { useEffect, useState } from 'react'
+
+import type { TicketTrackerStat } from '@/app/api/tickets/ticket-time-stats/route'
 
 import KanbanColumn from './KanbanColumn'
 import type { StatusColumn, TicketRecord, TicketSortField, TicketSortOrder } from './types'
@@ -64,6 +67,21 @@ export default function TicketsKanbanView({
   onFilterByTag,
   onFilterByCompany,
 }: TicketsKanbanViewProps) {
+  const [ticketStatsMap, setTicketStatsMap] = useState<Map<number, TicketTrackerStat>>(new Map())
+
+  useEffect(() => {
+    const ids = tickets.map((t) => t.id).join(',')
+    if (!ids) return
+    fetch(`/api/tickets/ticket-time-stats?ticket_ids=${ids}`)
+      .then((r) => r.json())
+      .then((data: TicketTrackerStat[]) => {
+        const map = new Map<number, TicketTrackerStat>()
+        for (const s of data) map.set(s.ticket_id, s)
+        setTicketStatsMap(map)
+      })
+      .catch(() => {})
+  }, [tickets])
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       /** Slightly more than a click; still responsive for drag. */
@@ -106,6 +124,7 @@ export default function TicketsKanbanView({
           onFilterByStatus={onFilterByStatus}
           onFilterByTag={onFilterByTag}
           onFilterByCompany={onFilterByCompany}
+          ticketStatsMap={ticketStatsMap}
         />
       ))}
     </div>

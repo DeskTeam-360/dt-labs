@@ -22,6 +22,7 @@ type StatusRow = {
   customer_title?: string
   description?: string
   color: string
+  is_active?: boolean
 }
 
 type KnowledgeArticleRow = {
@@ -308,7 +309,7 @@ export default function TicketReferenceContent({ user: currentUser }: TicketRefe
               <Switch size="small" checked={viewAsClient} onChange={setViewAsClient} />
             </div>
           )}
-          {statuses.map((row) => (
+          {statuses.filter((row) => row.is_active !== false).map((row) => (
             <GlossaryBlock
               key={row.id}
               title={statusTitle(row)}

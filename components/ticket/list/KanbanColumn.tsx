@@ -5,6 +5,8 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Badge, Card, Empty, Typography } from 'antd'
 import { useMemo } from 'react'
 
+import type { TicketTrackerStat } from '@/app/api/tickets/ticket-time-stats/route'
+
 import KanbanCard from './KanbanCard'
 import {
   sortTickets,
@@ -33,6 +35,7 @@ interface KanbanColumnProps {
   onFilterByStatus?: (statusSlug: string) => void
   onFilterByTag?: (tagId: string) => void
   onFilterByCompany?: (companyId: string) => void
+  ticketStatsMap?: Map<number, TicketTrackerStat>
 }
 
 export default function KanbanColumn({
@@ -50,6 +53,7 @@ export default function KanbanColumn({
   onFilterByStatus,
   onFilterByTag,
   onFilterByCompany,
+  ticketStatsMap,
 }: KanbanColumnProps) {
   const columnTickets = useMemo(() => {
     const filtered = tickets.filter((t) => t.status === column.id)
@@ -139,6 +143,7 @@ export default function KanbanColumn({
                   onFilterByStatus={onFilterByStatus}
                   onFilterByTag={onFilterByTag}
                   onFilterByCompany={onFilterByCompany}
+                  trackerStat={ticketStatsMap?.get(ticket.id)}
                 />
               ))
             )}

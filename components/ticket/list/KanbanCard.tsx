@@ -7,12 +7,20 @@ import { Avatar, Button, Card, Flex, Modal, Tag, Tooltip, Typography } from 'ant
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
 
+import type { TicketTrackerStat } from '@/app/api/tickets/ticket-time-stats/route'
 import DateDisplay from '@/components/common/DateDisplay'
 import { KANBAN_SEMANTIC_BLUE, KANBAN_SEMANTIC_GREEN, kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 import { isClosedLikeTicketStatus } from '@/lib/ticket-status-workflow'
 
 import type { StatusColumn, TicketRecord } from './types'
 import { DEFAULT_ALL_STATUS_COLUMNS } from './types'
+
+function fmtSeconds(s: number): string {
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  if (h === 0 && m === 0) return '< 1m'
+  return m === 0 ? `${h}h` : `${h}h ${m}m`
+}
 
 const { Text } = Typography
 
@@ -28,6 +36,7 @@ interface KanbanCardProps {
   onFilterByTag?: (tagId: string) => void
   onFilterByCompany?: (companyId: string) => void
   allStatusColumns?: StatusColumn[]
+  trackerStat?: TicketTrackerStat
 }
 
 export default function KanbanCard({
@@ -42,6 +51,7 @@ export default function KanbanCard({
   onFilterByTag,
   onFilterByCompany,
   allStatusColumns,
+  trackerStat,
 }: KanbanCardProps) {
   const statusCols = allStatusColumns?.length ? allStatusColumns : DEFAULT_ALL_STATUS_COLUMNS
   const statusCol = statusCols.find((c) => c.id === ticket.status)
@@ -293,6 +303,30 @@ export default function KanbanCard({
             </Avatar.Group>
           )}
         </Flex>
+
+        {/* Tracker info row */}
+        {trackerStat && (trackerStat.today_seconds > 0 || trackerStat.active_trackers.length > 0) && (
+          <Flex
+            align="center"
+            gap={6}
+            style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--kanban-card-divider)', flexWrap: 'wrap' }}
+          >
+            {trackerStat.today_seconds > 0 && (
+              <Flex align="center" gap={4} style={{ fontSize: 11, color: 'var(--kanban-card-muted)' }}>
+                <FieldTimeOutlined />
+                <span>Today: {fmtSeconds(trackerStat.today_seconds)}</span>
+              </Flex>
+            )}
+            {trackerStat.active_trackers.map((a, idx) => (
+              <Tooltip key={idx} title={`Tracking since ${new Date(a.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}>
+                <Flex align="center" gap={4} style={{ fontSize: 11, color: '#52c41a', cursor: 'default' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#52c41a', display: 'inline-block' }} />
+                  <span>{a.user_name}</span>
+                </Flex>
+              </Tooltip>
+            ))}
+          </Flex>
+        )}
       </Card>
     </div>
   )
