@@ -31,15 +31,16 @@ const themeInitScript = `
 // });
 
 const SITE_URL = 'https://ticket.deskteam360.com'
-const OG_TITLE = 'DeskTeam360 — Stop Outsourcing, Start Insourcing'
-const OG_DESCRIPTION = 'Stop uncontrolled outsourcing. Build a dedicated insourcing team—developers, designers, and AI specialists—with clear process, fast SLA, and direct contact.'
+const OG_TITLE = 'Deskteam360 Ticketing System'
+const OG_DESCRIPTION = 'Deskteam360 Ticketing System'
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getAppSettings()
-  const appName = settings.app_name || process.env.NEXT_PUBLIC_APP_NAME || 'DeskTeam360'
+  const appName = settings.app_name || process.env.NEXT_PUBLIC_APP_NAME || 'Deskteam360'
+  const logoUrl = settings.app_logo_url || '/logo.png'
   return {
     metadataBase: new URL(SITE_URL),
-    title: { default: appName, template: `%s | ${appName}` },
+    title: { default: OG_TITLE, template: `%s | ${appName}` },
     description: OG_DESCRIPTION,
     manifest: '/manifest.json',
     icons: settings.app_favicon_url ? [{ url: settings.app_favicon_url }] : undefined,
@@ -48,14 +49,14 @@ export async function generateMetadata(): Promise<Metadata> {
       description: OG_DESCRIPTION,
       url: SITE_URL,
       siteName: appName,
-      images: [{ url: '/og-image.png', width: 1200, height: 630, alt: OG_TITLE }],
+      images: [{ url: logoUrl, alt: OG_TITLE }],
       type: 'website',
     },
     twitter: {
-      card: 'summary_large_image',
+      card: 'summary',
       title: OG_TITLE,
       description: OG_DESCRIPTION,
-      images: ['/og-image.png'],
+      images: [logoUrl],
     },
   }
 }
