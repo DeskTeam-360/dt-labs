@@ -140,7 +140,7 @@ export default function CardViewCard({
             Last update {dayjs(ticket.updated_at).format('MMM DD, YYYY')}
           </span>
           <Tooltip title={<TrackerTooltipContent stat={trackerStat} />} placement="top" mouseEnterDelay={0.2}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--kanban-card-muted)', marginLeft: 'auto', cursor: 'default', userSelect: 'none' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--kanban-card-muted)', cursor: 'default', userSelect: 'none' }}>
               <FieldTimeOutlined style={{ fontSize: 12 }} />
               {trackerStat && (trackerStat.today_seconds > 0 || trackerStat.yesterday_seconds > 0)
                 ? fmtHours(trackerStat.today_seconds)
