@@ -12,10 +12,12 @@ import {
   Input,
   InputNumber,
   message,
+  Popover,
   Row,
   Select,
   Space,
   Spin,
+  Tag,
   TimePicker,
   Typography,
 } from 'antd'
@@ -33,6 +35,49 @@ import { DEFAULT_RECURRING_VISIBILITY } from '@/lib/ticket-visibility'
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false })
 
 const { Title, Text } = Typography
+
+const TEMPLATE_VARS = [
+  { var: '{{ this_month_name }}', example: 'September' },
+  { var: '{{ prev_month_name }}', example: 'August' },
+  { var: '{{ next_month_name }}', example: 'October' },
+  { var: '{{ this_day_name }}', example: 'Thursday' },
+  { var: '{{ prev_day_name }}', example: 'Wednesday' },
+  { var: '{{ next_day_name }}', example: 'Friday' },
+  { var: '{{ this_date }}', example: '2026-09-25' },
+  { var: '{{ prev_date }}', example: '2026-09-24' },
+  { var: '{{ next_date }}', example: '2026-09-26' },
+  { var: '{{ this_year }}', example: '2026' },
+  { var: '{{ this_month_number }}', example: '9' },
+  { var: '{{ this_day_number }}', example: '25' },
+]
+
+function TemplateVarHint() {
+  return (
+    <Popover
+      title="Available template variables"
+      trigger="click"
+      content={
+        <div style={{ maxWidth: 340 }}>
+          <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+            Use these in Title or Description — they are replaced when the ticket is created.
+          </Text>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {TEMPLATE_VARS.map(({ var: v, example }) => (
+              <div key={v} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Tag style={{ fontFamily: 'monospace', fontSize: 11, margin: 0 }}>{v}</Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>→ {example}</Text>
+              </div>
+            ))}
+          </div>
+        </div>
+      }
+    >
+      <Text style={{ fontSize: 12, color: '#1677ff', cursor: 'pointer', userSelect: 'none' }}>
+        {'{ } available variables'}
+      </Text>
+    </Popover>
+  )
+}
 
 const DAY_OPTIONS = [
   { label: 'Sunday', value: 0 },
@@ -245,19 +290,23 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
           ) : (
             <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ marginTop: 24 }}>
 
-              <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Title is required' }]}>
-                <Input placeholder="e.g. Weekly server backup check" size="large" />
+              <Form.Item
+                name="title"
+                label={<span>Title <TemplateVarHint /></span>}
+                rules={[{ required: true, message: 'Title is required' }]}
+              >
+                <Input placeholder="e.g. {{ this_month_name }} Monthly Maintenance" size="large" />
               </Form.Item>
 
-              <Form.Item label="Description">
-                <div className="rt-quill-wrapper">
+              <Form.Item label={<span>Description <TemplateVarHint /></span>}>
+                <div className="rt-quill-wrapper" style={{ background: '#fff', borderRadius: 6 }}>
                   <ReactQuill
                     theme="snow"
                     value={description}
                     onChange={setDescription}
                     modules={QUILL_MODULES}
                     formats={QUILL_FORMATS}
-                    placeholder="Optional ticket description..."
+                    placeholder="Optional ticket description — template variables supported"
                   />
                 </div>
               </Form.Item>
