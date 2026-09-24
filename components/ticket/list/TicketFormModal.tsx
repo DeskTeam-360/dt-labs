@@ -15,7 +15,7 @@ import {
   Space,
 } from 'antd'
 import type { FormInstance } from 'antd/es/form'
-import { useId, useMemo } from 'react'
+import { useCallback,useId, useMemo } from 'react'
 
 import CommentWysiwyg from '@/components/ticket/detail/CommentWysiwyg'
 
@@ -104,6 +104,30 @@ export default function TicketFormModal({
     return `Contact belongs to a different company (${otherName}). When the ticket is created, its company will match the contact's company (cross-company).`
   }, [showSimplifiedForm, open, watchedContactUserId, watchedCompanyId, users, companies])
 
+  const handleCancelWithGuard = useCallback(() => {
+    // Only warn on create (not edit) when the user has typed something
+    if (!editingTicket) {
+      const values = form.getFieldsValue()
+      const hasContent =
+        (values.title && String(values.title).trim().length > 0) ||
+        (values.description && String(values.description).replace(/<[^>]*>/g, '').trim().length > 0) ||
+        newTicketAttachments.length > 0
+      if (hasContent) {
+        Modal.confirm({
+          title: 'Discard draft?',
+          content: 'You have unsaved changes. If you close now, your draft will be lost.',
+          okText: 'Discard',
+          okButtonProps: { danger: true },
+          cancelText: 'Keep editing',
+          centered: true,
+          onOk: onCancel,
+        })
+        return
+      }
+    }
+    onCancel()
+  }, [editingTicket, form, newTicketAttachments, onCancel])
+
   const statusOptionsForForm = useMemo(() => {
     if (!editingTicket || showSimplifiedForm) return []
     const active = allStatuses.filter((s) => s.is_active !== false)
@@ -119,7 +143,7 @@ export default function TicketFormModal({
     <Modal
       title={editingTicket ? 'Edit Ticket' : 'Create Ticket'}
       open={open}
-      onCancel={onCancel}
+      onCancel={handleCancelWithGuard}
       footer={null}
       width={showSimplifiedForm ? 800 : 1200}
       centered
