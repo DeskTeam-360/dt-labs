@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Avatar, Button, Card, Flex, Modal, Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
+import type { ReactNode } from 'react'
 
 import type { TicketTrackerStat } from '@/app/api/tickets/ticket-time-stats/route'
 import DateDisplay from '@/components/common/DateDisplay'
@@ -20,6 +21,29 @@ function fmtSeconds(s: number): string {
   const m = Math.floor((s % 3600) / 60)
   if (h === 0 && m === 0) return '< 1m'
   return m === 0 ? `${h}h` : `${h}h ${m}m`
+}
+
+function fmtHours(s: number): string {
+  return (s / 3600).toFixed(1) + 'h'
+}
+
+function TrackerTooltipContent({ stat }: { stat: TicketTrackerStat | undefined }): ReactNode {
+  return (
+    <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+      <div>⏱ Today: <strong>{stat && stat.today_seconds > 0 ? fmtSeconds(stat.today_seconds) : '—'}</strong></div>
+      <div style={{ color: '#aaa' }}>⏱ Yesterday: {stat && stat.yesterday_seconds > 0 ? fmtSeconds(stat.yesterday_seconds) : '—'}</div>
+      {stat && stat.active_trackers.length > 0 ? (
+        <div style={{ marginTop: 4 }}>
+          🟢 Active now:
+          {stat.active_trackers.map((a, idx) => (
+            <div key={idx} style={{ paddingLeft: 8 }}>• {a.user_name}</div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ color: '#aaa', marginTop: 2 }}>No active tracker</div>
+      )}
+    </div>
+  )
 }
 
 const { Text } = Typography
@@ -287,6 +311,15 @@ export default function KanbanCard({
                 <span>Last update <DateDisplay date={ticket.updated_at} format="date-only" /></span>
               </Flex>
             )}
+            <Tooltip title={<TrackerTooltipContent stat={trackerStat} />} placement="top" mouseEnterDelay={0.2}>
+              <Flex align="center" gap={4} style={{ fontSize: 11, color: 'var(--kanban-card-muted)', cursor: 'default' }}>
+                <FieldTimeOutlined />
+                <span>{trackerStat && trackerStat.today_seconds > 0 ? fmtHours(trackerStat.today_seconds) : '0.0h'}</span>
+                {trackerStat && trackerStat.active_trackers.length > 0 && (
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#52c41a', display: 'inline-block' }} />
+                )}
+              </Flex>
+            </Tooltip>
             {ticket.has_unread_replies && (
               <Tooltip title="Unread replies">
                 <CommentOutlined style={{ color: 'var(--kanban-card-muted)', fontSize: 12 }} />
@@ -304,35 +337,6 @@ export default function KanbanCard({
           )}
         </Flex>
 
-        {/* Tracker info row */}
-        {trackerStat && (trackerStat.today_seconds > 0 || trackerStat.yesterday_seconds > 0 || trackerStat.active_trackers.length > 0) && (
-          <Flex
-            align="center"
-            gap={6}
-            style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--kanban-card-divider)', flexWrap: 'wrap' }}
-          >
-            {trackerStat.today_seconds > 0 && (
-              <Flex align="center" gap={4} style={{ fontSize: 11, color: 'var(--kanban-card-muted)' }}>
-                <FieldTimeOutlined />
-                <span>Today: {fmtSeconds(trackerStat.today_seconds)}</span>
-              </Flex>
-            )}
-            {trackerStat.yesterday_seconds > 0 && (
-              <Flex align="center" gap={4} style={{ fontSize: 11, color: 'var(--kanban-card-muted)', opacity: 0.7 }}>
-                <FieldTimeOutlined />
-                <span>Yesterday: {fmtSeconds(trackerStat.yesterday_seconds)}</span>
-              </Flex>
-            )}
-            {trackerStat.active_trackers.map((a, idx) => (
-              <Tooltip key={idx} title={`Tracking since ${new Date(a.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}>
-                <Flex align="center" gap={4} style={{ fontSize: 11, color: '#52c41a', cursor: 'default' }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#52c41a', display: 'inline-block' }} />
-                  <span>{a.user_name}</span>
-                </Flex>
-              </Tooltip>
-            ))}
-          </Flex>
-        )}
       </Card>
     </div>
   )

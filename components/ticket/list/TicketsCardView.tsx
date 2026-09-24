@@ -1,7 +1,9 @@
 'use client'
 
 import { Col, Empty, Pagination, Row } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
+import type { TicketTrackerStat } from '@/app/api/tickets/ticket-time-stats/route'
 
 import CardViewCard from './CardViewCard'
 import {
@@ -55,6 +57,24 @@ export default function TicketsCardView({
   const saved = readSessionPage()
   const [page, setPage] = useState(saved.page)
   const [pageSize, setPageSize] = useState(saved.pageSize)
+  const [ticketStatsMap, setTicketStatsMap] = useState<Map<number, TicketTrackerStat>>(new Map())
+  const lastIdsRef = useRef<string>('')
+
+  useEffect(() => {
+    const ids = tickets.map((t) => t.id)
+    if (ids.length === 0) return
+    const key = ids.join(',')
+    if (key === lastIdsRef.current) return
+    lastIdsRef.current = key
+    fetch(`/api/tickets/ticket-time-stats?ticket_ids=${key}`)
+      .then((r) => r.json())
+      .then((data: TicketTrackerStat[]) => {
+        const map = new Map<number, TicketTrackerStat>()
+        for (const s of data) map.set(s.ticket_id, s)
+        setTicketStatsMap(map)
+      })
+      .catch(() => { /* ignore */ })
+  }, [tickets])
 
   const sortedTickets = useMemo(
     () => sortTickets(tickets, sortBy, sortOrder),
@@ -96,6 +116,7 @@ export default function TicketsCardView({
               onFilterByStatus={onFilterByStatus}
               onFilterByTag={onFilterByTag}
               onFilterByCompany={onFilterByCompany}
+              trackerStat={ticketStatsMap.get(ticket.id)}
             />
           </Col>
         ))}
