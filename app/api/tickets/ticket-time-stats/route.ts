@@ -7,6 +7,7 @@ import { db, ticketTimeTracker, users } from '@/lib/db'
 export type TicketTrackerStat = {
   ticket_id: number
   today_seconds: number
+  yesterday_seconds: number
   active_trackers: { user_name: string; start_time: string }[]
 }
 
@@ -22,8 +23,10 @@ export async function GET(request: Request) {
 
   const todayStart = new Date()
   todayStart.setUTCHours(0, 0, 0, 0)
+  const yesterdayStart = new Date(todayStart)
+  yesterdayStart.setUTCDate(yesterdayStart.getUTCDate() - 1)
 
-  const [timeRows, activeRows] = await Promise.all([
+  const [timeRows, yesterdayRows, activeRows] = await Promise.all([
     db
       .select({
         ticketId: ticketTimeTracker.ticketId,
@@ -39,6 +42,25 @@ export async function GET(request: Request) {
       .where(and(
         inArray(ticketTimeTracker.ticketId, ticketIds),
         gte(ticketTimeTracker.startTime, todayStart),
+        isNotNull(ticketTimeTracker.stopTime),
+      ))
+      .groupBy(ticketTimeTracker.ticketId),
+    db
+      .select({
+        ticketId: ticketTimeTracker.ticketId,
+        totalSeconds: sql<number>`coalesce(sum(
+          case
+            when ${ticketTimeTracker.durationAdjustment} is not null then ${ticketTimeTracker.durationAdjustment}
+            when ${ticketTimeTracker.durationSeconds} is not null then ${ticketTimeTracker.durationSeconds}
+            else 0
+          end
+        ), 0)`.mapWith(Number),
+      })
+      .from(ticketTimeTracker)
+      .where(and(
+        inArray(ticketTimeTracker.ticketId, ticketIds),
+        gte(ticketTimeTracker.startTime, yesterdayStart),
+        sql`${ticketTimeTracker.startTime} < ${todayStart}`,
         isNotNull(ticketTimeTracker.stopTime),
       ))
       .groupBy(ticketTimeTracker.ticketId),
@@ -68,6 +90,9 @@ export async function GET(request: Request) {
   const timeMap = new Map<number, number>()
   for (const r of timeRows) timeMap.set(r.ticketId, r.totalSeconds)
 
+  const yesterdayMap = new Map<number, number>()
+  for (const r of yesterdayRows) yesterdayMap.set(r.ticketId, r.totalSeconds)
+
   const activeMap = new Map<number, { user_name: string; start_time: string }[]>()
   for (const r of activeRows) {
     const arr = activeMap.get(r.ticketId) ?? []
@@ -78,6 +103,7 @@ export async function GET(request: Request) {
   const result: TicketTrackerStat[] = ticketIds.map((id) => ({
     ticket_id: id,
     today_seconds: timeMap.get(id) ?? 0,
+    yesterday_seconds: yesterdayMap.get(id) ?? 0,
     active_trackers: activeMap.get(id) ?? [],
   }))
 

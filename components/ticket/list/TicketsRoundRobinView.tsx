@@ -141,7 +141,15 @@ export default function TicketsRoundRobinView({
         const tStat = ticketStats.get(ticket.id)
         const tooltipContent = tStat ? (
           <div style={{ fontSize: 12, lineHeight: 1.6 }}>
-            <div>⏱ Today: <strong>{fmtSeconds(tStat.today_seconds)}</strong></div>
+            {tStat.today_seconds > 0 && (
+              <div>⏱ Today: <strong>{fmtSeconds(tStat.today_seconds)}</strong></div>
+            )}
+            {tStat.yesterday_seconds > 0 && (
+              <div style={{ color: '#aaa' }}>⏱ Yesterday: {fmtSeconds(tStat.yesterday_seconds)}</div>
+            )}
+            {tStat.today_seconds === 0 && tStat.yesterday_seconds === 0 && (
+              <div style={{ color: '#aaa' }}>No time logged recently</div>
+            )}
             {tStat.active_trackers.length > 0 ? (
               <div style={{ marginTop: 4 }}>
                 🟢 Active now:

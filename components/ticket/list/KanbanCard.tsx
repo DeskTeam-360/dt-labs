@@ -305,7 +305,7 @@ export default function KanbanCard({
         </Flex>
 
         {/* Tracker info row */}
-        {trackerStat && (trackerStat.today_seconds > 0 || trackerStat.active_trackers.length > 0) && (
+        {trackerStat && (trackerStat.today_seconds > 0 || trackerStat.yesterday_seconds > 0 || trackerStat.active_trackers.length > 0) && (
           <Flex
             align="center"
             gap={6}
@@ -315,6 +315,12 @@ export default function KanbanCard({
               <Flex align="center" gap={4} style={{ fontSize: 11, color: 'var(--kanban-card-muted)' }}>
                 <FieldTimeOutlined />
                 <span>Today: {fmtSeconds(trackerStat.today_seconds)}</span>
+              </Flex>
+            )}
+            {trackerStat.yesterday_seconds > 0 && (
+              <Flex align="center" gap={4} style={{ fontSize: 11, color: 'var(--kanban-card-muted)', opacity: 0.7 }}>
+                <FieldTimeOutlined />
+                <span>Yesterday: {fmtSeconds(trackerStat.yesterday_seconds)}</span>
               </Flex>
             )}
             {trackerStat.active_trackers.map((a, idx) => (

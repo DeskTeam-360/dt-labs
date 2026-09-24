@@ -468,7 +468,7 @@ export default function TabTimeTracker({
                 const owner = isOwner(session)
                 const completed = !!session.stop_time
                 const canMutate = owner || canManageOthersTime
-                const showRowStop = false
+                const showRowStop = !completed && (owner || canManageOthersTime)
                 return (
                   <List.Item
                     style={!completed ? {
