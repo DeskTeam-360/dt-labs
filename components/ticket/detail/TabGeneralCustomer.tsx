@@ -5,9 +5,9 @@ import { Avatar, Button, Col, Descriptions, Empty, Flex, InputNumber, Modal, Pop
 import { useEffect, useState } from 'react'
 
 import DateDisplay from '@/components/common/DateDisplay'
-import { sanitizeRichHtml } from '@/lib/sanitize-rich-html'
 
 import CommentComposer from './CommentComposer'
+import CommentHtml from './CommentHtml'
 import CommentTaggedCcLines from './CommentTaggedCcLines'
 import CommentWysiwyg from './CommentWysiwyg'
 import TicketUserMention from './TicketUserMention'
@@ -224,11 +224,7 @@ export default function TabGeneralCustomer({
                 </Text>
               </Space>
             </Flex>
-            <div
-              className="ql-editor comment-html"
-              style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
-              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(ticketData.description) }}
-            />
+            <CommentHtml html={ticketData.description || ''} />
             {ticketAttachments.length > 0 && (
               <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
                 {ticketAttachments.map((att) => (
@@ -408,11 +404,7 @@ export default function TabGeneralCustomer({
                             </Space>
                           </Flex>
                         ) : comment.comment && /<[a-z][\s\S]*>/i.test(comment.comment) ? (
-                          <div
-                            className="ql-editor comment-html"
-                            style={{ margin: 0, padding: 0, minHeight: 'auto', fontSize: 14 }}
-                            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(comment.comment) }}
-                          />
+                          <CommentHtml html={comment.comment} />
                         ) : (
                           <Paragraph style={{ margin: 0, color: 'var(--ticket-thread-text)' }}>{comment.comment}</Paragraph>
                         )}
