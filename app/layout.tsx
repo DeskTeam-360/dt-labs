@@ -37,7 +37,7 @@ const OG_DESCRIPTION = 'Deskteam360 Ticketing System'
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getAppSettings()
   const appName = settings.app_name || process.env.NEXT_PUBLIC_APP_NAME || 'Deskteam360'
-  const logoUrl = settings.app_logo_url || '/logo.png'
+  const logoUrl = settings.app_logo_url || '/logo.jpg'
   return {
     metadataBase: new URL(SITE_URL),
     title: { default: OG_TITLE, template: `%s | ${appName}` },
