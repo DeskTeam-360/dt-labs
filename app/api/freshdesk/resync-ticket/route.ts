@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
     typeId: mappedTypeId,
     source: 'freshdesk',
     visibility: 'public',
+    ticketType: 'support',
     updatedAt: new Date(),
   }).where(eq(tickets.id, ticketId))
 

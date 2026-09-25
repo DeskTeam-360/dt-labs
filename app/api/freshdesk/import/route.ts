@@ -304,7 +304,7 @@ export async function POST(req: NextRequest) {
               status, type_id, priority, company_id,
               contact_user_id, created_by,
               created_via, source,
-              visibility,
+              visibility, ticket_type,
               created_at, updated_at
             )
             OVERRIDING SYSTEM VALUE
@@ -321,7 +321,7 @@ export async function POST(req: NextRequest) {
               ${createdBy}::uuid,
               ${'freshdesk'},
               ${'freshdesk'},
-              ${'public'},
+              ${'public'}, ${'support'},
               ${new Date(ft.created_at).toISOString()}::timestamptz,
               ${new Date(ft.updated_at).toISOString()}::timestamptz
             )
