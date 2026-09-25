@@ -628,6 +628,12 @@ export async function POST(request: NextRequest) {
     const alreadyProcessed = new Set<string>()
     const threadToTicketThisRun = new Map<string, number>()
 
+    // Load trusted internal senders (bypass self-loop + get full notifications)
+    const trustedSendersRaw = (await getAppSettings()).trusted_internal_senders ?? ''
+    const trustedInternalSenders = new Set(
+      String(trustedSendersRaw).split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+    )
+
     const existingMessagesRows = await db.select({ gmailMessageId: emailMessages.gmailMessageId }).from(emailMessages)
     existingMessagesRows.forEach((m) => alreadyProcessed.add(m.gmailMessageId))
 
@@ -694,12 +700,22 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      // Skip emails sent FROM the support Gmail itself (e.g. "Ticket Received" notifications
-      // that land back in the inbox when the customer email equals the integration email).
-      if (integration.emailAddress && senderEmail === integration.emailAddress.toLowerCase().trim()) {
-        alreadyProcessed.add(gmailMessageId)
-        if (isDebug) debugLog.push({ email: senderEmail, subject: subject || '', reason: 'SKIP: sent from own support email (self-loop)' })
-        continue
+      // Self-sender check: email FROM the inbox address itself.
+      // - Trusted internal senders → proceed normally (full notifications).
+      // - Others → create ticket silently (no notifications) to avoid reply loops.
+      const isSelfSender = !!(
+        integration.emailAddress &&
+        senderEmail === integration.emailAddress.toLowerCase().trim()
+      )
+      const skipNotifications = isSelfSender && !trustedInternalSenders.has(senderEmail)
+      if (isSelfSender && isDebug) {
+        debugLog.push({
+          email: senderEmail,
+          subject: subject || '',
+          reason: trustedInternalSenders.has(senderEmail)
+            ? 'INFO: self-sender but trusted — full notifications'
+            : 'INFO: self-sender — ticket created silently (no notifications)',
+        })
       }
 
       const textBodies = extractEmailTextBodies(msg.payload || {})
@@ -1534,82 +1550,84 @@ export async function POST(request: NextRequest) {
             },
           })
 
-          if (creatorUserId) {
-            try {
-              const notifResult = await sendRequesterTicketCreatedEmail({
-                creatorUserId,
-                creatorRole: 'customer',
-                companyId: ticketCompanyId,
-                ticketId: newTicket.id,
-                ticketTitle: title,
-                requesterEmailOverride: senderEmail,
-                inReplyToMessageId: rfcMessageId,
-                gmailThreadId: msgThreadId ?? null,
-                originalEmailBody: body || null,
-              })
-              if (!notifResult.sent && isDebug) {
-                debugLog.push({
-                  email: senderEmail,
-                  subject: title,
-                  reason: 'WARN: requester_notification_new_ticket_created not sent (see server log)',
+          if (!skipNotifications) {
+            if (creatorUserId) {
+              try {
+                const notifResult = await sendRequesterTicketCreatedEmail({
+                  creatorUserId,
+                  creatorRole: 'customer',
+                  companyId: ticketCompanyId,
+                  ticketId: newTicket.id,
+                  ticketTitle: title,
+                  requesterEmailOverride: senderEmail,
+                  inReplyToMessageId: rfcMessageId,
+                  gmailThreadId: msgThreadId ?? null,
+                  originalEmailBody: body || null,
                 })
-              }
-              // Save the sent notification to email_messages so send-reply can use its
-              // RFC Message-ID as In-Reply-To (threading all agent replies to this notification).
-              if (notifResult.sent && notifResult.sentGmailMessageId) {
-                try {
-                  await db.insert(emailMessages).values({
-                    gmailMessageId: notifResult.sentGmailMessageId,
-                    threadId: notifResult.sentThreadId ?? null,
-                    fromEmail: senderEmail,
-                    toEmail: senderEmail,
-                    subject: notifResult.sentSubject ?? title,
-                    snippet: null,
-                    ticketId: newTicket.id,
-                    direction: 'outgoing',
-                    ...(notifResult.sentRfcMessageId && { rfcMessageId: notifResult.sentRfcMessageId }),
+                if (!notifResult.sent && isDebug) {
+                  debugLog.push({
+                    email: senderEmail,
+                    subject: title,
+                    reason: 'WARN: requester_notification_new_ticket_created not sent (see server log)',
                   })
-                } catch {
-                  // Non-fatal — email was sent, only record-keeping failed
                 }
+                // Save the sent notification to email_messages so send-reply can use its
+                // RFC Message-ID as In-Reply-To (threading all agent replies to this notification).
+                if (notifResult.sent && notifResult.sentGmailMessageId) {
+                  try {
+                    await db.insert(emailMessages).values({
+                      gmailMessageId: notifResult.sentGmailMessageId,
+                      threadId: notifResult.sentThreadId ?? null,
+                      fromEmail: senderEmail,
+                      toEmail: senderEmail,
+                      subject: notifResult.sentSubject ?? title,
+                      snippet: null,
+                      ticketId: newTicket.id,
+                      direction: 'outgoing',
+                      ...(notifResult.sentRfcMessageId && { rfcMessageId: notifResult.sentRfcMessageId }),
+                    })
+                  } catch {
+                    // Non-fatal — email was sent, only record-keeping failed
+                  }
+                }
+              } catch (mailErr) {
+                console.error(
+                  '[Sync] requester new ticket email failed:',
+                  senderEmail,
+                  (mailErr as Error)?.message
+                )
               }
-            } catch (mailErr) {
-              console.error(
-                '[Sync] requester new ticket email failed:',
-                senderEmail,
-                (mailErr as Error)?.message
-              )
             }
-          }
 
-          if (newTicket.teamId && creatorUserId) {
-            try {
-              await sendNewTicketAgentNotificationEmail({
-                ticketId: newTicket.id,
-                ticketTitle: title,
-                teamId: newTicket.teamId,
-                creatorUserId,
-              })
-            } catch (mailErr) {
-              console.error('[Sync] agent new ticket notification email failed:', (mailErr as Error)?.message)
+            if (newTicket.teamId && creatorUserId) {
+              try {
+                await sendNewTicketAgentNotificationEmail({
+                  ticketId: newTicket.id,
+                  ticketTitle: title,
+                  teamId: newTicket.teamId,
+                  creatorUserId,
+                })
+              } catch (mailErr) {
+                console.error('[Sync] agent new ticket notification email failed:', (mailErr as Error)?.message)
+              }
             }
-          }
 
-          // New inbox sender: User Activation + Password Reset templates.
-          if (shouldSendActivationForNewUser && creatorUserId && createdUserTempPassword) {
-            try {
-              await sendNewInboxUserOnboardingEmails({
-                gmail,
-                fromEmail: integration.emailAddress || 'noreply@example.com',
-                toEmail: senderEmail,
-                baseUrl,
-                ticketId: newTicket.id,
-                recipientUserId: creatorUserId,
-                integrationActorUserId: userId,
-                temporaryPassword: createdUserTempPassword,
-              })
-            } catch (mailErr) {
-              console.error('[Sync] activation/password email failed:', senderEmail, (mailErr as Error)?.message)
+            // New inbox sender: User Activation + Password Reset templates.
+            if (shouldSendActivationForNewUser && creatorUserId && createdUserTempPassword) {
+              try {
+                await sendNewInboxUserOnboardingEmails({
+                  gmail,
+                  fromEmail: integration.emailAddress || 'noreply@example.com',
+                  toEmail: senderEmail,
+                  baseUrl,
+                  ticketId: newTicket.id,
+                  recipientUserId: creatorUserId,
+                  integrationActorUserId: userId,
+                  temporaryPassword: createdUserTempPassword,
+                })
+              } catch (mailErr) {
+                console.error('[Sync] activation/password email failed:', senderEmail, (mailErr as Error)?.message)
+              }
             }
           }
 
@@ -1618,34 +1636,37 @@ export async function POST(request: NextRequest) {
             debugLog.push({ email: senderEmail, subject: title, reason: `OK: new_ticket #${newTicket.id} company=${ticketCompanyId}` })
             console.log('[Sync] CREATED ticket #' + newTicket.id, senderEmail, title?.slice(0, 40))
           }
-          sendAutomationLog({
-            event: 'email_ticket_created',
-            ticket_id: ticketId,
-            email: senderEmail,
-            subject: title,
-            message: (processedNew.body || '').slice(0, 200) || '',
-            detail: `company=${ticketCompanyId}`,
-          }).catch(() => {})
 
-          try {
-            const autoCtx = await loadAutomationTicketContext(newTicket.id)
-            if (autoCtx) {
-              await runAutomationRules('ticket_created', {
-                ...autoCtx,
-                description: finalDescription ?? autoCtx.description,
-                sender_email: senderEmail,
-                sender_domain: senderDomain || null,
-              })
-            }
-          } catch (autoErr) {
-            console.error('Automation rules error:', autoErr)
+          if (!skipNotifications) {
             sendAutomationLog({
-              event: 'automation_error',
+              event: 'email_ticket_created',
               ticket_id: ticketId,
               email: senderEmail,
-              message: String(autoErr),
-              detail: 'ticket_created',
+              subject: title,
+              message: (processedNew.body || '').slice(0, 200) || '',
+              detail: `company=${ticketCompanyId}`,
             }).catch(() => {})
+
+            try {
+              const autoCtx = await loadAutomationTicketContext(newTicket.id)
+              if (autoCtx) {
+                await runAutomationRules('ticket_created', {
+                  ...autoCtx,
+                  description: finalDescription ?? autoCtx.description,
+                  sender_email: senderEmail,
+                  sender_domain: senderDomain || null,
+                })
+              }
+            } catch (autoErr) {
+              console.error('Automation rules error:', autoErr)
+              sendAutomationLog({
+                event: 'automation_error',
+                ticket_id: ticketId,
+                email: senderEmail,
+                message: String(autoErr),
+                detail: 'ticket_created',
+              }).catch(() => {})
+            }
           }
 
           await db.update(emailMessages).set({ ticketId }).where(eq(emailMessages.gmailMessageId, gmailMessageId))
