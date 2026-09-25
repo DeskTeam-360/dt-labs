@@ -41,7 +41,6 @@ import {
 } from '@/lib/ticket-contact-user'
 import { sendNewTicketAgentNotificationEmail } from '@/lib/ticket-notification-emails'
 import { assertCustomerMayUseTicketType } from '@/lib/ticket-type-customer-access'
-import { buildTicketVisibilityAccessSql } from '@/lib/ticket-visibility-server'
 
 const DEFAULT_LIMIT = 50
 /** Max tickets per list request (UI: 50 / 100 / 200 / 500). */
@@ -79,7 +78,6 @@ export async function GET(request: Request) {
   const noCompany = url.searchParams.get('no_company') === '1'
   const noTags = url.searchParams.get('no_tags') === '1'
   const noTeam = url.searchParams.get('no_team') === '1'
-  const visibilityParam = url.searchParams.get('visibility')
   const teamIdParam = url.searchParams.get('team_id')
   const teamIdsParam = url.searchParams.get('team_ids')
   const dateFrom = url.searchParams.get('date_from')
@@ -99,7 +97,6 @@ export async function GET(request: Request) {
 
   const statusSlugs = statusParam ? statusParam.split(',').map((s) => s.trim()).filter(Boolean) : []
   const tagIds = tagIdsParam ? tagIdsParam.split(',').map((s) => s.trim()).filter(Boolean) : []
-  const visibilityValues = visibilityParam ? visibilityParam.split(',').map((s) => s.trim()).filter(Boolean) : []
   const typeIds = typeIdsParam
     ? typeIdsParam.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
     : typeIdParam
@@ -116,7 +113,6 @@ export async function GET(request: Request) {
    * Visibility access (non-admin agents): legacy public/private/specific_users plus
    * configured levels (team, account_manager, team_leader, admin, project_manager).
    */
-  const visibilityAccess = await buildTicketVisibilityAccessSql(userId, role as string | undefined)
 
   const isCustomerList = role === 'customer'
   const isAdminList = isAdmin(role as string | undefined)
@@ -131,21 +127,12 @@ export async function GET(request: Request) {
     userTeamIds = teamRows.map((r) => r.teamId)
   }
 
-  /** When filter visibility=private (or old specific_users), include both - Private filter shows tickets for creator/assignees */
-  let visibilityFilterValues = visibilityValues
-  if (visibilityValues.includes('private') || visibilityValues.includes('specific_users')) {
-    visibilityFilterValues = visibilityFilterValues.filter((v) => v !== 'private' && v !== 'specific_users')
-    if (!visibilityFilterValues.includes('specific_users')) visibilityFilterValues.push('specific_users')
-    if (!visibilityFilterValues.includes('private')) visibilityFilterValues.push('private')
-  }
-
   const conditions: SQL[] = []
   if (isCustomerList) {
     conditions.push(await customerTicketsAccessCondition(userId, customerCompanyId))
   } else if (isAdminList) {
     if (companyIds.length > 0) conditions.push(inArray(tickets.companyId, companyIds))
   } else {
-    conditions.push(visibilityAccess)
     if (companyIds.length > 0) conditions.push(inArray(tickets.companyId, companyIds))
     // Team access: unassigned OR public team OR user is a member of the ticket's team
     const publicTeamSubq = sql`(SELECT id FROM teams WHERE type = 'public')`
@@ -171,7 +158,6 @@ export async function GET(request: Request) {
   }
   if (!isCustomerList) {
     if (teamIds.length > 0) conditions.push(inArray(tickets.teamId, teamIds))
-    if (visibilityFilterValues.length > 0) conditions.push(inArray(tickets.visibility, visibilityFilterValues))
   }
   if (dateFrom) {
     const d = new Date(dateFrom)
@@ -406,7 +392,6 @@ export async function GET(request: Request) {
       contact_user_id: t.contactUserId ?? null,
       due_date: t.dueDate ? new Date(t.dueDate).toISOString() : null,
       status: t.status,
-      visibility: t.visibility,
       team_id: t.teamId,
       type_id: t.typeId,
       ticket_type: coerceTicketType(t.ticketType),
