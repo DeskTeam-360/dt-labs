@@ -68,12 +68,15 @@ type AttrHookEvent = {
 }
 
 let ticketRichHtmlHooksInstalled = false
+/** Only apply table-layout hooks while sanitizeRichHtml runs — never for EmailIframe. */
+let richHtmlSanitizeDepth = 0
 
 function installTicketRichHtmlHooks(): void {
   if (ticketRichHtmlHooksInstalled) return
   ticketRichHtmlHooksInstalled = true
 
   DOMPurify.addHook('uponSanitizeAttribute', (node, data: AttrHookEvent) => {
+    if (richHtmlSanitizeDepth === 0) return
     const tag = node.nodeName
     if (!TABLE_LAYOUT_TAGS.has(tag)) return
 
@@ -90,6 +93,7 @@ function installTicketRichHtmlHooks(): void {
   })
 
   DOMPurify.addHook('afterSanitizeElements', (node) => {
+    if (richHtmlSanitizeDepth === 0) return
     if (node.nodeType !== 1) return
     const el = node as Element
     if (el.nodeName !== 'TD' && el.nodeName !== 'TH') return
@@ -161,17 +165,22 @@ export function sanitizeRichHtml(html: string | null | undefined): string {
   const t = html.trim()
   if (!t) return '<p></p>'
 
-  const frag = DOMPurify.sanitize(t, {
-    ...RICH_HTML_CONFIG,
-    RETURN_DOM_FRAGMENT: true,
-  }) as unknown as DocumentFragment
+  richHtmlSanitizeDepth += 1
+  try {
+    const frag = DOMPurify.sanitize(t, {
+      ...RICH_HTML_CONFIG,
+      RETURN_DOM_FRAGMENT: true,
+    }) as unknown as DocumentFragment
 
-  if (frag?.ownerDocument && frag.childNodes.length > 0) {
-    mergeSiblingOrderedListStarts(frag)
-    const holder = frag.ownerDocument.createElement('div')
-    holder.append(...Array.from(frag.childNodes))
-    return String(DOMPurify.sanitize(holder.innerHTML, RICH_HTML_CONFIG))
+    if (frag?.ownerDocument && frag.childNodes.length > 0) {
+      mergeSiblingOrderedListStarts(frag)
+      const holder = frag.ownerDocument.createElement('div')
+      holder.append(...Array.from(frag.childNodes))
+      return String(DOMPurify.sanitize(holder.innerHTML, RICH_HTML_CONFIG))
+    }
+
+    return String(DOMPurify.sanitize(t, RICH_HTML_CONFIG))
+  } finally {
+    richHtmlSanitizeDepth -= 1
   }
-
-  return String(DOMPurify.sanitize(t, RICH_HTML_CONFIG))
 }

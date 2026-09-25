@@ -13,8 +13,28 @@ function sanitizeEmail(html: string): string {
   return String(
     DOMPurify.sanitize(html, {
       USE_PROFILES: { html: true },
-      ADD_ATTR: ['target', 'class', 'style', 'width', 'height', 'align', 'valign', 'bgcolor', 'cellpadding', 'cellspacing', 'border'],
-      ADD_TAGS: ['style'],
+      ADD_ATTR: [
+        'target',
+        'class',
+        'style',
+        'width',
+        'height',
+        'align',
+        'valign',
+        'bgcolor',
+        'background',
+        'cellpadding',
+        'cellspacing',
+        'border',
+        'color',
+        'face',
+        'size',
+        'hspace',
+        'vspace',
+        'nowrap',
+        'role',
+      ],
+      ADD_TAGS: ['style', 'center', 'font'],
       FORBID_TAGS: ['script', 'object', 'embed', 'base', 'form', 'input', 'button', 'textarea', 'select'],
       FORCE_BODY: true,
     })
@@ -25,6 +45,9 @@ function sanitizeEmail(html: string): string {
  * Renders untrusted email HTML inside a sandboxed iframe so the app's
  * global CSS (Ant Design, Quill, etc.) cannot bleed in and corrupt email
  * layout (buttons, images, tables, etc.).
+ *
+ * Host CSS is intentionally minimal — newsletter HTML relies on its own
+ * <style>, table widths, spacer cells, and inline styles.
  */
 function EmailIframe({ html, className }: EmailIframeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -38,15 +61,14 @@ function EmailIframe({ html, className }: EmailIframeProps) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #1f1f1f; background: transparent; }
-  img { max-width: 100%; height: auto; }
-  a { color: #1677ff; }
-  p { margin: 0 0 8px; }
-  p:last-child { margin-bottom: 0; }
-  blockquote { border-left: 3px solid #d9d9d9; margin: 8px 0 8px 12px; padding-left: 12px; color: #666; }
-  table { border-collapse: collapse; max-width: 100%; }
-  td, th { padding: 4px 8px; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow-x: auto;
+    word-wrap: break-word;
+    -webkit-text-size-adjust: 100%;
+  }
 </style>
 </head>
 <body>${sanitized}</body>

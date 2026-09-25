@@ -19,6 +19,23 @@ import dayjs from 'dayjs'
  * {{ this_month_number }} → e.g. "9"
  * {{ this_day_number }}   → e.g. "25"
  */
+
+/** Normalize Quill/HTML quirks so `{{ var }}` tokens match reliably. */
+function normalizeTemplateSource(text: string): string {
+  return String(text)
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/&#(?:x7B|123);/gi, '{')
+    .replace(/&#(?:x7D|125);/gi, '}')
+    .replace(/&lcub;/gi, '{')
+    .replace(/&rcub;/gi, '}')
+    .replace(/&lbrace;/gi, '{')
+    .replace(/&rbrace;/gi, '}')
+    .replace(/\uff5b/g, '{')
+    .replace(/\uff5d/g, '}')
+}
+
 export function applyRecurringTicketTemplate(text: string, at: Date = new Date()): string {
   const d = dayjs(at)
   const prev = d.subtract(1, 'day')
@@ -44,7 +61,8 @@ export function applyRecurringTicketTemplate(text: string, at: Date = new Date()
     this_day_number: String(d.date()),
   }
 
-  return text.replace(/\{\{\s*([\w]+)\s*\}\}/g, (match, key: string) => {
+  const normalized = normalizeTemplateSource(text)
+  return normalized.replace(/\{\{\s*([\w]+)\s*\}\}/g, (match, key: string) => {
     return key in vars ? vars[key] : match
   })
 }

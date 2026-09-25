@@ -24,14 +24,18 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   try {
     const desiredRank = parseCompanyTicketDesiredRank(rule.ticketPriority ?? 0)
+    const resolvedTitle = applyRecurringTicketTemplate(rule.title, now)
+    const resolvedDescription = rule.description
+      ? applyRecurringTicketTemplate(rule.description, now)
+      : null
     let newTicket: { id: number } | undefined
 
     await db.transaction(async (tx) => {
       const [row] = await tx
         .insert(tickets)
         .values({
-          title: applyRecurringTicketTemplate(rule.title, now),
-          description: rule.description ? applyRecurringTicketTemplate(rule.description, now) : null,
+          title: resolvedTitle,
+          description: resolvedDescription,
           status: rule.ticketStatus ?? 'open',
           priority: rule.companyId ? null : (rule.ticketPriority || null),
           teamId: rule.teamId ?? null,
@@ -97,7 +101,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     try {
       await sendRecurringTicketCreatedEmail({
         ticketId: newTicket.id,
-        ticketTitle: rule.title,
+        ticketTitle: resolvedTitle,
         companyId: rule.companyId ?? null,
         contactUserId: rule.contactUserId ?? null,
         createdByUserId: rule.createdBy ?? null,
