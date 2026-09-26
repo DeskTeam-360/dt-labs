@@ -86,6 +86,11 @@ export async function GET(request: Request) {
   const dueDateTo = url.searchParams.get('due_date_to')
   const search = url.searchParams.get('search')?.trim()
   const searchBy = url.searchParams.get('search_by')?.trim() || 'all' // 'all' | 'title' | 'id'
+  // search_fields: comma-separated subset — title,description,comments,properties
+  const searchFieldsRaw = url.searchParams.get('search_fields')
+  const searchFields = searchFieldsRaw
+    ? new Set(searchFieldsRaw.split(',').map((s) => s.trim()).filter(Boolean))
+    : null
   const paginated = url.searchParams.get('paginated') === '1'
   const sortOrder = url.searchParams.get('sort_order') === 'asc' ? 'asc' : 'desc'
   const sortById = url.searchParams.get('sort_by') === 'id'
@@ -192,13 +197,21 @@ export async function GET(request: Request) {
       else conditions.push(sql`false`)
     } else if (searchBy === 'title') {
       conditions.push(ilike(tickets.title, pattern)!)
+    } else if (searchFields) {
+      // granular field selection from preferences
+      const parts: ReturnType<typeof ilike>[] = []
+      if (searchAsId !== null) parts.push(eq(tickets.id, searchAsId) as ReturnType<typeof ilike>)
+      if (searchFields.has('title')) parts.push(ilike(tickets.title, pattern)!)
+      if (searchFields.has('description')) parts.push(ilike(tickets.description, pattern)!)
+      if (searchFields.has('comments')) parts.push(sql`${tickets.id} IN (SELECT ticket_id FROM ticket_comments WHERE comment ILIKE ${pattern})`)
+      if (parts.length > 0) conditions.push(or(...parts)!)
+      else conditions.push(sql`false`)
     } else {
-      // 'all' — default: id OR title OR description OR comment body
-      const commentSubquery = sql`${tickets.id} IN (SELECT ticket_id FROM ticket_comments WHERE comment ILIKE ${pattern})`
+      // 'all' default — title + description only (comments excluded for performance)
       if (searchAsId !== null) {
-        conditions.push(or(eq(tickets.id, searchAsId), ilike(tickets.title, pattern), ilike(tickets.description, pattern), commentSubquery)!)
+        conditions.push(or(eq(tickets.id, searchAsId), ilike(tickets.title, pattern), ilike(tickets.description, pattern))!)
       } else {
-        conditions.push(or(ilike(tickets.title, pattern), ilike(tickets.description, pattern), commentSubquery)!)
+        conditions.push(or(ilike(tickets.title, pattern), ilike(tickets.description, pattern))!)
       }
     }
   }

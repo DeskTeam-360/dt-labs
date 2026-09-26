@@ -286,12 +286,15 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
   const [userCompanyId, setUserCompanyId] = useState<string | null>(null)
   const [userTeamIds, setUserTeamIds] = useState<string[]>([])
 
-  const [debouncedSearch, setDebouncedSearch] = useState(initialState.filterSearch)
-  useEffect(() => {
-    const delay = filterSearch.trim() ? 500 : 0
-    const t = window.setTimeout(() => setDebouncedSearch(filterSearch), delay)
-    return () => window.clearTimeout(t)
-  }, [filterSearch])
+  const [committedSearch, setCommittedSearch] = useState(initialState.filterSearch ?? '')
+  const debouncedSearch = committedSearch
+
+  const [searchFields, setSearchFields] = useState<string>('title,description')
+
+  const commitSearch = (val: string) => {
+    setCommittedSearch(val)
+    if (!val.trim()) setFilterSearch('')
+  }
 
   const columnsToShow = useMemo(() => {
     if (allStatusColumns.length === 0) return []
@@ -367,6 +370,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         debouncedSearch,
         filterTicketType,
         lookupReady,
+        searchFields,
       }),
     [
       isCustomer,
@@ -381,6 +385,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       debouncedSearch,
       filterTicketType,
       lookupReady,
+      searchFields,
     ]
   )
 
@@ -431,8 +436,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       }
       if (debouncedSearch.trim()) {
         params.set('search', debouncedSearch.trim())
-        const sb = searchParams.get('search_by')
-        if (sb && (sb === 'title' || sb === 'id')) params.set('search_by', sb)
+        params.set('search_fields', searchFields || 'title,description')
       }
       params.set('limit', String(effectiveTicketsLimit))
 
@@ -451,7 +455,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
   })
 
   const tickets = ticketsQuery.data ?? []
-  const loading = ticketsQuery.isLoading
+  const loading = ticketsQuery.isFetching
 
   /** Server returns filtered data - no client-side filtering */
   const filteredTickets = tickets
@@ -485,6 +489,14 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setViewMode(vm)
     setTicketsPageLimitState(normalizeTicketsPageLimit(stored.ticketsPageLimit))
     setDebouncedSearch(state.filterSearch)
+    try {
+      const savedPrefs = localStorage.getItem('ticket-search-prefs')
+      if (savedPrefs) {
+        const p = JSON.parse(savedPrefs) as Record<string, boolean>
+        const fields = Object.entries(p).filter(([, v]) => v).map(([k]) => k).join(',')
+        if (fields) setSearchFields(fields)
+      }
+    } catch { /* ignore */ }
   }, [isCustomer])
 
   const fetchLookup = async () => {
@@ -1323,6 +1335,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setFilterDueDateRange,
     filterSearch,
     setFilterSearch,
+    commitSearch,
+    searchFields,
+    setSearchFields,
     filterSidebarCollapsed,
     setFilterSidebarCollapsed,
     viewMode,

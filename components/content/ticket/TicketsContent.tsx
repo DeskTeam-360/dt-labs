@@ -87,6 +87,9 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     setFilterDueDateRange,
     filterSearch,
     setFilterSearch,
+    commitSearch,
+    searchFields,
+    setSearchFields,
     filterSidebarCollapsed,
     setFilterSidebarCollapsed,
     viewMode,
@@ -171,6 +174,9 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             isCustomer={isCustomer}
             filterSearch={filterSearch}
             onFilterSearchChange={setFilterSearch}
+            onCommitSearch={commitSearch}
+            searchFields={searchFields}
+            onSearchFieldsChange={setSearchFields}
             filterTicketType={filterTicketType}
             ticketsPageLimit={ticketsPageLimit}
             onTicketsPageLimitChange={setTicketsPageLimit}

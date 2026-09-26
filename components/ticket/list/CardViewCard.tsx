@@ -162,19 +162,6 @@ export default function CardViewCard({
         {ticket.priority != null && ticket.priority > 0 && (
           <Tag style={kanbanTagStyle({ neutral: true })}>P{ticket.priority}</Tag>
         )}
-        {ticket.visibility !== 'team' && (
-          <Tag
-            style={kanbanTagStyle({
-              ...(ticket.visibility === 'public' ? { fillHex: KANBAN_SEMANTIC_GREEN } : { neutral: true }),
-            })}
-          >
-            {ticket.visibility === 'specific_users' || ticket.visibility === 'private'
-              ? 'Private'
-              : ticket.visibility === 'public'
-                ? 'Public'
-                : (ticket.visibility as string).toUpperCase()}
-          </Tag>
-        )}
         {ticket.team_name && (
           <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>{ticket.team_name}</Tag>
         )}

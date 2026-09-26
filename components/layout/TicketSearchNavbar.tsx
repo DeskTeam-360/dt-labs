@@ -2,8 +2,8 @@
 
 import 'dayjs/locale/en'
 
-import { CloseOutlined, HistoryOutlined, SearchOutlined } from '@ant-design/icons'
-import { Input, Modal, Select, Space, Spin, Typography } from 'antd'
+import { CloseOutlined, HistoryOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons'
+import { Button, Input, Modal, Popover, Space, Spin, Switch, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { usePathname, useRouter } from 'next/navigation'
@@ -76,7 +76,15 @@ export default function TicketSearchNavbar({
   const router = useRouter()
   const pathname = usePathname()
   const [q, setQ] = useState('')
-  const [searchBy, setSearchBy] = useState<'all' | 'title' | 'id'>('all')
+  const [searchBy] = useState<'all'>('all')
+  const [prefOpen, setPrefOpen] = useState(false)
+  const [searchPrefs, setSearchPrefs] = useState<{ title: boolean; description: boolean; comments: boolean }>(() => {
+    try {
+      const saved = localStorage.getItem('ticket-search-prefs')
+      if (saved) return JSON.parse(saved)
+    } catch { /* ignore */ }
+    return { title: true, description: true, comments: false }
+  })
   const [preview, setPreview] = useState<TicketPreview[]>([])
   const [panelVisible, setPanelVisible] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -85,6 +93,9 @@ export default function TicketSearchNavbar({
   const abortRef = useRef<AbortController | null>(null)
   const historyLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const historyWrapRef = useRef<HTMLDivElement>(null)
+
+  const getSearchFields = (prefs: typeof searchPrefs) =>
+    Object.entries(prefs).filter(([, v]) => v).map(([k]) => k).join(',') || 'title'
 
   const [savedPresets, setSavedPresets] = useState<SavedTicketFilterPreset[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -162,8 +173,9 @@ export default function TicketSearchNavbar({
       setPreviewLoading(true)
       setPreview([])
       try {
+        const fields = getSearchFields(searchPrefs)
         const res = await fetch(
-          `/api/tickets?search=${encodeURIComponent(trimmed)}&search_by=${searchBy}&limit=${PREVIEW_LIMIT}`,
+          `/api/tickets?search=${encodeURIComponent(trimmed)}&search_fields=${encodeURIComponent(fields)}&limit=${PREVIEW_LIMIT}`,
           { credentials: 'include', signal: ac.signal }
         )
         if (!res.ok) throw new Error('fetch failed')
@@ -203,24 +215,25 @@ export default function TicketSearchNavbar({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [q, searchBy])
+  }, [q, searchPrefs])
 
   const applySearch = useCallback(
     (value: string) => {
       setPanelVisible(false)
       const trimmed = value.trim()
       const onTicketList = pathname === '/tickets' || pathname === '/tickets/'
+      const fields = getSearchFields(searchPrefs)
       if (onTicketList) {
         const sp = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
-        if (trimmed) { sp.set('search', trimmed); sp.set('search_by', searchBy) }
-        else { sp.delete('search'); sp.delete('search_by') }
+        if (trimmed) { sp.set('search', trimmed); sp.set('search_fields', fields) }
+        else { sp.delete('search'); sp.delete('search_fields') }
         const qs = sp.toString()
         router.push(qs ? `/tickets?${qs}` : '/tickets', { scroll: false })
       } else {
-        router.push(trimmed ? `/tickets?search=${encodeURIComponent(trimmed)}&search_by=${searchBy}` : '/tickets')
+        router.push(trimmed ? `/tickets?search=${encodeURIComponent(trimmed)}&search_fields=${encodeURIComponent(fields)}` : '/tickets')
       }
     },
-    [pathname, router]
+    [pathname, router, searchPrefs]
   )
 
   const goTicket = useCallback(
@@ -307,27 +320,25 @@ export default function TicketSearchNavbar({
           alignSelf: 'stretch',
         }}
       >
+        {previewLoading && (
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, overflow: 'hidden', zIndex: 300, borderRadius: 1 }}>
+            <div style={{
+              height: '100%',
+              background: 'linear-gradient(90deg, transparent, #1677ff, #1677ff, transparent)',
+              animation: 'navbar-search-progress 1.2s ease-in-out infinite',
+              width: '40%',
+            }} />
+            <style>{`@keyframes navbar-search-progress { 0% { transform: translateX(-100%) } 100% { transform: translateX(350%) } }`}</style>
+          </div>
+        )}
         <Space.Compact style={{ width: '100%' }}>
-          <Select
-            value={searchBy}
-            onChange={(v) => { setSearchBy(v); setPreview([]); setPanelVisible(false) }}
-            size={NAV_CONTROL_SIZE}
-            popupMatchSelectWidth={false}
-            style={{ minWidth: 80 }}
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'title', label: 'Title' },
-              { value: 'id', label: 'ID' },
-            ]}
-          />
-          <Input.Search
+          <Input
             size={NAV_CONTROL_SIZE}
             allowClear
-            placeholder={searchBy === 'id' ? 'Search by ticket ID…' : searchBy === 'title' ? 'Search by title…' : 'Search tickets…'}
-            enterButton={<SearchOutlined />}
+            placeholder="Search tickets…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            onSearch={applySearch}
+            onPressEnter={() => applySearch(q)}
             onFocus={() => {
               if (q.trim().length >= PREVIEW_MIN_CHARS && (preview.length > 0 || previewLoading)) {
                 setPanelVisible(true)
@@ -335,6 +346,47 @@ export default function TicketSearchNavbar({
             }}
             style={{ flex: 1 }}
           />
+          <Button
+            size={NAV_CONTROL_SIZE}
+            type="primary"
+            icon={<SearchOutlined />}
+            onClick={() => applySearch(q)}
+          />
+          <Popover
+            open={prefOpen}
+            onOpenChange={setPrefOpen}
+            trigger="click"
+            placement="bottomRight"
+            content={
+              <div style={{ width: 220 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, color: 'var(--ticket-nav-text)' }}>Search in</div>
+                {([
+                  { key: 'title', label: 'Subject / Title' },
+                  { key: 'description', label: 'Description' },
+                  { key: 'comments', label: 'Notes & Replies' },
+                ] as const).map(({ key, label }) => (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--ticket-nav-panel-border)' }}>
+                    <span style={{ fontSize: 13 }}>{label}</span>
+                    <Switch
+                      size="small"
+                      checked={searchPrefs[key]}
+                      onChange={(checked) => {
+                        const next = { ...searchPrefs, [key]: checked }
+                        setSearchPrefs(next)
+                        try { localStorage.setItem('ticket-search-prefs', JSON.stringify(next)) } catch { /* ignore */ }
+                        setPreview([])
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            }
+          >
+            <Button
+              size={NAV_CONTROL_SIZE}
+              icon={<SettingOutlined />}
+            />
+          </Popover>
         </Space.Compact>
         {panelVisible && q.trim().length >= PREVIEW_MIN_CHARS && (
           <div
@@ -352,11 +404,7 @@ export default function TicketSearchNavbar({
               zIndex: 200,
             }}
           >
-            {previewLoading ? (
-              <div style={{ padding: 16, textAlign: 'center' }}>
-                <Spin size="small" />
-              </div>
-            ) : preview.length > 0 ? (
+            {preview.length > 0 ? (
               preview.map((t) => (
                 <button
                   key={t.id}
@@ -446,8 +494,18 @@ export default function TicketSearchNavbar({
                   )}
                 </button>
               ))
-            ) : (
+            ) : !previewLoading ? (
               <div style={{ padding: 12, color: 'var(--ticket-nav-muted)', fontSize: 13 }}>No tickets found</div>
+            ) : (
+              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ height: 14, borderRadius: 4, background: 'var(--ticket-nav-panel-border)', width: `${70 - i * 10}%`, animation: 'skeleton-pulse 1.4s ease-in-out infinite' }} />
+                    <div style={{ height: 11, borderRadius: 4, background: 'var(--ticket-nav-panel-border)', width: '40%', animation: 'skeleton-pulse 1.4s ease-in-out infinite 0.2s' }} />
+                  </div>
+                ))}
+                <style>{`@keyframes skeleton-pulse { 0%,100%{opacity:.4} 50%{opacity:.9} }`}</style>
+              </div>
             )}
             {!previewLoading && preview.length > 0 && (
               <button
@@ -455,7 +513,7 @@ export default function TicketSearchNavbar({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   setPanelVisible(false)
-                  router.push(`/tickets?search=${encodeURIComponent(q.trim())}&search_by=${searchBy}&view=list`)
+                  router.push(`/tickets?search=${encodeURIComponent(q.trim())}&search_fields=${encodeURIComponent(getSearchFields(searchPrefs))}&view=list`)
                 }}
                 style={{
                   display: 'block',

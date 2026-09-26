@@ -1,7 +1,8 @@
 'use client'
 
-import { AppstoreOutlined, IdcardOutlined, LoadingOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Flex, Input, Segmented, Select, theme,Tooltip, Typography } from 'antd'
+import { AppstoreOutlined, IdcardOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SettingOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { Button, ConfigProvider, Flex, Input, Popover, Segmented, Select, Space, Switch, theme, Tooltip, Typography } from 'antd'
+import { useState } from 'react'
 
 import { TICKETS_PAGE_LIMIT_OPTIONS, type TicketsPageLimit } from '@/lib/tickets-list-query'
 
@@ -12,16 +13,23 @@ interface TicketsHeaderProps {
   onViewModeChange: (v: ViewMode) => void
   onCreateClick: () => void
   loading?: boolean
-  /** When true, hide Round Robin view option */
   isCustomer?: boolean
   filterSearch?: string
   onFilterSearchChange?: (v: string) => void
-  /** Row classification list (staff junk folders) - spam/trash set title and hide view mode picker */
+  onCommitSearch?: (v: string) => void
+  searchFields?: string
+  onSearchFieldsChange?: (v: string) => void
   filterTicketType?: 'spam' | 'trash' | null
   ticketsPageLimit?: TicketsPageLimit
   onTicketsPageLimitChange?: (v: TicketsPageLimit) => void
   onRefresh?: () => void
 }
+
+const SEARCH_FIELD_OPTIONS = [
+  { key: 'title', label: 'Subject / Title' },
+  { key: 'description', label: 'Description' },
+  { key: 'comments', label: 'Notes & Replies' },
+] as const
 
 export default function TicketsHeader({
   viewMode,
@@ -31,6 +39,9 @@ export default function TicketsHeader({
   isCustomer = false,
   filterSearch = '',
   onFilterSearchChange,
+  onCommitSearch,
+  searchFields = 'title,description',
+  onSearchFieldsChange,
   filterTicketType = null,
   ticketsPageLimit = 50,
   onTicketsPageLimitChange,
@@ -38,17 +49,29 @@ export default function TicketsHeader({
 }: TicketsHeaderProps) {
   const { token } = theme.useToken()
   const searchPending = loading && !!filterSearch.trim()
+  const [prefOpen, setPrefOpen] = useState(false)
+
+  const fieldsSet = new Set(searchFields.split(',').map((s) => s.trim()).filter(Boolean))
 
   function handleViewModeChange(v: ViewMode) {
     if ((v === 'kanban' || v === 'roundrobin') && filterSearch.trim()) {
       onFilterSearchChange?.('')
+      onCommitSearch?.('')
     }
     onViewModeChange(isCustomer && v === 'roundrobin' ? 'kanban' : (v as ViewMode))
   }
 
+  function handleFieldToggle(key: string, checked: boolean) {
+    const next = new Set(fieldsSet)
+    if (checked) next.add(key)
+    else next.delete(key)
+    const val = Array.from(next).join(',') || 'title'
+    onSearchFieldsChange?.(val)
+    try { localStorage.setItem('ticket-search-prefs', JSON.stringify(Object.fromEntries(SEARCH_FIELD_OPTIONS.map(f => [f.key, next.has(f.key)])))) } catch { /* ignore */ }
+  }
+
   const inJunkFolder = !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
-  const junkTitle =
-    filterTicketType === 'spam' ? 'Spam' : filterTicketType === 'trash' ? 'Trash' : null
+  const junkTitle = filterTicketType === 'spam' ? 'Spam' : filterTicketType === 'trash' ? 'Trash' : null
   const viewOptions = [
     { label: <span style={{ marginRight: 8 }}><AppstoreOutlined /> Kanban</span>, value: 'kanban' },
     ...(!isCustomer ? [{ label: <span style={{ marginRight: 8 }}><TeamOutlined /> Round Robin</span>, value: 'roundrobin' }] : []),
@@ -57,72 +80,106 @@ export default function TicketsHeader({
   ]
 
   return (
-    <Flex vertical gap={12} style={{ padding: 24 }}>
-      <Typography.Title level={2} style={{ margin: 0 }}>
-        {junkTitle ?? 'My Tickets'}
-      </Typography.Title>
+    <div style={{ position: 'relative' }}>
+      {searchPending && (
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, overflow: 'hidden', zIndex: 10 }}>
+          <div style={{
+            height: '100%',
+            background: 'linear-gradient(90deg, transparent, #1677ff, #1677ff, transparent)',
+            animation: 'ticket-search-progress 1.2s ease-in-out infinite',
+            width: '40%',
+          }} />
+          <style>{`@keyframes ticket-search-progress { 0% { transform: translateX(-100%) } 100% { transform: translateX(350%) } }`}</style>
+        </div>
+      )}
+      <Flex vertical gap={12} style={{ padding: 24 }}>
+        <Typography.Title level={2} style={{ margin: 0 }}>
+          {junkTitle ?? 'My Tickets'}
+        </Typography.Title>
 
-      {!inJunkFolder && (
-        <Flex align="center" justify="space-between" gap={12} wrap="wrap">
-          <Flex align="center" gap={12} wrap="wrap">
-            <ConfigProvider theme={{ components: { Segmented: { trackBg: token.colorBgContainer, itemSelectedBg: '#667eea', itemSelectedColor: '#fff' } } }}>
-              <Segmented
-                value={isCustomer && viewMode === 'roundrobin' ? 'kanban' : viewMode}
-                onChange={(v) => handleViewModeChange(v as ViewMode)}
-                options={viewOptions}
-                size="middle"
-                style={{ border: '1px solid var(--ant-color-border)' }}
-              />
-            </ConfigProvider>
-            {(viewMode === 'list' || viewMode === 'card') && (
-              <Input
-                placeholder="Search by ID, title or description..."
-                allowClear
-                value={filterSearch}
-                onChange={(e) => onFilterSearchChange?.(e.target.value)}
-                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                suffix={searchPending ? <LoadingOutlined style={{ color: '#bfbfbf' }} spin /> : undefined}
-                style={{ minWidth: 280, width: 340 }}
-              />
-            )}
-            {onTicketsPageLimitChange && (viewMode === 'kanban' || viewMode === 'roundrobin') && (
-              <Flex align="center" gap={8}>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  Load
-                </Typography.Text>
-                <Select
-                  value={ticketsPageLimit}
-                  onChange={(v) => onTicketsPageLimitChange(v as TicketsPageLimit)}
-                  options={TICKETS_PAGE_LIMIT_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
-                  style={{ width: 72 }}
-                  aria-label="Tickets per load"
-                />
-              </Flex>
-            )}
-            {onRefresh && (
-              <Tooltip title="Refresh tickets">
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={onRefresh}
-                  loading={loading}
+        {!inJunkFolder && (
+          <Flex align="center" justify="space-between" gap={12} wrap="wrap">
+            <Flex align="center" gap={12} wrap="wrap">
+              <ConfigProvider theme={{ components: { Segmented: { trackBg: token.colorBgContainer, itemSelectedBg: '#667eea', itemSelectedColor: '#fff' } } }}>
+                <Segmented
+                  value={isCustomer && viewMode === 'roundrobin' ? 'kanban' : viewMode}
+                  onChange={(v) => handleViewModeChange(v as ViewMode)}
+                  options={viewOptions}
                   size="middle"
+                  style={{ border: '1px solid var(--ant-color-border)' }}
                 />
-              </Tooltip>
-            )}
+              </ConfigProvider>
+              {(viewMode === 'list' || viewMode === 'card') && (
+                <Space.Compact>
+                  <Input
+                    placeholder="Search tickets..."
+                    allowClear
+                    value={filterSearch}
+                    onChange={(e) => onFilterSearchChange?.(e.target.value)}
+                    onPressEnter={() => onCommitSearch?.(filterSearch)}
+                    style={{ width: 280 }}
+                  />
+                  <Button
+                    type="primary"
+                    icon={<SearchOutlined />}
+                    loading={searchPending}
+                    onClick={() => onCommitSearch?.(filterSearch)}
+                  />
+                  <Popover
+                    open={prefOpen}
+                    onOpenChange={setPrefOpen}
+                    trigger="click"
+                    placement="bottomRight"
+                    content={
+                      <div style={{ width: 210 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Search in</div>
+                        {SEARCH_FIELD_OPTIONS.map(({ key, label }) => (
+                          <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--ant-color-border)' }}>
+                            <span style={{ fontSize: 13 }}>{label}</span>
+                            <Switch size="small" checked={fieldsSet.has(key)} onChange={(c) => handleFieldToggle(key, c)} />
+                          </div>
+                        ))}
+                      </div>
+                    }
+                  >
+                    <Button
+                      icon={<SettingOutlined />}
+                    />
+                  </Popover>
+                </Space.Compact>
+              )}
+              {onTicketsPageLimitChange && (viewMode === 'kanban' || viewMode === 'roundrobin') && (
+                <Flex align="center" gap={8}>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>Load</Typography.Text>
+                  <Select
+                    value={ticketsPageLimit}
+                    onChange={(v) => onTicketsPageLimitChange(v as TicketsPageLimit)}
+                    options={TICKETS_PAGE_LIMIT_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
+                    style={{ width: 72 }}
+                    aria-label="Tickets per load"
+                  />
+                </Flex>
+              )}
+              {onRefresh && (
+                <Tooltip title="Refresh tickets">
+                  <Button icon={<ReloadOutlined />} onClick={onRefresh} loading={loading} size="middle" />
+                </Tooltip>
+              )}
+            </Flex>
+            <Button type="primary" icon={<PlusOutlined />} onClick={onCreateClick} loading={loading}>
+              Add Ticket
+            </Button>
           </Flex>
-          <Button type="primary" icon={<PlusOutlined />} onClick={onCreateClick} loading={loading}>
-            Add Ticket
-          </Button>
-        </Flex>
-      )}
+        )}
 
-      {inJunkFolder && onRefresh && (
-        <Flex>
-          <Tooltip title="Refresh tickets">
-            <Button icon={<ReloadOutlined />} onClick={onRefresh} loading={loading} size="middle" />
-          </Tooltip>
-        </Flex>
-      )}
-    </Flex>
+        {inJunkFolder && onRefresh && (
+          <Flex>
+            <Tooltip title="Refresh tickets">
+              <Button icon={<ReloadOutlined />} onClick={onRefresh} loading={loading} size="middle" />
+            </Tooltip>
+          </Flex>
+        )}
+      </Flex>
+    </div>
   )
 }
