@@ -488,7 +488,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setFilterSidebarCollapsed(state.filterSidebarCollapsed)
     setViewMode(vm)
     setTicketsPageLimitState(normalizeTicketsPageLimit(stored.ticketsPageLimit))
-    setDebouncedSearch(state.filterSearch)
+    setCommittedSearch(state.filterSearch)
     try {
       const savedPrefs = localStorage.getItem('ticket-search-prefs')
       if (savedPrefs) {
