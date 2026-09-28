@@ -1,8 +1,8 @@
 'use client'
 
-import { CloudDownloadOutlined, SaveOutlined } from '@ant-design/icons'
+import { CloudDownloadOutlined, PaperClipOutlined, SaveOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Checkbox, Col, Divider, Flex, Form, Input, InputNumber, Layout, message, Row, Statistic, Switch, Typography } from 'antd'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
@@ -40,6 +40,14 @@ export default function FreshdeskImportContent({
   const [lastResult, setLastResult] = useState<ImportResult | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
+  // Attachment import state
+  const [attFromId, setAttFromId] = useState(1)
+  const [attToId, setAttToId] = useState(99999)
+  const [attImporting, setAttImporting] = useState(false)
+  const [attLogs, setAttLogs] = useState<string[]>([])
+  const [attDone, setAttDone] = useState(false)
+  const attLogsEndRef = useRef<HTMLDivElement>(null)
+
   const handleSaveSettings = async (values: { freshdesk_domain: string; freshdesk_api_key: string }) => {
     setSavingSettings(true)
     try {
@@ -61,6 +69,55 @@ export default function FreshdeskImportContent({
       message.error((e as Error).message || 'Failed to save settings')
     } finally {
       setSavingSettings(false)
+    }
+  }
+
+  const handleImportAttachments = async () => {
+    setAttImporting(true)
+    setAttLogs([])
+    setAttDone(false)
+    try {
+      const res = await fetch('/api/freshdesk/import-attachments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ from_ticket_id: attFromId, to_ticket_id: attToId }),
+      })
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err?.error || 'Request failed')
+      }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          try {
+            const ev = JSON.parse(line) as Record<string, unknown>
+            if (ev.type === 'start') {
+              setAttLogs((p) => [...p, `Memulai — ${ev.total as number} ticket di range #${ev.from}–#${ev.to}`])
+            } else if (ev.type === 'progress') {
+              setAttLogs((p) => [...p, `Ticket #${ev.ticketId} ✓ — total import: ${ev.attachmentsImported}, skip: ${ev.attachmentsSkipped}, error: ${ev.attachmentsError}`])
+              setTimeout(() => attLogsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+            } else if (ev.type === 'error') {
+              setAttLogs((p) => [...p, `Ticket #${ev.ticketId} ERROR: ${ev.message as string}`])
+            } else if (ev.type === 'done') {
+              setAttLogs((p) => [...p, `✅ Selesai — Import: ${ev.attachmentsImported}, Skip: ${ev.attachmentsSkipped}, Error: ${ev.attachmentsError} (dari ${ev.total} ticket)`])
+              setAttDone(true)
+            }
+          } catch { /* skip malformed line */ }
+        }
+      }
+    } catch (e: unknown) {
+      setAttLogs((p) => [...p, `❌ ${(e as Error).message}`])
+    } finally {
+      setAttImporting(false)
     }
   }
 
@@ -214,6 +271,68 @@ export default function FreshdeskImportContent({
                     )}
                   </Row>
                 </>
+              )}
+            </Card>
+            {/* ── Attachment Import Card ───────────────────── */}
+            <Card title="Import Attachments dari Freshdesk" style={{ marginTop: 24 }}>
+              <Paragraph type="secondary">
+                Download file attachment dari Freshdesk dan upload ke storage DeskTeam360.
+                Proses hanya menyentuh ticket dengan <Text code>source=freshdesk</Text> di rentang ID yang dipilih.
+                Attachment yang sudah ada di-skip otomatis.
+              </Paragraph>
+
+              <Flex align="center" gap={12} style={{ marginBottom: 16 }} wrap="wrap">
+                <Text>Ticket ID dari</Text>
+                <InputNumber
+                  min={1}
+                  value={attFromId}
+                  onChange={(v) => setAttFromId(v ?? 1)}
+                  style={{ width: 110 }}
+                  disabled={attImporting}
+                />
+                <Text>sampai</Text>
+                <InputNumber
+                  min={1}
+                  value={attToId}
+                  onChange={(v) => setAttToId(v ?? 99999)}
+                  style={{ width: 110 }}
+                  disabled={attImporting}
+                />
+                <Button
+                  type="primary"
+                  icon={<PaperClipOutlined />}
+                  loading={attImporting}
+                  onClick={handleImportAttachments}
+                  size="large"
+                >
+                  {attImporting ? 'Mengimpor attachment…' : 'Import Attachments'}
+                </Button>
+                {(attLogs.length > 0 && !attImporting) && (
+                  <Button onClick={() => { setAttLogs([]); setAttDone(false) }}>Reset</Button>
+                )}
+              </Flex>
+
+              {attLogs.length > 0 && (
+                <div style={{
+                  background: 'var(--ant-color-bg-container-disabled)',
+                  border: '1px solid var(--ant-color-border)',
+                  borderRadius: 6,
+                  padding: '10px 14px',
+                  maxHeight: 320,
+                  overflowY: 'auto',
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  lineHeight: 1.7,
+                }}>
+                  {attLogs.map((log, i) => (
+                    <div key={i}>{log}</div>
+                  ))}
+                  <div ref={attLogsEndRef} />
+                </div>
+              )}
+
+              {attDone && (
+                <Alert type="success" message="Import attachment selesai." style={{ marginTop: 12 }} showIcon />
               )}
             </Card>
           </Content>
