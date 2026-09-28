@@ -105,6 +105,9 @@ export default function FreshdeskImportContent({
             } else if (ev.type === 'progress') {
               setAttLogs((p) => [...p, `Ticket #${ev.ticketId} ✓ — total import: ${ev.attachmentsImported}, skip: ${ev.attachmentsSkipped}, error: ${ev.attachmentsError}`])
               setTimeout(() => attLogsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+            } else if (ev.type === 'att_error') {
+              const file = ev.file ? ` [${ev.file as string}]` : ''
+              setAttLogs((p) => [...p, `  ⚠ Ticket #${ev.ticketId}${file}: ${ev.reason as string}`])
             } else if (ev.type === 'error') {
               setAttLogs((p) => [...p, `Ticket #${ev.ticketId} ERROR: ${ev.message as string}`])
             } else if (ev.type === 'done') {

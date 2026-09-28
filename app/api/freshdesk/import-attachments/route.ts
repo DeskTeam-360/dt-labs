@@ -117,12 +117,20 @@ export async function POST(req: NextRequest) {
               if (existing.length > 0) { attachmentsSkipped++; continue }
 
               const downloaded = await downloadAttachment(att.attachment_url, authHeader)
-              if (!downloaded) { attachmentsError++; continue }
+              if (!downloaded) {
+                attachmentsError++
+                send({ type: 'att_error', ticketId, file: att.name, reason: 'download failed' })
+                continue
+              }
 
               const safeName = sanitizeFileName(att.name)
               const path = `freshdesk/attachments/tickets/${ticketId}/${att.id}_${safeName}`
-              const { url: fileUrl } = await uploadBuffer(path, downloaded.buffer, downloaded.contentType)
-              if (!fileUrl) { attachmentsError++; continue }
+              const { url: fileUrl, error: uploadErr } = await uploadBuffer(path, downloaded.buffer, downloaded.contentType)
+              if (!fileUrl) {
+                attachmentsError++
+                send({ type: 'att_error', ticketId, file: att.name, reason: `upload failed: ${uploadErr}` })
+                continue
+              }
 
               await db.insert(ticketAttachments).values({
                 ticketId,
@@ -132,6 +140,8 @@ export async function POST(req: NextRequest) {
               })
               attachmentsImported++
             }
+          } else {
+            send({ type: 'att_error', ticketId, file: null, reason: `FD ticket fetch failed: ${tdRes.status}` })
           }
 
           // ── Conversation attachments ───────────────────────────
@@ -141,7 +151,10 @@ export async function POST(req: NextRequest) {
               `${baseUrl}/api/v2/tickets/${ticketId}/conversations?page=${page}&per_page=100`,
               { headers: { Authorization: authHeader } }
             )
-            if (!cvRes.ok) break
+            if (!cvRes.ok) {
+              send({ type: 'att_error', ticketId, file: null, reason: `conversations fetch failed: ${cvRes.status}` })
+              break
+            }
             const conversations = await cvRes.json() as FDConversation[]
             if (!Array.isArray(conversations) || conversations.length === 0) break
 
@@ -177,15 +190,23 @@ export async function POST(req: NextRequest) {
                 }
 
                 const downloaded = await downloadAttachment(att.attachment_url, authHeader)
-                if (!downloaded) { attachmentsError++; continue }
+                if (!downloaded) {
+                  attachmentsError++
+                  send({ type: 'att_error', ticketId, file: att.name, reason: 'download failed (conversation)' })
+                  continue
+                }
 
                 const safeName = sanitizeFileName(att.name)
                 const pathPrefix = commentId
                   ? `freshdesk/attachments/tickets/${ticketId}/comments/${commentId}`
                   : `freshdesk/attachments/tickets/${ticketId}/conversations/${conv.id}`
                 const path = `${pathPrefix}/${att.id}_${safeName}`
-                const { url: fileUrl } = await uploadBuffer(path, downloaded.buffer, downloaded.contentType)
-                if (!fileUrl) { attachmentsError++; continue }
+                const { url: fileUrl, error: uploadErr } = await uploadBuffer(path, downloaded.buffer, downloaded.contentType)
+                if (!fileUrl) {
+                  attachmentsError++
+                  send({ type: 'att_error', ticketId, file: att.name, reason: `upload failed: ${uploadErr}` })
+                  continue
+                }
 
                 if (commentId) {
                   await db.insert(commentAttachments).values({
