@@ -245,13 +245,13 @@ export async function GET(request: Request) {
         .where(whereClause)
         .orderBy(...(sortById
           ? [sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id)]
-          : [asc(tickets.companyId), asc(tickets.priority), sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id)]))
+          : [asc(tickets.priority), asc(tickets.companyId), sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id)]))
         .limit(limit)
         .offset(offset)
     : await baseQuery
         .orderBy(...(sortById
           ? [sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id)]
-          : [asc(tickets.companyId), asc(tickets.priority), sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id)]))
+          : [asc(tickets.priority), asc(tickets.companyId), sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id)]))
         .limit(limit)
         .offset(offset)
 
