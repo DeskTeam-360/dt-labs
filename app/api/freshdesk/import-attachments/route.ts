@@ -31,17 +31,23 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._\-]/g, '_').slice(0, 200)
 }
 
-async function downloadAttachment(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
-  try {
-    // FD attachment URLs are pre-signed S3 URLs — must NOT send Authorization header
-    const res = await fetch(url)
-    if (!res.ok) return null
-    const contentType = res.headers.get('content-type') || 'application/octet-stream'
-    const arrayBuffer = await res.arrayBuffer()
-    return { buffer: Buffer.from(arrayBuffer), contentType }
-  } catch {
-    return null
+async function downloadAttachment(url: string, authHeader: string): Promise<{ buffer: Buffer; contentType: string } | null | { error: string }> {
+  // Try without auth first (pre-signed S3 URLs), then with auth as fallback
+  for (const headers of [{}, { Authorization: authHeader }]) {
+    try {
+      const res = await fetch(url, { headers })
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || 'application/octet-stream'
+        const arrayBuffer = await res.arrayBuffer()
+        return { buffer: Buffer.from(arrayBuffer), contentType }
+      }
+      if (res.status === 403 || res.status === 401) continue
+      return { error: `HTTP ${res.status}` }
+    } catch (e) {
+      return { error: (e as Error).message }
+    }
   }
+  return { error: 'HTTP 403 (both with and without auth)' }
 }
 
 export async function POST(req: NextRequest) {
@@ -117,10 +123,10 @@ export async function POST(req: NextRequest) {
                 .limit(1)
               if (existing.length > 0) { attachmentsSkipped++; continue }
 
-              const downloaded = await downloadAttachment(att.attachment_url)
-              if (!downloaded) {
+              const downloaded = await downloadAttachment(att.attachment_url, authHeader)
+              if (!downloaded || 'error' in downloaded) {
                 attachmentsError++
-                send({ type: 'att_error', ticketId, file: att.name, reason: 'download failed' })
+                send({ type: 'att_error', ticketId, file: att.name, reason: `download failed: ${(downloaded as { error: string })?.error ?? 'unknown'}` })
                 continue
               }
 
@@ -190,10 +196,10 @@ export async function POST(req: NextRequest) {
                   if (existing.length > 0) { attachmentsSkipped++; continue }
                 }
 
-                const downloaded = await downloadAttachment(att.attachment_url)
-                if (!downloaded) {
+                const downloaded = await downloadAttachment(att.attachment_url, authHeader)
+                if (!downloaded || 'error' in downloaded) {
                   attachmentsError++
-                  send({ type: 'att_error', ticketId, file: att.name, reason: 'download failed (conversation)' })
+                  send({ type: 'att_error', ticketId, file: att.name, reason: `download failed (conversation): ${(downloaded as { error: string })?.error ?? 'unknown'}` })
                   continue
                 }
 
