@@ -1,6 +1,6 @@
 import { eq, inArray } from 'drizzle-orm'
 
-import { db, projectStatuses, tags, teams, ticketActivityLog, ticketAssignees, tickets, ticketStatuses, ticketTags, users } from '@/lib/db'
+import { companies, db, projectStatuses, tags, teams, ticketActivityLog, ticketAssignees, tickets, ticketStatuses, ticketTags, users } from '@/lib/db'
 
 import type { TicketActivityAction } from './ticket-activity-actions'
 
@@ -114,8 +114,8 @@ export function diffTicketSnapshots(
 /** Resolve UUIDs in activity `changes` to display names for ticket activity UI. */
 export async function enrichActivityEntityLabels(
   changes: Record<string, { from: unknown; to: unknown }>
-): Promise<{ teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string> }> {
-  const out: { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string> } = {}
+): Promise<{ teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string>; companies?: Record<string, string> }> {
+  const out: { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string>; companies?: Record<string, string> } = {}
 
   // Teams
   const teamDelta = changes.teamId
@@ -186,6 +186,20 @@ export async function enrichActivityEntityLabels(
       const map: Record<string, string> = {}
       for (const r of rows) map[r.id] = (r.fullName?.trim() || r.email || r.id) as string
       out.contacts = map
+    }
+  }
+
+  // Companies
+  const companyDelta = changes.companyId
+  if (companyDelta) {
+    const ids = new Set<string>()
+    if (companyDelta.from != null && companyDelta.from !== '') ids.add(String(companyDelta.from))
+    if (companyDelta.to != null && companyDelta.to !== '') ids.add(String(companyDelta.to))
+    if (ids.size > 0) {
+      const rows = await db.select({ id: companies.id, name: companies.name }).from(companies).where(inArray(companies.id, [...ids]))
+      const map: Record<string, string> = {}
+      for (const r of rows) map[r.id] = (r.name?.trim() || r.id) as string
+      out.companies = map
     }
   }
 

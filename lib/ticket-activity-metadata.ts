@@ -68,13 +68,14 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
   if (action === 'ticket_updated') {
     const parts: string[] = []
     const changes = m.changes
-    const entityLabels = m.entity_labels as { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string> } | undefined
+    const entityLabels = m.entity_labels as { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string>; companies?: Record<string, string> } | undefined
     const teamNames = entityLabels?.teams
     const tagNames = entityLabels?.tags
     const contactNames = entityLabels?.contacts
     const assigneeNames = entityLabels?.assignees
     const statusNames = entityLabels?.statuses
     const projectStatusNames = entityLabels?.project_statuses
+    const companyNames = entityLabels?.companies
 
     const resolveRef = (id: unknown, map?: Record<string, string>): string => {
       if (id == null || id === '') return 'None'
@@ -106,6 +107,8 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
             parts.push(`${label}: ${resolveRef(ft.from, contactNames)} → ${resolveRef(ft.to, contactNames)}`)
           } else if (key === 'project_status_id') {
             parts.push(`${label}: ${resolveRef(ft.from, projectStatusNames)} → ${resolveRef(ft.to, projectStatusNames)}`)
+          } else if (key === 'companyId') {
+            parts.push(`${label}: ${resolveRef(ft.from, companyNames)} → ${resolveRef(ft.to, companyNames)}`)
           } else {
             parts.push(`${label}: ${formatScalarLabel(ft.from, key)} → ${formatScalarLabel(ft.to, key)}`)
           }

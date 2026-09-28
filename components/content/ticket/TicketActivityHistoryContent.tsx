@@ -181,62 +181,64 @@ export default function TicketActivityHistoryContent({ user: currentUser }: Tick
                 {
                   title: 'By',
                   key: 'actor',
-                  width: 220,
+                  width: 160,
                   render: (_, r) => {
                     const label = r.actor?.name?.trim() || r.actor?.email?.trim() || null
                     const role = r.actor_role
                     if (!label) {
                       if (role === 'system') {
                         return (
-                          <Space size="small">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                             <TicketActivityActorAvatar size={28} actorRole={role} />
                             <Text type="secondary">System</Text>
-                          </Space>
+                          </div>
                         )
                       }
                       if (role === 'automation') {
                         return (
-                          <Space size="small">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                             <TicketActivityActorAvatar size={28} actorRole={role} />
                             <Text type="secondary">Automation</Text>
-                          </Space>
+                          </div>
                         )
                       }
                       return <Text type="secondary">—</Text>
                     }
                     return (
-                      <Space size="small" align="center">
-                        <TicketActivityActorAvatar
-                          size={28}
-                          actorRole={role}
-                          avatarUrl={r.actor?.avatar_url}
-                          name={r.actor?.name}
-                          email={r.actor?.email}
-                        />
-                        <span>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, minWidth: 0 }}>
+                        <div style={{ flexShrink: 0 }}>
+                          <TicketActivityActorAvatar
+                            size={28}
+                            actorRole={role}
+                            avatarUrl={r.actor?.avatar_url}
+                            name={r.actor?.name}
+                            email={r.actor?.email}
+                          />
+                        </div>
+                        <span style={{ wordBreak: 'break-word', fontSize: 13, minWidth: 0 }}>
                           {label}
                           {role === 'customer' && (
-                            <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>
+                            <Text type="secondary" style={{ marginLeft: 4, fontSize: 11 }}>
                               (customer)
                             </Text>
                           )}
                         </span>
-                      </Space>
+                      </div>
                     )
                   },
                 },
                 {
                   title: 'Activity',
                   dataIndex: 'action',
-                  width: 180,
+                  width: 160,
                   render: (_: string, r) => formatTicketActivityAction(r.action, r.actor_role),
                 },
                 {
                   title: 'Details',
                   key: 'details',
-                  ellipsis: true,
+                  width: 220,
                   render: (_, r) => (
-                    <Text type="secondary" style={{ fontSize: 13 }}>
+                    <Text type="secondary" style={{ fontSize: 13, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
                       {summarizeTicketActivityMetadata(r.action, r.metadata) || '—'}
                     </Text>
                   ),
