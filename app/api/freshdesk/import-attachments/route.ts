@@ -31,9 +31,10 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._\-]/g, '_').slice(0, 200)
 }
 
-async function downloadAttachment(url: string, authHeader: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+async function downloadAttachment(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
   try {
-    const res = await fetch(url, { headers: { Authorization: authHeader } })
+    // FD attachment URLs are pre-signed S3 URLs — must NOT send Authorization header
+    const res = await fetch(url)
     if (!res.ok) return null
     const contentType = res.headers.get('content-type') || 'application/octet-stream'
     const arrayBuffer = await res.arrayBuffer()
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest) {
                 .limit(1)
               if (existing.length > 0) { attachmentsSkipped++; continue }
 
-              const downloaded = await downloadAttachment(att.attachment_url, authHeader)
+              const downloaded = await downloadAttachment(att.attachment_url)
               if (!downloaded) {
                 attachmentsError++
                 send({ type: 'att_error', ticketId, file: att.name, reason: 'download failed' })
@@ -189,7 +190,7 @@ export async function POST(req: NextRequest) {
                   if (existing.length > 0) { attachmentsSkipped++; continue }
                 }
 
-                const downloaded = await downloadAttachment(att.attachment_url, authHeader)
+                const downloaded = await downloadAttachment(att.attachment_url)
                 if (!downloaded) {
                   attachmentsError++
                   send({ type: 'att_error', ticketId, file: att.name, reason: 'download failed (conversation)' })
