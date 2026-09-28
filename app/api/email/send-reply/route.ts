@@ -341,10 +341,18 @@ export async function POST(request: NextRequest) {
       requestBody.threadId = threadId
     }
 
-    const sendRes = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody,
-    })
+    let staleThread = false
+    let sendRes
+    try {
+      sendRes = await gmail.users.messages.send({ userId: 'me', requestBody })
+    } catch (e: unknown) {
+      // Stored threadId can belong to another mailbox or a deleted thread; Gmail then 404s. In-Reply-To still threads it for the customer.
+      const status = (e as { code?: number; status?: number })?.code ?? (e as { status?: number })?.status
+      if (!requestBody.threadId || status !== 404) throw e
+      staleThread = true
+      delete requestBody.threadId
+      sendRes = await gmail.users.messages.send({ userId: 'me', requestBody })
+    }
 
     const sentMessageId = sendRes.data.id
     const sentThreadId = sendRes.data.threadId
@@ -360,11 +368,11 @@ export async function POST(request: NextRequest) {
         ticketId: ticketIdNum,
         direction: 'outgoing',
       })
-      if (sentThreadId && ticketRow && !ticketRow.gmailThreadId) {
+      if (sentThreadId && ticketRow && (staleThread || !ticketRow.gmailThreadId)) {
         await db
           .update(tickets)
           .set({ gmailThreadId: sentThreadId, updatedAt: new Date() })
-          .where(and(eq(tickets.id, ticketIdNum), isNull(tickets.gmailThreadId)))
+          .where(staleThread ? eq(tickets.id, ticketIdNum) : and(eq(tickets.id, ticketIdNum), isNull(tickets.gmailThreadId)))
       }
     }
 
