@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { randomBytes } from 'crypto'
-import { and,eq } from 'drizzle-orm'
+import { and, eq, ne, sql } from 'drizzle-orm'
 import { google } from 'googleapis'
 import { NextResponse } from 'next/server'
 
@@ -394,6 +394,26 @@ export async function PATCH(
   }
 
   const updateData: Record<string, unknown> = {}
+  if (body.email !== undefined) {
+    const newEmail = String(body.email ?? '').trim().toLowerCase()
+    if (newEmail !== (targetUser.email ?? '').toLowerCase()) {
+      if (!isAdmin) {
+        return NextResponse.json({ error: 'Only admins can change a user email' }, { status: 403 })
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+        return NextResponse.json({ error: 'Invalid email address' }, { status: 400 })
+      }
+      const [taken] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(sql`lower(${users.email}) = ${newEmail}`, ne(users.id, id)))
+        .limit(1)
+      if (taken) {
+        return NextResponse.json({ error: 'This email is already used by another user' }, { status: 409 })
+      }
+      updateData.email = newEmail
+    }
+  }
   if (body.full_name !== undefined) updateData.fullName = body.full_name
   if (body.first_name !== undefined) updateData.firstName = body.first_name || null
   if (body.last_name !== undefined) updateData.lastName = body.last_name || null
