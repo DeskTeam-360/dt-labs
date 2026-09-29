@@ -113,6 +113,8 @@ export async function PATCH(
         { status: access.status }
       )
     }
+    // Customers can't edit the description; dropping it (not 403) keeps their other edits working.
+    delete body.description
   }
 
   // Quick path: only status update (e.g. kanban drag)

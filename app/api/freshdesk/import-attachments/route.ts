@@ -1,54 +1,15 @@
-import { and, eq, gte, lte, sql } from 'drizzle-orm'
+import { and, eq, gte, lte } from 'drizzle-orm'
 import { NextRequest } from 'next/server'
 
 import { auth } from '@/auth'
-import { appSettings, commentAttachments, db, ticketAttachments, ticketComments, tickets } from '@/lib/db'
-import { uploadBuffer } from '@/lib/storage-idrive'
+import { appSettings, db, tickets } from '@/lib/db'
+import { type FdAttachment, importFdTicketAttachments } from '@/lib/freshdesk-attachments'
 
 function freshdeskAuthHeader(apiKey: string) {
   return 'Basic ' + Buffer.from(`${apiKey}:X`).toString('base64')
 }
 
-type FDAttachment = {
-  id: number
-  name: string
-  attachment_url: string
-  content_type: string
-  size: number
-}
-
-type FDTicketDetail = {
-  id: number
-  attachments?: FDAttachment[]
-}
-
-type FDConversation = {
-  id: number
-  attachments?: FDAttachment[]
-}
-
-function sanitizeFileName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._\-]/g, '_').slice(0, 200)
-}
-
-async function downloadAttachment(url: string, authHeader: string): Promise<{ buffer: Buffer; contentType: string } | null | { error: string }> {
-  // Try without auth first (pre-signed S3 URLs), then with auth as fallback
-  for (const headers of [{}, { Authorization: authHeader }]) {
-    try {
-      const res = await fetch(url, { headers })
-      if (res.ok) {
-        const contentType = res.headers.get('content-type') || 'application/octet-stream'
-        const arrayBuffer = await res.arrayBuffer()
-        return { buffer: Buffer.from(arrayBuffer), contentType }
-      }
-      if (res.status === 403 || res.status === 401) continue
-      return { error: `HTTP ${res.status}` }
-    } catch (e) {
-      return { error: (e as Error).message }
-    }
-  }
-  return { error: 'HTTP 403 (both with and without auth)' }
-}
+type FDConversation = { id: number; attachments?: FdAttachment[] }
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -103,57 +64,16 @@ export async function POST(req: NextRequest) {
 
       for (const { id: ticketId } of fdTickets) {
         try {
-          // ── Ticket-level attachments ────────────────────────────
           const tdRes = await fetch(`${baseUrl}/api/v2/tickets/${ticketId}`, {
             headers: { Authorization: authHeader },
           })
-          if (tdRes.ok) {
-            const td = await tdRes.json() as FDTicketDetail
-            for (const att of td.attachments ?? []) {
-              // Skip if already imported (match by ticketId + fileName)
-              const existing = await db
-                .select({ id: ticketAttachments.id })
-                .from(ticketAttachments)
-                .where(
-                  and(
-                    eq(ticketAttachments.ticketId, ticketId),
-                    eq(ticketAttachments.fileName, att.name),
-                  )
-                )
-                .limit(1)
-              if (existing.length > 0) { attachmentsSkipped++; continue }
-
-              const downloaded = await downloadAttachment(att.attachment_url, authHeader)
-              if (!downloaded || 'error' in downloaded) {
-                attachmentsError++
-                send({ type: 'att_error', ticketId, file: att.name, reason: `download failed: ${(downloaded as { error: string })?.error ?? 'unknown'}` })
-                continue
-              }
-
-              const safeName = sanitizeFileName(att.name)
-              const path = `freshdesk/attachments/tickets/${ticketId}/${att.id}_${safeName}`
-              const { url: fileUrl, error: uploadErr } = await uploadBuffer(path, downloaded.buffer, downloaded.contentType)
-              if (!fileUrl) {
-                attachmentsError++
-                send({ type: 'att_error', ticketId, file: att.name, reason: `upload failed: ${uploadErr}` })
-                continue
-              }
-
-              await db.insert(ticketAttachments).values({
-                ticketId,
-                fileUrl,
-                fileName: att.name,
-                filePath: path,
-              })
-              attachmentsImported++
-            }
-          } else {
+          if (!tdRes.ok) {
             send({ type: 'att_error', ticketId, file: null, reason: `FD ticket fetch failed: ${tdRes.status}` })
           }
+          const td = tdRes.ok ? ((await tdRes.json()) as { attachments?: FdAttachment[] }) : null
 
-          // ── Conversation attachments ───────────────────────────
-          let page = 1
-          while (true) {
+          const conversations: FDConversation[] = []
+          for (let page = 1; ; page++) {
             const cvRes = await fetch(
               `${baseUrl}/api/v2/tickets/${ticketId}/conversations?page=${page}&per_page=100`,
               { headers: { Authorization: authHeader } }
@@ -162,82 +82,22 @@ export async function POST(req: NextRequest) {
               send({ type: 'att_error', ticketId, file: null, reason: `conversations fetch failed: ${cvRes.status}` })
               break
             }
-            const conversations = await cvRes.json() as FDConversation[]
-            if (!Array.isArray(conversations) || conversations.length === 0) break
-
-            for (const conv of conversations) {
-              for (const att of conv.attachments ?? []) {
-                // Find our comment that came from this FD conversation
-                const commentRows = await db
-                  .select({ id: ticketComments.id })
-                  .from(ticketComments)
-                  .where(
-                    and(
-                      eq(ticketComments.ticketId, ticketId),
-                      sql`${ticketComments.fdConversationId} = ${conv.id}`
-                    )
-                  )
-                  .limit(1)
-
-                const commentId = commentRows[0]?.id ?? null
-
-                if (commentId) {
-                  // Skip if already imported for this comment + fileName
-                  const existing = await db
-                    .select({ id: commentAttachments.id })
-                    .from(commentAttachments)
-                    .where(
-                      and(
-                        eq(commentAttachments.commentId, commentId),
-                        eq(commentAttachments.fileName, att.name),
-                      )
-                    )
-                    .limit(1)
-                  if (existing.length > 0) { attachmentsSkipped++; continue }
-                }
-
-                const downloaded = await downloadAttachment(att.attachment_url, authHeader)
-                if (!downloaded || 'error' in downloaded) {
-                  attachmentsError++
-                  send({ type: 'att_error', ticketId, file: att.name, reason: `download failed (conversation): ${(downloaded as { error: string })?.error ?? 'unknown'}` })
-                  continue
-                }
-
-                const safeName = sanitizeFileName(att.name)
-                const pathPrefix = commentId
-                  ? `freshdesk/attachments/tickets/${ticketId}/comments/${commentId}`
-                  : `freshdesk/attachments/tickets/${ticketId}/conversations/${conv.id}`
-                const path = `${pathPrefix}/${att.id}_${safeName}`
-                const { url: fileUrl, error: uploadErr } = await uploadBuffer(path, downloaded.buffer, downloaded.contentType)
-                if (!fileUrl) {
-                  attachmentsError++
-                  send({ type: 'att_error', ticketId, file: att.name, reason: `upload failed: ${uploadErr}` })
-                  continue
-                }
-
-                if (commentId) {
-                  await db.insert(commentAttachments).values({
-                    commentId,
-                    fileUrl,
-                    fileName: att.name,
-                    filePath: path,
-                  })
-                } else {
-                  // Conversation not in our DB yet — store as ticket attachment fallback
-                  await db.insert(ticketAttachments).values({
-                    ticketId,
-                    fileUrl,
-                    fileName: att.name,
-                    filePath: path,
-                  })
-                }
-                attachmentsImported++
-              }
-            }
-
-            if (conversations.length < 100) break
-            page++
+            const batch = (await cvRes.json()) as FDConversation[]
+            if (!Array.isArray(batch) || batch.length === 0) break
+            conversations.push(...batch)
+            if (batch.length < 100) break
           }
+
+          const r = await importFdTicketAttachments({
+            ticketId,
+            ticketFiles: td?.attachments ?? [],
+            conversations,
+            authHeader,
+          })
+          attachmentsImported += r.imported
+          attachmentsSkipped += r.skipped
+          attachmentsError += r.failed
+          for (const err of r.errors) send({ type: 'att_error', ticketId, file: err.file, reason: err.reason })
 
           send({ type: 'progress', ticketId, attachmentsImported, attachmentsSkipped, attachmentsError })
         } catch (e) {

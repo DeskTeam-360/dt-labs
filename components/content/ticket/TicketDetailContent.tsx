@@ -1392,11 +1392,24 @@ export default function TicketDetailContent({
         if (tid == null) return
         setResyncLoading(true)
         try {
-            const res = await apiFetch<{ ok: boolean; comments: { imported: number; skipped: number } }>(
+            const res = await apiFetch<{
+                ok: boolean
+                comments: { imported: number; skipped: number }
+                attachments?: { imported: number; failed: number; errors: { file: string; reason: string }[] }
+            }>(
                 '/api/freshdesk/resync-ticket',
                 { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket_id: tid }) },
             )
-            message.success(`Resync done — ${res.comments.imported} new comment(s)`)
+            const att = res.attachments
+            message.success(
+                `Resync done — ${res.comments.imported} new comment(s), ${att?.imported ?? 0} new attachment(s)`,
+            )
+            if (att && att.failed > 0) {
+                message.warning(
+                    `${att.failed} attachment(s) failed: ${att.errors.map((e) => `${e.file} (${e.reason})`).join('; ')}`,
+                    10,
+                )
+            }
             await mergeDetailFromServer()
         } catch (e: unknown) {
             message.error(e instanceof Error ? e.message : 'Resync failed')

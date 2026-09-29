@@ -13,11 +13,11 @@ import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import TicketActivityActorAvatar from '@/components/ticket/TicketActivityActorAvatar'
+import TicketActivityDetails from '@/components/ticket/TicketActivityDetails'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import { kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 import { TICKET_ACTIVITY_ACTIONS } from '@/lib/ticket-activity-actions'
 import { formatTicketActivityAction } from '@/lib/ticket-activity-labels'
-import { summarizeTicketActivityMetadata } from '@/lib/ticket-activity-metadata'
 
 dayjs.extend(relativeTime)
 dayjs.extend(localizedFormat)
@@ -238,9 +238,11 @@ export default function TicketActivityHistoryContent({ user: currentUser }: Tick
                   key: 'details',
                   width: 220,
                   render: (_, r) => (
-                    <Text type="secondary" style={{ fontSize: 13, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                      {summarizeTicketActivityMetadata(r.action, r.metadata) || '—'}
-                    </Text>
+                    <TicketActivityDetails
+                      action={r.action}
+                      metadata={r.metadata}
+                      title={`#${r.ticket_id} ${r.ticket_title || ''}`.trim()}
+                    />
                   ),
                 },
                 {

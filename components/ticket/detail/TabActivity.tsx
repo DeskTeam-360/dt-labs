@@ -9,8 +9,8 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import { useEffect, useState } from 'react'
 
 import TicketActivityActorAvatar from '@/components/ticket/TicketActivityActorAvatar'
+import TicketActivityDetails from '@/components/ticket/TicketActivityDetails'
 import { formatTicketActivityAction } from '@/lib/ticket-activity-labels'
-import { summarizeTicketActivityMetadata } from '@/lib/ticket-activity-metadata'
 
 dayjs.extend(relativeTime)
 dayjs.extend(localizedFormat)
@@ -150,12 +150,8 @@ export default function TabActivity({
         {
           title: 'Details',
           key: 'details',
-          ellipsis: true,
-          render: (_, r) => (
-            <Text type="secondary" style={{ fontSize: 13 }}>
-              {summarizeTicketActivityMetadata(r.action, r.metadata) || '—'}
-            </Text>
-          ),
+          width: 420,
+          render: (_, r) => <TicketActivityDetails action={r.action} metadata={r.metadata} />,
         },
       ]}
     />

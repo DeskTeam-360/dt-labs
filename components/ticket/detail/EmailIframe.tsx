@@ -41,6 +41,20 @@ function sanitizeEmail(html: string): string {
   )
 }
 
+const QUOTE_SELECTORS = [
+  'blockquote',
+  '.gmail_quote',
+  '.gmail_quote_container',
+  '.gmail_extra',
+  '.yahoo_quoted',
+  '#divRplyFwdMsg',
+  '#OutlookMessageHeader',
+]
+
+export function emailHtmlHasQuote(html: string): boolean {
+  return /<blockquote|class="[^"]*(?:gmail_quote|yahoo_quoted)[^"]*"|id="(?:divRplyFwdMsg|OutlookMessageHeader)"/i.test(html)
+}
+
 /**
  * Renders untrusted email HTML inside a sandboxed iframe so the app's
  * global CSS (Ant Design, Quill, etc.) cannot bleed in and corrupt email
@@ -52,8 +66,10 @@ function sanitizeEmail(html: string): string {
 function EmailIframe({ html, className }: EmailIframeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [height, setHeight] = useState(120)
+  const [showQuote, setShowQuote] = useState(false)
 
   const sanitized = sanitizeEmail(html)
+  const hasQuote = emailHtmlHasQuote(sanitized)
 
   const doc = `<!DOCTYPE html>
 <html>
@@ -69,10 +85,28 @@ function EmailIframe({ html, className }: EmailIframeProps) {
     word-wrap: break-word;
     -webkit-text-size-adjust: 100%;
   }
+  ${QUOTE_SELECTORS.map((sel) => `body.collapsed-quote ${sel}`).join(', ')} {
+    display: none !important;
+  }
 </style>
 </head>
-<body>${sanitized}</body>
+<body class="${hasQuote && !showQuote ? 'collapsed-quote' : ''}">${sanitized}</body>
 </html>`
+
+  const measure = () => {
+    try {
+      const body = iframeRef.current?.contentDocument?.body
+      if (body) setHeight(Math.max(40, body.scrollHeight + 8))
+    } catch { /* cross-origin guard */ }
+  }
+
+  // Toggle without reloading the iframe so scroll position and loaded images are kept.
+  useEffect(() => {
+    const body = iframeRef.current?.contentDocument?.body
+    if (!body) return
+    body.classList.toggle('collapsed-quote', hasQuote && !showQuote)
+    measure()
+  }, [showQuote, hasQuote])
 
   useEffect(() => {
     const iframe = iframeRef.current
@@ -83,10 +117,7 @@ function EmailIframe({ html, className }: EmailIframeProps) {
     iframe.src = url
 
     const onLoad = () => {
-      try {
-        const body = iframe.contentDocument?.body
-        if (body) setHeight(Math.max(40, body.scrollHeight + 8))
-      } catch { /* cross-origin guard */ }
+      measure()
       URL.revokeObjectURL(url)
     }
 
@@ -99,6 +130,7 @@ function EmailIframe({ html, className }: EmailIframeProps) {
   }, [html])
 
   return (
+    <>
     <iframe
       ref={iframeRef}
       sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
@@ -114,6 +146,30 @@ function EmailIframe({ html, className }: EmailIframeProps) {
       }}
       title="email-content"
     />
+    {hasQuote && (
+      <button
+        onClick={() => setShowQuote((v) => !v)}
+        title={showQuote ? 'Hide email history' : 'Show email history'}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          marginTop: 6,
+          padding: '2px 8px',
+          fontSize: 12,
+          color: 'var(--ant-color-text-secondary, #8c8c8c)',
+          background: 'var(--ant-color-fill-tertiary, rgba(0,0,0,0.06))',
+          border: '1px solid var(--ant-color-border, #d9d9d9)',
+          borderRadius: 4,
+          cursor: 'pointer',
+          lineHeight: '20px',
+        }}
+      >
+        <span style={{ letterSpacing: 2, fontSize: 10, fontWeight: 700 }}>•••</span>
+        {showQuote ? ' Hide history' : ' Show history'}
+      </button>
+    )}
+    </>
   )
 }
 

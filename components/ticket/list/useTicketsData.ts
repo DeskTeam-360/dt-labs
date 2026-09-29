@@ -1137,7 +1137,6 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         if (customerEditing) {
           const attachBody: Record<string, unknown> = {
             title: values.title,
-            description: values.description ?? null,
             type_id: values.type_id ?? null,
             priority: priorityFromFormValue(values.priority),
           }

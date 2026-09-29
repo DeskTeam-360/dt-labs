@@ -9,21 +9,6 @@ function trunc(s: string): string {
   return t.length <= MAX_VAL_LEN ? t : t.slice(0, MAX_VAL_LEN) + '…'
 }
 
-function formatScalarLabel(v: unknown, fieldKey?: string): string {
-  if (v === null || v === undefined || v === '') return 'None'
-  if (fieldKey === 'status' || fieldKey === 'visibility' || fieldKey === 'ticketType') {
-    const s = String(v)
-    return trunc(
-      s
-        .split(/[_-]+/)
-        .filter(Boolean)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(' '),
-    )
-  }
-  return str(v)
-}
-
 const TICKET_FIELD_LABELS: Record<string, string> = {
   status: 'Status',
   project_status_id: 'Project status',
@@ -42,15 +27,102 @@ const TICKET_FIELD_LABELS: Record<string, string> = {
   tag_ids: 'Tags',
 }
 
-function str(v: unknown): string {
-  if (v === null || v === undefined) return '—'
-  if (typeof v === 'string') return trunc(v.replace(/\s+/g, ' '))
-  if (typeof v === 'number' || typeof v === 'boolean') return String(v)
-  if (Array.isArray(v)) return trunc(JSON.stringify(v))
-  try {
-    return trunc(JSON.stringify(v))
-  } catch {
-    return '…'
+type EntityLabels = {
+  teams?: Record<string, string>
+  tags?: Record<string, string>
+  contacts?: Record<string, string>
+  assignees?: Record<string, string>
+  statuses?: Record<string, string>
+  project_statuses?: Record<string, string>
+  companies?: Record<string, string>
+}
+
+export type TicketActivityChangeRow = {
+  key: string
+  label: string
+  from: string
+  to: string
+  /** Values are rich HTML (description) and should be rendered, not shown as text. */
+  isHtml: boolean
+}
+
+const REF_MAP_BY_KEY: Record<string, keyof EntityLabels> = {
+  status: 'statuses',
+  teamId: 'teams',
+  tag_ids: 'tags',
+  assignee_ids: 'assignees',
+  contactUserId: 'contacts',
+  project_status_id: 'project_statuses',
+  companyId: 'companies',
+}
+
+function fullValue(v: unknown, key: string, labels: EntityLabels | undefined): string {
+  const map = REF_MAP_BY_KEY[key] ? labels?.[REF_MAP_BY_KEY[key]] : undefined
+  const one = (id: unknown): string => {
+    if (id == null || id === '') return 'None'
+    const name = map?.[String(id)]
+    if (name) return name.replace(/\s+/g, ' ').trim()
+    if (key === 'status' || key === 'visibility' || key === 'ticketType') {
+      return String(id)
+        .split(/[_-]+/)
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ')
+    }
+    if (typeof id === 'string') return key === 'description' ? id : id.replace(/\s+/g, ' ')
+    if (typeof id === 'number' || typeof id === 'boolean') return String(id)
+    try {
+      return JSON.stringify(id)
+    } catch {
+      return '…'
+    }
+  }
+  if (key === 'tag_ids' || key === 'assignee_ids') {
+    return Array.isArray(v) && v.length > 0 ? v.map(one).join(', ') : 'None'
+  }
+  return one(v)
+}
+
+/** Full, untruncated field-by-field changes of a `ticket_updated` entry (for the details view). */
+export function ticketActivityChangeRows(action: string, metadata: unknown): TicketActivityChangeRow[] {
+  if (action !== 'ticket_updated' || !metadata || typeof metadata !== 'object') return []
+  const m = metadata as Record<string, unknown>
+  if (m.source === 'automation_rule') return []
+  const changes = m.changes
+  if (!changes || typeof changes !== 'object' || Array.isArray(changes)) return []
+  const labels = m.entity_labels as EntityLabels | undefined
+  const rows: TicketActivityChangeRow[] = []
+  for (const [key, val] of Object.entries(changes)) {
+    if (!val || typeof val !== 'object' || !('from' in val) || !('to' in val)) continue
+    const ft = val as { from: unknown; to: unknown }
+    rows.push({
+      key,
+      label: TICKET_FIELD_LABELS[key] ?? key,
+      from: fullValue(ft.from, key, labels),
+      to: fullValue(ft.to, key, labels),
+      isHtml: key === 'description',
+    })
+  }
+  return rows
+}
+
+function fileNames(list: unknown): string[] | null {
+  if (!Array.isArray(list) || list.length === 0) return null
+  return list
+    .map((x) => (x && typeof x === 'object' && 'file_name' in x ? String((x as { file_name?: string }).file_name ?? '') : ''))
+    .filter(Boolean)
+}
+
+/** Attachment names added/removed in a `ticket_updated` entry. */
+export function ticketActivityAttachmentChanges(metadata: unknown): { added: string[]; removed: string[]; addedCount: number; removedCount: number } {
+  const m = (metadata && typeof metadata === 'object' ? metadata : {}) as Record<string, unknown>
+  const added = Array.isArray(m.attachments_added) ? m.attachments_added : []
+  const removed = Array.isArray(m.attachments_removed) ? m.attachments_removed : []
+  return {
+    added: fileNames(added) ?? [],
+    removed: fileNames(removed) ?? [],
+    addedCount: added.length,
+    removedCount: removed.length,
   }
 }
 
@@ -66,69 +138,12 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
   }
 
   if (action === 'ticket_updated') {
-    const parts: string[] = []
-    const changes = m.changes
-    const entityLabels = m.entity_labels as { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string>; companies?: Record<string, string> } | undefined
-    const teamNames = entityLabels?.teams
-    const tagNames = entityLabels?.tags
-    const contactNames = entityLabels?.contacts
-    const assigneeNames = entityLabels?.assignees
-    const statusNames = entityLabels?.statuses
-    const projectStatusNames = entityLabels?.project_statuses
-    const companyNames = entityLabels?.companies
-
-    const resolveRef = (id: unknown, map?: Record<string, string>): string => {
-      if (id == null || id === '') return 'None'
-      const s = String(id)
-      const name = map?.[s]
-      if (name) return trunc(name.replace(/\s+/g, ' '))
-      return str(id)
-    }
-
-    const resolveIds = (arr: unknown, map?: Record<string, string>): string => {
-      if (!Array.isArray(arr) || arr.length === 0) return 'None'
-      return arr.map((id) => resolveRef(id, map)).join(', ')
-    }
-
-    if (changes && typeof changes === 'object' && !Array.isArray(changes)) {
-      for (const [key, val] of Object.entries(changes)) {
-        if (val && typeof val === 'object' && 'from' in val && 'to' in val) {
-          const ft = val as { from: unknown; to: unknown }
-          const label = TICKET_FIELD_LABELS[key] ?? key
-          if (key === 'status') {
-            parts.push(`${label}: ${resolveRef(ft.from, statusNames)} → ${resolveRef(ft.to, statusNames)}`)
-          } else if (key === 'teamId') {
-            parts.push(`${label}: ${resolveRef(ft.from, teamNames)} → ${resolveRef(ft.to, teamNames)}`)
-          } else if (key === 'tag_ids') {
-            parts.push(`${label}: ${resolveIds(ft.from, tagNames)} → ${resolveIds(ft.to, tagNames)}`)
-          } else if (key === 'assignee_ids') {
-            parts.push(`${label}: ${resolveIds(ft.from, assigneeNames)} → ${resolveIds(ft.to, assigneeNames)}`)
-          } else if (key === 'contactUserId') {
-            parts.push(`${label}: ${resolveRef(ft.from, contactNames)} → ${resolveRef(ft.to, contactNames)}`)
-          } else if (key === 'project_status_id') {
-            parts.push(`${label}: ${resolveRef(ft.from, projectStatusNames)} → ${resolveRef(ft.to, projectStatusNames)}`)
-          } else if (key === 'companyId') {
-            parts.push(`${label}: ${resolveRef(ft.from, companyNames)} → ${resolveRef(ft.to, companyNames)}`)
-          } else {
-            parts.push(`${label}: ${formatScalarLabel(ft.from, key)} → ${formatScalarLabel(ft.to, key)}`)
-          }
-        }
-      }
-    }
-    const added = m.attachments_added
-    if (Array.isArray(added) && added.length > 0) {
-      const names = added
-        .map((x) => (x && typeof x === 'object' && 'file_name' in x ? String((x as { file_name?: string }).file_name ?? '') : ''))
-        .filter(Boolean)
-      parts.push(names.length ? `+files: ${names.join(', ')}` : `+${added.length} file(s)`)
-    }
-    const removed = m.attachments_removed
-    if (Array.isArray(removed) && removed.length > 0) {
-      const names = removed
-        .map((x) => (x && typeof x === 'object' && 'file_name' in x ? String((x as { file_name?: string }).file_name ?? '') : ''))
-        .filter(Boolean)
-      parts.push(names.length ? `−files: ${names.join(', ')}` : `−${removed.length} file(s)`)
-    }
+    const parts = ticketActivityChangeRows(action, metadata).map(
+      (r) => `${r.label}: ${trunc(r.from.replace(/\s+/g, ' '))} → ${trunc(r.to.replace(/\s+/g, ' '))}`
+    )
+    const att = ticketActivityAttachmentChanges(metadata)
+    if (att.addedCount > 0) parts.push(att.added.length ? `+files: ${att.added.join(', ')}` : `+${att.addedCount} file(s)`)
+    if (att.removedCount > 0) parts.push(att.removed.length ? `−files: ${att.removed.join(', ')}` : `−${att.removedCount} file(s)`)
     return parts.join(' · ')
   }
 

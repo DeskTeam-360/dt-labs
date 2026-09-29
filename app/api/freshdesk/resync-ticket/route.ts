@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { isAdmin, isAdminOrManager } from '@/lib/auth-utils'
 import { appSettings, db, ticketComments, tickets, users } from '@/lib/db'
+import { type FdAttachment, importFdTicketAttachments } from '@/lib/freshdesk-attachments'
 import { FD_STATUS_MAP, FD_TYPE_MAP } from '@/lib/freshdesk-maps'
 
 function freshdeskAuthHeader(apiKey: string) {
@@ -44,6 +45,7 @@ type FDConversation = {
   private: boolean
   from_email: string | null
   created_at: string
+  attachments?: FdAttachment[]
 }
 
 type FDTicket = {
@@ -56,6 +58,7 @@ type FDTicket = {
   requester_id: number
   created_at: string
   updated_at: string
+  attachments?: FdAttachment[]
 }
 
 type FDAgent = { id: number; contact: { name: string; email: string } }
@@ -174,5 +177,19 @@ export async function POST(req: NextRequest) {
     } catch (e) { result.comments.errors++; if (result.comments.errors === 1) result.comments.firstError = (e as Error).message }
   }
 
-  return NextResponse.json({ ok: true, comments: result.comments, conversationsFetched: conversations.length, conversationsFetchError })
+  // Runs after comments are synced so conversation files attach to their comment.
+  const attachments = await importFdTicketAttachments({
+    ticketId,
+    ticketFiles: ft.attachments ?? [],
+    conversations,
+    authHeader,
+  })
+
+  return NextResponse.json({
+    ok: true,
+    comments: result.comments,
+    attachments,
+    conversationsFetched: conversations.length,
+    conversationsFetchError,
+  })
 }

@@ -52,6 +52,7 @@ function CommentHtml({ html, style, className }: CommentHtmlProps) {
         .comment-collapsed-quote #OutlookMessageHeader {
           display: none !important;
         }
+        .comment-collapsed-quote .gmail_quote_container,
         .comment-collapsed-quote .gmail_extra {
           display: none !important;
         }
