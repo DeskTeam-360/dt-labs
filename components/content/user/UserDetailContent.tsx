@@ -65,6 +65,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const [collapsed, setCollapsed] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [userData, setUserData] = useState(initialUserData)
+  const extraCompanies: { id: string; name: string }[] = userData.extra_companies ?? []
   const isOwnProfile = String(currentUser.id) === String(userData?.id)
   const isCustomer = ((userData?.role ?? '').toLowerCase() === 'customer')
   const [loading, setLoading] = useState(false)
@@ -972,8 +973,25 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           {userData.status?.toUpperCase()}
                         </Tag>
                       </Descriptions.Item>
-                      <Descriptions.Item label="Company">
-                        <Text>{userData.company?.name ?? '—'}</Text>
+                      <Descriptions.Item label={extraCompanies.length > 0 ? 'Companies' : 'Company'}>
+                        {extraCompanies.length > 0 ? (
+                          <Space orientation="vertical" size={4}>
+                            {userData.company && (
+                              <Space size={6}>
+                                <SpaNavLink href={`/settings/companies/${userData.company.id}`}>{userData.company.name}</SpaNavLink>
+                                <Tag color="blue">Primary</Tag>
+                              </Space>
+                            )}
+                            {extraCompanies.map((c) => (
+                              <Space key={c.id} size={6}>
+                                <SpaNavLink href={`/settings/companies/${c.id}`}>{c.name}</SpaNavLink>
+                                <Tag color="purple">Additional</Tag>
+                              </Space>
+                            ))}
+                          </Space>
+                        ) : (
+                          <Text>{userData.company?.name ?? '—'}</Text>
+                        )}
                       </Descriptions.Item>
                     </Descriptions>
                   )}

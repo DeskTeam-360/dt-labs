@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 
-import { companyUsers,db, users } from '@/lib/db'
+import { companies, companyUsers, db, users } from '@/lib/db'
 
 /** Company UUID for a portal customer (`users.company_id` or `company_users`). */
 export async function getCustomerCompanyId(userId: string): Promise<string | null> {
@@ -37,6 +37,19 @@ export async function getCustomerCompanyIds(userId: string): Promise<string[]> {
     if (fallback) ids.add(fallback)
   }
   return [...ids]
+}
+
+/** Companies an admin granted on top of the user's primary company (for display). */
+export async function getExtraCompanies(
+  userId: string,
+  primaryCompanyId: string | null
+): Promise<{ id: string; name: string }[]> {
+  const rows = await db
+    .select({ id: companies.id, name: companies.name })
+    .from(companyUsers)
+    .innerJoin(companies, eq(companyUsers.companyId, companies.id))
+    .where(and(eq(companyUsers.userId, userId), eq(companyUsers.ticketAccess, true)))
+  return rows.filter((r) => r.id !== primaryCompanyId).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function customerOwnsCompany(userId: string, companyId: string): Promise<boolean> {

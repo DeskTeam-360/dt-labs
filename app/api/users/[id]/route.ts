@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
+import { getExtraCompanies } from '@/lib/customer-company'
 import { companies, companyUsers, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 import {
@@ -307,6 +308,7 @@ export async function GET(
     status: u.status,
     company_id: u.companyId,
     company: row.company ? { id: row.company.id, name: row.company.name } : null,
+    extra_companies: await getExtraCompanies(u.id, u.companyId),
     avatar_url: u.avatarUrl,
     created_at: u.createdAt ? new Date(u.createdAt).toISOString() : '',
     updated_at: u.updatedAt ? new Date(u.updatedAt).toISOString() : '',

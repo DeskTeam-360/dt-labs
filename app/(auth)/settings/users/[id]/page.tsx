@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import UserDetailContent from '@/components/content/user/UserDetailContent'
 import { canAccessUsers, isAdminOrManager } from '@/lib/auth-utils'
+import { getExtraCompanies } from '@/lib/customer-company'
 import { companies,db, users } from '@/lib/db'
 
 export async function generateMetadata({
@@ -61,6 +62,7 @@ export default async function SettingsUserDetailPage({
     status: u.status,
     company_id: u.companyId,
     company: row.company ? { id: row.company.id, name: row.company.name } : null,
+    extra_companies: await getExtraCompanies(u.id, u.companyId),
     avatar_url: u.avatarUrl,
     created_at: u.createdAt ? new Date(u.createdAt).toISOString() : '',
     updated_at: u.updatedAt ? new Date(u.updatedAt).toISOString() : '',
