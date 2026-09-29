@@ -76,6 +76,7 @@ function EmailIframe({ html, className }: EmailIframeProps) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<base target="_blank">
 <style>
   html, body {
     margin: 0;
@@ -117,6 +118,15 @@ function EmailIframe({ html, className }: EmailIframeProps) {
     iframe.src = url
 
     const onLoad = () => {
+      // Open links in a new tab instead of navigating inside the iframe.
+      try {
+        iframe.contentDocument?.querySelectorAll('a[href]').forEach((a) => {
+          // mailto/tel stay _blank too: the sandbox blocks _top, while an allowed popup still hands off to the mail app.
+          if ((a.getAttribute('href') || '').startsWith('#')) return
+          a.setAttribute('target', '_blank')
+          a.setAttribute('rel', 'noopener noreferrer')
+        })
+      } catch { /* cross-origin guard */ }
       measure()
       URL.revokeObjectURL(url)
     }

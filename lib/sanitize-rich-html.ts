@@ -92,6 +92,16 @@ function installTicketRichHtmlHooks(): void {
     }
   })
 
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (richHtmlSanitizeDepth === 0) return
+    if (node.nodeName !== 'A') return
+    const el = node as Element
+    const href = el.getAttribute('href')
+    if (!href || /^(#|mailto:|tel:)/i.test(href)) return
+    el.setAttribute('target', '_blank')
+    el.setAttribute('rel', 'noopener noreferrer')
+  })
+
   DOMPurify.addHook('afterSanitizeElements', (node) => {
     if (richHtmlSanitizeDepth === 0) return
     if (node.nodeType !== 1) return
