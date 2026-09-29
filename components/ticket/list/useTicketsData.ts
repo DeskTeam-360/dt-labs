@@ -291,10 +291,21 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
 
   const [searchFields, setSearchFields] = useState<string>('title,description')
 
-  const commitSearch = (val: string) => {
+  // Input text and the query keyword are separate (search runs on Enter), so resets from URL/presets must update both.
+  const applySearch = useCallback((val: string) => {
+    setFilterSearch(val)
     setCommittedSearch(val)
-    if (!val.trim()) setFilterSearch('')
+  }, [])
+
+  const commitSearch = (val: string) => {
+    if (!val.trim()) applySearch('')
+    else setCommittedSearch(val)
   }
+
+  // Clearing the input (✕ or backspace) drops the active search right away.
+  useEffect(() => {
+    if (!filterSearch.trim() && committedSearch) setCommittedSearch('')
+  }, [filterSearch, committedSearch])
 
   const columnsToShow = useMemo(() => {
     if (allStatusColumns.length === 0) return []
@@ -347,8 +358,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setFilterTeamIds([])
     setFilterDateRange(null)
     setFilterDueDateRange(null)
-    setFilterSearch('')
-  }, [statusColumns, isCustomer, allStatuses])
+    applySearch('')
+  }, [statusColumns, isCustomer, allStatuses, applySearch])
 
   const queryClient = useQueryClient()
 
@@ -487,11 +498,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setFilterTeamIds(state.filterTeamIds)
     setFilterDateRange(state.filterDateRange)
     setFilterDueDateRange(state.filterDueDateRange ?? null)
-    setFilterSearch(state.filterSearch)
+    applySearch(state.filterSearch)
     setFilterSidebarCollapsed(state.filterSidebarCollapsed)
     setViewMode(vm)
     setTicketsPageLimitState(normalizeTicketsPageLimit(stored.ticketsPageLimit))
-    setCommittedSearch(state.filterSearch)
     try {
       const savedPrefs = localStorage.getItem('ticket-search-prefs')
       if (savedPrefs) {
@@ -500,7 +510,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         if (fields) setSearchFields(fields)
       }
     } catch { /* ignore */ }
-  }, [isCustomer])
+  }, [isCustomer, applySearch])
 
   const fetchLookup = async () => {
     try {
@@ -682,7 +692,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         setFilterTeamIds(parsed.filterTeamIds)
         setFilterDateRange(parsed.filterDateRange)
         setFilterDueDateRange(parsed.filterDueDateRange ?? null)
-        setFilterSearch(parsed.filterSearch)
+        applySearch(parsed.filterSearch)
         setViewMode(parsed.viewMode)
         setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
         setFilterTicketType(parsed.filterTicketType ?? null)
@@ -695,7 +705,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         setFilterTeamIds(parsed.filterTeamIds)
         setFilterDateRange(parsed.filterDateRange)
         setFilterDueDateRange(parsed.filterDueDateRange ?? null)
-        setFilterSearch(parsed.filterSearch)
+        applySearch(parsed.filterSearch)
         // Only apply viewMode if explicitly present in URL — preset=1 is always added by the save
         // effect even without a view param, so absent view means "keep current / localStorage value".
         if (searchParams.has(URL_PARAMS.view)) setViewMode(parsed.viewMode)
@@ -713,7 +723,8 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         if (searchParams.has(URL_PARAMS.due_date_from) && searchParams.has(URL_PARAMS.due_date_to)) {
           setFilterDueDateRange(parsed.filterDueDateRange ?? null)
         }
-        if (searchParams.has(URL_PARAMS.search)) setFilterSearch(parsed.filterSearch)
+        // Search is always mirrored into the URL, so a missing param means "no search" (e.g. navbar cleared).
+        applySearch(parsed.filterSearch)
         if (searchParams.has(URL_PARAMS.view)) setViewMode(parsed.viewMode)
         if (searchParams.has(URL_PARAMS.sidebar)) setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
         if (searchParams.has(URL_PARAMS.ticket_type)) setFilterTicketType(parsed.filterTicketType ?? null)
@@ -735,6 +746,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       }
       if (searchParams.has(URL_PARAMS.view)) setViewMode(parsed.viewMode)
       if (searchParams.has(URL_PARAMS.sidebar)) setFilterSidebarCollapsed(parsed.filterSidebarCollapsed)
+      applySearch(parsed.filterSearch)
     } else {
       const sidebarOnly = parseSidebarCollapsedFromUrl(searchParams)
       if (sidebarOnly !== null) {
@@ -755,7 +767,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         setFilterTeamIds([])
         setFilterDateRange(null)
         setFilterDueDateRange(null)
-        setFilterSearch('')
+        applySearch('')
         setViewMode('kanban')
         setFilterSidebarCollapsed(true)
         setFilterTicketType(null)
@@ -763,6 +775,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     }
   }, [
     pathname,
+    applySearch,
     searchParamsKey,
     searchParams,
     isCustomer,
@@ -787,7 +800,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         filterDueDateRange?.[0] && filterDueDateRange?.[1]
           ? [filterDueDateRange[0].toISOString(), filterDueDateRange[1].toISOString()]
           : null,
-      filterSearch: filterSearch || null,
+      filterSearch: committedSearch || null,
       viewMode: viewMode,
       filterSidebarCollapsed: filterSidebarCollapsed,
       ticketsPageLimit,
@@ -808,7 +821,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         filterTeamIds,
         filterDateRange,
         filterDueDateRange,
-        filterSearch,
+        filterSearch: committedSearch,
         viewMode,
         filterTicketType: isCustomer ? null : filterTicketType,
       })
@@ -828,7 +841,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     filterTeamIds,
     filterDateRange,
     filterDueDateRange,
-    filterSearch,
+    committedSearch,
     viewMode,
     filterSidebarCollapsed,
     filterTicketType,
@@ -845,7 +858,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       filterTeamIds,
       filterDateRange,
       filterDueDateRange,
-      filterSearch,
+      filterSearch: committedSearch,
       viewMode,
       filterTicketType: isCustomer ? null : filterTicketType,
     })
@@ -857,7 +870,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     filterTeamIds,
     filterDateRange,
     filterDueDateRange,
-    filterSearch,
+    committedSearch,
     viewMode,
     filterTicketType,
     isCustomer,
