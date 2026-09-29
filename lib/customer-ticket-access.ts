@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, not, or, type SQL } from 'drizzle-orm'
 
-import { getCustomerCompanyId } from '@/lib/customer-company'
+import { getCustomerCompanyIds } from '@/lib/customer-company'
 import { db, tickets } from '@/lib/db'
 import { coerceTicketType } from '@/lib/ticket-classification'
 import {
@@ -40,10 +40,10 @@ export async function customerMaySeeVisibility(visibility: string | null | undef
 export function customerCanAccessTicket(
   ticket: CustomerTicketRow,
   userId: string,
-  customerCompanyId: string | null
+  customerCompanyIds: string[]
 ): boolean {
   if (ticket.companyId) {
-    return customerCompanyId !== null && ticket.companyId === customerCompanyId
+    return customerCompanyIds.includes(ticket.companyId)
   }
   return customerOwnsPersonalTicket(ticket, userId)
 }
@@ -60,14 +60,14 @@ export async function customerBlockedVisibilityLevels(): Promise<string[]> {
 /** SQL condition for the customer ticket list. */
 export async function customerTicketsAccessCondition(
   userId: string,
-  customerCompanyId: string | null
+  customerCompanyIds: string[]
 ): Promise<SQL> {
   const personalOwned = and(
     isNull(tickets.companyId),
     or(eq(tickets.contactUserId, userId), eq(tickets.createdBy, userId))!
   )!
-  const scope = customerCompanyId
-    ? or(eq(tickets.companyId, customerCompanyId), personalOwned)!
+  const scope = customerCompanyIds.length > 0
+    ? or(inArray(tickets.companyId, customerCompanyIds), personalOwned)!
     : personalOwned
 
   const blocked = await customerBlockedVisibilityLevels()
@@ -79,7 +79,7 @@ export async function assertCustomerMayAccessTicket(
   userId: string,
   ticketId: number
 ): Promise<{ ok: true } | { ok: false; status: 403 | 404 }> {
-  const customerCompanyId = await getCustomerCompanyId(userId)
+  const customerCompanyIds = await getCustomerCompanyIds(userId)
   const [trow] = await db
     .select({
       companyId: tickets.companyId,
@@ -92,7 +92,7 @@ export async function assertCustomerMayAccessTicket(
     .where(eq(tickets.id, ticketId))
     .limit(1)
   if (!trow) return { ok: false, status: 404 }
-  if (!customerCanAccessTicket(trow, userId, customerCompanyId)) {
+  if (!customerCanAccessTicket(trow, userId, customerCompanyIds)) {
     return { ok: false, status: 403 }
   }
   if (!(await customerMaySeeVisibility(trow.visibility))) {

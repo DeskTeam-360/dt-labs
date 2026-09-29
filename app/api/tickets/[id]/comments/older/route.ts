@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { getCustomerCompanyId } from '@/lib/customer-company'
+import { getCustomerCompanyIds } from '@/lib/customer-company'
 import { customerCanAccessTicket } from '@/lib/customer-ticket-access'
 import { db, tickets } from '@/lib/db'
 import {
@@ -33,9 +33,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const role = (session.user as { role?: string }).role?.toLowerCase()
   const userId = session.user.id!
-  let customerPortal: { userId: string; companyId: string | null } | undefined
+  let customerPortal: { userId: string; companyIds: string[] } | undefined
   if (role === 'customer') {
-    customerPortal = { userId, companyId: await getCustomerCompanyId(userId) }
+    customerPortal = { userId, companyIds: await getCustomerCompanyIds(userId) }
   }
 
   const [trow] = await db
@@ -50,7 +50,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!trow) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
-  if (customerPortal && !customerCanAccessTicket(trow, customerPortal.userId, customerPortal.companyId)) {
+  if (customerPortal && !customerCanAccessTicket(trow, customerPortal.userId, customerPortal.companyIds)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

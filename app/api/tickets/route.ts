@@ -4,12 +4,11 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { isAdmin } from '@/lib/auth-utils'
 import { loadAutomationTicketContext, runAutomationRules } from '@/lib/automation-engine'
-import { getCustomerCompanyId } from '@/lib/customer-company'
+import { getCustomerCompanyIds } from '@/lib/customer-company'
 import { customerTicketsAccessCondition } from '@/lib/customer-ticket-access'
 import { db } from '@/lib/db'
 import {
   companies,
-  companyUsers,
   projects,
   projectStatuses,
   tags,
@@ -58,9 +57,9 @@ export async function GET(request: Request) {
   const isCustomerViewer = role === 'customer'
 
   // Customer: company tickets + personal tickets without company (owner)
-  let customerCompanyId: string | null = null
+  let customerCompanyIds: string[] = []
   if (isCustomerViewer) {
-    customerCompanyId = await getCustomerCompanyId(userId)
+    customerCompanyIds = await getCustomerCompanyIds(userId)
   }
 
   const url = new URL(request.url)
@@ -134,7 +133,8 @@ export async function GET(request: Request) {
 
   const conditions: SQL[] = []
   if (isCustomerList) {
-    conditions.push(await customerTicketsAccessCondition(userId, customerCompanyId))
+    conditions.push(await customerTicketsAccessCondition(userId, customerCompanyIds))
+    if (companyIds.length > 0) conditions.push(inArray(tickets.companyId, companyIds))
   } else if (isAdminList) {
     if (companyIds.length > 0) conditions.push(inArray(tickets.companyId, companyIds))
   } else {
@@ -491,14 +491,12 @@ export async function POST(request: Request) {
       ? Math.max(0, Math.floor(numericPriorityRaw))
       : 0
   let resolvedCompanyId = company_id || null
-  if (role === 'customer' && !resolvedCompanyId) {
-    const [userRow] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1)
-    let cid = userRow?.companyId ?? null
-    if (!cid) {
-      const [cu] = await db.select({ companyId: companyUsers.companyId }).from(companyUsers).where(eq(companyUsers.userId, userId)).limit(1)
-      cid = cu?.companyId ?? null
+  if (role === 'customer') {
+    const allowedCompanyIds = await getCustomerCompanyIds(userId)
+    if (resolvedCompanyId && !allowedCompanyIds.includes(resolvedCompanyId)) {
+      return NextResponse.json({ error: 'You cannot create tickets for this company' }, { status: 403 })
     }
-    resolvedCompanyId = cid
+    resolvedCompanyId = resolvedCompanyId ?? allowedCompanyIds[0] ?? null
   }
 
   let contactUserId: string | null = null

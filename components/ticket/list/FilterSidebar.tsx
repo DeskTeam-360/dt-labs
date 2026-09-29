@@ -166,6 +166,21 @@ export default function FilterSidebar({
                 ))}
               </Select>
             </div>
+            {isCustomer && companies.length > 1 && (
+              <div>
+                <Text style={{ fontSize: 12, display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.65)' }}>Company</Text>
+                <Select
+                  mode="multiple"
+                  placeholder="All my companies"
+                  allowClear
+                  style={{ width: '100%' }}
+                  value={filterCompanyIds}
+                  onChange={(v) => onFilterCompanyIdsChange(v ?? [])}
+                  maxTagCount="responsive"
+                  options={companies.map((c) => ({ value: c.id, label: c.name }))}
+                />
+              </div>
+            )}
             {!isCustomer && (
               <>
                 <div>

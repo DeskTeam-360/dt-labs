@@ -58,6 +58,17 @@ export async function GET() {
 
     const rows = await query
 
+    const extraAccessRows = await db
+      .select({ userId: companyUsers.userId, companyId: companyUsers.companyId })
+      .from(companyUsers)
+      .where(eq(companyUsers.ticketAccess, true))
+    const extraCompanyIdsByUser = new Map<string, string[]>()
+    for (const r of extraAccessRows) {
+      const list = extraCompanyIdsByUser.get(r.userId) ?? []
+      list.push(r.companyId)
+      extraCompanyIdsByUser.set(r.userId, list)
+    }
+
     const result = rows.map((r) => {
     const u = r.user
     return {
@@ -70,6 +81,7 @@ export async function GET() {
       status: u.status,
       company_id: u.companyId,
       company: r.company ? { id: r.company.id, name: r.company.name } : null,
+      extra_company_ids: (extraCompanyIdsByUser.get(u.id) ?? []).filter((cid) => cid !== u.companyId),
       avatar_url: u.avatarUrl,
       created_at: u.createdAt ? new Date(u.createdAt).toISOString() : '',
       last_login_at: u.lastLoginAt ? new Date(u.lastLoginAt).toISOString() : null,

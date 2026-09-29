@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gte, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { getCustomerCompanyId } from '@/lib/customer-company'
+import { getCustomerCompanyIds } from '@/lib/customer-company'
 import { customerTicketsAccessCondition } from '@/lib/customer-ticket-access'
 import { db } from '@/lib/db'
 import {
@@ -48,10 +48,11 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id
-  const companyId = await getCustomerCompanyId(userId)
+  const companyIds = await getCustomerCompanyIds(userId)
+  const companyId = companyIds[0] ?? null
 
   // Support tickets: company + personal (no company); exclude spam/trash
-  const customerAccess = await customerTicketsAccessCondition(userId, companyId)
+  const customerAccess = await customerTicketsAccessCondition(userId, companyIds)
   const myTickets = await db
     .select({
       id: tickets.id,

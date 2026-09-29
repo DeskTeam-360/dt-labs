@@ -222,6 +222,19 @@ export default function TicketFormModal({
           </Form.Item>
         )}
 
+        {showSimplifiedForm && !editingTicket && companies.length > 1 && (
+          <Form.Item
+            name="company_id"
+            label="Company"
+            rules={[{ required: true, message: 'Select the company for this ticket' }]}
+          >
+            <Select
+              placeholder="Select company"
+              options={companies.map((c) => ({ value: c.id, label: c.name }))}
+            />
+          </Form.Item>
+        )}
+
         <Row gutter={24}>
           {editingTicket && !showSimplifiedForm ? (
             <Col span={8}>

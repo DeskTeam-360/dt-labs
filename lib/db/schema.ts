@@ -97,6 +97,7 @@ export const companyUsers = pgTable(
     companyId: uuid('company_id').notNull(),
     userId: uuid('user_id').notNull(),
     companyRole: varchar('company_role', { length: 32 }).notNull().default('member'),
+    ticketAccess: boolean('ticket_access').notNull().default(false),
     createdAt: ts('created_at').notNull().defaultNow(),
     updatedAt: ts('updated_at').notNull().defaultNow(),
   },

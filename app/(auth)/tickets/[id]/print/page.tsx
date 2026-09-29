@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
 import TicketPrintView from '@/components/ticket/TicketPrintView'
-import { db, tickets, users } from '@/lib/db'
+import { getCustomerCompanyIds } from '@/lib/customer-company'
+import { db, tickets } from '@/lib/db'
 import { getTicketDetail } from '@/lib/ticket-detail'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -29,12 +30,8 @@ export default async function TicketPrintPage({ params }: { params: Promise<{ id
   const isCustomer = role === 'customer'
 
   // Customers see filtered view (no internal notes)
-  const [userRow] = isCustomer
-    ? await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, session.user.id!)).limit(1)
-    : [null]
-
   const options = isCustomer
-    ? { customerPortal: { userId: session.user.id!, companyId: (userRow as { companyId: string | null } | null)?.companyId ?? null }, screenshotUserId: session.user.id! }
+    ? { customerPortal: { userId: session.user.id!, companyIds: await getCustomerCompanyIds(session.user.id!) }, screenshotUserId: session.user.id! }
     : { screenshotUserId: session.user.id! }
 
   const data = await getTicketDetail(ticketId, options)

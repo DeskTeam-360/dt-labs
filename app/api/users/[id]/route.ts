@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { randomBytes } from 'crypto'
-import { and, eq, ne, sql } from 'drizzle-orm'
+import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 import { google } from 'googleapis'
 import { NextResponse } from 'next/server'
 
@@ -449,10 +449,43 @@ export async function PATCH(
     await db.delete(companyUsers).where(eq(companyUsers.userId, id))
   }
 
+  let extraCompaniesChanged = false
+  if (Array.isArray(body.extra_company_ids)) {
+    if (!isAdmin && role !== 'manager') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const primaryId = (updateData.companyId as string | null | undefined) ?? targetUser.companyId ?? null
+    const wanted = [...new Set((body.extra_company_ids as unknown[]).map(String).filter(Boolean))].filter(
+      (cid) => cid !== primaryId
+    )
+    const current = await db
+      .select({ companyId: companyUsers.companyId })
+      .from(companyUsers)
+      .where(and(eq(companyUsers.userId, id), eq(companyUsers.ticketAccess, true)))
+    const revoke = current.map((r) => r.companyId).filter((cid) => !wanted.includes(cid))
+    if (revoke.length > 0) {
+      await db
+        .update(companyUsers)
+        .set({ ticketAccess: false, updatedAt: new Date() })
+        .where(and(eq(companyUsers.userId, id), inArray(companyUsers.companyId, revoke)))
+    }
+    for (const cid of wanted) {
+      await db
+        .insert(companyUsers)
+        .values({ companyId: cid, userId: id, ticketAccess: true })
+        .onConflictDoUpdate({
+          target: [companyUsers.companyId, companyUsers.userId],
+          set: { ticketAccess: true, updatedAt: new Date() },
+        })
+    }
+    extraCompaniesChanged = revoke.length > 0 || wanted.some((cid) => !current.some((r) => r.companyId === cid))
+  }
+
   const [afterRow] = await db.select().from(users).where(eq(users.id, id)).limit(1)
   if (afterRow) {
     const extra: Record<string, unknown> = {}
     if (passwordChanged) extra.password_changed = true
+    if (extraCompaniesChanged) extra.extra_company_ids = body.extra_company_ids
     await logUserUpdated({
       actorUserId: session.user.id ?? null,
       actorRole: actorRoleFromSession(session),

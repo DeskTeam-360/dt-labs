@@ -31,7 +31,6 @@ export default function AdminMainColumn({
   noSidebarInset,
   layoutProps,
 }: Props) {
-  const isCustomer = (user.role ?? '').toLowerCase() === 'customer'
   const layoutStyle: CSSProperties = {
     marginLeft: noSidebarInset ? 0 : collapsed ? 80 : 250,
     transition: 'margin-left 0.2s',
@@ -44,7 +43,7 @@ export default function AdminMainColumn({
       <GlobalAnnouncementBar />
 
       <TicketSearchNavbar
-        savedFiltersUserId={!isCustomer ? user.id : undefined}
+        savedFiltersUserId={user.id}
         navbarUser={user}
       />
 

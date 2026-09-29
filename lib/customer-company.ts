@@ -17,9 +17,30 @@ export async function getCustomerCompanyId(userId: string): Promise<string | nul
   return companyId
 }
 
+/**
+ * Companies whose tickets a portal customer may see: primary company plus `company_users` rows
+ * an admin granted with `ticket_access`. Falls back to `getCustomerCompanyId` when neither exists.
+ */
+export async function getCustomerCompanyIds(userId: string): Promise<string[]> {
+  const [[userRow], granted] = await Promise.all([
+    db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1),
+    db
+      .select({ companyId: companyUsers.companyId })
+      .from(companyUsers)
+      .where(and(eq(companyUsers.userId, userId), eq(companyUsers.ticketAccess, true))),
+  ])
+  const ids = new Set<string>()
+  if (userRow?.companyId) ids.add(userRow.companyId)
+  for (const r of granted) ids.add(r.companyId)
+  if (ids.size === 0) {
+    const fallback = await getCustomerCompanyId(userId)
+    if (fallback) ids.add(fallback)
+  }
+  return [...ids]
+}
+
 export async function customerOwnsCompany(userId: string, companyId: string): Promise<boolean> {
-  const cid = await getCustomerCompanyId(userId)
-  return cid !== null && cid === companyId
+  return (await getCustomerCompanyIds(userId)).includes(companyId)
 }
 
 /** User is linked to this company via `users.company_id` or `company_users`. */

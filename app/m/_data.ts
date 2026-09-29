@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm'
 
 import { auth } from '@/auth'
-import { getCustomerCompanyId } from '@/lib/customer-company'
+import { getCustomerCompanyIds } from '@/lib/customer-company'
 import {
   companies,
   db,
@@ -44,11 +44,11 @@ export async function getMobileTickets() {
   const conditions = []
 
   if (isCustomer) {
-    const companyId = await getCustomerCompanyId(user.id)
-    if (companyId) {
+    const companyIds = await getCustomerCompanyIds(user.id)
+    if (companyIds.length > 0) {
       conditions.push(
         or(
-          eq(tickets.companyId, companyId),
+          inArray(tickets.companyId, companyIds),
           and(eq(tickets.createdBy, user.id), isNull(tickets.companyId)),
         )
       )
@@ -154,8 +154,8 @@ export async function getMobileDashboardStats() {
 
   let baseWhere: ReturnType<typeof eq> | ReturnType<typeof and> | undefined
   if (isCustomer) {
-    const companyId = await getCustomerCompanyId(user.id)
-    baseWhere = companyId ? eq(tickets.companyId, companyId) : eq(tickets.createdBy, user.id)
+    const companyIds = await getCustomerCompanyIds(user.id)
+    baseWhere = companyIds.length > 0 ? inArray(tickets.companyId, companyIds) : eq(tickets.createdBy, user.id)
   }
 
   const allStatuses = await db.select({ slug: ticketStatuses.slug }).from(ticketStatuses)

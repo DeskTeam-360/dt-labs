@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { isAdmin } from '@/lib/auth-utils'
-import { getCustomerCompanyId } from '@/lib/customer-company'
+import { getCustomerCompanyIds } from '@/lib/customer-company'
 import { customerTicketsAccessCondition } from '@/lib/customer-ticket-access'
 import { db, tags, ticketActivityLog, tickets, ticketTags, users } from '@/lib/db'
 import { TICKET_ACTIVITY_ACTIONS, type TicketActivityAction } from '@/lib/ticket-activity-actions'
@@ -49,8 +49,8 @@ export async function GET(request: Request) {
   let ticketFilter: SQL | null = null
 
   if (role === 'customer') {
-    const companyId = await getCustomerCompanyId(userId)
-    ticketFilter = await customerTicketsAccessCondition(userId, companyId)
+    const companyIds = await getCustomerCompanyIds(userId)
+    ticketFilter = await customerTicketsAccessCondition(userId, companyIds)
   } else if (!isAdmin(role)) {
     ticketFilter = visibilityAccess
   }

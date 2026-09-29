@@ -400,7 +400,10 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       const inJunkFolder =
         !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
       if (inJunkFolder) params.set('ticket_type', filterTicketType!)
-      if (!isCustomer) {
+      if (isCustomer) {
+        const customerCompanyIds = filterCompanyIds.filter((id) => id !== '__none__')
+        if (customerCompanyIds.length > 0) params.set('company_ids', customerCompanyIds.join(','))
+      } else {
         const noCompany = filterCompanyIds.includes('__none__')
         const realCompanyIds = filterCompanyIds.filter((id) => id !== '__none__')
         if (noCompany) params.set('no_company', '1')
@@ -1005,7 +1008,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setAttachmentUploading(true)
     try {
       const companyId = isCustomer
-        ? userCompanyId ?? undefined
+        ? (form.getFieldValue('company_id') as string | undefined) || userCompanyId || undefined
         : (form.getFieldValue('company_id') as string | undefined)
       const companyName = companyId ? companies.find((c) => c.id === companyId)?.name : undefined
       for (let i = 0; i < arr.length; i++) {
@@ -1091,7 +1094,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       if (isCustomer && !editingTicket) {
         effectiveValues.status = newTicketDefaultStatus
         effectiveValues.visibility = 'public'
-        effectiveValues.company_id = userCompanyId ?? null
+        effectiveValues.company_id = values.company_id || userCompanyId || null
       }
 
       const teamIdNormalized =

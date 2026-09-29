@@ -82,6 +82,7 @@ interface UserRecord {
   status: string
   company_id: string | null
   company?: { id: string; name: string } | null
+  extra_company_ids?: string[]
   avatar_url: string | null
   created_at: string
   last_login_at: string | null
@@ -123,6 +124,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     description: string
   } | null>(null)
   const selectedRole = Form.useWatch('role', form)
+  const selectedCompanyId = Form.useWatch('company_id', form) as string | undefined
   const watchedEmail = Form.useWatch('email', form) as string | undefined
   const emailChanged =
     !!editingUser && isAdmin && !!watchedEmail &&
@@ -217,6 +219,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       role: record.role,
       status: record.status,
       company_id: record.company_id || undefined,
+      extra_company_ids: record.extra_company_ids ?? [],
       phone: record.phone || '',
       department: record.department || '',
       position: record.position || '',
@@ -382,6 +385,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
           Object.assign(patchBody, {
             role: values.role,
             company_id: values.company_id || null,
+            ...(values.role === 'customer' ? { extra_company_ids: values.extra_company_ids ?? [] } : {}),
             department: values.department || null,
             position: values.position || null,
             bio: values.bio || null,
@@ -1134,6 +1138,24 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                         showSearch
                         optionFilterProp="label"
                         options={companies.map((c) => ({ label: c.name, value: c.id }))}
+                      />
+                    </Form.Item>
+                  )}
+                  {selectedRole === 'customer' && editingUser && (
+                    <Form.Item
+                      name="extra_company_ids"
+                      label="Additional companies"
+                      extra="This customer will also see all tickets of these companies in My Tickets."
+                    >
+                      <Select
+                        mode="multiple"
+                        placeholder="None"
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        options={companies
+                          .filter((c) => c.id !== selectedCompanyId)
+                          .map((c) => ({ label: c.name, value: c.id }))}
                       />
                     </Form.Item>
                   )}

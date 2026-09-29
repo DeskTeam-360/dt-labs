@@ -42,7 +42,7 @@ export interface TicketDetailOptions {
   /** @deprecated Prefer customerPortal */
   companyId?: string
   /** Portal customer: company tickets + personal tickets without company */
-  customerPortal?: { userId: string; companyId: string | null }
+  customerPortal?: { userId: string; companyIds: string[] }
   /** Filter screenshots by user (both admin and customer show only current user's) */
   screenshotUserId?: string
 }
@@ -226,11 +226,11 @@ export async function getTicketDetail(ticketId: number, options?: TicketDetailOp
 
   const t = ticketRow.ticket
   if (options?.customerPortal) {
-    const { userId, companyId } = options.customerPortal
+    const { userId, companyIds } = options.customerPortal
     if (!customerCanAccessTicket(
       { companyId: t.companyId, contactUserId: t.contactUserId, createdBy: t.createdBy },
       userId,
-      companyId
+      companyIds
     )) {
       return null
     }

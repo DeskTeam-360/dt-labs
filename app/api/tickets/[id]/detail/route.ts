@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { isAdmin } from '@/lib/auth-utils'
-import { getCustomerCompanyId } from '@/lib/customer-company'
+import { getCustomerCompanyIds } from '@/lib/customer-company'
 import { db, teamMembers, teams, tickets } from '@/lib/db'
 import { getTicketDetail } from '@/lib/ticket-detail'
 
@@ -61,7 +61,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           screenshotUserId: userId,
           customerPortal: {
             userId,
-            companyId: await getCustomerCompanyId(userId),
+            companyIds: await getCustomerCompanyIds(userId),
           },
         }
       : { screenshotUserId: userId }
