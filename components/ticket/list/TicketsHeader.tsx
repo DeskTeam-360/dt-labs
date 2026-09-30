@@ -1,10 +1,12 @@
 'use client'
 
-import { AppstoreOutlined, IdcardOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SettingOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, CloudDownloadOutlined, IdcardOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SettingOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Flex, Input, Popover, Segmented, Select, Space, Switch, theme, Tooltip, Typography } from 'antd'
 import { useState } from 'react'
 
 import { TICKETS_PAGE_LIMIT_OPTIONS, type TicketsPageLimit } from '@/lib/tickets-list-query'
+
+import ImportFdTicketsModal from './ImportFdTicketsModal'
 
 type ViewMode = 'kanban' | 'list' | 'card' | 'roundrobin'
 
@@ -50,6 +52,7 @@ export default function TicketsHeader({
   const { token } = theme.useToken()
   const searchPending = loading && !!filterSearch.trim()
   const [prefOpen, setPrefOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   const fieldsSet = new Set(searchFields.split(',').map((s) => s.trim()).filter(Boolean))
 
@@ -166,9 +169,16 @@ export default function TicketsHeader({
                 </Tooltip>
               )}
             </Flex>
-            <Button type="primary" icon={<PlusOutlined />} onClick={onCreateClick} loading={loading}>
-              Add Ticket
-            </Button>
+            <Flex gap={8}>
+              {!isCustomer && (
+                <Button icon={<CloudDownloadOutlined />} onClick={() => setImportOpen(true)}>
+                  Import from FD
+                </Button>
+              )}
+              <Button type="primary" icon={<PlusOutlined />} onClick={onCreateClick} loading={loading}>
+                Add Ticket
+              </Button>
+            </Flex>
           </Flex>
         )}
 
@@ -180,6 +190,9 @@ export default function TicketsHeader({
           </Flex>
         )}
       </Flex>
+      {!isCustomer && (
+        <ImportFdTicketsModal open={importOpen} onClose={() => setImportOpen(false)} onImported={onRefresh} />
+      )}
     </div>
   )
 }

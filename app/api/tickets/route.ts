@@ -93,6 +93,7 @@ export async function GET(request: Request) {
   const paginated = url.searchParams.get('paginated') === '1'
   const sortOrder = url.searchParams.get('sort_order') === 'asc' ? 'asc' : 'desc'
   const sortById = url.searchParams.get('sort_by') === 'id'
+  const sortByCreated = url.searchParams.get('sort_by') === 'created_at'
   const limit = Math.min(
     Math.max(1, parseInt(url.searchParams.get('limit') || String(DEFAULT_LIMIT), 10)),
     MAX_LIMIT
@@ -226,6 +227,13 @@ export async function GET(request: Request) {
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
+  const idOrder = sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id)
+  const ticketOrder = sortByCreated
+    ? [sortOrder === 'asc' ? asc(tickets.createdAt) : desc(tickets.createdAt), idOrder]
+    : sortById
+      ? [idOrder]
+      : [asc(tickets.priority), asc(tickets.companyId), idOrder]
+
   const baseQuery = db
     .select({
       ticket: tickets,
@@ -243,15 +251,11 @@ export async function GET(request: Request) {
   const ticketsRows = whereClause
     ? await baseQuery
         .where(whereClause)
-        .orderBy(...(sortById
-          ? [sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id)]
-          : [asc(tickets.priority), asc(tickets.companyId), sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id)]))
+        .orderBy(...ticketOrder)
         .limit(limit)
         .offset(offset)
     : await baseQuery
-        .orderBy(...(sortById
-          ? [sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id)]
-          : [asc(tickets.priority), asc(tickets.companyId), sortOrder === 'asc' ? asc(tickets.id) : desc(tickets.id)]))
+        .orderBy(...ticketOrder)
         .limit(limit)
         .offset(offset)
 

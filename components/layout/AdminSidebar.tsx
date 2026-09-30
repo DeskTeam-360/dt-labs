@@ -2,6 +2,7 @@
 
 import {
   CheckSquareOutlined,
+  ClockCircleOutlined,
   DashboardOutlined,
   DeleteOutlined,
   MenuFoldOutlined,
@@ -55,6 +56,7 @@ function selectedKeysForPathname(pathname: string | null, ticketsSearch: string)
     if (tt === 'trash') return ['/tickets?ticket_type=trash']
     return ['/tickets']
   }
+  if (pathname === '/tickets/latest') return ['/tickets/latest']
   if (pathname === '/reference' || pathname.startsWith('/reference/')) return ['/reference']
   if (pathname === '/projects' || pathname.startsWith('/projects/')) return ['/projects']
   if (isSettingsHrefPathname(pathname)) return ['/settings']
@@ -126,6 +128,11 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
                   label: linkLabel('/tickets', 'All tickets'),
                 },
                 {
+                  key: '/tickets/latest',
+                  icon: <ClockCircleOutlined />,
+                  label: linkLabel('/tickets/latest', 'Latest tickets'),
+                },
+                {
                   key: '/tickets?ticket_type=spam',
                   icon: <WarningOutlined />,
                   label: linkLabel('/tickets?ticket_type=spam', 'Spam'),
@@ -165,7 +172,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     if (isCustomer) {
       return item.key !== '/settings'
     }
-    const ticketMenuKeys = ['/tickets', '/tickets?ticket_type=spam', '/tickets?ticket_type=trash']
+    const ticketMenuKeys = ['/tickets', '/tickets/latest', '/tickets?ticket_type=spam', '/tickets?ticket_type=trash']
     if (ticketMenuKeys.includes(item.key as string) && !canAccessTickets(role)) return false
     if (item.key === '/settings' && !canAccessSettingsHub(role)) return false
     return true
