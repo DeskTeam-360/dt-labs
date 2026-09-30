@@ -251,7 +251,7 @@ export async function importFdTicketById(params: {
       : { ticketId, status: 'id_conflict', title: existing.title, message: 'This ID is already used by a ticket created in DeskTeam360, so it was not overwritten.' }
   }
 
-  const { status: httpStatus, data: ft } = await fd.get<FdTicket>(`/api/v2/tickets/${ticketId}?include=description`)
+  const { status: httpStatus, data: ft } = await fd.get<FdTicket>(`/api/v2/tickets/${ticketId}`)
   if (httpStatus === 404) return { ticketId, status: 'not_found', message: 'Ticket not found in Freshdesk.' }
   if (!ft) return { ticketId, status: 'error', message: `Freshdesk returned HTTP ${httpStatus}.` }
 
