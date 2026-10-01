@@ -130,6 +130,7 @@ function normalizeForMatch(email: string): string {
 
 const USER_ACTIVATION_TEMPLATE_KEY = 'requester_notification_user_activation' as const
 const USER_PASSWORD_TEMPLATE_KEY = 'requester_notification_password_reset' as const
+const SYNC_OVERLAP_MS = 5 * 60 * 1000
 
 function encodeSubjectHeader(subject: string): string {
   if (/^[\x01-\x7F]*$/.test(subject)) return subject
@@ -607,6 +608,10 @@ export async function POST(request: NextRequest) {
       ? Math.floor(lastSyncAt.getTime() / 1000)
       : twoDaysAgo
     const searchQuery = `(is:inbox OR in:spam) after:${sinceSeconds}`
+    // The next run must start from before this listing, not from when this run finishes:
+    // mail that arrives while we process would otherwise fall between runs and never sync.
+    // The overlap also covers Gmail's search indexing delay; re-listed mail is skipped by gmail_message_id.
+    const nextSyncFrom = new Date(Date.now() - SYNC_OVERLAP_MS)
 
     // Paginate to fetch all matching messages (Gmail defaults to max 50 per page)
     const messages: { id: string }[] = []
@@ -801,6 +806,14 @@ export async function POST(request: NextRequest) {
 
       if (!ticketId) {
         ticketId = parseTicketIdFromSubject(subject)
+        if (ticketId) {
+          // "Ticket #N" may be someone else's number (e.g. a Freshdesk forward). Unknown N → treat as a new email, don't drop it.
+          const [known] = await db.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)).limit(1)
+          if (!known) {
+            if (isDebug) debugLog.push({ email: senderEmail, subject: subject || '', reason: `INFO: subject #${ticketId} is not a known ticket — creating a new ticket` })
+            ticketId = null
+          }
+        }
       }
 
       if (ticketId) {
@@ -1679,7 +1692,7 @@ export async function POST(request: NextRequest) {
 
     await db
       .update(emailIntegrations)
-      .set({ lastSyncAt: new Date(), updatedAt: new Date() })
+      .set({ lastSyncAt: nextSyncFrom, updatedAt: new Date() })
       .where(eq(emailIntegrations.id, integration.id))
 
     if (isDebug) {
@@ -1690,7 +1703,7 @@ export async function POST(request: NextRequest) {
       success: true,
       addedCount,
       createdCount,
-      lastSyncAt: new Date().toISOString(),
+      lastSyncAt: nextSyncFrom.toISOString(),
       totalFromGmail: messages.length,
       newToProcess: fetched.length,
       ...(isDebug && {
