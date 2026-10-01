@@ -219,6 +219,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
+                {canAccessEmailIntegration(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Held & Blocked Emails"
+                      description="Emails that didn't become tickets, and the sender blocklist"
+                      href="/settings/email-skip-list"
+                      icon={<MailOutlined />}
+                    />
+                  </Col>
+                )}
                 {canAccessSlackNotifications(role) && (
                   <Col xs={24} sm={12} md={8}>
                     <HubTile
