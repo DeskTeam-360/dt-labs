@@ -6,8 +6,16 @@ import { canAccessMyTeams } from '@/lib/auth-utils'
 import { db, teamMembers, teams, tickets, ticketTimeTracker, users } from '@/lib/db'
 import { loadActiveJobTypeTitleMap } from '@/lib/job-types-db'
 import { accumulateSession, roundHourly, type SessionLike } from '@/lib/my-teams-activity-aggregate'
-import { localDayBoundsFromYmd, localYmd, validateMyTeamsActivityDayWindow } from '@/lib/my-teams-date'
+import { localYmd, validateMyTeamsActivityDayWindow } from '@/lib/my-teams-date'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
+
+const DAY_MS = 24 * 3600 * 1000
+
+/** YYYY-MM-DD plus n days, as pure calendar arithmetic (timezone-independent). */
+function addDaysYmd(ymd: string, n: number): string {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
+}
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role
@@ -115,13 +123,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
     .orderBy(desc(ticketTimeTracker.startTime))
     .limit(800)
 
-  // Build list of calendar dates in the range (local YYYY-MM-DD)
-  const rangeDates: string[] = []
-  const cursorDate = new Date(dayStart)
-  while (cursorDate.getTime() <= dayEnd.getTime()) {
-    rangeDates.push(localYmd(cursorDate))
-    cursorDate.setDate(cursorDate.getDate() + 1)
-  }
+  // Days follow the viewer's calendar: labels from the client's local start date, bounds from day_start.
+  // The server's own timezone (UTC in production) must not be used here, or days shift by the UTC offset.
+  const dayCount = Math.max(1, Math.round((dayEnd.getTime() + 1 - dayStart.getTime()) / DAY_MS))
+  const rangeDays = Array.from({ length: dayCount }, (_, i) => {
+    const start = new Date(dayStart.getTime() + i * DAY_MS)
+    const end = new Date(Math.min(start.getTime() + DAY_MS - 1, dayEnd.getTime()))
+    return { ymd: addDaysYmd(date, i), start, end }
+  })
+  const rangeDates = rangeDays.map((d) => d.ymd)
   const isMultiDay = rangeDates.length > 1
 
   const teamHourly = Array.from({ length: 24 }, () => 0)
@@ -161,9 +171,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
 
     // Accumulate per-day totals for multi-day range
     if (isMultiDay) {
-      for (const ymd of rangeDates) {
-        const dayBounds = localDayBoundsFromYmd(ymd)
-        if (!dayBounds) continue
+      for (const { ymd, ...dayBounds } of rangeDays) {
         const rep2 =
           reportedDurationSeconds({ durationSeconds: t.durationSeconds, durationAdjustment: t.durationAdjustment }) ?? 0
         const endWall = t.stopTime ? new Date(t.stopTime) : now

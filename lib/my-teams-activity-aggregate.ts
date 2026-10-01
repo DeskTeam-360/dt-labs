@@ -8,13 +8,15 @@ export type SessionLike = {
   durationAdjustment: number | null
 }
 
+const HOUR_MS = 3600 * 1000
+
 function empty24(): number[] {
   return Array.from({ length: 24 }, () => 0)
 }
 
 /**
- * Seconds of reported time overlapping [dayStart, dayEnd], attributed across **local** clock hours (0–23)
- * for the calendar day represented by `dayStart`..`dayEnd` (typically local midnight..end from the client).
+ * Seconds of reported time overlapping [dayStart, dayEnd], attributed across the viewer's local clock hours (0–23).
+ * `dayStart` must be the viewer's local midnight (sent by the client); hour 0 starts there.
  * Running sessions use `now` as stop for wall-clock span; reported seconds scale to overlap.
  */
 export function accumulateSession(
@@ -42,11 +44,13 @@ export function accumulateSession(
   const overlapSec = (overlapEndMs - overlapStartMs) / 1000
   const attributed = rep * (overlapSec / wallSec)
 
+  // Hours are counted from the viewer's local midnight (`dayStart`), not the server's timezone.
+  const originMs = dayStart.getTime()
   let cursor = overlapStartMs
   while (cursor < overlapEndMs) {
-    const d = new Date(cursor)
-    const h = d.getHours()
-    const nextHour = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1, 0, 0, 0).getTime()
+    const hoursFromOrigin = Math.floor((cursor - originMs) / HOUR_MS)
+    const h = ((hoursFromOrigin % 24) + 24) % 24
+    const nextHour = originMs + (hoursFromOrigin + 1) * HOUR_MS
     const segEnd = Math.min(overlapEndMs, nextHour)
     const segDur = (segEnd - cursor) / 1000
     const slice = attributed * (segDur / overlapSec)
