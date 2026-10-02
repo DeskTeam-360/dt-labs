@@ -9,7 +9,7 @@ export interface AutomationActions {
   priority?: number
   /** @deprecated UI removed; engine still applies legacy rules */
   priority_slug?: string
-  /** @deprecated UI removed; engine still applies legacy rules */
+  /** Set the ticket type (ticket_types.slug) */
   type_slug?: string
   /** Row classification: support | spam | trash (column ticket_type, not type_id) */
   ticket_type?: string

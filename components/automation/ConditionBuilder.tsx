@@ -69,6 +69,7 @@ export const CONDITION_FIELDS: Field[] = [
     { name: 'resolved', label: 'Resolved' },
     { name: 'closed', label: 'Closed' },
   ]},
+  { name: 'type', label: 'Ticket type', valueEditorType: 'select', values: [] },
   { name: 'sender_domain', label: 'Sender Domain' },
   { name: 'sender_email', label: 'Sender Email' },
   // { name: 'assignee_id', label: 'Assignee ID' },
@@ -104,6 +105,7 @@ interface ConditionBuilderProps {
 
 export default function ConditionBuilder({ value, onChange = () => {} }: ConditionBuilderProps) {
   const [statuses, setStatuses] = useState<{ name: string; label: string }[]>([])
+  const [ticketTypes, setTicketTypes] = useState<{ name: string; label: string }[]>([])
 
   useEffect(() => {
     fetch('/api/tickets/lookup', { credentials: 'include' })
@@ -112,13 +114,18 @@ export default function ConditionBuilder({ value, onChange = () => {} }: Conditi
         if (Array.isArray(data?.statuses)) {
           setStatuses(data.statuses.map((s: { slug: string; title: string }) => ({ name: s.slug, label: s.title })))
         }
+        if (Array.isArray(data?.ticketTypes)) {
+          setTicketTypes(data.ticketTypes.map((t: { slug: string; title: string }) => ({ name: t.slug, label: t.title })))
+        }
       })
       .catch(() => {})
   }, [])
 
-  const fields: Field[] = CONDITION_FIELDS.map((f) =>
-    f.name === 'status' && statuses.length > 0 ? { ...f, values: statuses } : f
-  )
+  const fields: Field[] = CONDITION_FIELDS.map((f) => {
+    if (f.name === 'status' && statuses.length > 0) return { ...f, values: statuses }
+    if (f.name === 'type') return { ...f, values: ticketTypes }
+    return f
+  })
 
   const [query, setQuery] = useState<RuleGroupType>(() => {
     const v = value as OurConditionGroup | undefined

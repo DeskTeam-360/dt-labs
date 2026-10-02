@@ -13,6 +13,7 @@ type ActionType =
   | 'assignee_ids'
   | 'priority'
   | 'status_slug'
+  | 'type_slug'
   | 'ticket_type'
   | 'tag_ids'
   | 'add_note'
@@ -41,6 +42,7 @@ const ACTION_LABELS: Record<ActionType, string> = {
   assignee_ids: 'Assign to Agent(s)',
   priority: 'Set Priority (number)',
   status_slug: 'Set Status',
+  type_slug: 'Set Ticket Type',
   ticket_type: 'Set classification (spam / trash)',
   tag_ids: 'Add Tags',
   add_note: 'Add Note',
@@ -73,6 +75,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
     'assignee_ids',
     'priority',
     'status_slug',
+    'type_slug',
     'ticket_type',
     'tag_ids',
     'add_note',
@@ -119,6 +122,8 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
       ;(next as Record<string, unknown>).add_checklist_items = []
     } else if (type === 'status_slug') {
       ;(next as Record<string, unknown>).status_slug = ''
+    } else if (type === 'type_slug') {
+      ;(next as Record<string, unknown>).type_slug = ''
     } else if (type === 'ticket_type') {
       ;(next as Record<string, unknown>).ticket_type = 'support'
     } else if (type === 'priority') {
@@ -147,6 +152,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
       'assignee_ids',
       'priority',
       'status_slug',
+      'type_slug',
       'ticket_type',
       'tag_ids',
       'add_note',
@@ -266,6 +272,20 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                     value={(actions as Record<string, unknown>).status_slug as string | undefined}
                     onChange={(v) => update('status_slug', v)}
                     options={lookup.statuses.map((s) => ({ value: s.slug, label: s.title }))}
+                  />
+                )}
+                {type === 'type_slug' && (
+                  <Select
+                    showSearch
+                    allowClear
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    placeholder="Select ticket type"
+                    style={{ width: '100%' }}
+                    value={(actions as Record<string, unknown>).type_slug as string | undefined}
+                    onChange={(v) => update('type_slug', v)}
+                    options={lookup.ticketTypes.map((t) => ({ value: t.slug, label: t.title }))}
                   />
                 )}
                 {type === 'ticket_type' && (
