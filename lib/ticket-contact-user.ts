@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 
 import { companyUsers, db, users } from '@/lib/db'
 
@@ -19,6 +19,28 @@ export async function getEffectiveCompanyIdForUser(userId: string): Promise<stri
     .orderBy(asc(companyUsers.createdAt))
     .limit(1)
   return cu?.companyId ?? null
+}
+
+/**
+ * Companies a contact belongs to for ticket purposes: primary company plus admin-granted additional
+ * companies (`company_users.ticket_access`). Falls back to the effective company when there are none.
+ */
+export async function getContactCompanyIds(userId: string): Promise<string[]> {
+  const [[u], granted] = await Promise.all([
+    db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1),
+    db
+      .select({ companyId: companyUsers.companyId })
+      .from(companyUsers)
+      .where(and(eq(companyUsers.userId, userId), eq(companyUsers.ticketAccess, true))),
+  ])
+  const ids = new Set<string>()
+  if (u?.companyId) ids.add(u.companyId)
+  for (const r of granted) ids.add(r.companyId)
+  if (ids.size === 0) {
+    const fallback = await getEffectiveCompanyIdForUser(userId)
+    if (fallback) ids.add(fallback)
+  }
+  return [...ids]
 }
 
 /**

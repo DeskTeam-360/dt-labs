@@ -35,6 +35,7 @@ import {
 } from '@/lib/ticket-company-priority-order'
 import {
   assertTicketContactUserAllowed,
+  getContactCompanyIds,
   getEffectiveCompanyIdForUser,
 } from '@/lib/ticket-contact-user'
 import { sendAgentClosesTicketEmail, sendTicketAssignedEmail } from '@/lib/ticket-notification-emails'
@@ -503,7 +504,12 @@ export async function PATCH(
     }
 
     if (nextContact) {
-      const contactEffectiveCompany = await getEffectiveCompanyIdForUser(nextContact)
+      const contactCompanyIds = await getContactCompanyIds(nextContact)
+      // Contacts can belong to several companies; keep the ticket's company when it is one of them.
+      const contactEffectiveCompany =
+        mergedCompanyId && contactCompanyIds.includes(mergedCompanyId)
+          ? mergedCompanyId
+          : await getEffectiveCompanyIdForUser(nextContact)
       if (contactEffectiveCompany && contactEffectiveCompany !== mergedCompanyId) {
         if (company_id !== undefined) {
           // User explicitly changed company — contact belongs to a different company, so clear the contact.

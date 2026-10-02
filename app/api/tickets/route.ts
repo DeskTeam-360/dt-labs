@@ -36,6 +36,7 @@ import {
 } from '@/lib/ticket-company-priority-order'
 import {
   assertTicketContactUserAllowed,
+  getContactCompanyIds,
   getEffectiveCompanyIdForUser,
 } from '@/lib/ticket-contact-user'
 import { sendNewTicketAgentNotificationEmail } from '@/lib/ticket-notification-emails'
@@ -518,7 +519,12 @@ export async function POST(request: Request) {
   const companyIdBeforeContactAlign = resolvedCompanyId
   let ticketCrossCompanyWarning: string | undefined
   if (contactUserId) {
-    const contactCompany = await getEffectiveCompanyIdForUser(contactUserId)
+    const contactCompanyIds = await getContactCompanyIds(contactUserId)
+    // A contact may belong to several companies; only realign when the chosen company isn't one of them.
+    const contactCompany =
+      resolvedCompanyId && contactCompanyIds.includes(resolvedCompanyId)
+        ? resolvedCompanyId
+        : await getEffectiveCompanyIdForUser(contactUserId)
     if (contactCompany && contactCompany !== resolvedCompanyId) {
       if (companyIdBeforeContactAlign && companyIdBeforeContactAlign !== contactCompany) {
         ticketCrossCompanyWarning =

@@ -1,8 +1,9 @@
-import { asc } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { revalidateTag, unstable_cache } from 'next/cache'
 
 import {
   companies,
+  companyUsers,
   db,
   tags,
   teams,
@@ -29,6 +30,7 @@ async function loadTicketsLookupCatalog() {
     companiesData,
     tagsData,
     statusesData,
+    extraCompanyRows,
   ] = await Promise.all([
     db.select({ id: teams.id, name: teams.name, type: teams.type }).from(teams).orderBy(asc(teams.name)),
     db
@@ -79,7 +81,18 @@ async function loadTicketsLookupCatalog() {
       })
       .from(ticketStatuses)
       .orderBy(asc(ticketStatuses.sortOrder)),
+    db
+      .select({ userId: companyUsers.userId, companyId: companyUsers.companyId })
+      .from(companyUsers)
+      .where(eq(companyUsers.ticketAccess, true)),
   ])
+
+  const extraCompaniesByUser = new Map<string, string[]>()
+  for (const r of extraCompanyRows) {
+    const list = extraCompaniesByUser.get(r.userId) ?? []
+    list.push(r.companyId)
+    extraCompaniesByUser.set(r.userId, list)
+  }
 
   return {
     teams: teamsData,
@@ -89,6 +102,8 @@ async function loadTicketsLookupCatalog() {
       email: u.email,
       role: u.role,
       company_id: u.companyId ?? null,
+      /** Primary company plus admin-granted additional companies. */
+      company_ids: [...new Set([u.companyId, ...(extraCompaniesByUser.get(u.id) ?? [])].filter((c): c is string => !!c))],
     })),
     ticketTypes: ticketTypesData,
     ticketPriorities: ticketPrioritiesData,

@@ -19,8 +19,8 @@ import { useCallback,useId, useMemo } from 'react'
 
 import CommentWysiwyg from '@/components/ticket/detail/CommentWysiwyg'
 
-import type { Team, TicketRecord, UserRecord } from './types'
 import type { NewTicketAttachment,TicketAttachment } from './types'
+import { type Team, type TicketRecord, userInCompany,type UserRecord } from './types'
 
 const { Option } = Select
 
@@ -99,7 +99,7 @@ export default function TicketFormModal({
     if (!watchedContactUserId || !watchedCompanyId) return null
     const u = users.find((x) => x.id === watchedContactUserId)
     const uc = u?.company_id
-    if (!uc || uc === watchedCompanyId) return null
+    if (!u || !uc || userInCompany(u, watchedCompanyId)) return null
     const otherName = companies.find((c) => c.id === uc)?.name ?? 'another company'
     return `Contact belongs to a different company (${otherName}). When the ticket is created, its company will match the contact's company (cross-company).`
   }, [showSimplifiedForm, open, watchedContactUserId, watchedCompanyId, users, companies])
@@ -343,7 +343,7 @@ export default function TicketFormModal({
               showSearch
               optionFilterProp="label"
               options={users
-                .filter((u) => String(u.email || '').trim() && (!watchedCompanyId || u.company_id === watchedCompanyId))
+                .filter((u) => String(u.email || '').trim() && (!watchedCompanyId || userInCompany(u, watchedCompanyId)))
                 .map((u) => ({
                   value: u.id,
                   label: u.full_name ? `${u.full_name} (${u.email})` : u.email,

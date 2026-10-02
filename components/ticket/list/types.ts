@@ -72,6 +72,13 @@ export interface UserRecord {
   role?: string
   /** From users.company_id in lookup; may be null even if user is in company_users */
   company_id?: string | null
+  /** Primary + admin-granted additional companies (lookup) */
+  company_ids?: string[]
+}
+
+/** User belongs to the company as primary or as an admin-granted additional company. */
+export function userInCompany(u: Pick<UserRecord, 'company_id' | 'company_ids'>, companyId: string): boolean {
+  return u.company_id === companyId || (u.company_ids ?? []).includes(companyId)
 }
 
 export interface TicketStatusRecord {
