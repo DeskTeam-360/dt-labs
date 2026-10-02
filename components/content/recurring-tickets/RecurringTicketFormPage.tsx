@@ -137,6 +137,7 @@ export interface RecurringTicketFormValues {
   ticketTypeId: number | string | null
   contactUserId: string | null
   assigneeIds: string[]
+  tagIds?: string[]
 }
 
 interface Props {
@@ -160,6 +161,7 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
   const [ticketTypes, setTicketTypes] = useState<OptionItem[]>([])
   const [statuses, setStatuses] = useState<OptionItem[]>([])
   const [contacts, setContacts] = useState<OptionItem[]>([])
+  const [tagOptions, setTagOptions] = useState<OptionItem[]>([])
 
   useEffect(() => {
     Promise.all([
@@ -168,7 +170,10 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
       fetch('/api/ticket-types').then(r => r.json()).catch(() => ({ data: [] })),
       fetch('/api/ticket-statuses').then(r => r.json()).catch(() => ({ data: [] })),
       fetch('/api/users?limit=500').then(r => r.json()).catch(() => ({ data: [] })),
-    ]).then(([comp, team, types, sts, allUsr]) => {
+      fetch('/api/tags').then(r => r.json()).catch(() => []),
+    ]).then(([comp, team, types, sts, allUsr, tagRows]) => {
+      const tagArr = Array.isArray(tagRows) ? tagRows : (tagRows.data ?? [])
+      setTagOptions(tagArr.map((t: { id: string; name: string }) => ({ label: t.name, value: t.id })))
       setCompanies((comp.data ?? comp ?? []).map((c: { id: string; name: string }) => ({ label: c.name, value: c.id })))
       setTeams((team.data ?? team ?? []).map((t: { id: string; name: string }) => ({ label: t.name, value: t.id })))
       const typesArr = Array.isArray(types) ? types : (types.data ?? [])
@@ -204,6 +209,7 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
         ticket_type_id: initialValues.ticketTypeId ?? null,
         contact_user_id: initialValues.contactUserId ?? null,
         assignee_ids: Array.isArray(initialValues.assigneeIds) && initialValues.assigneeIds.length > 0 ? initialValues.assigneeIds[0] : null,
+        tag_ids: initialValues.tagIds ?? [],
       })
     } else {
       form.setFieldsValue({
@@ -243,6 +249,7 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
         ticket_type_id: values.ticket_type_id || null,
         contact_user_id: values.contact_user_id || null,
         assignee_ids: values.assignee_ids ? [values.assignee_ids] : [],
+        tag_ids: Array.isArray(values.tag_ids) ? values.tag_ids : [],
       }
 
       const url = isEdit ? `/api/recurring-tickets/${initialValues!.id}` : '/api/recurring-tickets'
@@ -411,6 +418,12 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
               </Row>
 
               <Row gutter={12}>
+                <Col span={24}>
+                  <Form.Item name="tag_ids" label="Tags">
+                    <Select mode="multiple" allowClear showSearch placeholder="Select tags"
+                      optionFilterProp="label" options={tagOptions} />
+                  </Form.Item>
+                </Col>
                 <Col span={12}>
                   <Form.Item name="ticket_type_id" label="Ticket type">
                     <Select allowClear showSearch placeholder="Select type"

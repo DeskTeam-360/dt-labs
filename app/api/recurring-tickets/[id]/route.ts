@@ -100,6 +100,7 @@ export async function PATCH(
   if (body.ticket_type_id !== undefined) updates.ticketTypeId = body.ticket_type_id ?? null
   if (body.contact_user_id !== undefined) updates.contactUserId = body.contact_user_id ?? null
   if (body.assignee_ids !== undefined) updates.assigneeIds = Array.isArray(body.assignee_ids) ? body.assignee_ids : []
+  if (body.tag_ids !== undefined) updates.tagIds = Array.isArray(body.tag_ids) ? body.tag_ids.map(String) : []
   if (body.visibility !== undefined) {
     if (!isTicketVisibilityLevel(body.visibility)) {
       return NextResponse.json({ error: 'invalid visibility' }, { status: 400 })

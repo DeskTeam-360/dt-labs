@@ -1,9 +1,9 @@
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { canAccessRecurringTickets } from '@/lib/auth-utils'
-import { db, recurringTicketRuns, recurringTickets, ticketAssignees, tickets } from '@/lib/db'
+import { db, recurringTicketRuns, recurringTickets, tags, ticketAssignees, tickets, ticketTags } from '@/lib/db'
 import { sendRecurringTicketCreatedEmail } from '@/lib/recurring-ticket-email'
 import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
 import { applyRecurringTicketTemplate } from '@/lib/recurring-ticket-template'
@@ -63,6 +63,14 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       const assigneeIds = Array.isArray(rule.assigneeIds) ? rule.assigneeIds as string[] : []
       if (assigneeIds.length > 0) {
         await tx.insert(ticketAssignees).values(assigneeIds.map((userId) => ({ ticketId: row.id, userId })))
+      }
+      const ruleTagIds = Array.isArray(rule.tagIds) ? (rule.tagIds as string[]) : []
+        // Skip tags deleted since the rule was saved; a dangling id would fail the FK and the whole run.
+        const tagIds = ruleTagIds.length
+          ? (await tx.select({ id: tags.id }).from(tags).where(inArray(tags.id, ruleTagIds))).map((t) => t.id)
+          : []
+      if (tagIds.length > 0) {
+        await tx.insert(ticketTags).values(tagIds.map((tagId) => ({ ticketId: row.id, tagId }))).onConflictDoNothing()
       }
 
       newTicket = row

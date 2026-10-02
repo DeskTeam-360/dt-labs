@@ -839,6 +839,7 @@ export const recurringTickets = pgTable('recurring_tickets', {
   teamId: uuid('team_id'),
   companyId: uuid('company_id'),
   assigneeIds: jsonb('assignee_ids').$type<string[]>().default([]),
+  tagIds: jsonb('tag_ids').$type<string[]>().notNull().default([]),
   ticketTypeId: integer('ticket_type_id'),
   contactUserId: uuid('contact_user_id'),
   visibility: varchar('visibility', { length: 32 }).notNull().default('team'),
