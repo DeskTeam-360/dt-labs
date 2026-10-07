@@ -149,17 +149,9 @@ export default function DashboardContent({ user }: DashboardContentProps) {
   const [timeSummary, setTimeSummary] = useState<{ data: UserTimeSummary; fetchedAt: number } | null>(null)
 
   const fetchTimeSummary = useCallback(async () => {
-    const now = dayjs()
-    const monthStart = now.startOf('month')
-    const params = new URLSearchParams({
-      today_start: now.startOf('day').toISOString(),
-      // Week starts on Monday regardless of locale.
-      week_start: now.startOf('day').subtract((now.day() + 6) % 7, 'day').toISOString(),
-      month_start: monthStart.toISOString(),
-      last_month_start: monthStart.subtract(1, 'month').toISOString(),
-    })
     try {
-      const data = await apiFetch<UserTimeSummary>(`/api/users/time-summary?${params}`)
+      // Period boundaries are cut on the server in the user's profile timezone.
+      const data = await apiFetch<UserTimeSummary>('/api/users/time-summary')
       setTimeSummary({ data, fetchedAt: Date.now() })
     } catch {
       setTimeSummary(null)
@@ -306,7 +298,10 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                 prefix={<ClockCircleOutlined />}
                 styles={{ content: { color: '#1890ff', fontSize: 18 } }}
               />
-              <Text type="secondary" style={{ fontSize: 12 }}>Tickets: {trackerStats.todayTickets}</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Tickets: {trackerStats.todayTickets}
+                {timeSummary ? ` · ${timeSummary.data.timezone}` : ''}
+              </Text>
             </Card>
           </Col>
           <Col xs={24} sm={12} lg={6}>
