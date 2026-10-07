@@ -32,6 +32,7 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { useEffect, useState } from 'react'
 
 import DateDisplay from '@/components/common/DateDisplay'
+import StopTimerNoteModal from '@/components/ticket/StopTimerNoteModal'
 
 const { Text } = Typography
 const { RangePicker } = DatePicker
@@ -360,18 +361,24 @@ export default function TabTimeTracker({
   }
 
   /** Admin: stop another user’s running timer from the list (own timer uses the main Stop button). */
-  const stopTimerSessionForRow = async (session: Record<string, unknown>) => {
+  const [stopNoteSession, setStopNoteSession] = useState<Record<string, unknown> | null>(null)
+  const stopTimerSessionForRow = (session: Record<string, unknown>) => setStopNoteSession(session)
+
+  const confirmStopTimerSessionForRow = async (note: string) => {
+    if (!stopNoteSession) return
     setMutating(true)
     try {
       await apiFetch(`/api/tickets/${ticketId}/time-tracker`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'stop', session_id: session.id }),
+        body: JSON.stringify({ action: 'stop', session_id: stopNoteSession.id, note }),
       })
+      setStopNoteSession(null)
       message.success('Timer stopped')
       await onTimeTrackingChanged()
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to stop timer')
+      throw e
     } finally {
       setMutating(false)
     }
@@ -772,6 +779,16 @@ export default function TabTimeTracker({
           ) : null}
         </Form>
       </Modal>
+      <StopTimerNoteModal
+        open={!!stopNoteSession}
+        context={
+          stopNoteSession
+            ? `Stopping ${String((stopNoteSession.user as { full_name?: string; email?: string } | undefined)?.full_name || (stopNoteSession.user as { email?: string } | undefined)?.email || 'this user')}'s timer`
+            : null
+        }
+        onCancel={() => setStopNoteSession(null)}
+        onSubmit={confirmStopTimerSessionForRow}
+      />
     </Space>
   )
 }

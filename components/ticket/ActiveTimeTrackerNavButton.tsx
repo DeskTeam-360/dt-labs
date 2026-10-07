@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useCallback, useEffect, useState } from 'react'
 
+import StopTimerNoteModal from '@/components/ticket/StopTimerNoteModal'
+
 const { Text } = Typography
 
 const POLL_MS = 20_000
@@ -94,19 +96,32 @@ export default function ActiveTimeTrackerNavButton() {
     return () => window.clearInterval(interval)
   }, [activeTrackers])
 
-  const handlePauseTracker = async (row: ActiveTrackerRow) => {
+  // Pausing closes the session too, so it needs the same work note as Stop.
+  const [noteRequest, setNoteRequest] = useState<{ row: ActiveTrackerRow; mode: 'pause' | 'stop' } | null>(null)
+
+  const handlePauseTracker = (row: ActiveTrackerRow) => {
+    setOpen(false)
+    setNoteRequest({ row, mode: 'pause' })
+  }
+  const handleStopTracker = (row: ActiveTrackerRow) => {
+    setOpen(false)
+    setNoteRequest({ row, mode: 'stop' })
+  }
+
+  const pauseTracker = async (row: ActiveTrackerRow, note: string) => {
     setPausingId(row.id)
     try {
       await apiFetch(`/api/tickets/${row.ticket_id}/time-tracker`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'stop', session_id: row.id }),
+        body: JSON.stringify({ action: 'stop', session_id: row.id, note }),
       })
       const elapsed = elapsedBySessionId[row.id] ?? 0
       setActiveTrackers((prev) => prev.filter((t) => t.id !== row.id))
       setPausedTrackers((prev) => [...prev.filter((p) => p.row.id !== row.id), { row, elapsed }])
     } catch (error: unknown) {
       message.error(error instanceof Error ? error.message : 'Failed to pause tracker')
+      throw error
     } finally {
       setPausingId(null)
     }
@@ -129,21 +144,29 @@ export default function ActiveTimeTrackerNavButton() {
     }
   }
 
-  const handleStopTracker = async (row: ActiveTrackerRow) => {
+  const stopTracker = async (row: ActiveTrackerRow, note: string) => {
     setStoppingId(row.id)
     try {
       await apiFetch(`/api/tickets/${row.ticket_id}/time-tracker`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'stop', session_id: row.id }),
+        body: JSON.stringify({ action: 'stop', session_id: row.id, note }),
       })
       setActiveTrackers((prev) => prev.filter((t) => t.id !== row.id))
       message.success('Time tracker stopped')
     } catch (error: unknown) {
       message.error(error instanceof Error ? error.message : 'Failed to stop tracker')
+      throw error
     } finally {
       setStoppingId(null)
     }
+  }
+
+  const confirmNote = async (note: string) => {
+    if (!noteRequest) return
+    if (noteRequest.mode === 'pause') await pauseTracker(noteRequest.row, note)
+    else await stopTracker(noteRequest.row, note)
+    setNoteRequest(null)
   }
 
   const running = activeTrackers.length > 0
@@ -242,6 +265,7 @@ export default function ActiveTimeTrackerNavButton() {
   )
 
   return (
+    <>
     <Popover
       content={popoverContent}
       trigger={['hover', 'click']}
@@ -283,5 +307,14 @@ export default function ActiveTimeTrackerNavButton() {
         ) : null}
       </button>
     </Popover>
+    <StopTimerNoteModal
+      open={!!noteRequest}
+      title={noteRequest?.mode === 'pause' ? 'Pause timer' : 'Stop timer'}
+      okText={noteRequest?.mode === 'pause' ? 'Pause timer' : 'Stop timer'}
+      context={noteRequest ? `#${noteRequest.row.ticket_id} ${noteRequest.row.ticket?.title ?? ''}`.trim() : null}
+      onCancel={() => setNoteRequest(null)}
+      onSubmit={confirmNote}
+    />
+    </>
   )
 }

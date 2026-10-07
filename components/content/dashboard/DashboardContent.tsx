@@ -19,6 +19,7 @@ import DashboardAnnouncementsSection from '@/components/dashboard/DashboardAnnou
 import DashboardHourlyActivityCard from '@/components/dashboard/DashboardHourlyActivityCard'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import StopTimerNoteModal from '@/components/ticket/StopTimerNoteModal'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
@@ -247,14 +248,20 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     return () => clearInterval(interval)
   }, [activeTrackers])
 
-  const handleStopTracker = async (row: ActiveTrackerRow) => {
+  const [stopNoteRow, setStopNoteRow] = useState<ActiveTrackerRow | null>(null)
+  const handleStopTracker = (row: ActiveTrackerRow) => setStopNoteRow(row)
+
+  const confirmStopTracker = async (note: string) => {
+    const row = stopNoteRow
+    if (!row) return
     setStoppingId(row.id)
     try {
       await apiFetch(`/api/tickets/${row.ticket_id}/time-tracker`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'stop', session_id: row.id }),
+        body: JSON.stringify({ action: 'stop', session_id: row.id, note }),
       })
+      setStopNoteRow(null)
       setActiveTrackers((prev) => prev.filter((t) => t.id !== row.id))
       message.success('Time tracker stopped')
       void loadTrackerDashboardData()
@@ -263,6 +270,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         error instanceof Error ? error.message : 'Failed to stop tracker'
       message.error(errMsg)
       console.error('Stop tracker error:', error)
+      throw error
     } finally {
       setStoppingId(null)
     }
@@ -535,6 +543,12 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         </Row>
         </Content>
       </AdminMainColumn>
+      <StopTimerNoteModal
+        open={!!stopNoteRow}
+        context={stopNoteRow ? `#${stopNoteRow.ticket_id} ${stopNoteRow.ticket?.title ?? ''}`.trim() : null}
+        onCancel={() => setStopNoteRow(null)}
+        onSubmit={confirmStopTracker}
+      />
     </Layout>
   )
 }

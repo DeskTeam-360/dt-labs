@@ -42,6 +42,7 @@ const { useBreakpoint } = Grid
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef,useState } from 'react'
 
+import StopTimerNoteModal from '@/components/ticket/StopTimerNoteModal'
 import { uploadTicketFile } from '@/utils/storage'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
@@ -574,20 +575,29 @@ export default function TicketDetailContent({
         }
     }
 
+    const [stopNoteOpen, setStopNoteOpen] = useState(false)
+
     const handleStopTimeTracker = async () => {
+        if (!activeTimeTracker) return
+        setStopNoteOpen(true)
+    }
+
+    const confirmStopTimeTracker = async (note: string) => {
         if (!activeTimeTracker) return
         setLoading(true)
         try {
             await apiFetch(`/api/tickets/${displayTicket.id}/time-tracker`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'stop', session_id: activeTimeTracker.id }),
+                body: JSON.stringify({ action: 'stop', session_id: activeTimeTracker.id, note }),
             })
             setActiveTimeTracker(null)
+            setStopNoteOpen(false)
             message.success('Time tracker stopped')
             fetchTimeTrackerSessions()
         } catch (err: any) {
             message.error(err?.message || 'Failed to stop time tracker')
+            throw err
         } finally {
             setLoading(false)
         }
@@ -1973,6 +1983,12 @@ export default function TicketDetailContent({
                     </div>
                 </Content>
             </AdminMainColumn>
+            <StopTimerNoteModal
+                open={stopNoteOpen}
+                context={`#${displayTicket.id} ${displayTicket.title ?? ''}`.trim()}
+                onCancel={() => setStopNoteOpen(false)}
+                onSubmit={confirmStopTimeTracker}
+            />
         </Layout>
     )
 }

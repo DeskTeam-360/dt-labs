@@ -250,6 +250,14 @@ export async function POST(
     const sessionId = sessionIdRaw.trim()
     const stopTime = new Date()
 
+    // Every finished session needs a work note (also enforced by the stop dialog in the UI).
+    let stopNote: string
+    try {
+      stopNote = normalizeNoteFromBodyOptional({ note: body.note ?? null }) as string
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 400 })
+    }
+
     const [active] = await db
       .select()
       .from(ticketTimeTracker)
@@ -273,7 +281,7 @@ export async function POST(
 
     await db
       .update(ticketTimeTracker)
-      .set({ stopTime, durationSeconds, durationAdjustment: durationSeconds })
+      .set({ stopTime, durationSeconds, durationAdjustment: durationSeconds, note: stopNote })
       .where(eq(ticketTimeTracker.id, sessionId))
 
     return NextResponse.json({ ok: true })
