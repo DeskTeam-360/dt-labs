@@ -35,12 +35,12 @@ import {
   TICKETS_LIST_SORT_ORDER,
 } from './types'
 
-type ColKey = 'company' | 'priority' | 'type' | 'tags' | 'due_date' | 'team' | 'status'
+type ColKey = 'company' | 'priority' | 'type' | 'tags' | 'due_date' | 'team' | 'status' | 'updated_at'
 
-const ALL_COL_KEYS: ColKey[] = ['company', 'priority', 'type', 'tags', 'due_date', 'team', 'status']
+const ALL_COL_KEYS: ColKey[] = ['company', 'priority', 'type', 'tags', 'due_date', 'team', 'status', 'updated_at']
 const COL_LABELS: Record<ColKey, string> = {
   company: 'Company', priority: 'Priority', type: 'Type',
-  tags: 'Tags', due_date: 'Due date', team: 'Team', status: 'Status',
+  tags: 'Tags', due_date: 'Due date', team: 'Team', status: 'Status', updated_at: 'Last update',
 }
 const LS_KEY = 'tickets_list_col_config'
 
@@ -55,7 +55,9 @@ function readColConfig(isCustomer = false): ColConfig {
     const raw = localStorage.getItem(key)
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<ColConfig>
-      const order = (parsed.order ?? ALL_COL_KEYS).filter((k): k is ColKey => ALL_COL_KEYS.includes(k as ColKey))
+      const saved = (parsed.order ?? ALL_COL_KEYS).filter((k): k is ColKey => ALL_COL_KEYS.includes(k as ColKey))
+      // Columns added after the user saved their layout are appended instead of staying hidden forever.
+      const order = [...saved, ...ALL_COL_KEYS.filter((k) => !saved.includes(k))]
       const hidden = (parsed.hidden ?? defaultHidden).filter((k): k is ColKey => ALL_COL_KEYS.includes(k as ColKey))
       return { order, hidden }
     }
@@ -94,6 +96,7 @@ const SORTABLE_COLUMN_FIELDS: Partial<Record<string, TicketSortField>> = {
   due_date: 'due_date',
   team: 'team',
   status: 'status',
+  updated_at: 'updated_at',
 }
 
 export default function TicketsListView({
@@ -262,6 +265,17 @@ export default function TicketsListView({
         record.team_name
           ? <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>{record.team_name}</Tag>
           : '—',
+    },
+    updated_at: {
+      title: 'Last update', dataIndex: 'updated_at', key: 'updated_at', width: 160,
+      render: (_: unknown, record: TicketRecord) =>
+        record.updated_at ? (
+          <span title={new Date(record.updated_at).toLocaleString()} style={{ fontSize: 12, color: '#8c8c8c' }}>
+            {new Date(record.updated_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+            {' '}
+            {new Date(record.updated_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        ) : '—',
     },
     status: {
       title: 'Status', dataIndex: 'status', key: 'status',
