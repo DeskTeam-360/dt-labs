@@ -23,6 +23,10 @@ export type TicketsListQueryKeyPayload = {
   debouncedSearch: string
   filterTicketType: string
   lookupReady: boolean
+  /** Search-in fields (title,description,comments); part of the key so changing them refetches. */
+  searchFields: string
+  /** List/Card server paging: "page:size:sortBy:order"; empty for Kanban/Round Robin. */
+  pageKey: string
 }
 
 function rangeKey(r: [Dayjs | null, Dayjs | null] | null): string {
@@ -42,6 +46,8 @@ export function buildTicketsListQueryKey(
     | 'filterDueDateRangeKey'
     | 'debouncedSearch'
     | 'filterTicketType'
+    | 'pageKey'
+    | 'searchFields'
   > & {
     filterCompanyIds: string[]
     filterStatus: string[]
@@ -52,6 +58,8 @@ export function buildTicketsListQueryKey(
     filterDueDateRange: [Dayjs | null, Dayjs | null] | null
     debouncedSearch: string
     filterTicketType: 'spam' | 'trash' | null
+    pageKey?: string
+    searchFields?: string
   }
 ): readonly ['tickets', 'list', TicketsListQueryKeyPayload] {
   const payload: TicketsListQueryKeyPayload = {
@@ -67,6 +75,8 @@ export function buildTicketsListQueryKey(
     debouncedSearch: ctx.debouncedSearch.trim(),
     filterTicketType: ctx.filterTicketType ?? '',
     lookupReady: ctx.lookupReady,
+    pageKey: ctx.pageKey ?? '',
+    searchFields: ctx.searchFields ?? '',
   }
   return ['tickets', 'list', payload] as const
 }

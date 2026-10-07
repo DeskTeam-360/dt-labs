@@ -78,6 +78,22 @@ interface TicketsListViewProps {
   onFilterByCompany?: (companyId: string) => void
   sortBy?: TicketSortField
   sortOrder?: TicketSortOrder
+  /** Server-side paging: `tickets` is already the current page. */
+  serverPaging?: { page: number; pageSize: number; total: number; onChange: (page: number, pageSize: number) => void }
+  /** Server-side sorting driven by column headers. */
+  serverSort?: { sortBy: TicketSortField; sortOrder: TicketSortOrder; onChange: (sortBy: TicketSortField, sortOrder: TicketSortOrder) => void }
+  loading?: boolean
+}
+
+const SORTABLE_COLUMN_FIELDS: Partial<Record<string, TicketSortField>> = {
+  id: 'id',
+  title: 'title',
+  company: 'company',
+  priority: 'priority',
+  type: 'type',
+  due_date: 'due_date',
+  team: 'team',
+  status: 'status',
 }
 
 export default function TicketsListView({
@@ -95,6 +111,9 @@ export default function TicketsListView({
   onFilterByCompany,
   sortBy = TICKETS_LIST_SORT_BY,
   sortOrder = TICKETS_LIST_SORT_ORDER,
+  serverPaging,
+  serverSort,
+  loading = false,
 }: TicketsListViewProps) {
   const router = useRouter()
 
@@ -128,9 +147,22 @@ export default function TicketsListView({
   }, [lsKey])
 
   const sortedTickets = useMemo(
-    () => sortTickets(tickets, sortBy, sortOrder),
-    [tickets, sortBy, sortOrder]
+    () => (serverPaging ? tickets : sortTickets(tickets, sortBy, sortOrder)),
+    [tickets, sortBy, sortOrder, serverPaging]
   )
+
+  /** Header sort state for server sorting (antd's controlled `sortOrder`). */
+  const withServerSort = <T extends { key: string }>(col: T) => {
+    const field = SORTABLE_COLUMN_FIELDS[col.key]
+    if (!serverSort || !field) return col
+    return {
+      ...col,
+      sorter: true,
+      sortDirections: ['ascend', 'descend'] as ('ascend' | 'descend')[],
+      sortOrder:
+        serverSort.sortBy === field ? (serverSort.sortOrder === 'asc' ? ('ascend' as const) : ('descend' as const)) : null,
+    }
+  }
 
   const effectivePagination = useMemo(() => {
     const totalListPages = Math.max(1, Math.ceil(sortedTickets.length / pagination.pageSize))
@@ -334,21 +366,40 @@ export default function TicketsListView({
             }
           : undefined
       }
-      pagination={{
-        current: effectivePagination.current,
-        pageSize: effectivePagination.pageSize,
-        total: sortedTickets.length,
-        showSizeChanger: true,
-        pageSizeOptions: ['10', '15', '20', '50'],
-        showTotal: (t) => `Total ${t} tickets`,
-        onChange: (page, ps) =>
-          setPagination((prev) => ({ current: page, pageSize: ps ?? prev.pageSize })),
-        onShowSizeChange: (_page, size) => setPagination({ current: 1, pageSize: size }),
+      loading={serverPaging ? loading : false}
+      onChange={(_pagination, _filters, sorter, extra) => {
+        if (!serverSort || extra.action !== 'sort') return
+        const s = Array.isArray(sorter) ? sorter[0] : sorter
+        const field = s?.columnKey ? SORTABLE_COLUMN_FIELDS[String(s.columnKey)] : undefined
+        if (field && s.order) serverSort.onChange(field, s.order === 'ascend' ? 'asc' : 'desc')
       }}
+      pagination={
+        serverPaging
+          ? {
+              current: serverPaging.page,
+              pageSize: serverPaging.pageSize,
+              total: serverPaging.total,
+              showSizeChanger: true,
+              pageSizeOptions: ['10', '15', '20', '50'],
+              showTotal: (t) => `Total ${t} tickets`,
+              onChange: (page, ps) => serverPaging.onChange(ps !== serverPaging.pageSize ? 1 : page, ps),
+            }
+          : {
+              current: effectivePagination.current,
+              pageSize: effectivePagination.pageSize,
+              total: sortedTickets.length,
+              showSizeChanger: true,
+              pageSizeOptions: ['10', '15', '20', '50'],
+              showTotal: (t) => `Total ${t} tickets`,
+              onChange: (page, ps) =>
+                setPagination((prev) => ({ current: page, pageSize: ps ?? prev.pageSize })),
+              onShowSizeChange: (_page, size) => setPagination({ current: 1, pageSize: size }),
+            }
+      }
       size="middle"
       columns={[
-        { title: '#', dataIndex: 'id', key: 'id', width: 72, align: 'center', render: (id: number) => <span style={{ color: '#8c8c8c', fontWeight: 500 }}>#{id}</span> },
-        {
+        withServerSort({ title: '#', dataIndex: 'id', key: 'id', width: 90, align: 'center' as const, render: (id: number) => <span style={{ color: '#8c8c8c', fontWeight: 500 }}>#{id}</span> }),
+        withServerSort({
           title: 'Title', dataIndex: 'title', key: 'title', ellipsis: true,
           render: (title: string, record: TicketRecord) => (
             <a href={`/tickets/${record.id}`} style={{ cursor: 'pointer', color: '#1677ff', padding: 0, height: 'auto', textDecoration: 'underline' }}
@@ -360,10 +411,10 @@ export default function TicketsListView({
               {!isCustomer && record.short_note && <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2, lineHeight: 1.3 }}>{record.short_note}</div>}
             </a>
           ),
-        },
+        }),
         ...colConfig.order
           .filter((k) => !colConfig.hidden.includes(k))
-          .map((k) => allColDefs[k]),
+          .map((k) => withServerSort(allColDefs[k])),
         {
           title: '', key: 'actions', width: 80,
           render: (_: unknown, record: TicketRecord) => (

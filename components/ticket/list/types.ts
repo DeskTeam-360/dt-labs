@@ -165,7 +165,30 @@ export function getVisibilityColor(visibility: string): string {
   }
 }
 
-export type TicketSortField = 'id' | 'title' | 'priority' | 'due_date' | 'updated_at' | 'created_at' | 'company'
+export type TicketSortField =
+  | 'id'
+  | 'title'
+  | 'priority'
+  | 'due_date'
+  | 'updated_at'
+  | 'created_at'
+  | 'company'
+  | 'status'
+  | 'type'
+  | 'team'
+
+export const TICKET_SORT_FIELDS: { value: TicketSortField; label: string }[] = [
+  { value: 'priority', label: 'Priority' },
+  { value: 'updated_at', label: 'Last update' },
+  { value: 'created_at', label: 'Created' },
+  { value: 'due_date', label: 'Due date' },
+  { value: 'id', label: 'Ticket #' },
+  { value: 'title', label: 'Title' },
+  { value: 'company', label: 'Company' },
+  { value: 'type', label: 'Type' },
+  { value: 'team', label: 'Team' },
+  { value: 'status', label: 'Status' },
+]
 export type TicketSortOrder = 'asc' | 'desc'
 
 /** Ticket list order: ascending priority — matches API and board/card/list views. */

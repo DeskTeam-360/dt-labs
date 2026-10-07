@@ -96,6 +96,9 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     setViewMode,
     sortBy,
     sortOrder,
+    isPagedView,
+    listPagination,
+    listSortControl,
     selectedAssignees,
     setSelectedAssignees,
     selectedTagIds,
@@ -202,7 +205,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
             />
           )}
 
-          {loading || !lookupReady ? (
+          {/* List/Card keep the current page on screen while the next page or sort loads. */}
+          {!lookupReady || (loading && !(isPagedView && filteredTickets.length > 0)) ? (
           <div style={{ padding: 48, textAlign: 'center' }}>
           <Spin size="large" />
           <div style={{ marginTop: 12 }}>Loading tasks...</div>
@@ -220,6 +224,9 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               onFilterByStatus={filterByStatusFromChip}
               onFilterByTag={filterByTagFromChip}
               onFilterByCompany={filterByCompanyFromChip}
+              serverPaging={listPagination}
+              serverSort={listSortControl}
+              loading={loading}
             />
           ) : viewMode === 'list' ? (
             <TicketsListView
@@ -237,6 +244,9 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               onFilterByStatus={filterByStatusFromChip}
               onFilterByTag={filterByTagFromChip}
               onFilterByCompany={filterByCompanyFromChip}
+              serverPaging={listPagination}
+              serverSort={listSortControl}
+              loading={loading}
             />
           ) : viewMode === 'roundrobin' && !isCustomer ? (
             <TicketsRoundRobinView

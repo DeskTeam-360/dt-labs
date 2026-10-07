@@ -27,7 +27,7 @@ import {
 } from '@/lib/tickets-list-query'
 import { deleteFile, uploadTicketFileDraft } from '@/utils/storage'
 
-import type { Team, TicketRecord, UserRecord } from './types'
+import type { Team, TicketRecord, TicketSortField, TicketSortOrder, UserRecord } from './types'
 import type { NewTicketAttachment } from './types'
 import type { TicketStatusRecord } from './types'
 import {
@@ -43,6 +43,29 @@ export type TicketsDragStartHandler = (event: DragStartEvent) => void
 export type TicketsDragEndHandler = (event: DragEndEvent) => Promise<void>
 
 const FILTER_STORAGE_KEY = 'deskteam-tickets-filter'
+const LIST_PAGE_SIZE_KEY = 'tickets_list_page_size'
+const LIST_SORT_KEY = 'tickets_list_sort'
+const DEFAULT_LIST_PAGE_SIZE = 15
+const LIST_PAGE_SIZES = [10, 15, 20, 50]
+const SORT_FIELDS: TicketSortField[] = ['id', 'title', 'priority', 'due_date', 'updated_at', 'created_at', 'company', 'status', 'type', 'team']
+
+function readStoredListPageSize(): number {
+  try {
+    const n = Number(sessionStorage.getItem(LIST_PAGE_SIZE_KEY))
+    if (LIST_PAGE_SIZES.includes(n)) return n
+  } catch { /* ignore */ }
+  return DEFAULT_LIST_PAGE_SIZE
+}
+
+function readStoredListSort(): { sortBy: TicketSortField; sortOrder: TicketSortOrder } {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LIST_SORT_KEY) || 'null') as { sortBy?: string; sortOrder?: string } | null
+    if (raw && SORT_FIELDS.includes(raw.sortBy as TicketSortField) && (raw.sortOrder === 'asc' || raw.sortOrder === 'desc')) {
+      return { sortBy: raw.sortBy as TicketSortField, sortOrder: raw.sortOrder }
+    }
+  } catch { /* ignore */ }
+  return { sortBy: TICKETS_LIST_SORT_BY, sortOrder: TICKETS_LIST_SORT_ORDER }
+}
 
 interface StoredFilter {
   filterStatus?: string[] | null
@@ -363,8 +386,22 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
 
   const queryClient = useQueryClient()
 
-  // list/card have built-in pagination so fetch all; kanban/RR show cards at once → use user limit
-  const effectiveTicketsLimit = (viewMode === 'list' || viewMode === 'card') ? 9999 : ticketsPageLimit
+  // List/Card page and sort on the server; Kanban/Round Robin load `ticketsPageLimit` cards at once.
+  const isPagedView = viewMode === 'list' || viewMode === 'card'
+  const [listPage, setListPage] = useState(1)
+  const [listPageSize, setListPageSize] = useState<number>(DEFAULT_LIST_PAGE_SIZE)
+  const [listSort, setListSort] = useState<{ sortBy: TicketSortField; sortOrder: TicketSortOrder }>({
+    sortBy: TICKETS_LIST_SORT_BY,
+    sortOrder: TICKETS_LIST_SORT_ORDER,
+  })
+  // Stored preferences are applied after mount so SSR and the first client render match.
+  useLayoutEffect(() => {
+    setListPageSize(readStoredListPageSize())
+    setListSort(readStoredListSort())
+  }, [])
+  const [listTotals, setListTotals] = useState<Record<string, number>>({})
+  const pageKey = isPagedView ? `${listPage}:${listPageSize}:${listSort.sortBy}:${listSort.sortOrder}` : ''
+  const effectiveTicketsLimit = ticketsPageLimit
 
   const ticketsListQueryKey = useMemo(
     () =>
@@ -382,6 +419,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         filterTicketType,
         lookupReady,
         searchFields,
+        pageKey,
       }),
     [
       isCustomer,
@@ -397,8 +435,29 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       filterTicketType,
       lookupReady,
       searchFields,
+      pageKey,
     ]
   )
+
+  // Any filter, search or sort change starts List/Card from page 1.
+  const listResetKey = JSON.stringify([ticketsListQueryKey[2], listPageSize, listSort]).replace(/"pageKey":"[^"]*"/, '')
+  const prevListResetKeyRef = useRef(listResetKey)
+  useEffect(() => {
+    if (prevListResetKeyRef.current === listResetKey) return
+    prevListResetKeyRef.current = listResetKey
+    setListPage(1)
+  }, [listResetKey])
+
+  const setListPagination = useCallback((page: number, pageSize: number) => {
+    setListPageSize(pageSize)
+    setListPage(page)
+    try { sessionStorage.setItem(LIST_PAGE_SIZE_KEY, String(pageSize)) } catch { /* ignore */ }
+  }, [])
+
+  const changeListSort = useCallback((sortBy: TicketSortField, sortOrder: TicketSortOrder) => {
+    setListSort({ sortBy, sortOrder })
+    try { localStorage.setItem(LIST_SORT_KEY, JSON.stringify({ sortBy, sortOrder })) } catch { /* ignore */ }
+  }, [])
 
   const ticketsListQueryKeyRef = useRef(ticketsListQueryKey)
   ticketsListQueryKeyRef.current = ticketsListQueryKey
@@ -452,6 +511,23 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
         params.set('search', debouncedSearch.trim())
         params.set('search_fields', searchFields || 'title,description')
       }
+      if (isPagedView) {
+        params.set('paginated', '1')
+        params.set('limit', String(listPageSize))
+        params.set('offset', String((listPage - 1) * listPageSize))
+        params.set('sort_by', listSort.sortBy)
+        params.set('sort_order', listSort.sortOrder)
+        const totalKey = JSON.stringify(ticketsListQueryKey)
+        try {
+          const res = await apiFetch<{ data: TicketRecord[]; total: number }>(`/api/tickets?${params}`, { signal })
+          setListTotals((prev) => ({ ...prev, [totalKey]: res.total ?? 0 }))
+          return Array.isArray(res.data) ? res.data : []
+        } catch (error: unknown) {
+          if (isRequestAborted(error, signal)) throw error
+          message.error((error as Error).message || 'Failed to fetch tickets')
+          throw error
+        }
+      }
       params.set('limit', String(effectiveTicketsLimit))
 
       const qs = params.toString()
@@ -470,6 +546,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
 
   const tickets = ticketsQuery.data ?? []
   const loading = ticketsQuery.isFetching
+  const listTotal = listTotals[JSON.stringify(ticketsListQueryKey)] ?? tickets.length
 
   /** Server returns filtered data - no client-side filtering */
   const filteredTickets = tickets
@@ -1357,8 +1434,11 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     setFilterSidebarCollapsed,
     viewMode,
     setViewMode,
-    sortBy: TICKETS_LIST_SORT_BY,
-    sortOrder: TICKETS_LIST_SORT_ORDER,
+    sortBy: listSort.sortBy,
+    sortOrder: listSort.sortOrder,
+    isPagedView,
+    listPagination: { page: listPage, pageSize: listPageSize, total: listTotal, onChange: setListPagination },
+    listSortControl: { sortBy: listSort.sortBy, sortOrder: listSort.sortOrder, onChange: changeListSort },
     hasActiveFilters,
     clearFilters,
     handleCreate,
