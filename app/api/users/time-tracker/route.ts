@@ -2,12 +2,13 @@ import { and, desc, eq, gte, inArray,isNotNull, isNull, lte, sql } from 'drizzle
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { isAdminOrManager } from '@/lib/auth-utils'
 import { db, tickets, ticketTimeTracker } from '@/lib/db'
 import { loadActiveJobTypeTitleMap } from '@/lib/job-types-db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 import type { UserTimeTrackerTicketSummary } from '@/lib/user-time-tracker-summary'
 
-/** GET /api/users/time-tracker?user_id=xxx&filter=week|month|all&start=&end=&stopped_only=1&active_only=1&limit=15&include_ticket_summary=1 */
+/** GET /api/users/time-tracker?user_id=xxx&filter=week|month|all&start=&end=&stopped_only=1&active_only=1&limit=15&offset=0&include_ticket_summary=1 */
 export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user) {
@@ -23,10 +24,17 @@ export async function GET(request: Request) {
   const activeOnly = url.searchParams.get('active_only') === '1'
   const limitParam = url.searchParams.get('limit')
   const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 100, 1), 500) : 100
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0)
   const includeTicketSummary = url.searchParams.get('include_ticket_summary') === '1'
 
   if (!userId) {
     return NextResponse.json({ error: 'user_id required' }, { status: 400 })
+  }
+
+  // Same rule as the user detail page: anyone may read their own sessions; other users' only admin/manager/staff.
+  const viewerRole = ((session.user as { role?: string }).role ?? '').toLowerCase()
+  if (userId !== session.user.id && !isAdminOrManager(viewerRole) && viewerRole !== 'staff') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const conditions = [eq(ticketTimeTracker.userId, userId)]
@@ -55,8 +63,9 @@ export async function GET(request: Request) {
     .from(ticketTimeTracker)
     .leftJoin(tickets, eq(ticketTimeTracker.ticketId, tickets.id))
     .where(and(...conditions))
-    .orderBy(desc(ticketTimeTracker.startTime))
+    .orderBy(desc(ticketTimeTracker.startTime), desc(ticketTimeTracker.id))
     .limit(limit)
+    .offset(offset)
 
   const titleMap = await loadActiveJobTypeTitleMap()
   const result = rows.map((r) => ({
