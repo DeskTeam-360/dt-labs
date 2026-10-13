@@ -8,6 +8,8 @@ import { useEffect,useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import MyTeamReportCard from '@/components/profile/MyTeamReportCard'
+import { canViewCustomerReports } from '@/lib/auth-utils'
 import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
 import { uploadAvatar } from '@/utils/storage'
 
@@ -463,6 +465,8 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
               </Form.Item>
             </Form>
           </Card>
+
+          {canViewCustomerReports((clientSession?.user as { role?: string } | undefined)?.role) ? <MyTeamReportCard /> : null}
 
           <Card style={{ marginTop: 24 }}>
             <Title level={3}>

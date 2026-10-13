@@ -2,10 +2,10 @@ import { and, eq, inArray, lt, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isAdminOrManager } from '@/lib/auth-utils'
+import { canViewCustomerReports, isAdminOrManager } from '@/lib/auth-utils'
 import { companies, db, jobTypes, teamMembers, teams, tickets, ticketTimeTracker, users } from '@/lib/db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
-import { getCapacityDaily, isValidYmd, listYmd } from '@/lib/user-capacity'
+import { getCapacityDaily, isValidYmd, listYmd, wibTodayYmd } from '@/lib/user-capacity'
 
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -35,44 +35,58 @@ type Acc = {
   totalAll: number
   totalScope: number
   extraTime: number
+  /** company key → ticket id → seconds (within scope) */
+  byTicket: Map<string, Map<number, { title: string; seconds: number }>>
 }
 
 /**
  * GET /api/reports/team-utilization?team_ids=a,b&start=YYYY-MM-DD&end=YYYY-MM-DD&customer_only=1
  * Per person: capacity (leave / piket / holidays aware), time worked, utilization, per-company split and
  * day-by-day free time. Dates are WIB calendar days. Admin & manager.
+ *
+ * `mine=1` returns only the signed-in user (no team_ids needed); allowed for admin, manager and staff.
  */
 export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!isAdminOrManager((session.user as { role?: string }).role)) {
+  const q = new URL(request.url).searchParams
+  const mine = q.get('mine') === '1'
+  const sessionRole = (session.user as { role?: string }).role
+  if (mine ? !canViewCustomerReports(sessionRole) : !isAdminOrManager(sessionRole)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const q = new URL(request.url).searchParams
   const teamIds = [...new Set((q.get('team_ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean))]
   const start = q.get('start')
   const end = q.get('end')
   const customerOnly = q.get('customer_only') === '1'
-  if (teamIds.length === 0) return NextResponse.json({ error: 'team_ids is required' }, { status: 400 })
+  if (!mine && teamIds.length === 0) return NextResponse.json({ error: 'team_ids is required' }, { status: 400 })
   if (!isValidYmd(start) || !isValidYmd(end) || end < start) {
     return NextResponse.json({ error: 'start and end (YYYY-MM-DD) are required' }, { status: 400 })
   }
-  const days = listYmd(start, end)
+  // Future days have no work yet; counting their capacity would make everyone look idle.
+  const todayWib = wibTodayYmd()
+  const effEnd = end > todayWib ? todayWib : end
+  if (effEnd < start) {
+    return NextResponse.json({ start, end, customer_only: customerOnly, summary: null, people: [], future_range: true })
+  }
+  const days = listYmd(start, effEnd)
   if (days.length > MAX_DAYS) {
     return NextResponse.json({ error: `Date range too large (max ${MAX_DAYS} days)` }, { status: 400 })
   }
   const windowStart = wibDayStartMs(start)
-  const windowEnd = wibDayStartMs(end) + DAY_MS
+  const windowEnd = wibDayStartMs(effEnd) + DAY_MS
 
   // --- people
-  const [memberRows, teamRows] = await Promise.all([
-    db
-      .select({ teamId: teamMembers.teamId, userId: teamMembers.userId })
-      .from(teamMembers)
-      .where(inArray(teamMembers.teamId, teamIds)),
-    db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, teamIds)),
-  ])
+  const [memberRows, teamRows]: [{ teamId: string; userId: string }[], { id: string; name: string }[]] = mine
+    ? [[{ teamId: '', userId: session.user.id }], []]
+    : await Promise.all([
+        db
+          .select({ teamId: teamMembers.teamId, userId: teamMembers.userId })
+          .from(teamMembers)
+          .where(inArray(teamMembers.teamId, teamIds)),
+        db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, teamIds)),
+      ])
   const teamNameById = new Map(teamRows.map((t) => [t.id, t.name]))
   const userIds = [...new Set(memberRows.map((m) => m.userId))]
   if (userIds.length === 0) {
@@ -94,7 +108,7 @@ export async function GET(request: Request) {
   // --- work sessions overlapping the window
   const nowMs = Date.now()
   const [capacity, sessionRows, jobRows] = await Promise.all([
-    getCapacityDaily(activeIds, start, end),
+    getCapacityDaily(activeIds, start, effEnd),
     db
       .select({
         userId: ticketTimeTracker.userId,
@@ -106,6 +120,8 @@ export async function GET(request: Request) {
         companyId: tickets.companyId,
         companyName: companies.name,
         companyIsCustomer: companies.isCustomer,
+        ticketId: tickets.id,
+        ticketTitle: tickets.title,
       })
       .from(ticketTimeTracker)
       .innerJoin(tickets, eq(ticketTimeTracker.ticketId, tickets.id))
@@ -125,7 +141,7 @@ export async function GET(request: Request) {
   const getAcc = (uid: string): Acc => {
     let a = acc.get(uid)
     if (!a) {
-      a = { dayAll: new Map(), dayScope: new Map(), byCompany: new Map(), totalAll: 0, totalScope: 0, extraTime: 0 }
+      a = { dayAll: new Map(), dayScope: new Map(), byCompany: new Map(), totalAll: 0, totalScope: 0, extraTime: 0, byTicket: new Map() }
       acc.set(uid, a)
     }
     return a
@@ -166,6 +182,14 @@ export async function GET(request: Request) {
         }
         cur.seconds += share
         a.byCompany.set(key, cur)
+        let tm = a.byTicket.get(key)
+        if (!tm) {
+          tm = new Map()
+          a.byTicket.set(key, tm)
+        }
+        const tk = tm.get(r.ticketId) ?? { title: r.ticketTitle ?? '', seconds: 0 }
+        tk.seconds += share
+        tm.set(r.ticketId, tk)
       }
     }
   }
@@ -210,6 +234,15 @@ export async function GET(request: Request) {
           hours: round2(v.seconds / 3600),
           pct_of_capacity: capacityHours > 0 ? round2((v.seconds / 3600 / capacityHours) * 100) : null,
           pct_of_worked: a.totalScope > 0 ? round2((v.seconds / a.totalScope) * 100) : null,
+          top_tickets: [...(a.byTicket.get(id)?.entries() ?? [])]
+            .map(([ticketId, t]) => ({
+              ticket_id: ticketId,
+              title: t.title,
+              hours: round2(t.seconds / 3600),
+              pct_of_company: v.seconds > 0 ? round2((t.seconds / v.seconds) * 100) : null,
+            }))
+            .sort((x, y) => y.hours - x.hours)
+            .slice(0, 5),
         }))
         .sort((x, y) => y.hours - x.hours)
       return {
@@ -243,7 +276,8 @@ export async function GET(request: Request) {
   const totalWorked = people.reduce((s, p) => s + p.worked_hours, 0)
   return NextResponse.json({
     start,
-    end,
+    end: effEnd,
+    clipped_to_today: effEnd !== end,
     customer_only: customerOnly,
     loose_day_min_free_hours: LOOSE_DAY_MIN_FREE_HOURS,
     summary: {

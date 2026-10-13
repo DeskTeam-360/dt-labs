@@ -38,16 +38,17 @@ const { Content } = Layout
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
 
-type CompanyShare = {
+export type CompanyShare = {
   company_id: string | null
   name: string
   is_customer: boolean
   hours: number
   pct_of_capacity: number | null
   pct_of_worked: number | null
+  top_tickets?: { ticket_id: number; title: string; hours: number; pct_of_company: number | null }[]
 }
-type DayRow = { date: string; reason: string; capacity_hours: number; worked_hours: number; free_hours: number }
-type Person = {
+export type DayRow = { date: string; reason: string; capacity_hours: number; worked_hours: number; free_hours: number }
+export type Person = {
   user_id: string
   name: string
   position: string | null
@@ -67,10 +68,12 @@ type Person = {
   companies: CompanyShare[]
   days: DayRow[]
 }
-type Report = {
+export type Report = {
   start: string
   end: string
   customer_only: boolean
+  clipped_to_today?: boolean
+  future_range?: boolean
   loose_day_min_free_hours: number
   summary: {
     people: number
@@ -96,10 +99,10 @@ const REASON_LABEL: Record<string, string> = {
   not_employed: 'Not employed',
 }
 
-const fmtH = (n: number | null | undefined) => (n == null ? '—' : `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} h`)
-const pctColor = (p: number | null) => (p == null ? 'default' : p > 100 ? 'red' : p >= 80 ? 'green' : p >= 50 ? 'gold' : 'orange')
+export const fmtH = (n: number | null | undefined) => (n == null ? '—' : `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} h`)
+export const pctColor = (p: number | null) => (p == null ? 'default' : p > 100 ? 'red' : p >= 80 ? 'green' : p >= 50 ? 'gold' : 'orange')
 
-function PersonDetail({ p, minFree }: { p: Person; minFree: number }) {
+export function PersonDetail({ p, minFree }: { p: Person; minFree: number }) {
   const [allDays, setAllDays] = useState(false)
   const dayData = useMemo(
     () => (allDays ? p.days.filter((d) => d.capacity_hours > 0 || d.worked_hours > 0) : p.days.filter((d) => d.capacity_hours > 0 && d.free_hours >= minFree)),
@@ -134,7 +137,40 @@ function PersonDetail({ p, minFree }: { p: Person; minFree: number }) {
     <Row gutter={[24, 16]}>
       <Col xs={24} xl={11}>
         <Text strong style={{ display: 'block', marginBottom: 8 }}>Where the time went</Text>
-        <Table size="small" bordered rowKey={(r) => r.company_id ?? 'none'} pagination={false} columns={companyCols} dataSource={p.companies} locale={{ emptyText: 'No time logged in this range' }} />
+        <Table
+          size="small"
+          bordered
+          rowKey={(r) => r.company_id ?? 'none'}
+          pagination={false}
+          columns={companyCols}
+          dataSource={p.companies}
+          locale={{ emptyText: 'No time logged in this range' }}
+          expandable={{
+            rowExpandable: (r) => (r.top_tickets?.length ?? 0) > 0,
+            expandedRowRender: (r) => (
+              <Table
+                size="small"
+                pagination={false}
+                rowKey="ticket_id"
+                dataSource={r.top_tickets}
+                columns={[
+                  {
+                    title: `Top ${r.top_tickets?.length ?? 0} ticket${(r.top_tickets?.length ?? 0) === 1 ? '' : 's'} worked`,
+                    dataIndex: 'title',
+                    ellipsis: true,
+                    render: (v: string, t: { ticket_id: number }) => (
+                      <SpaNavLink href={`/tickets/${t.ticket_id}`}>
+                        #{t.ticket_id} {v}
+                      </SpaNavLink>
+                    ),
+                  },
+                  { title: 'Hours', dataIndex: 'hours', width: 90, align: 'right', render: (v: number) => fmtH(v) },
+                  { title: '% of company', dataIndex: 'pct_of_company', width: 120, align: 'right', render: (v: number | null) => (v == null ? '—' : `${v}%`) },
+                ]}
+              />
+            ),
+          }}
+        />
       </Col>
       <Col xs={24} xl={13}>
         <Flex justify="space-between" align="center" style={{ marginBottom: 8 }}>
@@ -370,13 +406,18 @@ export default function TeamReportContent({ user: currentUser }: { user: { id: s
                   scroll={{ x: 1300 }}
                   expandable={{ expandedRowRender: (p) => <PersonDetail p={p} minFree={report.loose_day_min_free_hours} /> }}
                 />
+                {report.clipped_to_today ? (
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+                    The range ends in the future, so the report stops at today ({report.end}).
+                  </Text>
+                ) : null}
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   Worked = reported time (adjustments included), including timers still running. Free = capacity minus worked on days
                   that have capacity. Idle days = working days with nothing logged. Loose days = at least {report.loose_day_min_free_hours} h free.
                 </Text>
               </>
             ) : report ? (
-              <Alert type="info" showIcon title="The selected team(s) have no members." />
+              <Alert type="info" showIcon title={report.future_range ? 'That date range is still in the future — nothing to report yet.' : 'The selected team(s) have no members.'} />
             ) : null}
           </Space>
         </Content>
