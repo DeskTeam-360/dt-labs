@@ -178,3 +178,50 @@ export async function getCapacityHoursByUser(
   }
   return result
 }
+
+/**
+ * Daily capacity per user over [startYmd, endYmd] (WIB dates): stored row, else the default while employed.
+ * Returns user → date → { hours, reason }; days when the user was not employed are omitted.
+ */
+export async function getCapacityDaily(
+  userIds: string[],
+  startYmd: string,
+  endYmd: string
+): Promise<Map<string, Map<string, { hours: number; reason: string }>>> {
+  const out = new Map<string, Map<string, { hours: number; reason: string }>>()
+  if (userIds.length === 0) return out
+  const [userRows, capRows, holi] = await Promise.all([
+    db
+      .select({ id: users.id, status: users.status, joinedAt: users.joinedAt, leftAt: users.leftAt })
+      .from(users)
+      .where(inArray(users.id, userIds)),
+    db
+      .select({
+        userId: userDailyCapacity.userId,
+        d: userDailyCapacity.capacityDate,
+        hours: userDailyCapacity.hours,
+        reason: userDailyCapacity.reason,
+      })
+      .from(userDailyCapacity)
+      .where(
+        and(
+          inArray(userDailyCapacity.userId, userIds),
+          gte(userDailyCapacity.capacityDate, startYmd),
+          lte(userDailyCapacity.capacityDate, endYmd)
+        )
+      ),
+    holidaySet(startYmd, endYmd),
+  ])
+  const stored = new Map(capRows.map((r) => [`${r.userId}|${r.d}`, r]))
+  const days = listYmd(startYmd, endYmd)
+  for (const u of userRows) {
+    const m = new Map<string, { hours: number; reason: string }>()
+    for (const d of days) {
+      const row = stored.get(`${u.id}|${d}`)
+      if (row) m.set(d, { hours: Number(row.hours) || 0, reason: row.reason })
+      else if (isEmployedOn(u, d)) m.set(d, defaultCapacityFor(d, holi))
+    }
+    out.set(u.id, m)
+  }
+  return out
+}

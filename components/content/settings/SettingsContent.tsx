@@ -369,6 +369,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
+                {canAccessTeams(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Team Report"
+                      description="Utilization per person, split by company, with loose days"
+                      href="/team-report"
+                      icon={<TeamOutlined />}
+                    />
+                  </Col>
+                )}
                 {canAccessCustomerTimeReport(role) && (
                   <Col xs={24} sm={12} md={8}>
                     <HubTile
