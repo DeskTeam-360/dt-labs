@@ -1659,7 +1659,11 @@ export async function POST(request: NextRequest) {
               message: (processedNew.body || '').slice(0, 200) || '',
               detail: `company=${ticketCompanyId}`,
             }).catch(() => {})
+          }
 
+          // Automation rules never send email, so they also run for self-sender tickets
+          // (e.g. forms mailed from the support inbox itself) where notifications are skipped.
+          {
             try {
               const autoCtx = await loadAutomationTicketContext(newTicket.id)
               if (autoCtx) {

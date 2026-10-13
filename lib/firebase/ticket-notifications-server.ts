@@ -90,6 +90,7 @@ export async function notifyTicketUsers(params: {
       }))
     )
   } catch (e) {
-    console.error('[notifyTicketUsers] insert failed (is migration 071 applied?):', e)
+    const cause = (e as { cause?: { message?: string } })?.cause?.message
+    console.error('[notifyTicketUsers] insert failed (is migration 071 applied?):', cause ?? (e as Error)?.message)
   }
 }
