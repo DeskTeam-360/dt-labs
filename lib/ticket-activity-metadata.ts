@@ -147,6 +147,11 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
     return parts.join(' · ')
   }
 
+  if (action === 'comment_attachment_added') {
+    const names = Array.isArray(m.file_names) ? m.file_names.map(String).join(', ') : ''
+    return names ? trunc(names) : ''
+  }
+
   if (action === 'comment_attachment_deleted') {
     const fn = typeof m.file_name === 'string' ? m.file_name.trim() : ''
     return fn ? trunc(fn) : ''

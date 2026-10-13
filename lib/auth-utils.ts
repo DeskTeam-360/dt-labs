@@ -94,9 +94,15 @@ export function canAccessRecapSnapshots(role: string | undefined): boolean {
   return isAdminOrManager(role)
 }
 
-/** Customer weekly recap grid (`customer_weekly_recap_cells`) in Settings → General: Admin & Manager */
+/** Read-only access to customer reports (time report, weekly recap): Admin, Manager & Staff */
+export function canViewCustomerReports(role: string | undefined): boolean {
+  const r = (role ?? '').toLowerCase()
+  return r === 'admin' || r === 'manager' || r === 'staff'
+}
+
+/** Customer weekly recap grid (`customer_weekly_recap_cells`): Admin, Manager & Staff (materialize stays Admin & Manager) */
 export function canAccessCustomerWeeklyRecap(role: string | undefined): boolean {
-  return isAdminOrManager(role)
+  return canViewCustomerReports(role)
 }
 
 /** Global running-text announcement (Settings): Admin only */
@@ -109,9 +115,9 @@ export function canManageDashboardAnnouncements(role: string | undefined): boole
   return isAdmin(role)
 }
 
-/** Customer (company) time & ticket summary report: Admin & Manager */
+/** Customer (company) time & ticket summary report: Admin, Manager & Staff */
 export function canAccessCustomerTimeReport(role: string | undefined): boolean {
-  return isAdminOrManager(role)
+  return canViewCustomerReports(role)
 }
 
 /** My Teams: work time & activity for teams the user belongs to (not customers) */

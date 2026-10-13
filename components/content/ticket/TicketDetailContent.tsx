@@ -254,6 +254,7 @@ export default function TicketDetailContent({
     const [editingComment, setEditingComment] = useState<string | null>(null)
     const [editingCommentValue, setEditingCommentValue] = useState('')
     const [removingCommentAttachmentKey, setRemovingCommentAttachmentKey] = useState<string | null>(null)
+    const [addingCommentAttachmentId, setAddingCommentAttachmentId] = useState<string | null>(null)
     const [editingAttribute, setEditingAttribute] = useState<string | null>(null)
     const [newAttributeKey, setNewAttributeKey] = useState('')
     const [newAttributeValue, setNewAttributeValue] = useState('')
@@ -942,6 +943,43 @@ export default function TicketDetailContent({
             message.error(err?.message || 'Failed to remove attachment')
         } finally {
             setRemovingCommentAttachmentKey(null)
+        }
+    }
+
+    const handleAddCommentAttachments = async (commentId: string, files: File[]) => {
+        if (!files.length) return
+        setAddingCommentAttachmentId(commentId)
+        try {
+            const uploaded: { file_url: string; file_name: string; file_path: string }[] = []
+            for (const file of files) {
+                const result = await uploadTicketFile(file, displayTicket.id, 'comments', displayTicket?.company?.name ?? 'unknown')
+                if (result.url && result.path) {
+                    uploaded.push({ file_url: result.url, file_name: file.name, file_path: result.path })
+                } else if (result.error) {
+                    message.error(`${file.name}: ${result.error}`)
+                }
+            }
+            if (!uploaded.length) return
+            const res = await apiFetch<{ attachments: { id: string; file_url: string; file_name: string }[] }>(
+                `/api/tickets/${displayTicket.id}/comments/${commentId}/attachments`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ attachments: uploaded }),
+                }
+            )
+            setComments((prev) =>
+                prev.map((c) =>
+                    c.id === commentId
+                        ? { ...c, comment_attachments: [...(c.comment_attachments || []), ...res.attachments] }
+                        : c
+                )
+            )
+            message.success('Attachment added')
+        } catch (err: any) {
+            message.error(err?.message || 'Failed to add attachment')
+        } finally {
+            setAddingCommentAttachmentId(null)
         }
     }
 
@@ -1859,6 +1897,8 @@ export default function TicketDetailContent({
                                             onDeleteComment={handleDeleteComment}
                                             canDeleteComment={canDeleteComment}
                                             onRemoveCommentAttachment={handleRemoveCommentAttachment}
+                                onAddCommentAttachments={handleAddCommentAttachments}
+                                addingCommentAttachmentId={addingCommentAttachmentId}
                                             removingCommentAttachmentKey={removingCommentAttachmentKey}
                                             onAddComment={handleAddComment}
                                             onAddChecklistItemsBulk={handleAddChecklistItemsBulk}

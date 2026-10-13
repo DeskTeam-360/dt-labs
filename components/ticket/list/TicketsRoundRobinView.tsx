@@ -162,21 +162,8 @@ export default function TicketsRoundRobinView({
               <Tooltip title={tooltipContent} placement="top" mouseEnterDelay={0.3}>
               <a
                 href={`/tickets/${ticket.id}`}
-                role="button"
-                tabIndex={0}
-                onClick={(e) => {
-                  if (e.button !== 0) return
-                  if (e.ctrlKey || e.metaKey) return
-                  e.preventDefault()
-                  router.push(`/tickets/${ticket.id}`)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    if (e.ctrlKey || e.metaKey) return
-                    e.preventDefault()
-                    router.push(`/tickets/${ticket.id}`)
-                  }
-                }}
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   display: 'inline-block',
                   textDecoration: 'none',

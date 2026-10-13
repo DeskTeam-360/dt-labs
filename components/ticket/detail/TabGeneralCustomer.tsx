@@ -5,6 +5,7 @@ import { Avatar, Button, Col, Descriptions, Empty, Flex, InputNumber, Modal, Pop
 import { useEffect, useState } from 'react'
 
 import DateDisplay from '@/components/common/DateDisplay'
+import { attachmentDownloadHref } from '@/lib/attachment-download-url'
 
 import CommentComposer from './CommentComposer'
 import CommentHtml from './CommentHtml'
@@ -230,9 +231,7 @@ export default function TabGeneralCustomer({
                 {ticketAttachments.map((att) => (
                   <a
                     key={att.id}
-                    href={att.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={attachmentDownloadHref(att.file_url, att.file_name)}
                     style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'blue' }}
                   >
                     <PaperClipOutlined /> {att.file_name}
@@ -416,9 +415,7 @@ export default function TabGeneralCustomer({
                               return (
                                 <Flex key={att.id || att.file_url} align="center" gap={4} wrap="nowrap">
                                   <a
-                                    href={att.file_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                    href={attachmentDownloadHref(att.file_url, att.file_name)}
                                     style={{
                                       display: 'inline-flex',
                                       alignItems: 'center',

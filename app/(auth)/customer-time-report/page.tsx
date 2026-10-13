@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
 import CustomerTimeReportContent from '@/components/content/customer/CustomerTimeReportContent'
-import { isAdminOrManager } from '@/lib/auth-utils'
+import { canAccessCustomerTimeReport } from '@/lib/auth-utils'
 
 export default async function CustomerTimeReportPage() {
   const session = await auth()
@@ -10,7 +10,7 @@ export default async function CustomerTimeReportPage() {
     redirect('/login')
   }
   const role = (session.user as { role?: string }).role
-  if (!isAdminOrManager(role)) {
+  if (!canAccessCustomerTimeReport(role)) {
     redirect('/dashboard')
   }
   return <CustomerTimeReportContent user={session.user} />

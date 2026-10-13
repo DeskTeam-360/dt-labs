@@ -1,4 +1,9 @@
-import dayjs, { type Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
+import timezone from 'dayjs/plugin/timezone'
+import utc from 'dayjs/plugin/utc'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 
 export type StoppedTimeSession = {
   ticket_id: number
@@ -14,14 +19,16 @@ export type HourlyActivityRow = {
   tickets: number
 }
 
-/** Per-hour overlap: minutes logged + distinct tickets active in that hour (local day). */
+/** Per-hour overlap: minutes logged + distinct tickets active in that hour of `day` (YYYY-MM-DD) in `tz`. */
 export function buildHourlyActivity(
-  selectedDay: Dayjs,
+  day: string,
+  tz: string,
   stoppedSessions: StoppedTimeSession[],
   activeSessions: Array<{ ticket_id: number; start_time: string }>
 ): HourlyActivityRow[] {
-  const dayStart = selectedDay.startOf('day').valueOf()
-  const dayEnd = selectedDay.endOf('day').valueOf()
+  const dayStartD = dayjs.tz(day, tz).startOf('day')
+  const dayStart = dayStartD.valueOf()
+  const dayEnd = dayStartD.add(1, 'day').valueOf() - 1
   const now = dayjs().valueOf()
   if (dayStart > now) {
     return Array.from({ length: 24 }, (_, h) => ({
@@ -54,7 +61,7 @@ export function buildHourlyActivity(
 
   const rows: HourlyActivityRow[] = []
   for (let h = 0; h < 24; h++) {
-    const hStart = dayjs(selectedDay).startOf('day').add(h, 'hour').valueOf()
+    const hStart = dayStart + h * 60 * 60 * 1000
     const hEnd = hStart + 60 * 60 * 1000
     const ticketSet = new Set<number>()
     let totalMs = 0

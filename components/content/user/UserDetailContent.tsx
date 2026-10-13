@@ -1118,6 +1118,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
 
                       {!isCustomer && (
                         <DashboardHourlyActivityCard
+                          timezone={userData.timezone}
                           stoppedSessions={hourlyStopped}
                           activeSessions={hourlyActive}
                           style={{ marginTop: 0, marginBottom: 24 }}

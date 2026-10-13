@@ -342,6 +342,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
         </Row>
 
         <DashboardHourlyActivityCard
+          timezone={timeSummary?.data.timezone}
           stoppedSessions={allSessionsForStats}
           activeSessions={activeTrackers.map((t) => ({
             ticket_id: t.ticket_id,

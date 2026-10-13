@@ -416,8 +416,7 @@ export default function TicketsListView({
         withServerSort({
           title: 'Title', dataIndex: 'title', key: 'title', ellipsis: true,
           render: (title: string, record: TicketRecord) => (
-            <a href={`/tickets/${record.id}`} style={{ cursor: 'pointer', color: '#1677ff', padding: 0, height: 'auto', textDecoration: 'underline' }}
-              onClick={(e) => { if (e.button !== 0 || e.ctrlKey || e.metaKey) return; e.preventDefault(); router.push(`/tickets/${record.id}`) }}>
+            <a href={`/tickets/${record.id}`} target="_blank" rel="noopener noreferrer" style={{ cursor: 'pointer', color: '#1677ff', padding: 0, height: 'auto', textDecoration: 'underline' }}>
               {record.has_unread_replies && <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ff4d4f', marginRight: 6, verticalAlign: 'middle' }} title="Unread replies" />}
               {title && title.length > 50 ? title.slice(0, 50) + '...' : title}
               {record.created_via === 'recurring' && <SyncOutlined title="Created by recurring ticket" style={{ fontSize: 11, color: '#722ed1', marginLeft: 6, verticalAlign: 'middle' }} />}

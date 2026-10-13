@@ -3,6 +3,8 @@
 import { ClockCircleOutlined } from '@ant-design/icons'
 import { Card, DatePicker, Space, Typography } from 'antd'
 import dayjs from 'dayjs'
+import timezone from 'dayjs/plugin/timezone'
+import utc from 'dayjs/plugin/utc'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Bar,
@@ -21,29 +23,47 @@ import {
   type StoppedTimeSession,
 } from '@/lib/dashboard-hourly-activity'
 
+dayjs.extend(utc)
+dayjs.extend(timezone)
+
 const { Text } = Typography
 
 export default function DashboardHourlyActivityCard({
   stoppedSessions,
   activeSessions,
+  timezone: tzProp,
   style,
 }: {
   stoppedSessions: StoppedTimeSession[]
   activeSessions: Array<{ ticket_id: number; start_time: string }>
+  /** IANA zone the hours are cut in (profile timezone); defaults to the browser zone. */
+  timezone?: string | null
   style?: React.CSSProperties
 }) {
-  const [hourlyDay, setHourlyDay] = useState(() => dayjs())
+  const tz = useMemo(() => {
+    const candidate = tzProp?.trim() || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: candidate })
+      return candidate
+    } catch {
+      return 'UTC'
+    }
+  }, [tzProp])
+  const [pickedDay, setPickedDay] = useState<string | null>(null)
   const [hourlyTick, setHourlyTick] = useState(0)
 
+  const todayStr = dayjs().tz(tz).format('YYYY-MM-DD')
+  const dayStr = pickedDay ?? todayStr
+
   useEffect(() => {
-    if (!hourlyDay.isSame(dayjs(), 'day')) return
+    if (dayStr !== todayStr) return
     const id = window.setInterval(() => setHourlyTick((n) => n + 1), 60_000)
     return () => window.clearInterval(id)
-  }, [hourlyDay])
+  }, [dayStr, todayStr])
 
   const hourlyChartData = useMemo(
-    () => buildHourlyActivity(hourlyDay, stoppedSessions, activeSessions),
-    [hourlyDay, stoppedSessions, activeSessions, hourlyTick]
+    () => buildHourlyActivity(dayStr, tz, stoppedSessions, activeSessions),
+    [dayStr, tz, stoppedSessions, activeSessions, hourlyTick]
   )
 
   return (
@@ -54,18 +74,19 @@ export default function DashboardHourlyActivityCard({
           <ClockCircleOutlined />
           <span>My Daily activity by hour</span>
           <Text type="secondary" style={{ fontSize: 12, fontWeight: 'normal' }}>
+            {tz}
           </Text>
         </Space>
       }
       extra={
         <DatePicker
-          value={hourlyDay}
-          onChange={(d) => d && setHourlyDay(d.startOf('day'))}
+          value={dayjs(dayStr)}
+          onChange={(d) => d && setPickedDay(d.format('YYYY-MM-DD'))}
           allowClear={false}
           disabledDate={(current) =>
             !!current &&
-            (current.isAfter(dayjs().endOf('day')) ||
-              current.isBefore(dayjs().subtract(30, 'day').startOf('day')))
+            (current.format('YYYY-MM-DD') > todayStr ||
+              current.format('YYYY-MM-DD') < dayjs(todayStr).subtract(30, 'day').format('YYYY-MM-DD'))
           }
         />
       }

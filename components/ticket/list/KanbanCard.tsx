@@ -246,14 +246,10 @@ export default function KanbanCard({
         {/* Title + subtitle - use <a> for native right-click "Open in new tab" */}
         <a
           href={`/tickets/${ticket.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
           style={{ cursor: 'pointer', display: 'block', color: 'inherit', textDecoration: 'none' }}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (e.button !== 0) return
-            if (e.ctrlKey || e.metaKey) return
-            e.preventDefault()
-            router.push(`/tickets/${ticket.id}`)
-          }}
+          onClick={(e) => e.stopPropagation()}
         >
           <Text strong style={{ fontSize: 14, color: 'var(--kanban-card-title)', lineHeight: 1.4, display: 'block' }}>
             {ticket.has_unread_replies && (

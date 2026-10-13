@@ -2,7 +2,7 @@ import dayjs from 'dayjs'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isAdminOrManager } from '@/lib/auth-utils'
+import { canViewCustomerReports } from '@/lib/auth-utils'
 import { fetchWeeklyRecapRowsForTeam } from '@/lib/customer-weekly-recap-grid-query'
 import { listIsoWeeksOverlapping } from '@/lib/customer-weekly-recap-materialize'
 import { weekColumnHeaderMonthW } from '@/lib/customer-weekly-recap-week-label'
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!isAdminOrManager(sessionRole(session))) {
+  if (!canViewCustomerReports(sessionRole(session))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

@@ -43,6 +43,8 @@ import {
   Typography,
 } from 'antd'
 
+import { attachmentDownloadHref } from '@/lib/attachment-download-url'
+
 const { useBreakpoint } = Grid
 import dayjs from 'dayjs'
 import React, { useEffect, useMemo, useState } from 'react'
@@ -251,6 +253,8 @@ interface TabGeneralProps {
   canDeleteComment: (createdAt: string) => boolean
   onRemoveCommentAttachment: (commentId: string, attachmentId: string) => void | Promise<void>
   removingCommentAttachmentKey?: string | null
+  onAddCommentAttachments?: (commentId: string, files: File[]) => void | Promise<void>
+  addingCommentAttachmentId?: string | null
   onAddComment: (
     commentText: string,
     attachments: { url: string; file_name: string; file_path: string }[],
@@ -336,6 +340,8 @@ export default function TabGeneral({
   canDeleteComment,
   onRemoveCommentAttachment,
   removingCommentAttachmentKey = null,
+  onAddCommentAttachments,
+  addingCommentAttachmentId = null,
   onAddComment,
   onAddChecklistItemsBulk,
   onAddAiSummaryComment,
@@ -639,7 +645,7 @@ export default function TabGeneral({
                         {ticketAttachments.length > 0 && (
                           <Flex gap={8} wrap="wrap" style={{ marginTop: 8 }}>
                             {ticketAttachments.map((att) => (
-                              <a key={att.id} href={att.file_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <a key={att.id} href={attachmentDownloadHref(att.file_url, att.file_name)} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                 <PaperClipOutlined /> {att.file_name}
                               </a>
                             ))}
@@ -823,6 +829,28 @@ export default function TabGeneral({
                                 onChange={onEditingCommentValueChange}
                                 height="200px"
                               />
+                              {onAddCommentAttachments && (
+                                <div>
+                                  <input
+                                    type="file"
+                                    multiple
+                                    hidden
+                                    id={`edit-comment-files-${comment.id}`}
+                                    onChange={(e) => {
+                                      const files = e.target.files ? Array.from(e.target.files) : []
+                                      e.target.value = ''
+                                      void onAddCommentAttachments(comment.id, files)
+                                    }}
+                                  />
+                                  <Button
+                                    icon={<PaperClipOutlined />}
+                                    loading={addingCommentAttachmentId === comment.id}
+                                    onClick={() => document.getElementById(`edit-comment-files-${comment.id}`)?.click()}
+                                  >
+                                    Attach files
+                                  </Button>
+                                </div>
+                              )}
                               <Space>
                                 <Button
                                   type="primary"
@@ -862,9 +890,7 @@ export default function TabGeneral({
                               return (
                                 <Flex key={att.id || att.file_url} align="center" gap={4} wrap="nowrap">
                                   <a
-                                    href={att.file_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                    href={attachmentDownloadHref(att.file_url, att.file_name)}
                                     style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'blue', textDecoration: 'underline' }}
                                   >
                                     <PaperClipOutlined /> {att.file_name}

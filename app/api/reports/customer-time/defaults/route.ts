@@ -2,7 +2,7 @@ import { desc } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isAdminOrManager } from '@/lib/auth-utils'
+import { canViewCustomerReports, isAdminOrManager } from '@/lib/auth-utils'
 import {
   type CustomerTimeReportGlobalFilters,
   normalizeGlobalFilters,
@@ -20,7 +20,7 @@ export async function GET() {
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!isAdminOrManager(sessionRole(session))) {
+  if (!canViewCustomerReports(sessionRole(session))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

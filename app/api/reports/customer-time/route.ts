@@ -2,7 +2,7 @@ import { and, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isAdminOrManager } from '@/lib/auth-utils'
+import { canViewCustomerReports } from '@/lib/auth-utils'
 import {
   companies,
   companyDailyActiveAssignments,
@@ -131,7 +131,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (!isAdminOrManager(sessionRole(session))) {
+  if (!canViewCustomerReports(sessionRole(session))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
