@@ -42,7 +42,7 @@ export default function TicketNotificationBell() {
   const { message } = App.useApp()
   const { status } = useSession()
   const router = useRouter()
-  const { items, loading, unreadCount, readCount, setItems } = useNotificationPoll()
+  const { items, loading, unreadCount, readCount, setItems, refresh, clearUnreadExtra } = useNotificationPoll()
   const [open, setOpen] = useState(false)
   const [deletingRead, setDeletingRead] = useState(false)
 
@@ -65,11 +65,16 @@ export default function TicketNotificationBell() {
   )
 
   const markAllRead = useCallback(async () => {
-    const unread = items.filter((i) => !i.read).map((i) => i.id)
-    if (unread.length === 0) return
-    await markReadApi(unread)
+    if (unreadCount === 0) return
+    await fetch('/api/notifications/mark-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ all: true }),
+    })
     setItems((prev) => prev.map((i) => (i.read ? i : { ...i, read: true })))
-  }, [items, markReadApi, setItems])
+    clearUnreadExtra()
+  }, [unreadCount, setItems, clearUnreadExtra])
 
   const deleteAllRead = useCallback(async () => {
     if (readCount === 0) return
@@ -215,7 +220,11 @@ export default function TicketNotificationBell() {
       mouseEnterDelay={0.12}
       mouseLeaveDelay={0.28}
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(next) => {
+        setOpen(next)
+        // The background poll runs every 2 minutes; fetch right away when the panel is opened.
+        if (next) void refresh()
+      }}
       placement="bottomRight"
       destroyOnHidden={false}
     >

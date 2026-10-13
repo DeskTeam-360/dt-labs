@@ -29,6 +29,8 @@ type Ctx = {
   /** One-shot fetch (e.g. after mark-read); does not reset interval */
   refresh: () => Promise<void>
   setItems: React.Dispatch<React.SetStateAction<TicketNotificationItem[]>>
+  /** After mark-all-read: unread rows beyond the shown ones are read too. */
+  clearUnreadExtra: () => void
 }
 
 const NotificationPollContext = createContext<Ctx | null>(null)
@@ -56,6 +58,7 @@ export default function NotificationPollProvider({ children }: { children: React
 
   const [items, setItems] = useState<TicketNotificationItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [unreadExtra, setUnreadExtra] = useState(0)
 
   const initialHydratedRef = useRef(false)
   const alertedIdsRef = useRef<Set<string>>(new Set())
@@ -69,8 +72,12 @@ export default function NotificationPollProvider({ children }: { children: React
 
   const fetchNotifications = useCallback(async () => {
     const res = await fetch('/api/notifications', { credentials: 'include' })
-    const data = (await res.json().catch(() => ({}))) as { items?: TicketNotificationItem[] }
-    return Array.isArray(data.items) ? data.items : []
+    const data = (await res.json().catch(() => ({}))) as { items?: TicketNotificationItem[]; unread_total?: number }
+    const list = Array.isArray(data.items) ? data.items : []
+    // Unread rows that exist but are not among the newest few shown in the bell.
+    const shownUnread = list.filter((i) => !i.read).length
+    setUnreadExtra(Math.max(0, (data.unread_total ?? shownUnread) - shownUnread))
+    return list
   }, [])
 
   const processNewUnreadAlerts = useCallback((list: TicketNotificationItem[]) => {
@@ -153,7 +160,7 @@ export default function NotificationPollProvider({ children }: { children: React
     }
   }, [enabled, tick])
 
-  const unreadCount = useMemo(() => items.filter((i) => !i.read).length, [items])
+  const unreadCount = useMemo(() => items.filter((i) => !i.read).length + unreadExtra, [items, unreadExtra])
   const readCount = useMemo(() => items.filter((i) => i.read).length, [items])
 
   const refresh = useCallback(async () => {
@@ -168,6 +175,7 @@ export default function NotificationPollProvider({ children }: { children: React
       readCount,
       refresh,
       setItems,
+      clearUnreadExtra: () => setUnreadExtra(0),
     }),
     [items, loading, unreadCount, readCount, refresh]
   )

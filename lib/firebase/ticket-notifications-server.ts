@@ -1,8 +1,6 @@
 import { inArray } from 'drizzle-orm'
-import { FieldValue } from 'firebase-admin/firestore'
 
-import { db, users } from '@/lib/db'
-import { getFirebaseAdminFirestore } from '@/lib/firebase/admin'
+import { db, ticketNotifications, users } from '@/lib/db'
 
 export type TicketNotificationType =
   | 'mention'
@@ -55,7 +53,7 @@ async function filterRecipientsByRoleAndType(
   })
 }
 
-/** Writes one doc per recipient under `users/{userId}/ticketNotifications/{id}`. */
+/** Writes one `ticket_notifications` row per recipient. */
 export async function notifyTicketUsers(params: {
   recipientUserIds: string[]
   excludeUserId?: string | null
@@ -69,14 +67,6 @@ export async function notifyTicketUsers(params: {
   /** Session role of the actor (e.g. customer, admin, manager, staff). Drives customer vs staff routing for `new_comment`. */
   actorRole?: string | null
 }): Promise<void> {
-  const fsdb = getFirebaseAdminFirestore()
-  if (!fsdb) {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[notifyTicketUsers] skipped: Firebase Admin Firestore not configured (check .env service account)')
-    }
-    return
-  }
-
   const exclude = params.excludeUserId != null ? String(params.excludeUserId).trim() : ''
   const unique = [...new Set(params.recipientUserIds.map((id) => String(id).trim()))].filter(
     (id) => Boolean(id) && id !== exclude
@@ -86,30 +76,20 @@ export async function notifyTicketUsers(params: {
   const recipients = await filterRecipientsByRoleAndType(unique, params.type, params.actorRole)
   if (recipients.length === 0) return
 
-  const ticketTitle = (params.ticketTitle || 'Ticket').slice(0, 200)
-  const batch = fsdb.batch()
-  for (const userId of recipients) {
-    const ref = fsdb.collection('users').doc(userId).collection('ticketNotifications').doc()
-    batch.set(ref, {
-      userId,
-      ticketId: params.ticketId,
-      ticketTitle,
-      type: params.type,
-      title: params.title.slice(0, 200),
-      body: params.body.slice(0, 500),
-      read: false,
-      createdAt: FieldValue.serverTimestamp(),
-      actorUserId: params.actorUserId,
-      actorName: (params.actorName || 'Someone').slice(0, 200),
-    })
-  }
-
   try {
-    await batch.commit()
+    await db.insert(ticketNotifications).values(
+      recipients.map((userId) => ({
+        userId,
+        ticketId: params.ticketId,
+        ticketTitle: (params.ticketTitle || 'Ticket').slice(0, 200),
+        type: params.type,
+        title: params.title.slice(0, 200),
+        body: params.body.slice(0, 500),
+        actorUserId: params.actorUserId || null,
+        actorName: (params.actorName || 'Someone').slice(0, 200),
+      }))
+    )
   } catch (e) {
-    console.error('[notifyTicketUsers] batch.commit failed:', e)
-    if (process.env.NODE_ENV === 'development') {
-      console.error('[notifyTicketUsers] recipients:', recipients, 'ticketId:', params.ticketId)
-    }
+    console.error('[notifyTicketUsers] insert failed (is migration 071 applied?):', e)
   }
 }

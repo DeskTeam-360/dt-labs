@@ -1,42 +1,24 @@
+import { and, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { getFirebaseAdminFirestore } from '@/lib/firebase/admin'
+import { db, ticketNotifications } from '@/lib/db'
 
-const BATCH_MAX = 450
-
-/** Delete all notification documents that are already `read: true` for the logged-in user. */
+/** Delete all notifications of the logged-in user that are already read. */
 export async function POST() {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-
-  const db = getFirebaseAdminFirestore()
-  if (!db) {
-    return NextResponse.json({ error: 'Unavailable' }, { status: 503 })
-  }
-
   const uid = String(session.user.id).trim()
-  const col = db.collection('users').doc(uid).collection('ticketNotifications')
 
-  let deleted = 0
   try {
-    while (true) {
-      const snap = await col.where('read', '==', true).limit(BATCH_MAX).get()
-      if (snap.empty) break
-
-      const batch = db.batch()
-      for (const d of snap.docs) {
-        batch.delete(d.ref)
-      }
-      await batch.commit()
-      deleted += snap.size
-      if (snap.size < BATCH_MAX) break
-    }
-
-    return NextResponse.json({ ok: true, deleted })
-  } catch (e) {
-    return NextResponse.json({ error: 'Failed to delete', deleted }, { status: 500 })
+    const removed = await db
+      .delete(ticketNotifications)
+      .where(and(eq(ticketNotifications.userId, uid), eq(ticketNotifications.read, true)))
+      .returning({ id: ticketNotifications.id })
+    return NextResponse.json({ ok: true, deleted: removed.length })
+  } catch {
+    return NextResponse.json({ error: 'Failed to delete', deleted: 0 }, { status: 500 })
   }
 }

@@ -892,3 +892,23 @@ export const appSettings = pgTable('app_settings', {
   value: text('value'),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
+
+/** In-app ticket notifications (bell): one row per recipient. */
+export const ticketNotifications = pgTable(
+  'ticket_notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull(),
+    ticketId: integer('ticket_id').notNull(),
+    ticketTitle: varchar('ticket_title', { length: 200 }).notNull().default(''),
+    type: varchar('type', { length: 32 }).notNull(),
+    title: varchar('title', { length: 200 }).notNull().default(''),
+    body: text('body').notNull().default(''),
+    read: boolean('read').notNull().default(false),
+    readAt: ts('read_at'),
+    actorUserId: uuid('actor_user_id'),
+    actorName: varchar('actor_name', { length: 200 }).notNull().default(''),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('ticket_notifications_user_created_idx').on(t.userId, t.createdAt)]
+)
