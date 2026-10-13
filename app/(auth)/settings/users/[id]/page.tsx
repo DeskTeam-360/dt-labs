@@ -74,6 +74,8 @@ export default async function SettingsUserDetailPage({
     bio: u.bio,
     timezone: u.timezone,
     locale: u.locale,
+    joined_at: u.joinedAt ?? null,
+    left_at: u.leftAt ?? null,
     is_email_verified: u.isEmailVerified,
   }
 

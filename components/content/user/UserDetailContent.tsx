@@ -347,6 +347,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       bio: userData.bio || '',
       timezone: userData.timezone || 'UTC',
       locale: userData.locale || 'en',
+      joined_at: userData.joined_at ? dayjs(userData.joined_at) : null,
+      left_at: userData.left_at ? dayjs(userData.left_at) : null,
       is_email_verified: userData.is_email_verified || false,
     })
   }
@@ -374,6 +376,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       bio: userData.bio || '',
       timezone: userData.timezone || 'UTC',
       locale: userData.locale || 'en',
+      joined_at: userData.joined_at ? dayjs(userData.joined_at) : null,
+      left_at: userData.left_at ? dayjs(userData.left_at) : null,
       is_email_verified: userData.is_email_verified || false,
     })
     router.replace(`/settings/users/${userData.id}`, { scroll: false })
@@ -417,6 +421,12 @@ export default function UserDetailContent({ user: currentUser, userData: initial
         phone: values.phone || null,
         timezone: values.timezone || 'UTC',
         locale: values.locale || 'en',
+        ...(isAdmin
+          ? {
+              joined_at: values.joined_at ? values.joined_at.format('YYYY-MM-DD') : null,
+              left_at: values.left_at ? values.left_at.format('YYYY-MM-DD') : null,
+            }
+          : {}),
         is_email_verified: values.is_email_verified || false,
         updated_at: new Date().toISOString(),
       }
@@ -846,6 +856,16 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             <Option value="Asia/Singapore">Asia/Singapore (SGT)</Option>
                           </Select>
                         </Form.Item>
+                        {isAdmin && (
+                          <>
+                            <Form.Item name="joined_at" label="First working day" extra="Used for team capacity (WIB date).">
+                              <DatePicker style={{ width: '100%' }} />
+                            </Form.Item>
+                            <Form.Item name="left_at" label="Last working day" extra="Leave empty while the person still works here. Set it when they resign or are let go.">
+                              <DatePicker style={{ width: '100%' }} />
+                            </Form.Item>
+                          </>
+                        )}
                         <Form.Item name="locale" label="Locale">
                           <Select prefix={<TranslationOutlined />} placeholder="Select Locale">
                             <Option value="en">English (en)</Option>
@@ -896,6 +916,12 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             <Text>{userData.timezone || 'UTC'}</Text>
                           </Space>
                         </Descriptions.Item>
+                        {isAdmin && (
+                          <>
+                            <Descriptions.Item label="First working day">{userData.joined_at || '—'}</Descriptions.Item>
+                            <Descriptions.Item label="Last working day">{userData.left_at || '—'}</Descriptions.Item>
+                          </>
+                        )}
                         <Descriptions.Item label="Locale">
                           <Space>
                             <TranslationOutlined />

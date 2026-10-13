@@ -84,6 +84,11 @@ export function canAccessKnowledgeBase(role: string | undefined): boolean {
   return isAdmin(role)
 }
 
+/** Team availability (daily capacity, leave, piket, public holidays) in Settings: Admin only */
+export function canManageTeamAvailability(role: string | undefined): boolean {
+  return isAdmin(role)
+}
+
 /** Company Log (`company_daily_active_assignments`) in Settings → General: Admin & Manager */
 export function canAccessCompanyLog(role: string | undefined): boolean {
   return isAdminOrManager(role)
@@ -176,6 +181,7 @@ export function canAccessSettingsHub(role: string | undefined): boolean {
     canAccessCompanies(role) ||
     canAccessTeams(role) ||
     canAccessCompanyLog(role) ||
+    canManageTeamAvailability(role) ||
     canAccessRecapSnapshots(role) ||
     canAccessCustomerWeeklyRecap(role) ||
     canAccessAiSettings(role) ||

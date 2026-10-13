@@ -12,8 +12,8 @@ import {
 } from '@/lib/db'
 import { classifyRecapPeriodForStore } from '@/lib/recap-snapshot-period'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
+import { getCapacityHoursByUser } from '@/lib/user-capacity'
 
-const HOURS_PER_MEMBER_PER_DAY = 8
 /** One "available task" unit = this many hours of leftover time (must match UI ÷4h). */
 const HOURS_PER_AVAILABLE_TASK = 4
 const SECONDS_PER_AVAILABLE_TASK = HOURS_PER_AVAILABLE_TASK * 3600
@@ -68,15 +68,19 @@ export async function buildRecapSnapshotPayload(
   const teamMemberUserIds = new Set(memberRows.map((m) => m.userId))
 
   const teamMemberCountByPosition = new Map<string, number>()
+  /** Capacity hours per position over the period: Σ per-person daily hours (leave, piket, holidays, joiners/leavers). */
+  const capacityHoursByPosition = new Map<string, number>()
   if (teamMemberUserIds.size > 0) {
     const userRows = await db
       .select({ id: users.id, position: users.position })
       .from(users)
       .where(inArray(users.id, [...teamMemberUserIds]))
+    const capacityByUser = await getCapacityHoursByUser([...teamMemberUserIds], periodStartYmd, periodEndYmd)
     for (const u of userRows) {
       const key = normalizePosition(u.position)
       if (!key) continue
       teamMemberCountByPosition.set(key, (teamMemberCountByPosition.get(key) ?? 0) + 1)
+      capacityHoursByPosition.set(key, (capacityHoursByPosition.get(key) ?? 0) + (capacityByUser.get(u.id) ?? 0))
     }
   }
 
@@ -144,7 +148,7 @@ export async function buildRecapSnapshotPayload(
   for (const pos of [...seenPos].sort((a, b) => a.localeCompare(b))) {
     const used = timeUsedByPosition.get(pos) ?? 0
     const teamCnt = teamMemberCountByPosition.get(pos) ?? 0
-    const availHours = teamCnt * HOURS_PER_MEMBER_PER_DAY * avgLogRowsPerCompany
+    const availHours = capacityHoursByPosition.get(pos) ?? 0
     const availSec = Math.round(availHours * 3600)
     totalTimeUsedSeconds += used
     totalTimeAvailableSeconds += availSec
@@ -190,7 +194,7 @@ export async function buildRecapSnapshotPayload(
   const availableTasks = roleTasks.reduce((sum, r) => sum + r.available_tasks, 0)
 
   const payload: Record<string, unknown> = {
-    formula_version: 1,
+    formula_version: 2,
     team_ids: teamIds,
     team_names: teamNames,
     total_team: teamIds.length,

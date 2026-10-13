@@ -50,6 +50,7 @@ import {
   canAccessUsers,
   canManageDashboardAnnouncements,
   canManageGlobalAnnouncement,
+  canManageTeamAvailability,
   isAdmin,
 } from '@/lib/auth-utils'
 
@@ -344,6 +345,7 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
             canAccessCustomerTimeReport(role) ||
             canAccessRecapSnapshots(role) ||
             canAccessCustomerWeeklyRecap(role) ||
+            canManageTeamAvailability(role) ||
             canAccessCompanyLog(role)) && (
             <Section heading="Reports">
               <Row gutter={[16, 16]}>
@@ -393,6 +395,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                       title="Customer Weekly Recap"
                       description="Utilization and client time per customer per week"
                       href="/settings/customer-weekly-recap"
+                      icon={<CalendarOutlined />}
+                    />
+                  </Col>
+                )}
+                {canManageTeamAvailability(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Team Availability"
+                      description="Leave, sick days, on-duty (piket) and public holidays per person"
+                      href="/settings/team-availability"
                       icon={<CalendarOutlined />}
                     />
                   </Col>

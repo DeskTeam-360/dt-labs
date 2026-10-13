@@ -8,6 +8,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
   primaryKey,
   text,
@@ -44,6 +45,9 @@ export const users = pgTable('users', {
   /** job_types.slug preselected in the ticket Time Tracker. */
   defaultJobType: varchar('default_job_type', { length: 64 }),
   mustChangePassword: boolean('must_change_password').default(false),
+  /** First / last working day (WIB calendar date). Used for team capacity. */
+  joinedAt: date('joined_at'),
+  leftAt: date('left_at'),
   metadata: jsonb('metadata'),
   companyId: uuid('company_id'),
   createdAt: ts('created_at').notNull().defaultNow(),
@@ -912,3 +916,36 @@ export const ticketNotifications = pgTable(
   },
   (t) => [index('ticket_notifications_user_created_idx').on(t.userId, t.createdAt)]
 )
+
+/** Per-user daily capacity (WIB calendar date). One row per active admin/manager/staff per day. */
+export const userDailyCapacity = pgTable(
+  'user_daily_capacity',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    capacityDate: date('capacity_date').notNull(),
+    /** Hours available that day (0 = off). */
+    hours: numeric('hours', { precision: 4, scale: 2 }).notNull().default('8'),
+    /** work | weekend | holiday | leave | sick | piket | other */
+    reason: varchar('reason', { length: 16 }).notNull().default('work'),
+    /** auto = created by the daily job; manual = set by an admin (never overwritten by the job). */
+    source: varchar('source', { length: 8 }).notNull().default('auto'),
+    updatedBy: uuid('updated_by'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    unique('user_daily_capacity_user_id_capacity_date_key').on(t.userId, t.capacityDate),
+    index('user_daily_capacity_date_idx').on(t.capacityDate),
+  ]
+)
+
+/** Non-working days (WIB calendar date). */
+export const holidays = pgTable('holidays', {
+  holidayDate: date('holiday_date').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  createdBy: uuid('created_by'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+})
