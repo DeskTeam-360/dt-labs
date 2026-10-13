@@ -147,11 +147,16 @@ export default function TabTimeTracker({
     let cancelled = false
     ;(async () => {
       try {
-        const rows = await apiFetch<JobTypeOpt[]>('/api/job-types')
+        const [rows, prefs] = await Promise.all([
+          apiFetch<JobTypeOpt[]>('/api/job-types'),
+          apiFetch<{ default_job_type: string | null }>('/api/profile').catch(() => null),
+        ])
         if (cancelled) return
         setJobTypeOptions(Array.isArray(rows) ? rows : [])
         setTimerJobType((prev) => {
           if (prev != null) return prev
+          const preferred = prefs?.default_job_type
+          if (preferred && rows.some((r) => r.slug === preferred)) return preferred
           const other = rows.find((r) => r.slug === 'other')
           return other?.slug ?? rows[0]?.slug ?? null
         })

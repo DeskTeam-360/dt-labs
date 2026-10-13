@@ -41,6 +41,8 @@ export const users = pgTable('users', {
   bio: text('bio'),
   timezone: varchar('timezone', { length: 50 }).default('UTC'),
   locale: varchar('locale', { length: 10 }).default('en'),
+  /** job_types.slug preselected in the ticket Time Tracker. */
+  defaultJobType: varchar('default_job_type', { length: 64 }),
   mustChangePassword: boolean('must_change_password').default(false),
   metadata: jsonb('metadata'),
   companyId: uuid('company_id'),

@@ -24,6 +24,7 @@ export default async function ProfilePage() {
         position: userRow.position,
         timezone: userRow.timezone ?? 'UTC',
         locale: userRow.locale ?? 'en',
+        default_job_type: userRow.defaultJobType ?? null,
       }
     : undefined
 

@@ -68,6 +68,12 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const extraCompanies: { id: string; name: string }[] = userData.extra_companies ?? []
   const isOwnProfile = String(currentUser.id) === String(userData?.id)
   const isCustomer = ((userData?.role ?? '').toLowerCase() === 'customer')
+  const [createdTickets, setCreatedTickets] = useState<{
+    rows: { id: number; title: string; status: string; ticket_type: string; created_at: string | null; company_name: string | null }[]
+    total: number
+    loading: boolean
+  }>({ rows: [], total: 0, loading: false })
+  const [createdPage, setCreatedPage] = useState({ current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(userData.avatar_url)
@@ -92,6 +98,23 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const [activeTabKey, setActiveTabKey] = useState('general')
   const [hourlyStopped, setHourlyStopped] = useState<StoppedTimeSession[]>([])
   const [hourlyActive, setHourlyActive] = useState<Array<{ ticket_id: number; start_time: string }>>([])
+
+  useEffect(() => {
+    if (!userData?.id || isCustomer || activeTabKey !== 'my-tickets') return
+    let cancelled = false
+    setCreatedTickets((p) => ({ ...p, loading: true }))
+    fetch(`/api/users/${userData.id}/created-tickets?limit=${createdPage.pageSize}&offset=${(createdPage.current - 1) * createdPage.pageSize}`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load tickets'))))
+      .then((d) => {
+        if (!cancelled) setCreatedTickets({ rows: d.tickets ?? [], total: d.total ?? 0, loading: false })
+      })
+      .catch(() => {
+        if (!cancelled) setCreatedTickets((p) => ({ ...p, loading: false }))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [userData?.id, isCustomer, activeTabKey, createdPage])
 
   const fetchHourlyActivityData = useCallback(async () => {
     if (!userData?.id || isCustomer) return
@@ -1070,6 +1093,41 @@ export default function UserDetailContent({ user: currentUser, userData: initial
               </Col>
             </Row>
                     </>
+                  ),
+                },
+                {
+                  key: 'my-tickets',
+                  label: (
+                    <span>
+                      <NumberOutlined />
+                      My Ticket
+                    </span>
+                  ),
+                  children: (
+                    <Table
+                      rowKey="id"
+                      size="middle"
+                      loading={createdTickets.loading}
+                      dataSource={createdTickets.rows}
+                      pagination={{
+                        current: createdPage.current,
+                        pageSize: createdPage.pageSize,
+                        total: createdTickets.total,
+                        showSizeChanger: true,
+                        pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
+                        showTotal: appTableShowTotal('tickets'),
+                        onChange: (current, pageSize) => setCreatedPage({ current, pageSize }),
+                      }}
+                      columns={[
+                        { title: 'ID', dataIndex: 'id', width: 90, render: (v: number) => <SpaNavLink href={`/tickets/${v}`}>#{v}</SpaNavLink> },
+                        { title: 'Title', dataIndex: 'title', ellipsis: true, render: (v: string, r: { id: number }) => <SpaNavLink href={`/tickets/${r.id}`} style={{ fontWeight: 500 }}>{v}</SpaNavLink> },
+                        { title: 'Company', dataIndex: 'company_name', width: 220, ellipsis: true, render: (v: string | null) => v || '—' },
+                        { title: 'Type', dataIndex: 'ticket_type', width: 100, render: (v: string) => <Tag>{v}</Tag> },
+                        { title: 'Status', dataIndex: 'status', width: 140, render: (v: string) => <Tag>{v}</Tag> },
+                        { title: 'Created', dataIndex: 'created_at', width: 170, render: (v: string | null) => (v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '—') },
+                      ]}
+                      scroll={{ x: 'max-content' }}
+                    />
                   ),
                 },
                 {

@@ -28,6 +28,16 @@ dayjs.extend(timezone)
 
 const { Text } = Typography
 
+/** Ticks on the browser clock only (no server calls); isolated so only this span re-renders. */
+function TzClock({ tz }: { tz: string }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  return <span style={{ fontVariantNumeric: 'tabular-nums' }}>{dayjs(now).tz(tz).format('HH:mm:ss')}</span>
+}
+
 export default function DashboardHourlyActivityCard({
   stoppedSessions,
   activeSessions,
@@ -74,7 +84,7 @@ export default function DashboardHourlyActivityCard({
           <ClockCircleOutlined />
           <span>My Daily activity by hour</span>
           <Text type="secondary" style={{ fontSize: 12, fontWeight: 'normal' }}>
-            {tz}
+            {tz} · <TzClock tz={tz} />
           </Text>
         </Space>
       }

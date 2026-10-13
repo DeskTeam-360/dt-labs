@@ -4,6 +4,20 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db, users } from '@/lib/db'
 
+/** GET /api/profile - Preferences used by the UI (default job type for the time tracker) */
+export async function GET() {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const [row] = await db
+    .select({ defaultJobType: users.defaultJobType })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1)
+  return NextResponse.json({ default_job_type: row?.defaultJobType ?? null })
+}
+
 /** PATCH /api/profile - Update current user profile */
 export async function PATCH(request: Request) {
   const session = await auth()
@@ -23,6 +37,7 @@ export async function PATCH(request: Request) {
     bio,
     timezone,
     locale,
+    default_job_type,
   } = body
 
   const set: {
@@ -36,6 +51,7 @@ export async function PATCH(request: Request) {
     bio?: string | null
     timezone?: string
     locale?: string
+    defaultJobType?: string | null
     updatedAt: Date
   } = {
     updatedAt: new Date(),
@@ -50,6 +66,7 @@ export async function PATCH(request: Request) {
   if (bio !== undefined) set.bio = bio
   if (timezone !== undefined) set.timezone = timezone
   if (locale !== undefined) set.locale = locale
+  if (default_job_type !== undefined) set.defaultJobType = default_job_type ? String(default_job_type) : null
 
   const [updated] = await db
     .update(users)
@@ -74,6 +91,7 @@ export async function PATCH(request: Request) {
       bio: updated.bio,
       timezone: updated.timezone,
       locale: updated.locale,
+      default_job_type: updated.defaultJobType,
     },
   })
 }
