@@ -372,6 +372,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                 {canAccessCustomerTimeReport(role) && (
                   <Col xs={24} sm={12} md={8}>
                     <HubTile
+                      title="New Customer Report"
+                      description="Pick a team or companies, set the dates, and load the report"
+                      href="/new-customer-report"
+                      icon={<BarChartOutlined />}
+                    />
+                  </Col>
+                )}
+                {canAccessCustomerTimeReport(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
                       title="Time Report"
                       description="Detailed tracked time log across all tickets"
                       href="/reports"

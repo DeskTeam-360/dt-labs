@@ -23,6 +23,7 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs, { Dayjs } from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bar,
@@ -56,6 +57,8 @@ import { ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
 const { Content } = Layout
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
+
+dayjs.extend(relativeTime)
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600)
@@ -228,6 +231,7 @@ interface CompanyOpt {
   id: string
   name: string
   active_team_id?: string | null
+  is_customer?: boolean
 }
 
 interface StatusOpt {
@@ -238,6 +242,8 @@ interface StatusOpt {
 
 interface CustomerTimeReportProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string | null }
+  /** `new`: team pre-selects companies, customer-only filter, no presets / status / urgent filters. */
+  variant?: 'classic' | 'new'
 }
 
 type ReportTicket = {
@@ -250,6 +256,8 @@ type ReportTicket = {
   created_at: string | null
   priority_title: string | null
   priority_slug?: string | null
+  /** Display title of `status` (ticket_statuses.title). */
+  status_title?: string | null
   is_urgent: boolean
   /** False = no completed time sessions in the selected period (or ever if no date range). */
   has_reported_time?: boolean
@@ -273,6 +281,21 @@ type CompanySummaryRow = {
   avg_log_vs_tracker_percent: number | null
   avg_hours_per_log_day: number | null
   by_job_type: CompanySummaryByJobRow[]
+  last_ticket_at?: string | null
+  last_worked_at?: string | null
+}
+
+type ExtraTimeSession = {
+  id: string
+  ticket_id: number
+  ticket_title: string
+  company_id: string | null
+  company_name: string | null
+  user_name: string | null
+  start_time: string | null
+  stop_time: string | null
+  reported_seconds: number
+  note: string | null
 }
 
 type ReportData = {
@@ -294,12 +317,16 @@ type ReportData = {
   }
   tickets: ReportTicket[]
   company_summary?: CompanySummaryRow[]
+  extra_time_sessions?: ExtraTimeSession[]
 }
 
-export default function CustomerTimeReportContent({ user: currentUser }: CustomerTimeReportProps) {
+export default function CustomerTimeReportContent({ user: currentUser, variant = 'classic' }: CustomerTimeReportProps) {
+  const isNew = variant === 'new'
   const [collapsed, setCollapsed] = useState(false)
   const [form] = Form.useForm<{
     team_ids: string[]
+    company_ids?: string[]
+    customer_only?: boolean
     range: [Dayjs, Dayjs] | null
     date_preset?: CustomerTimeReportDatePresetKey
     status_slugs: string[] | undefined
@@ -313,6 +340,8 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
   const [loadingMeta, setLoadingMeta] = useState(true)
   const [reportLoading, setReportLoading] = useState(false)
   const [report, setReport] = useState<ReportData | null>(null)
+  const [ticketCompanyFilter, setTicketCompanyFilter] = useState<string | undefined>(undefined)
+  const [ticketSearch, setTicketSearch] = useState('')
 
   const [workersOpen, setWorkersOpen] = useState(false)
   const [workersTicket, setWorkersTicket] = useState<ReportTicket | null>(null)
@@ -392,13 +421,14 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
         if (!cRes.ok) throw new Error('Failed to load companies')
         if (!sRes.ok) throw new Error('Failed to load statuses')
         const cJson = (await cRes.json()) as {
-          data?: Array<{ id: string; name: string; active_team_id?: string | null }>
+          data?: Array<{ id: string; name: string; active_team_id?: string | null; is_customer?: boolean }>
         }
         const sJson = (await sRes.json()) as StatusOpt[]
         const companyList = (cJson.data ?? []).map((r) => ({
           id: r.id,
           name: r.name,
           active_team_id: r.active_team_id ?? null,
+          is_customer: r.is_customer ?? false,
         }))
         setCompanies(companyList)
         if (tRes.ok) {
@@ -419,7 +449,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
             title: r.title,
           }))
         )
-        await loadPresetsFromApi()
+        if (!isNew) await loadPresetsFromApi()
       } catch (e) {
         message.error((e as Error).message)
       } finally {
@@ -427,7 +457,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       }
     }
     load()
-  }, [loadPresetsFromApi])
+  }, [loadPresetsFromApi, isNew])
 
   useEffect(() => {
     if (globalDefaultsAppliedRef.current || presets.length === 0 || companies.length === 0) return
@@ -666,6 +696,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
   }, [teams, companies, presets])
 
   const watchedTeamIds = Form.useWatch('team_ids', form) as string[] | undefined
+  const watchedCustomerOnly = Form.useWatch('customer_only', form) as boolean | undefined
   const watchedRangeForRecap = Form.useWatch('range', form) as [Dayjs, Dayjs] | null | undefined
   const watchedPresetForRecap = Form.useWatch('date_preset', form) as CustomerTimeReportDatePresetKey | undefined
   const watchedRecapTitle = Form.useWatch('recap_snapshot_title', form) as string | undefined
@@ -755,6 +786,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       date_preset?: CustomerTimeReportDatePreset
       status_slugs?: string[]
       urgent_only?: boolean
+      company_ids?: string[]
     }
     try {
       values = await form.validateFields()
@@ -762,14 +794,20 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       return
     }
     const teamIds = [...new Set((values.team_ids ?? []).map((id) => String(id).trim()).filter(Boolean))]
-    const company_ids = companyIdsFromTeamIds(teamIds, companies)
+    const company_ids = isNew
+      ? [...new Set((values.company_ids ?? []).map((id) => String(id).trim()).filter(Boolean))]
+      : companyIdsFromTeamIds(teamIds, companies)
     if (company_ids.length === 0) {
-      message.warning('No companies use the selected team(s) as active team. Assign teams on companies in Settings.')
+      message.warning(
+        isNew
+          ? 'Select at least one company, or pick a team to fill the companies.'
+          : 'No companies use the selected team(s) as active team. Assign teams on companies in Settings.'
+      )
       return
     }
     const qs = buildQuery({ ...values, company_ids })
     if (!qs) {
-      message.warning('Select at least one team')
+      message.warning(isNew ? 'Select at least one company' : 'Select at least one team')
       return
     }
     setReportLoading(true)
@@ -786,7 +824,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
         date_preset: normalizeDatePreset(values.date_preset),
       })
       const periodKind = pr ? classifyRecapPeriodForStore(pr.start, pr.end) : null
-      if (pr && periodKind && teamIds.length > 0) {
+      if (!isNew && pr && periodKind && teamIds.length > 0) {
         try {
           const previewRes = await fetch('/api/reports/recap-snapshot/preview', {
             method: 'POST',
@@ -889,8 +927,16 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
 
   const tableData = useMemo(() => {
     if (!report?.tickets) return []
-    return [...report.tickets].sort((a, b) => b.reported_seconds - a.reported_seconds)
-  }, [report])
+    let list = [...report.tickets].sort((a, b) => b.reported_seconds - a.reported_seconds)
+    if (isNew) {
+      if (ticketCompanyFilter) list = list.filter((t) => t.company_id === ticketCompanyFilter)
+      const q = ticketSearch.trim().toLowerCase().replace(/^#/, '')
+      if (q) {
+        list = list.filter((t) => String(t.id).includes(q) || (t.title ?? '').toLowerCase().includes(q))
+      }
+    }
+    return list
+  }, [report, isNew, ticketCompanyFilter, ticketSearch])
 
   const companySummaryData = useMemo(() => {
     const rows = report?.company_summary
@@ -1143,7 +1189,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
       dataIndex: 'status',
       width: 130,
       align: 'center',
-      render: (s: string | null) => <Tag>{s ?? '—'}</Tag>,
+      render: (s: string | null, r: ReportTicket) => <Tag>{(isNew ? r.status_title : null) ?? s ?? '—'}</Tag>,
     },
     {
       title: 'Priority',
@@ -1204,7 +1250,7 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
               <BarChartOutlined style={{ fontSize: 28, color: 'var(--ant-color-primary, #1677ff)' }} />
               
                 <Title level={2} className="settings-section-heading" style={{ margin: 0, fontSize: '1.5rem' }}>
-                  C Report
+                  {isNew ? 'New Customer Report' : 'C Report'}
                 </Title>
               
             </Flex>
@@ -1213,9 +1259,106 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
             <Form
               form={form}
               layout="vertical"
-              initialValues={{ urgent_only: false, team_ids: [], recap_snapshot_title: '' }}
+              initialValues={{ urgent_only: false, team_ids: [], company_ids: [], customer_only: false, recap_snapshot_title: '' }}
               onFinish={fetchReport}
             >
+              {isNew ? (
+                <>
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} lg={8}>
+                      <Form.Item
+                        name="team_ids"
+                        label={<Text strong>Team</Text>}
+                        tooltip="Picking a team fills the Companies field with every company that uses this team as its active team. You can still add or remove companies afterwards."
+                      >
+                        <Select
+                          mode="multiple"
+                          allowClear
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="Optional — pick a team to fill the companies"
+                          maxTagCount="responsive"
+                          options={teamSelectOptions}
+                          loading={loadingMeta}
+                          onChange={(ids: string[]) => {
+                            const customerOnly = Boolean(form.getFieldValue('customer_only'))
+                            const pool = customerOnly ? companies.filter((c) => c.is_customer) : companies
+                            form.setFieldValue('company_ids', companyIdsFromTeamIds(ids ?? [], pool))
+                          }}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} lg={12}>
+                      <Form.Item
+                        name="company_ids"
+                        label={<Text strong>Companies</Text>}
+                        rules={[{ required: true, type: 'array', min: 1, message: 'Select at least one company' }]}
+                      >
+                        <Select
+                          mode="multiple"
+                          allowClear
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="Companies in this report"
+                          maxTagCount="responsive"
+                          loading={loadingMeta}
+                          options={(watchedCustomerOnly ? companies.filter((c) => c.is_customer) : companies).map((c) => ({
+                            value: c.id,
+                            label: c.name,
+                          }))}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} lg={4}>
+                      <Form.Item name="customer_only" label={<Text strong>Customer only</Text>} valuePropName="checked">
+                        <Switch
+                          onChange={(on) => {
+                            if (!on) return
+                            const keep = new Set(companies.filter((c) => c.is_customer).map((c) => c.id))
+                            const cur = (form.getFieldValue('company_ids') as string[] | undefined) ?? []
+                            form.setFieldValue('company_ids', cur.filter((id) => keep.has(id)))
+                          }}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} lg={8}>
+                      <Form.Item
+                        name="date_preset"
+                        label={<Text strong>Rolling dates</Text>}
+                        tooltip="Recalculated each time you load the report. Weeks are ISO (Monday–Sunday). Pick custom dates to clear this."
+                      >
+                        <Select<CustomerTimeReportDatePresetKey>
+                          allowClear
+                          placeholder="Custom — use the date range"
+                          style={{ width: '100%' }}
+                          options={CUSTOMER_TIME_REPORT_DATE_PRESET_OPTIONS}
+                          onChange={(v) => {
+                            if (v) {
+                              const r = resolveDatePresetToRange(v, dayjs())
+                              if (r) form.setFieldsValue({ range: [r.start, r.end] })
+                            }
+                          }}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} lg={8}>
+                      <Form.Item name="range" label={<Text strong>Date range</Text>}>
+                        <RangePicker
+                          style={{ width: '100%' }}
+                          format="MMM DD, YYYY"
+                          onChange={() => form.setFieldValue('date_preset', undefined)}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Button type="primary" htmlType="submit" loading={reportLoading}>
+                    Load report
+                  </Button>
+                </>
+              ) : (
+              <>
               <Row gutter={[16, 16]}>
                 <Col xs={24} lg={12} xl={10}>
                   <Form.Item
@@ -1445,6 +1588,8 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                 ) : null}
               </Col>
             </Row>
+              </>
+              )}
             </Form>
 
             {report ? (
@@ -1538,7 +1683,110 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                 </div>
 
 
-                {avgCustomerTimeRows.length > 0 ? (
+                {isNew ? (
+                  companySummaryData.length > 0 ? (
+                    <>
+                      <div className="customer-time-report-section-title">
+                        <Text strong>Average Customer Time</Text>
+                      </div>
+                      <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
+                        Used = tracked time in the selected period. Remaining = plan hours minus used. “Last ticket” and
+                        “last worked” look at all time, not only this period.
+                      </Text>
+                      <div className="customer-time-report-table-wrap" style={{ marginBottom: 24 }}>
+                        <Table<CompanySummaryRow>
+                          rowKey="company_id"
+                          size="small"
+                          bordered
+                          pagination={false}
+                          dataSource={companySummaryData}
+                          scroll={{ x: 900 }}
+                          columns={[
+                            {
+                              title: 'Company',
+                              key: 'company',
+                              fixed: 'left',
+                              ellipsis: true,
+                              render: (_: unknown, r: CompanySummaryRow) => <Text strong>{r.company_name ?? r.company_id}</Text>,
+                            },
+                            {
+                              title: 'Plan (h)',
+                              key: 'plan',
+                              width: 90,
+                              align: 'center',
+                              render: (_: unknown, r: CompanySummaryRow) => (Number(r.plan_active_time_hours) || 0).toLocaleString(),
+                            },
+                            {
+                              title: 'Used (h)',
+                              key: 'used',
+                              width: 90,
+                              align: 'center',
+                              render: (_: unknown, r: CompanySummaryRow) => hoursFromSeconds(r.total_tracker_reported_seconds),
+                            },
+                            {
+                              title: 'Remaining',
+                              key: 'remaining',
+                              width: 130,
+                              align: 'center',
+                              render: (_: unknown, r: CompanySummaryRow) => {
+                                const plan = Number(r.plan_active_time_hours) || 0
+                                if (plan <= 0) return <Text type="secondary">No plan</Text>
+                                const left = Math.round((plan - hoursFromSeconds(r.total_tracker_reported_seconds)) * 100) / 100
+                                return left >= 0 ? (
+                                  <Text strong>{left} h</Text>
+                                ) : (
+                                  <Text strong type="danger">
+                                    Overtime {Math.abs(left)} h
+                                  </Text>
+                                )
+                              },
+                            },
+                            {
+                              title: 'Used',
+                              key: 'pct',
+                              width: 90,
+                              align: 'center',
+                              render: (_: unknown, r: CompanySummaryRow) => {
+                                const plan = Number(r.plan_active_time_hours) || 0
+                                if (plan <= 0) return <Text type="secondary">—</Text>
+                                const pct = Math.round((r.total_tracker_reported_seconds / (plan * 3600)) * 100)
+                                return <Tag color={pct >= 100 ? 'red' : pct >= 80 ? 'orange' : 'green'} style={{ margin: 0 }}>{pct}%</Tag>
+                              },
+                            },
+                            {
+                              title: 'Last ticket sent',
+                              key: 'last_ticket',
+                              width: 190,
+                              render: (_: unknown, r: CompanySummaryRow) =>
+                                r.last_ticket_at ? (
+                                  <Flex vertical gap={0}>
+                                    <Text>{dayjs(r.last_ticket_at).format('MMM D, YYYY HH:mm')}</Text>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>{dayjs(r.last_ticket_at).fromNow()}</Text>
+                                  </Flex>
+                                ) : (
+                                  <Text type="secondary">No tickets yet</Text>
+                                ),
+                            },
+                            {
+                              title: 'Last worked on',
+                              key: 'last_worked',
+                              width: 190,
+                              render: (_: unknown, r: CompanySummaryRow) =>
+                                r.last_worked_at ? (
+                                  <Flex vertical gap={0}>
+                                    <Text>{dayjs(r.last_worked_at).format('MMM D, YYYY HH:mm')}</Text>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>{dayjs(r.last_worked_at).fromNow()}</Text>
+                                  </Flex>
+                                ) : (
+                                  <Text type="secondary">No work logged</Text>
+                                ),
+                            },
+                          ]}
+                        />
+                      </div>
+                    </>
+                  ) : null
+                ) : avgCustomerTimeRows.length > 0 ? (
                   <>
                     <div className="customer-time-report-section-title">
                       <Text strong>Average Customer Time</Text>
@@ -1594,12 +1842,35 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                   Total records: {tableData.length}. Click a row to see who logged time on that ticket (sessions match
                   your report date range when set).
                 </Text>
+                {isNew ? (
+                  <Flex gap={12} wrap="wrap" style={{ marginBottom: 12 }}>
+                    {report.companies.length > 1 ? (
+                      <Select
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder="All companies"
+                        style={{ minWidth: 240 }}
+                        value={ticketCompanyFilter}
+                        onChange={(v) => setTicketCompanyFilter(v ?? undefined)}
+                        options={report.companies.map((c) => ({ value: c.id, label: c.name ?? c.id }))}
+                      />
+                    ) : null}
+                    <Input.Search
+                      allowClear
+                      placeholder="Search by title or ticket ID"
+                      style={{ width: 300 }}
+                      value={ticketSearch}
+                      onChange={(e) => setTicketSearch(e.target.value)}
+                    />
+                  </Flex>
+                ) : null}
                 <div className="customer-time-report-table-wrap customer-time-report-tickets-clickable">
                   <Table<ReportTicket>
                     rowKey="id"
                     size="small"
                     bordered
-                    columns={columns}
+                    columns={isNew ? columns.filter((c) => c.key !== 'priority') : columns}
                     dataSource={tableData}
                     loading={reportLoading}
                     pagination={{ pageSize: 25, showSizeChanger: true, pageSizeOptions: [25, 50, 100] }}
@@ -1610,6 +1881,60 @@ export default function CustomerTimeReportContent({ user: currentUser }: Custome
                     })}
                   />
                 </div>
+
+                {isNew ? (
+                  <>
+                    <div className="customer-time-report-section-title" style={{ marginTop: 28 }}>
+                      <Text strong>Extra time work</Text>
+                    </div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+                      Completed work sessions with job type “Extra time” in this report ({report.extra_time_sessions?.length ?? 0}).
+                    </Text>
+                    <div className="customer-time-report-table-wrap">
+                      <Table<ExtraTimeSession>
+                        rowKey="id"
+                        size="small"
+                        bordered
+                        loading={reportLoading}
+                        dataSource={report.extra_time_sessions ?? []}
+                        locale={{ emptyText: 'No Extra time sessions in this period' }}
+                        pagination={{ pageSize: 25, showSizeChanger: true, pageSizeOptions: [25, 50, 100] }}
+                        scroll={{ x: 900 }}
+                        columns={[
+                          {
+                            title: 'Ticket',
+                            key: 'ticket',
+                            ellipsis: true,
+                            render: (_: unknown, r: ExtraTimeSession) => (
+                              <Flex vertical gap={0}>
+                                <SpaNavLink href={`/tickets/${r.ticket_id}`}>{r.ticket_title || `#${r.ticket_id}`}</SpaNavLink>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  #{r.ticket_id}
+                                  {report.companies.length > 1 && r.company_name ? ` · ${r.company_name}` : ''}
+                                </Text>
+                              </Flex>
+                            ),
+                          },
+                          { title: 'Person', dataIndex: 'user_name', width: 170, render: (v: string | null) => v || '—' },
+                          {
+                            title: 'Started',
+                            dataIndex: 'start_time',
+                            width: 160,
+                            render: (v: string | null) => (v ? dayjs(v).format('MMM D, YYYY HH:mm') : '—'),
+                          },
+                          {
+                            title: 'Duration',
+                            dataIndex: 'reported_seconds',
+                            width: 110,
+                            align: 'center',
+                            render: (v: number) => formatDuration(Number(v) || 0),
+                          },
+                          { title: 'Note', dataIndex: 'note', ellipsis: true, render: (v: string | null) => v || '—' },
+                        ]}
+                      />
+                    </div>
+                  </>
+                ) : null}
 
                 <Drawer
                   title={

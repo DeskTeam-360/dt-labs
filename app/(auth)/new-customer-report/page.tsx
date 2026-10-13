@@ -1,0 +1,17 @@
+import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
+import CustomerTimeReportContent from '@/components/content/customer/CustomerTimeReportContent'
+import { canAccessCustomerTimeReport } from '@/lib/auth-utils'
+
+export default async function NewCustomerReportPage() {
+  const session = await auth()
+  if (!session?.user) {
+    redirect('/login')
+  }
+  const role = (session.user as { role?: string }).role
+  if (!canAccessCustomerTimeReport(role)) {
+    redirect('/dashboard')
+  }
+  return <CustomerTimeReportContent user={session.user} variant="new" />
+}
