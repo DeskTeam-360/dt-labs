@@ -1673,6 +1673,8 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
             {report ? (
               <>
                 <Divider style={{ margin: '24px 0 16px' }} />
+                {isNew ? null : (
+                  <>
                 <Title level={4} className="settings-section-heading" style={{ marginTop: 0, marginBottom: 4 }}>
                   {report.companies.map((c) => c.name ?? c.id).join(', ')}
                 </Title>
@@ -1681,6 +1683,8 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                     {report.companies.length} companies — combined totals below
                   </Text>
                 ) : null}
+                  </>
+                )}
 
                 <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
                   {[
@@ -1737,15 +1741,25 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                     bordered
                     columns={
                       isNew
-                        ? companySummaryColumns.filter(
-                            (c) => !('dataIndex' in c && c.dataIndex === 'avg_hours_per_log_day')
-                          )
+                        ? companySummaryColumns
+                            .filter((c) => !('dataIndex' in c && c.dataIndex === 'avg_hours_per_log_day'))
+                            .map((c) => {
+                              // New report: company name always fully visible; numeric plan/day columns stay slim.
+                              if (c.key === 'company') return { ...c, width: 240, ellipsis: false }
+                              if ('dataIndex' in c) {
+                                if (c.dataIndex === 'plan_active_time_hours') return { ...c, width: 95 }
+                                if (c.dataIndex === 'log_days_count') return { ...c, width: 80 }
+                                if (c.dataIndex === 'log_total_active_time_hours') return { ...c, width: 90 }
+                                if (c.dataIndex === 'ticket_count') return { ...c, width: 90 }
+                              }
+                              return c
+                            })
                         : companySummaryColumns
                     }
                     dataSource={companySummaryData}
                     loading={reportLoading}
                     pagination={false}
-                    scroll={{ x: isNew ? 1100 + 360 + positionNames.length * 110 : 1100 }}
+                    scroll={{ x: isNew ? 1330 + positionNames.length * 110 : 1100 }}
                     expandable={{
                       expandedRowRender: (r) =>
                         r.by_job_type.length > 0 ? (
