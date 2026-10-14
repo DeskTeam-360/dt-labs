@@ -283,6 +283,7 @@ type CompanySummaryRow = {
   by_job_type: CompanySummaryByJobRow[]
   last_ticket_at?: string | null
   last_worked_at?: string | null
+  by_position?: { position: string; reported_seconds: number }[]
 }
 
 type ExtraTimeSession = {
@@ -967,6 +968,15 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
     })
   }, [report?.company_summary])
 
+  /** Agent positions that logged time in this report (columns of the new summary table). */
+  const positionNames = useMemo(() => {
+    const totals = new Map<string, number>()
+    for (const r of companySummaryData) {
+      for (const p of r.by_position ?? []) totals.set(p.position, (totals.get(p.position) ?? 0) + p.reported_seconds)
+    }
+    return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name)
+  }, [companySummaryData])
+
   const companySummaryColumns: ColumnsType<CompanySummaryRow> = useMemo(
     () => [
       {
@@ -1028,8 +1038,76 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
         render: (h: number | null) =>
           h == null ? <Text type="secondary">—</Text> : <Text>{h}</Text>,
       },
+      ...(isNew
+        ? ([
+            {
+              title: 'Remain Time',
+              key: 'remain_pct',
+              width: 130,
+              align: 'center',
+              render: (_: unknown, r: CompanySummaryRow) => {
+                const used = r.avg_log_vs_tracker_percent
+                if (used == null) return <Text type="secondary">—</Text>
+                const remain = Math.round((100 - used) * 100) / 100
+                if (remain < 0) {
+                  return <Tag color="red" style={{ margin: 0 }}>Over by {Math.abs(remain)}%</Tag>
+                }
+                return (
+                  <Tag color={remain >= 10 ? 'green' : 'gold'} style={{ margin: 0 }}>
+                    {remain}% left
+                  </Tag>
+                )
+              },
+            },
+            {
+              title: 'Last ticket request',
+              key: 'last_ticket_at',
+              width: 180,
+              render: (_: unknown, r: CompanySummaryRow) =>
+                r.last_ticket_at ? (
+                  <Flex vertical gap={0}>
+                    <Text>{dayjs(r.last_ticket_at).format('MMM D, YYYY HH:mm')}</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>{dayjs(r.last_ticket_at).fromNow()}</Text>
+                  </Flex>
+                ) : (
+                  <Text type="secondary">No tickets yet</Text>
+                ),
+            },
+            {
+              title: 'Last worked on',
+              key: 'last_worked_at',
+              width: 180,
+              render: (_: unknown, r: CompanySummaryRow) =>
+                r.last_worked_at ? (
+                  <Flex vertical gap={0}>
+                    <Text>{dayjs(r.last_worked_at).format('MMM D, YYYY HH:mm')}</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>{dayjs(r.last_worked_at).fromNow()}</Text>
+                  </Flex>
+                ) : (
+                  <Text type="secondary">No work logged</Text>
+                ),
+            },
+            ...(positionNames.length > 0
+              ? [
+                  {
+                    title: 'Total Time Spent by agent position (in hours)',
+                    children: positionNames.map((pos) => ({
+                      title: pos,
+                      key: `pos-${pos}`,
+                      width: 110,
+                      align: 'center' as const,
+                      render: (_: unknown, r: CompanySummaryRow) => {
+                        const sec = r.by_position?.find((x) => x.position === pos)?.reported_seconds ?? 0
+                        return sec > 0 ? hoursFromSeconds(sec) : <Text type="secondary">—</Text>
+                      },
+                    })),
+                  },
+                ]
+              : []),
+          ] as ColumnsType<CompanySummaryRow>)
+        : []),
     ],
-    []
+    [isNew, positionNames]
   )
 
   const jobBreakdownColumns: ColumnsType<CompanySummaryByJobRow> = useMemo(
@@ -1657,11 +1735,17 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                     rowKey="company_id"
                     size="small"
                     bordered
-                    columns={companySummaryColumns}
+                    columns={
+                      isNew
+                        ? companySummaryColumns.filter(
+                            (c) => !('dataIndex' in c && c.dataIndex === 'avg_hours_per_log_day')
+                          )
+                        : companySummaryColumns
+                    }
                     dataSource={companySummaryData}
                     loading={reportLoading}
                     pagination={false}
-                    scroll={{ x: 1100 }}
+                    scroll={{ x: isNew ? 1100 + 360 + positionNames.length * 110 : 1100 }}
                     expandable={{
                       expandedRowRender: (r) =>
                         r.by_job_type.length > 0 ? (
@@ -1683,110 +1767,7 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                 </div>
 
 
-                {isNew ? (
-                  companySummaryData.length > 0 ? (
-                    <>
-                      <div className="customer-time-report-section-title">
-                        <Text strong>Average Customer Time</Text>
-                      </div>
-                      <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
-                        Used = tracked time in the selected period. Remaining = plan hours minus used. “Last ticket” and
-                        “last worked” look at all time, not only this period.
-                      </Text>
-                      <div className="customer-time-report-table-wrap" style={{ marginBottom: 24 }}>
-                        <Table<CompanySummaryRow>
-                          rowKey="company_id"
-                          size="small"
-                          bordered
-                          pagination={false}
-                          dataSource={companySummaryData}
-                          scroll={{ x: 900 }}
-                          columns={[
-                            {
-                              title: 'Company',
-                              key: 'company',
-                              fixed: 'left',
-                              ellipsis: true,
-                              render: (_: unknown, r: CompanySummaryRow) => <Text strong>{r.company_name ?? r.company_id}</Text>,
-                            },
-                            {
-                              title: 'Plan (h)',
-                              key: 'plan',
-                              width: 90,
-                              align: 'center',
-                              render: (_: unknown, r: CompanySummaryRow) => (Number(r.plan_active_time_hours) || 0).toLocaleString(),
-                            },
-                            {
-                              title: 'Used (h)',
-                              key: 'used',
-                              width: 90,
-                              align: 'center',
-                              render: (_: unknown, r: CompanySummaryRow) => hoursFromSeconds(r.total_tracker_reported_seconds),
-                            },
-                            {
-                              title: 'Remaining',
-                              key: 'remaining',
-                              width: 130,
-                              align: 'center',
-                              render: (_: unknown, r: CompanySummaryRow) => {
-                                const plan = Number(r.plan_active_time_hours) || 0
-                                if (plan <= 0) return <Text type="secondary">No plan</Text>
-                                const left = Math.round((plan - hoursFromSeconds(r.total_tracker_reported_seconds)) * 100) / 100
-                                return left >= 0 ? (
-                                  <Text strong>{left} h</Text>
-                                ) : (
-                                  <Text strong type="danger">
-                                    Overtime {Math.abs(left)} h
-                                  </Text>
-                                )
-                              },
-                            },
-                            {
-                              title: 'Used',
-                              key: 'pct',
-                              width: 90,
-                              align: 'center',
-                              render: (_: unknown, r: CompanySummaryRow) => {
-                                const plan = Number(r.plan_active_time_hours) || 0
-                                if (plan <= 0) return <Text type="secondary">—</Text>
-                                const pct = Math.round((r.total_tracker_reported_seconds / (plan * 3600)) * 100)
-                                return <Tag color={pct >= 100 ? 'red' : pct >= 80 ? 'orange' : 'green'} style={{ margin: 0 }}>{pct}%</Tag>
-                              },
-                            },
-                            {
-                              title: 'Last ticket sent',
-                              key: 'last_ticket',
-                              width: 190,
-                              render: (_: unknown, r: CompanySummaryRow) =>
-                                r.last_ticket_at ? (
-                                  <Flex vertical gap={0}>
-                                    <Text>{dayjs(r.last_ticket_at).format('MMM D, YYYY HH:mm')}</Text>
-                                    <Text type="secondary" style={{ fontSize: 12 }}>{dayjs(r.last_ticket_at).fromNow()}</Text>
-                                  </Flex>
-                                ) : (
-                                  <Text type="secondary">No tickets yet</Text>
-                                ),
-                            },
-                            {
-                              title: 'Last worked on',
-                              key: 'last_worked',
-                              width: 190,
-                              render: (_: unknown, r: CompanySummaryRow) =>
-                                r.last_worked_at ? (
-                                  <Flex vertical gap={0}>
-                                    <Text>{dayjs(r.last_worked_at).format('MMM D, YYYY HH:mm')}</Text>
-                                    <Text type="secondary" style={{ fontSize: 12 }}>{dayjs(r.last_worked_at).fromNow()}</Text>
-                                  </Flex>
-                                ) : (
-                                  <Text type="secondary">No work logged</Text>
-                                ),
-                            },
-                          ]}
-                        />
-                      </div>
-                    </>
-                  ) : null
-                ) : avgCustomerTimeRows.length > 0 ? (
+                {isNew ? null : avgCustomerTimeRows.length > 0 ? (
                   <>
                     <div className="customer-time-report-section-title">
                       <Text strong>Average Customer Time</Text>
@@ -1834,53 +1815,6 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                     </div>
                   </>
                 ) : null}
-
-                <div className="customer-time-report-section-title" style={{ marginTop: 28 }}>
-                  <Text strong>Tickets in scope (max 500)</Text>
-                </div>
-                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                  Total records: {tableData.length}. Click a row to see who logged time on that ticket (sessions match
-                  your report date range when set).
-                </Text>
-                {isNew ? (
-                  <Flex gap={12} wrap="wrap" style={{ marginBottom: 12 }}>
-                    {report.companies.length > 1 ? (
-                      <Select
-                        allowClear
-                        showSearch
-                        optionFilterProp="label"
-                        placeholder="All companies"
-                        style={{ minWidth: 240 }}
-                        value={ticketCompanyFilter}
-                        onChange={(v) => setTicketCompanyFilter(v ?? undefined)}
-                        options={report.companies.map((c) => ({ value: c.id, label: c.name ?? c.id }))}
-                      />
-                    ) : null}
-                    <Input.Search
-                      allowClear
-                      placeholder="Search by title or ticket ID"
-                      style={{ width: 300 }}
-                      value={ticketSearch}
-                      onChange={(e) => setTicketSearch(e.target.value)}
-                    />
-                  </Flex>
-                ) : null}
-                <div className="customer-time-report-table-wrap customer-time-report-tickets-clickable">
-                  <Table<ReportTicket>
-                    rowKey="id"
-                    size="small"
-                    bordered
-                    columns={isNew ? columns.filter((c) => c.key !== 'priority') : columns}
-                    dataSource={tableData}
-                    loading={reportLoading}
-                    pagination={{ pageSize: 25, showSizeChanger: true, pageSizeOptions: [25, 50, 100] }}
-                    scroll={{ x: 1232 }}
-                    onRow={(record) => ({
-                      onClick: () => openWorkersDrawer(record),
-                      style: { cursor: 'pointer' },
-                    })}
-                  />
-                </div>
 
                 {isNew ? (
                   <>
@@ -1935,6 +1869,54 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                     </div>
                   </>
                 ) : null}
+
+                <div className="customer-time-report-section-title" style={{ marginTop: 28 }}>
+                  <Text strong>Tickets in scope (max 500)</Text>
+                </div>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+                  Total records: {tableData.length}. Click a row to see who logged time on that ticket (sessions match
+                  your report date range when set).
+                </Text>
+                {isNew ? (
+                  <Flex gap={12} wrap="wrap" style={{ marginBottom: 12 }}>
+                    {report.companies.length > 1 ? (
+                      <Select
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder="All companies"
+                        style={{ minWidth: 240 }}
+                        value={ticketCompanyFilter}
+                        onChange={(v) => setTicketCompanyFilter(v ?? undefined)}
+                        options={report.companies.map((c) => ({ value: c.id, label: c.name ?? c.id }))}
+                      />
+                    ) : null}
+                    <Input.Search
+                      allowClear
+                      placeholder="Search by title or ticket ID"
+                      style={{ width: 300 }}
+                      value={ticketSearch}
+                      onChange={(e) => setTicketSearch(e.target.value)}
+                    />
+                  </Flex>
+                ) : null}
+                <div className="customer-time-report-table-wrap customer-time-report-tickets-clickable">
+                  <Table<ReportTicket>
+                    rowKey="id"
+                    size="small"
+                    bordered
+                    columns={isNew ? columns.filter((c) => c.key !== 'priority') : columns}
+                    dataSource={tableData}
+                    loading={reportLoading}
+                    pagination={{ pageSize: 25, showSizeChanger: true, pageSizeOptions: [25, 50, 100] }}
+                    scroll={{ x: 1232 }}
+                    onRow={(record) => ({
+                      onClick: () => openWorkersDrawer(record),
+                      style: { cursor: 'pointer' },
+                    })}
+                  />
+                </div>
+
 
                 <Drawer
                   title={

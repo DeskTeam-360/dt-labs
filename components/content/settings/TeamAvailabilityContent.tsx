@@ -210,11 +210,11 @@ function CalendarTab() {
         loading={loading && !grid}
       >
         {grid && (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 230px)' }}>
             <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 12, minWidth: '100%' }}>
               <thead>
                 <tr>
-                  <th style={{ position: 'sticky', left: 0, background: 'var(--ant-color-bg-container, #fff)', zIndex: 2, textAlign: 'left', padding: '6px 10px', minWidth: 190, borderBottom: '1px solid #f0f0f0' }}>
+                  <th style={{ position: 'sticky', top: 0, left: 0, background: 'var(--ant-color-bg-container, #fff)', zIndex: 4, textAlign: 'left', padding: '6px 10px', minWidth: 190, borderBottom: '1px solid #f0f0f0' }}>
                     Person
                   </th>
                   {grid.days.map((d) => {
@@ -225,6 +225,10 @@ function CalendarTab() {
                         key={d}
                         title={hol}
                         style={{
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 3,
+                          background: 'var(--ant-color-bg-container, #fff)',
                           minWidth: 34,
                           padding: '4px 0',
                           textAlign: 'center',

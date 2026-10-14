@@ -169,7 +169,7 @@ export async function GET(request: Request) {
       const d = days[i]
       a.totalAll += share
       a.dayAll.set(d, (a.dayAll.get(d) ?? 0) + share)
-      if (normJob(r.jobType) === 'extra time' || normJob(jobTitle.get(r.jobType ?? '')) === 'extra time') {
+      if (r.jobType === 'extra_time') {
         a.extraTime += share
       }
       if (inScope) {

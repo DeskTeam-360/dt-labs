@@ -28,7 +28,8 @@ function makeCompanySummary(
   trackerSecondsByCompany: Map<string, number>,
   byCompanyJob: Map<string, Map<string, JobAggCell>>,
   jobTitleBySlug: Map<string, string>,
-  lastByCompany: Map<string, { ticket: string | null; worked: string | null }> = new Map()
+  lastByCompany: Map<string, { ticket: string | null; worked: string | null }> = new Map(),
+  byCompanyPosition: Map<string, Map<string, number>> = new Map()
 ) {
   return companyIds.map((id) => {
     const log = logAggMap.get(id) ?? { days: 0, hours: 0 }
@@ -63,6 +64,9 @@ function makeCompanySummary(
       avg_hours_per_log_day: avgHoursPerLogDay,
       by_job_type,
       /** Newest ticket created for the company (any date, support tickets). */
+      by_position: [...(byCompanyPosition.get(id)?.entries() ?? [])]
+        .map(([position, seconds]) => ({ position, reported_seconds: seconds }))
+        .sort((a, b) => b.reported_seconds - a.reported_seconds),
       last_ticket_at: lastByCompany.get(id)?.ticket ?? null,
       /** Latest tracked work session on any of the company's tickets (any date). */
       last_worked_at: lastByCompany.get(id)?.worked ?? null,
@@ -76,11 +80,8 @@ function toIso(v: unknown): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
-/** "Extra time" job type, matched by slug or title ignoring case and punctuation. */
-function isExtraTimeJob(slug: string | null, title: string | undefined): boolean {
-  const norm = (x: string | null | undefined) => (x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-  return norm(slug) === 'extra time' || norm(title) === 'extra time'
-}
+/** "Extra time" work = tracker sessions whose job type slug is exactly `extra_time`. */
+const EXTRA_TIME_JOB_SLUG = 'extra_time'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role
@@ -345,6 +346,12 @@ export async function GET(request: Request) {
     .innerJoin(tickets, eq(ticketTimeTracker.ticketId, tickets.id))
     .where(and(...aggConds))
 
+  const positionRows = await db
+    .select({ id: users.id, position: users.position })
+    .from(users)
+    .where(inArray(users.id, [...new Set(rows.map((r) => r.tracker.userId))]))
+  const positionByUser = new Map(positionRows.map((u) => [u.id, u.position?.trim() || 'Unspecified']))
+  const byCompanyPosition = new Map<string, Map<string, number>>()
   const secondsByTicket = new Map<number, number>()
   const trackerSecondsByCompany = new Map<string, number>()
   const byCompanyJob = new Map<string, Map<string, JobAggCell>>()
@@ -360,6 +367,10 @@ export async function GET(request: Request) {
     const cid = r.ticket.companyId
     if (cid) {
       trackerSecondsByCompany.set(cid, (trackerSecondsByCompany.get(cid) ?? 0) + sec)
+      const pos = positionByUser.get(r.tracker.userId) ?? 'Unspecified'
+      if (!byCompanyPosition.has(cid)) byCompanyPosition.set(cid, new Map())
+      const pm = byCompanyPosition.get(cid)!
+      pm.set(pos, (pm.get(pos) ?? 0) + sec)
       const slug = r.tracker.jobType ?? ''
       if (!byCompanyJob.has(cid)) byCompanyJob.set(cid, new Map())
       const jm = byCompanyJob.get(cid)!
@@ -441,9 +452,7 @@ export async function GET(request: Request) {
     return b.id - a.id
   })
 
-  const extraRows = rows.filter((r) =>
-    isExtraTimeJob(r.tracker.jobType ?? null, r.tracker.jobType ? jobTitleBySlug.get(r.tracker.jobType) : undefined)
-  )
+  const extraRows = rows.filter((r) => r.tracker.jobType === EXTRA_TIME_JOB_SLUG)
   const extraUserIds = [...new Set(extraRows.map((r) => r.tracker.userId))]
   const extraUsers = extraUserIds.length
     ? await db
@@ -497,7 +506,8 @@ export async function GET(request: Request) {
       trackerSecondsByCompany,
       byCompanyJob,
       jobTitleBySlug,
-      lastByCompany
+      lastByCompany,
+      byCompanyPosition
     ),
     extra_time_sessions: extraTimeSessions,
   })
