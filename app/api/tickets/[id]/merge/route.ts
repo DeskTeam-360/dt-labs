@@ -27,6 +27,7 @@ function fmtDate(d: Date | string | null | undefined): string {
  * [id] is the primary ticket. For every secondary ticket the description and all comments are copied onto the
  * primary as internal notes (attachments linked, not re-uploaded) and the secondary is marked as
  * "Part of #primary". Nothing is deleted or closed, and merging cannot be undone.
+ * If a secondary already has merged tickets of its own, those are re-pointed to the new primary.
  * Allowed for admin, manager and staff.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -76,18 +77,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       { status: 400 }
     )
   }
-  const hasChildren = await db
-    .select({ id: tickets.mergedIntoTicketId })
-    .from(tickets)
-    .where(inArray(tickets.mergedIntoTicketId, secondaryIds))
-    .limit(1)
-  if (hasChildren.length > 0) {
-    return NextResponse.json(
-      { error: 'One of these tickets already has merged tickets. Merge those into the new primary separately.' },
-      { status: 400 }
-    )
-  }
-
   // Authors for the "original author" line
   const comments = await db
     .select()
@@ -187,6 +176,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         .set({ mergedIntoTicketId: primaryId })
         .where(and(eq(tickets.id, s.id)))
     }
+
+    // A secondary that was itself a primary: its earlier merged tickets now belong to the new primary.
+    await tx
+      .update(tickets)
+      .set({ mergedIntoTicketId: primaryId })
+      .where(inArray(tickets.mergedIntoTicketId, secondaryIds))
   })
 
   await logTicketActivity({
