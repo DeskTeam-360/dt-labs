@@ -252,6 +252,8 @@ export const tickets = pgTable('tickets', {
   /** Numeric Priority level (not an FK to ticket_priorities). NULL when closed support (out of queue). */
   priority: integer('priority').default(0),
   createdVia: varchar('created_via', { length: 50 }),
+  /** Set on a secondary ticket after a merge: the primary ticket it is "Part of". */
+  mergedIntoTicketId: integer('merged_into_ticket_id'),
   lastReadAt: ts('last_read_at'),
   /** When a customer last opened the ticket (unread-dot for customers). */
   customerLastReadAt: ts('customer_last_read_at'),

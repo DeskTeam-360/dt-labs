@@ -11,6 +11,7 @@ import {
   tickets,
   users,
 } from '@/lib/db'
+import { AUTO_REPLY_HEADERS } from '@/lib/email-auto-headers'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 
 async function fetchCompanyName(companyId: string | null | undefined): Promise<string | null> {
@@ -95,6 +96,7 @@ async function sendRawEmail(
     `From: ${fromHeader ?? sender.fromEmail}`,
     `To: ${to}`,
     `Subject: ${subjectMime}`,
+    ...AUTO_REPLY_HEADERS,
     'MIME-Version: 1.0',
   ]
   if (opts?.inReplyTo) {

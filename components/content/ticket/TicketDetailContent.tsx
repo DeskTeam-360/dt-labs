@@ -10,6 +10,7 @@ import {
     FileMarkdownOutlined,
     FolderOutlined,
     LeftOutlined,
+    MergeCellsOutlined,
     PrinterOutlined,
     ReloadOutlined,
     RightOutlined,
@@ -42,6 +43,7 @@ const { useBreakpoint } = Grid
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef,useState } from 'react'
 
+import MergeTicketModal from '@/components/ticket/detail/MergeTicketModal'
 import StopTimerNoteModal from '@/components/ticket/StopTimerNoteModal'
 import { uploadTicketFile } from '@/utils/storage'
 
@@ -253,6 +255,7 @@ export default function TicketDetailContent({
     }, [displayTicket?.id])
     const [editingComment, setEditingComment] = useState<string | null>(null)
     const [editingCommentValue, setEditingCommentValue] = useState('')
+    const [mergeOpen, setMergeOpen] = useState(false)
     const [removingCommentAttachmentKey, setRemovingCommentAttachmentKey] = useState<string | null>(null)
     const [addingCommentAttachmentId, setAddingCommentAttachmentId] = useState<string | null>(null)
     const [editingAttribute, setEditingAttribute] = useState<string | null>(null)
@@ -1565,8 +1568,9 @@ export default function TicketDetailContent({
                 <Content style={{ padding: '0', background: 'var(--layout-bg)', minHeight: 'calc(100vh - 56px)' }}>
                     <div style={{
                         position: 'sticky',
-                        top: 0,
-                        zIndex: 100,
+                        // Stick right below the global navbar (56px) instead of on top of it.
+                        top: 56,
+                        zIndex: 99,
                         background: 'var(--ant-color-bg-container, #fff)',
                         borderBottom: '1px solid var(--ant-color-border-secondary, #f0f0f0)',
                         padding: isMobile ? '8px 12px' : '12px 24px',
@@ -1723,6 +1727,38 @@ export default function TicketDetailContent({
                                                     onClick={() => window.open(`/tickets/${displayTicket.id}/print`, '_blank')}
                                                 />
                                             </Tooltip>
+                                            {!displayTicket?.merged_into && (
+                                                <Tooltip title="Merge other tickets into this one">
+                                                    <Button icon={<MergeCellsOutlined />} onClick={() => setMergeOpen(true)}>
+                                                        Merge
+                                                    </Button>
+                                                </Tooltip>
+                                            )}
+                                            {displayTicket?.merged_into ? (
+                                                <Tooltip title={displayTicket.merged_into.title}>
+                                                    <Tag color="purple" style={{ margin: 0 }}>
+                                                        Part of{' '}
+                                                        <a href={`/tickets/${displayTicket.merged_into.id}`}>#{displayTicket.merged_into.id}</a>
+                                                    </Tag>
+                                                </Tooltip>
+                                            ) : null}
+                                            {(displayTicket?.merged_tickets?.length ?? 0) > 0 ? (
+                                                <Tag color="geekblue" style={{ margin: 0 }}>
+                                                    Merge:{' '}
+                                                    {(displayTicket.merged_tickets as { id: number; title: string }[]).map((m, i) => (
+                                                        <span key={m.id}>
+                                                            {i > 0 ? ', ' : ''}
+                                                            <a href={`/tickets/${m.id}`} title={m.title}>#{m.id}</a>
+                                                        </span>
+                                                    ))}
+                                                </Tag>
+                                            ) : null}
+                                            <MergeTicketModal
+                                                open={mergeOpen}
+                                                primaryId={displayTicket.id}
+                                                onClose={() => setMergeOpen(false)}
+                                                onMerged={() => window.location.reload()}
+                                            />
                                             {rowTicketType !== 'support' && (
                                                 <Tag color={rowTicketType === 'spam' ? 'red' : 'orange'}>
                                                     {rowTicketType === 'spam' ? 'Spam ticket' : 'Trash ticket'}

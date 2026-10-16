@@ -147,6 +147,12 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
     return parts.join(' · ')
   }
 
+  if (action === 'ticket_merged') {
+    if (m.role === 'primary' && Array.isArray(m.merged_ids)) return `merged ${m.merged_ids.map((i) => `#${i}`).join(', ')} into this ticket`
+    if (m.role === 'secondary' && m.primary_id != null) return `part of #${m.primary_id}`
+    return ''
+  }
+
   if (action === 'comment_attachment_added') {
     const names = Array.isArray(m.file_names) ? m.file_names.map(String).join(', ') : ''
     return names ? trunc(names) : ''

@@ -436,6 +436,7 @@ export async function GET(request: Request) {
       description: t.description,
       short_note: t.shortNote ?? null,
       created_by: t.createdBy,
+      merged_into_ticket_id: t.mergedIntoTicketId ?? null,
       contact_user_id: t.contactUserId ?? null,
       due_date: t.dueDate ? new Date(t.dueDate).toISOString() : null,
       status: t.status,

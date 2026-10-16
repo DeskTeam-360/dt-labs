@@ -3,6 +3,7 @@ import { google } from 'googleapis'
 
 import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
 import { companies, companyUsers, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
+import { AUTO_REPLY_HEADERS } from '@/lib/email-auto-headers'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 
 export const REQUESTER_NEW_TICKET_TEMPLATE_KEY = 'requester_notification_new_ticket_created' as const
@@ -210,7 +211,7 @@ export async function sendRequesterTicketCreatedEmail(
       rawEmailLines.push(`In-Reply-To: ${inReplyToMessageId}`)
       rawEmailLines.push(`References: ${inReplyToMessageId}`)
     }
-    rawEmailLines.push('MIME-Version: 1.0', 'Content-Type: text/html; charset=UTF-8', '', bodyHtml)
+    rawEmailLines.push(...AUTO_REPLY_HEADERS, 'MIME-Version: 1.0', 'Content-Type: text/html; charset=UTF-8', '', bodyHtml)
     const rawEmail = rawEmailLines.join('\r\n')
 
     const raw = Buffer.from(rawEmail)

@@ -3,6 +3,7 @@ import { google } from 'googleapis'
 
 import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
 import { companies, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
+import { AUTO_REPLY_HEADERS } from '@/lib/email-auto-headers'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 
 export const RECURRING_TICKET_CREATED_TEMPLATE_KEY =
@@ -202,6 +203,7 @@ export async function sendRecurringTicketCreatedEmail(
     `From: ${fromHeader}`,
     `To: ${recipientEmail}`,
     `Subject: ${subjectMime}`,
+    ...AUTO_REPLY_HEADERS,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=UTF-8',
     '',

@@ -13,6 +13,7 @@ export const TICKET_ACTIVITY_ACTIONS = [
   'comment_updated',
   'comment_deleted',
   'comment_attachment_added',
+  'ticket_merged',
   'comment_attachment_deleted',
 ] as const
 
