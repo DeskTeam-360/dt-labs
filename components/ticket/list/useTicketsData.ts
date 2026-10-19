@@ -45,8 +45,8 @@ export type TicketsDragEndHandler = (event: DragEndEvent) => Promise<void>
 const FILTER_STORAGE_KEY = 'deskteam-tickets-filter'
 const LIST_PAGE_SIZE_KEY = 'tickets_list_page_size'
 const LIST_SORT_KEY = 'tickets_list_sort'
-const DEFAULT_LIST_PAGE_SIZE = 15
-const LIST_PAGE_SIZES = [10, 15, 20, 50]
+const DEFAULT_LIST_PAGE_SIZE = 200
+const LIST_PAGE_SIZES = [10, 15, 20, 50, 100, 200]
 const SORT_FIELDS: TicketSortField[] = ['id', 'title', 'priority', 'due_date', 'updated_at', 'created_at', 'company', 'status', 'type', 'team']
 
 function readStoredListPageSize(): number {

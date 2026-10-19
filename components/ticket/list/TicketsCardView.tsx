@@ -161,7 +161,7 @@ export default function TicketsCardView({
           pageSize={serverPaging ? serverPaging.pageSize : pageSize}
           total={serverPaging ? serverPaging.total : sortedTickets.length}
           showSizeChanger
-          pageSizeOptions={['10', '15', '20', '50']}
+          pageSizeOptions={['10', '15', '20', '50', '100', '200']}
           showTotal={(t) => `Total ${t} tickets`}
           onChange={(p, ps) => {
             if (serverPaging) {

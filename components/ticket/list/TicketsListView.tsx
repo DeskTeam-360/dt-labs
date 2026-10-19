@@ -394,7 +394,7 @@ export default function TicketsListView({
               pageSize: serverPaging.pageSize,
               total: serverPaging.total,
               showSizeChanger: true,
-              pageSizeOptions: ['10', '15', '20', '50'],
+              pageSizeOptions: ['10', '15', '20', '50', '100', '200'],
               showTotal: (t) => `Total ${t} tickets`,
               onChange: (page, ps) => serverPaging.onChange(ps !== serverPaging.pageSize ? 1 : page, ps),
             }
@@ -403,7 +403,7 @@ export default function TicketsListView({
               pageSize: effectivePagination.pageSize,
               total: sortedTickets.length,
               showSizeChanger: true,
-              pageSizeOptions: ['10', '15', '20', '50'],
+              pageSizeOptions: ['10', '15', '20', '50', '100', '200'],
               showTotal: (t) => `Total ${t} tickets`,
               onChange: (page, ps) =>
                 setPagination((prev) => ({ current: page, pageSize: ps ?? prev.pageSize })),
