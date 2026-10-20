@@ -5,6 +5,7 @@ import { auth } from '@/auth'
 import { commentAttachments, db, ticketAttachments, ticketComments, tickets, users } from '@/lib/db'
 import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
+import { compactCompanySupportPriorities } from '@/lib/ticket-company-priority-order'
 
 const MAX_SECONDARY = 20
 
@@ -26,7 +27,7 @@ function fmtDate(d: Date | string | null | undefined): string {
  * POST /api/tickets/[id]/merge   body: { secondary_ids: number[] }
  * [id] is the primary ticket. For every secondary ticket the description and all comments are copied onto the
  * primary as internal notes (attachments linked, not re-uploaded) and the secondary is marked as
- * "Part of #primary". Nothing is deleted or closed, and merging cannot be undone.
+ * "Part of #primary" and closed (leaving the company support queue). Nothing is deleted, and merging cannot be undone.
  * If a secondary already has merged tickets of its own, those are re-pointed to the new primary.
  * Allowed for admin, manager and staff.
  */
@@ -171,10 +172,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         s.id,
         `<p><strong>Merged into <a href="/tickets/${primaryId}" target="_blank" rel="noopener noreferrer">#${primaryId}</a></strong> — ${esc(primary.title)}<br><em>by ${esc(actorName)}</em></p>`
       )
+      // The secondary is closed; a closed support ticket leaves the company queue (priority cleared).
       await tx
         .update(tickets)
-        .set({ mergedIntoTicketId: primaryId })
+        .set({
+          mergedIntoTicketId: primaryId,
+          ...(s.status !== 'closed' && { status: 'closed', priority: null }),
+          updatedAt: new Date(),
+        })
         .where(and(eq(tickets.id, s.id)))
+    }
+
+    // Close the gaps the closed secondaries left in their company queues.
+    const queueCompanies = new Set(
+      secondaries
+        .filter((s) => s.status !== 'closed' && s.ticketType === 'support' && s.companyId)
+        .map((s) => s.companyId as string)
+    )
+    for (const companyId of queueCompanies) {
+      await compactCompanySupportPriorities(tx, companyId)
     }
 
     // A secondary that was itself a primary: its earlier merged tickets now belong to the new primary.
@@ -199,6 +215,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       action: 'ticket_merged',
       metadata: { role: 'secondary', primary_id: primaryId },
     })
+    if (s.status !== 'closed') {
+      await logTicketActivity({
+        ticketId: s.id,
+        actorUserId: actorId,
+        actorRole: 'agent',
+        action: 'ticket_updated',
+        metadata: { changed_keys: ['status'], changes: { status: { from: s.status, to: 'closed' } } },
+      })
+    }
     bumpTicketDataVersion(s.id)
   }
   bumpTicketDataVersion(primaryId)

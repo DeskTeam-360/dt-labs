@@ -112,7 +112,7 @@ export default function MergeTicketModal({
           type="warning"
           showIcon
           title="This cannot be undone."
-          description={`The description and all comments of the selected tickets are copied into #${primaryId} as internal notes, with their attachments. The selected tickets stay open and are marked “Part of #${primaryId}”. Time tracked stays on the original tickets.`}
+          description={`The description and all comments of the selected tickets are copied into #${primaryId} as internal notes, with their attachments. The selected tickets are marked “Part of #${primaryId}” and closed. Time tracked stays on the original tickets.`}
         />
         <Input.Search
           autoFocus
