@@ -5,6 +5,7 @@ import {
   Alert,
   Button,
   Col,
+  DatePicker,
   Flex,
   Form,
   Input,
@@ -284,6 +285,11 @@ export default function TicketFormModal({
               rules={[{ required: true, message: 'Enter a priority number' }]}
             >
               <InputNumber min={0} precision={0} placeholder="0 = end of queue; 1, 2 …" style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item name="due_date" label="Due Date">
+              <DatePicker showTime format="YYYY-MM-DD HH:mm" allowClear style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           {!showSimplifiedForm && (
