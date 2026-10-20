@@ -1,7 +1,8 @@
 'use client'
 
 import { ClockCircleOutlined, DeleteOutlined,EditOutlined, PaperClipOutlined, SaveOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons'
-import { Avatar, Button, Col, Descriptions, Empty, Flex, InputNumber, Modal, Popconfirm, Row, Select, Space, Tag, Typography } from 'antd'
+import { Avatar, Button, Col, DatePicker, Descriptions, Empty, Flex, InputNumber, Modal, Popconfirm, Row, Select, Space, Tag, Typography } from 'antd'
+import dayjs from 'dayjs'
 import { useEffect, useState } from 'react'
 
 import DateDisplay from '@/components/common/DateDisplay'
@@ -74,7 +75,7 @@ interface TabGeneralCustomerProps {
   onStatusChange?: (newStatus: string) => void | Promise<void>
   statusChanging?: boolean
   typeOptions: { id: number; title: string; slug: string; color: string }[]
-  onSaveChanges?: (changes: { type_id?: number | null; priority?: number | null }) => Promise<void>
+  onSaveChanges?: (changes: { type_id?: number | null; priority?: number | null; due_date?: string | null }) => Promise<void>
   savingChanges?: boolean
   comments: Comment[]
   currentUserId: string
@@ -145,6 +146,12 @@ export default function TabGeneralCustomer({
     return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null
   })
 
+  const [dueDraft, setDueDraft] = useState<string | null>(() => (ticketData?.due_date ? String(ticketData.due_date) : null))
+
+  useEffect(() => {
+    setDueDraft(ticketData?.due_date ? String(ticketData.due_date) : null)
+  }, [ticketData?.due_date])
+
   useEffect(() => {
     setTypeDraft(ticketData?.type_id ?? null)
   }, [ticketData?.type_id])
@@ -156,7 +163,8 @@ export default function TabGeneralCustomer({
 
   const isDirty =
     typeDraft !== (ticketData?.type_id ?? null) ||
-    priorityDraft !== (ticketData?.priority ?? null)
+    priorityDraft !== (ticketData?.priority ?? null) ||
+    (dueDraft ? new Date(dueDraft).getTime() : null) !== (ticketData?.due_date ? new Date(ticketData.due_date).getTime() : null)
 
   const creatorId = ticketData.creator?.id ?? ticketData.created_by ?? null
   const creatorEmail = ticketData.creator?.email ?? null
@@ -543,7 +551,17 @@ export default function TabGeneralCustomer({
             )}
           </Descriptions.Item>
           <Descriptions.Item label="Due Date">
-            {ticketData.due_date ? (
+            {onSaveChanges ? (
+              <DatePicker
+                value={dueDraft ? dayjs(dueDraft) : null}
+                onChange={(dt) => setDueDraft(dt ? dt.toISOString() : null)}
+                allowClear
+                showTime
+                format="YYYY-MM-DD HH:mm"
+                disabled={savingChanges}
+                style={{ width: '100%' }}
+              />
+            ) : ticketData.due_date ? (
               <Space>
                 <ClockCircleOutlined />
                 <DateDisplay date={ticketData.due_date} />
@@ -581,7 +599,7 @@ export default function TabGeneralCustomer({
             icon={<SaveOutlined />}
             block
             loading={savingChanges}
-            onClick={() => void onSaveChanges({ type_id: typeDraft, priority: priorityDraft })}
+            onClick={() => void onSaveChanges({ type_id: typeDraft, priority: priorityDraft, due_date: dueDraft })}
             style={{ marginBottom: canCloseTicket ? 8 : 0 }}
           >
             Save changes

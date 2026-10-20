@@ -1309,7 +1309,7 @@ export default function TicketDetailContent({
         }
     }
 
-    const handleSaveCustomerChanges = async (changes: { type_id?: number | null; priority?: number | null }) => {
+    const handleSaveCustomerChanges = async (changes: { type_id?: number | null; priority?: number | null; due_date?: string | null }) => {
         setCustomerChangesSaving(true)
         try {
             await apiFetch(`/api/tickets/${displayTicket.id}`, {
@@ -1325,6 +1325,7 @@ export default function TicketDetailContent({
                     type: changes.type_id != null ? ticketTypes.find((t) => t.id === changes.type_id) ?? null : null,
                 }),
                 ...(changes.priority !== undefined && { priority: changes.priority }),
+                ...(changes.due_date !== undefined && { due_date: changes.due_date }),
             }))
             router.refresh()
         } catch (err: unknown) {
