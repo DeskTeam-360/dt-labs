@@ -1,7 +1,7 @@
 'use client'
 
 import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Col, Flex, Input, Layout, message, Row, Select, Space, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Col, Input, Layout, message, Row, Select, Space, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -46,7 +46,6 @@ const fmtDur = (sec: number) => {
   if (m < 60) return `${m}m`
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
 }
-const fmtPct = (v: number | null) => (v == null ? '—' : `${v}%`)
 
 export default function PoolReportContent({ user: currentUser }: { user: { id: string; email?: string | null; name?: string | null; role?: string | null } }) {
   const [collapsed, setCollapsed] = useState(false)
@@ -56,6 +55,7 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [report, setReport] = useState<PoolReport | null>(null)
+  const [expanded, setExpanded] = useState<string[]>([])
 
   useEffect(() => {
     fetch('/api/companies', { credentials: 'include' })
@@ -75,7 +75,10 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
       const res = await fetch(`/api/reports/pool?${qs.toString()}`, { credentials: 'include' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error((data as { error?: string }).error || res.statusText)
-      setReport(data as PoolReport)
+      const rep = data as PoolReport
+      setReport(rep)
+      // Rows stay collapsed, except when searching for one ticket: its customer opens straight away.
+      setExpanded(search.trim() && rep.search_found ? rep.companies.map((c) => c.company_id) : [])
     } catch (e) {
       message.error((e as Error).message)
       setReport(null)
@@ -123,6 +126,19 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
           <Text type="secondary">Still not working today</Text>
         ),
     },
+  ]
+
+  const pctTag = (v: number | null) =>
+    v == null ? '—' : <Tag color={v > 100 ? 'red' : v >= 80 ? 'gold' : 'green'} style={{ margin: 0 }}>{v}%</Tag>
+
+  const companyColumns: ColumnsType<PoolCompany> = [
+    { title: 'Company Name', dataIndex: 'name', render: (v: string) => <Text strong>{v}</Text> },
+    { title: 'Plan Package', dataIndex: 'plan_hours', width: 110, align: 'center' },
+    { title: 'Open Tickets', key: 'count', width: 110, align: 'center', render: (_: unknown, c) => c.tickets.length },
+    { title: 'Daily Spend', key: 'daily', width: 130, align: 'center', render: (_: unknown, c) => fmtDur(c.daily_seconds) },
+    { title: '% Today', key: 'dpct', width: 100, align: 'center', render: (_: unknown, c) => pctTag(c.daily_pct) },
+    { title: 'Weekly Spend', key: 'weekly', width: 130, align: 'center', render: (_: unknown, c) => fmtDur(c.weekly_seconds) },
+    { title: '% This Week', key: 'wpct', width: 110, align: 'center', render: (_: unknown, c) => pctTag(c.weekly_pct) },
   ]
 
   return (
@@ -183,32 +199,40 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
               />
             ) : null}
 
-            {report?.companies.map((c) => (
-              <div key={c.company_id} style={{ border: '1px solid #f0f0f0', borderRadius: 6, overflow: 'hidden', background: '#fff' }}>
-                <Flex wrap gap={24} align="center" style={{ background: '#fff2a8', padding: '8px 12px' }}>
-                  <Text strong style={{ minWidth: 180 }}>{c.name}</Text>
-                  <Text>Plan: <b>{c.plan_hours}</b> h</Text>
-                  <Text>Daily spend: <b>{fmtDur(c.daily_seconds)}</b> ({fmtPct(c.daily_pct)})</Text>
-                  <Text>Weekly spend: <b>{fmtDur(c.weekly_seconds)}</b> ({fmtPct(c.weekly_pct)})</Text>
-                </Flex>
-                <Table<PoolTicket>
-                  rowKey="id"
-                  size="small"
-                  columns={columns}
-                  dataSource={c.tickets}
-                  pagination={false}
-                  locale={{ emptyText: 'No open tickets' }}
-                  scroll={{ x: 800 }}
-                  onRow={(t) => ({
-                    style: t.highlight
-                      ? { background: '#ffe58f', fontWeight: 600 }
-                      : t.assignees.length === 0
-                        ? { background: '#e6ffe6' }
-                        : undefined,
-                  })}
-                />
-              </div>
-            ))}
+            {report && report.companies.length > 0 ? (
+              <Table<PoolCompany>
+                rowKey="company_id"
+                size="middle"
+                bordered
+                loading={loading}
+                columns={companyColumns}
+                dataSource={report.companies}
+                pagination={false}
+                scroll={{ x: 900 }}
+                expandable={{
+                  expandedRowKeys: expanded,
+                  onExpandedRowsChange: (keys) => setExpanded(keys as string[]),
+                  expandedRowRender: (c) => (
+                    <Table<PoolTicket>
+                      rowKey="id"
+                      size="small"
+                      columns={columns}
+                      dataSource={c.tickets}
+                      pagination={false}
+                      locale={{ emptyText: 'No open tickets' }}
+                      scroll={{ x: 800 }}
+                      onRow={(t) => ({
+                        style: t.highlight
+                          ? { background: '#ffe58f', fontWeight: 600 }
+                          : t.assignees.length === 0
+                            ? { background: '#e6ffe6' }
+                            : undefined,
+                      })}
+                    />
+                  ),
+                }}
+              />
+            ) : null}
           </Space>
         </Content>
       </AdminMainColumn>
