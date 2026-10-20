@@ -44,6 +44,8 @@ export async function GET(request: Request) {
     .map((s) => s.trim())
     .filter(Boolean)
   const sort = url.searchParams.get('sort') ?? 'customer'
+  // Customer priority reads 1 → N by default; spend sorts start with the biggest.
+  const order = url.searchParams.get('order') === 'asc' ? 'asc' : url.searchParams.get('order') === 'desc' ? 'desc' : sort === 'customer' ? 'asc' : 'desc'
   const searchDigits = (url.searchParams.get('search') ?? '').replace(/\D/g, '')
   const searchId = searchDigits ? Number(searchDigits) : null
   const now = new Date()
@@ -183,10 +185,11 @@ export async function GET(request: Request) {
   })
 
   const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)
+  const dir = order === 'asc' ? 1 : -1
   out.sort((a, b) => {
-    if (sort === 'weekly') return (b.weekly_pct ?? -1) - (a.weekly_pct ?? -1) || byName(a, b)
-    if (sort === 'daily') return (b.daily_pct ?? -1) - (a.daily_pct ?? -1) || byName(a, b)
-    return (a.display_order ?? 1e9) - (b.display_order ?? 1e9) || byName(a, b)
+    if (sort === 'weekly') return dir * ((a.weekly_pct ?? -1) - (b.weekly_pct ?? -1)) || byName(a, b)
+    if (sort === 'daily') return dir * ((a.daily_pct ?? -1) - (b.daily_pct ?? -1)) || byName(a, b)
+    return dir * ((a.display_order ?? 1e9) - (b.display_order ?? 1e9)) || byName(a, b)
   })
 
   return NextResponse.json({ generated_at: now.toISOString(), search_found: highlightId != null, companies: out })

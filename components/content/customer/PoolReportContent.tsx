@@ -52,6 +52,7 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
   const [companyOptions, setCompanyOptions] = useState<{ value: string; label: string }[]>([])
   const [companyIds, setCompanyIds] = useState<string[]>([])
   const [sort, setSort] = useState('customer')
+  const [order, setOrder] = useState<'asc' | 'desc'>('asc')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [report, setReport] = useState<PoolReport | null>(null)
@@ -69,7 +70,7 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const qs = new URLSearchParams({ sort })
+      const qs = new URLSearchParams({ sort, order })
       if (companyIds.length) qs.set('company_id', companyIds.join(','))
       if (search.trim()) qs.set('search', search.trim())
       const res = await fetch(`/api/reports/pool?${qs.toString()}`, { credentials: 'include' })
@@ -85,7 +86,7 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
     } finally {
       setLoading(false)
     }
-  }, [companyIds, sort, search])
+  }, [companyIds, sort, order, search])
 
   useEffect(() => {
     void load()
@@ -177,7 +178,26 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
                 </Col>
                 <Col xs={24} lg={6}>
                   <Text strong>Sorting</Text>
-                  <Select style={{ width: '100%' }} value={sort} options={SORT_OPTIONS} onChange={setSort} />
+                  <Space.Compact style={{ width: '100%' }}>
+                    <Select
+                      style={{ width: '65%' }}
+                      value={sort}
+                      options={SORT_OPTIONS}
+                      onChange={(v) => {
+                        setSort(v)
+                        setOrder(v === 'customer' ? 'asc' : 'desc')
+                      }}
+                    />
+                    <Select
+                      style={{ width: '35%' }}
+                      value={order}
+                      options={[
+                        { value: 'asc', label: 'Asc' },
+                        { value: 'desc', label: 'Desc' },
+                      ]}
+                      onChange={setOrder}
+                    />
+                  </Space.Compact>
                 </Col>
                 <Col xs={24} lg={6}>
                   <Text strong>Search by ticket</Text>
