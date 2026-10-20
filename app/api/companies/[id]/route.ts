@@ -63,6 +63,12 @@ export async function PUT(
   const activeManagerId =
     body.active_manager_id !== undefined ? normalizeUuidBody(body.active_manager_id) : undefined
   const activeTime = body.active_time !== undefined ? parseActiveTime(body.active_time) : undefined
+  const displayOrder =
+    body.display_order !== undefined
+      ? body.display_order === null || body.display_order === ''
+        ? null
+        : Math.max(0, Math.min(100000, Math.floor(Number(body.display_order) || 0)))
+      : undefined
   const isCustomerCompany = body.is_customer !== undefined ? body.is_customer === true : undefined
   const role = (session.user as { role?: string }).role?.toLowerCase()
   const isCustomer = role === 'customer'
@@ -113,6 +119,7 @@ export async function PUT(
       updateData.activeManagerId = activeManagerId
     }
     if (activeTime !== undefined) updateData.activeTime = activeTime
+    if (displayOrder !== undefined) updateData.displayOrder = displayOrder
     if (isCustomerCompany !== undefined) updateData.isCustomer = isCustomerCompany
   }
 
@@ -182,6 +189,7 @@ export async function PUT(
       active_team_id: row.activeTeamId ?? null,
       active_manager_id: row.activeManagerId ?? null,
       active_time: row.activeTime ?? 0,
+      display_order: row.displayOrder ?? null,
       is_customer: row.isCustomer ?? false,
       created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',
       updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : '',

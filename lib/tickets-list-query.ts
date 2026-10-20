@@ -6,8 +6,8 @@ export type TicketsPageLimit = (typeof TICKETS_PAGE_LIMIT_OPTIONS)[number]
 
 export function normalizeTicketsPageLimit(n: unknown): TicketsPageLimit {
   const x = typeof n === 'number' ? n : parseInt(String(n), 10)
-  if (x === 100 || x === 200) return x
-  return 50
+  if (x === 50 || x === 100 || x === 200) return x
+  return 200
 }
 
 export type TicketsListQueryKeyPayload = {

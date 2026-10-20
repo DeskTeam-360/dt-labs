@@ -41,6 +41,7 @@ interface CompanyRecord {
   active_team_id?: string | null
   active_manager_id?: string | null
   active_time?: number
+  display_order?: number | null
   is_customer?: boolean
   created_at: string
   updated_at: string
@@ -194,6 +195,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       active_team_id: undefined,
       active_manager_id: undefined,
       active_time: 0,
+      display_order: undefined,
       is_customer: false,
     })
     setModalVisible(true)
@@ -209,6 +211,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       active_team_id: record.active_team_id || undefined,
       active_manager_id: record.active_manager_id || undefined,
       active_time: record.active_time ?? 0,
+      display_order: record.display_order ?? undefined,
       is_customer: record.is_customer ?? false,
     })
     setModalVisible(true)
@@ -232,12 +235,14 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
     active_team_id?: string | null
     active_manager_id?: string | null
     active_time?: number | null
+    display_order?: number | null
     is_customer?: boolean
   }) => {
     const staffPayload = {
       active_team_id: values.active_team_id ?? null,
       active_manager_id: values.active_manager_id ?? null,
       active_time: values.active_time ?? 0,
+      display_order: values.display_order ?? null,
       is_customer: values.is_customer === true,
     }
     setSaving(true)
@@ -328,6 +333,14 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
         const mgr = managerOptions.find((m) => m.id === record.active_manager_id)
         return mgr ? <Tag color="purple">{mgr.full_name || mgr.email}</Tag> : '—'
       },
+    },
+    {
+      title: 'Order',
+      key: 'display_order',
+      width: 80,
+      align: 'center',
+      sorter: (a: CompanyRecord, b: CompanyRecord) => (a.display_order ?? 1e9) - (b.display_order ?? 1e9),
+      render: (_: unknown, record: CompanyRecord) => record.display_order ?? '—',
     },
     {
       title: 'Active Time',
@@ -544,6 +557,15 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                     initialValue={0}
                   >
                     <InputNumber min={0} precision={0} addonAfter="H" style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={6}>
+                  <Form.Item
+                    name="display_order"
+                    label="Display order"
+                    tooltip="Position in Round Robin and reports (1 = first). Leave empty to list after the numbered companies."
+                  >
+                    <InputNumber min={0} precision={0} placeholder="—" style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={5}>

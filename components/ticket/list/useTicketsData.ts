@@ -83,6 +83,8 @@ interface StoredFilter {
   filterSidebarCollapsed?: boolean
   /** Number of tickets fetched per list request (50 / 100 / 200). */
   ticketsPageLimit?: number | null
+  /** 2 = the saved limit was chosen after the default became 200; older saves (default 50) are ignored once. */
+  ticketsPageLimitV?: number | null
 }
 
 function loadFiltersFromStorage(): StoredFilter | null {
@@ -268,7 +270,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
   const prevTicketsListSearchRef = useRef<string | null>(null)
 
   const [collapsed, setCollapsed] = useState(true)
-  const [ticketsPageLimit, setTicketsPageLimitState] = useState<TicketsPageLimit>(isCustomer ? 200 : 50)
+  const [ticketsPageLimit, setTicketsPageLimitState] = useState<TicketsPageLimit>(200)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingTicket, setEditingTicket] = useState<TicketRecord | null>(null)
   const [form] = Form.useForm()
@@ -578,7 +580,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     applySearch(state.filterSearch)
     setFilterSidebarCollapsed(state.filterSidebarCollapsed)
     setViewMode(vm)
-    setTicketsPageLimitState(normalizeTicketsPageLimit(stored.ticketsPageLimit))
+    setTicketsPageLimitState(stored.ticketsPageLimitV === 2 ? normalizeTicketsPageLimit(stored.ticketsPageLimit) : 200)
     try {
       const savedPrefs = localStorage.getItem('ticket-search-prefs')
       if (savedPrefs) {
@@ -881,6 +883,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       viewMode: viewMode,
       filterSidebarCollapsed: filterSidebarCollapsed,
       ticketsPageLimit,
+      ticketsPageLimitV: 2,
     })
 
     if (applyingFromUrlRef.current) {

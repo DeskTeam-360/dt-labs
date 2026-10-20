@@ -31,7 +31,7 @@ type Acc = {
   /** seconds worked per WIB day, within the selected scope (customer-only or all) */
   dayScope: Map<string, number>
   /** seconds per company key within scope */
-  byCompany: Map<string, { name: string; isCustomer: boolean; seconds: number }>
+  byCompany: Map<string, { name: string; isCustomer: boolean; order: number | null; seconds: number }>
   totalAll: number
   totalScope: number
   extraTime: number
@@ -120,6 +120,7 @@ export async function GET(request: Request) {
         companyId: tickets.companyId,
         companyName: companies.name,
         companyIsCustomer: companies.isCustomer,
+        companyOrder: companies.displayOrder,
         ticketId: tickets.id,
         ticketTitle: tickets.title,
       })
@@ -178,6 +179,7 @@ export async function GET(request: Request) {
         const cur = a.byCompany.get(key) ?? {
           name: r.companyId ? r.companyName ?? 'Unnamed company' : 'No company',
           isCustomer: isCustomerCompany,
+          order: r.companyOrder ?? null,
           seconds: 0,
         }
         cur.seconds += share
@@ -243,8 +245,16 @@ export async function GET(request: Request) {
             }))
             .sort((x, y) => y.hours - x.hours)
             .slice(0, 5),
+          display_order: v.order,
         }))
         .sort((x, y) => y.hours - x.hours)
+      // Biggest company by hours (used for "top company") before the manual display order is applied.
+      const topCompanySharePct = companiesOut[0]?.pct_of_worked ?? null
+      companiesOut.sort(
+        (x, y) =>
+          (x.display_order ?? Number.MAX_SAFE_INTEGER) - (y.display_order ?? Number.MAX_SAFE_INTEGER) ||
+          y.hours - x.hours
+      )
       return {
         user_id: u.id,
         name: u.fullName || u.email,
@@ -265,7 +275,7 @@ export async function GET(request: Request) {
         idle_days: idleDays,
         loose_days: looseDays,
         extra_time_hours: hours(a.extraTime),
-        top_company_share_pct: companiesOut[0]?.pct_of_worked ?? null,
+        top_company_share_pct: topCompanySharePct,
         companies: companiesOut,
         days: dayRows,
       }

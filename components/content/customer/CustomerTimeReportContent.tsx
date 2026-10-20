@@ -498,6 +498,9 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
       }
       if (range?.[0]) params.set('start', range[0].startOf('day').toISOString())
       if (range?.[1]) params.set('end', range[1].endOf('day').toISOString())
+      // Calendar days exactly as picked: converting local midnight to UTC would shift the company-log window by a day.
+      if (range?.[0]) params.set('start_date', range[0].format('YYYY-MM-DD'))
+      if (range?.[1]) params.set('end_date', range[1].format('YYYY-MM-DD'))
       const st = values.status_slugs
       if (st && st.length > 0) params.set('status', st.join(','))
       if (values.urgent_only) params.set('urgent_only', '1')

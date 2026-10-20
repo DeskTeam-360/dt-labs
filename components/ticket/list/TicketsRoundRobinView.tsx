@@ -63,10 +63,19 @@ export default function TicketsRoundRobinView({
     byCompany.set(cid, sortTickets(arr, TICKETS_LIST_SORT_BY, TICKETS_LIST_SORT_ORDER))
   }
 
+  // Companies follow their manual "Display order" (1 first); unnumbered ones come after, by name.
+  const companyMeta = new Map<string, { order: number; name: string }>()
+  for (const [cid, arr] of byCompany) {
+    const c = arr[0]?.company
+    companyMeta.set(cid, { order: c?.display_order ?? Number.MAX_SAFE_INTEGER, name: c?.name ?? '' })
+  }
   const companyIds = Array.from(byCompany.keys()).sort((a, b) => {
     if (a === '__no_company__') return 1
     if (b === '__no_company__') return -1
-    return a.localeCompare(b)
+    const ma = companyMeta.get(a)!
+    const mb = companyMeta.get(b)!
+    if (ma.order !== mb.order) return ma.order - mb.order
+    return ma.name.localeCompare(mb.name) || a.localeCompare(b)
   })
   const maxSlots = Math.max(1, ...Array.from(byCompany.values()).map((a) => a.length))
 

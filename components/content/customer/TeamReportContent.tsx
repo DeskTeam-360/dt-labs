@@ -99,6 +99,10 @@ const REASON_LABEL: Record<string, string> = {
   not_employed: 'Not employed',
 }
 
+/** Company with the most hours (the list itself follows the manual display order). */
+const topCompanyOf = (p: Person): CompanyShare | undefined =>
+  p.companies.reduce<CompanyShare | undefined>((best, c) => (!best || c.hours > best.hours ? c : best), undefined)
+
 export const fmtH = (n: number | null | undefined) => (n == null ? '—' : `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} h`)
 export const pctColor = (p: number | null) => (p == null ? 'default' : p > 100 ? 'red' : p >= 80 ? 'green' : p >= 50 ? 'gold' : 'orange')
 
@@ -256,7 +260,7 @@ export default function TeamReportContent({ user: currentUser }: { user: { id: s
     }
     const concentrated = report.people.filter((p) => (p.top_company_share_pct ?? 0) >= 70 && p.worked_hours >= 5)
     if (concentrated.length > 0) {
-      out.push({ type: 'info', text: `Single-company dependence (≥70% of worked time): ${concentrated.map((p) => `${p.name} → ${p.companies[0]?.name} ${p.top_company_share_pct}%`).join(', ')}.` })
+      out.push({ type: 'info', text: `Single-company dependence (≥70% of worked time): ${concentrated.map((p) => `${p.name} → ${topCompanyOf(p)?.name} ${p.top_company_share_pct}%`).join(', ')}.` })
     }
     const extra = report.people.reduce((s, p) => s + p.extra_time_hours, 0)
     if (extra > 0) out.push({ type: 'info', text: `${Math.round(extra * 100) / 100} h logged as Extra time in this range.` })
@@ -307,7 +311,7 @@ export default function TeamReportContent({ user: currentUser }: { user: { id: s
     { title: 'Overtime', dataIndex: 'overtime_hours', width: 95, align: 'right', render: (v: number) => (v > 0 ? <Text type="danger">{fmtH(v)}</Text> : '—') },
     { title: 'Extra time', dataIndex: 'extra_time_hours', width: 100, align: 'right', render: (v: number) => (v > 0 ? fmtH(v) : '—') },
     { title: 'Non-customer', dataIndex: 'non_customer_hours', width: 115, align: 'right', render: (v: number) => (v > 0 ? fmtH(v) : '—') },
-    { title: 'Top company', key: 'top', width: 200, ellipsis: true, render: (_: unknown, p) => (p.companies[0] ? `${p.companies[0].name} (${p.top_company_share_pct ?? 0}%)` : '—') },
+    { title: 'Top company', key: 'top', width: 200, ellipsis: true, render: (_: unknown, p) => (topCompanyOf(p) ? `${topCompanyOf(p)!.name} (${p.top_company_share_pct ?? 0}%)` : '—') },
   ]
 
   return (

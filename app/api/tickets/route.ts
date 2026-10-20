@@ -453,7 +453,7 @@ export async function GET(request: Request) {
       team: r.team ? { id: r.team.id, name: r.team.name } : null,
       type: r.type ? { id: r.type.id, title: r.type.title, slug: r.type.slug, color: r.type.color } : null,
       company: r.company
-        ? { id: r.company.id, name: r.company.name, color: r.company.color, email: r.company.email }
+        ? { id: r.company.id, name: r.company.name, color: r.company.color, email: r.company.email, display_order: r.company.displayOrder ?? null }
         : null,
       creator_name: creatorName,
       by_label: creatorName || companyName,

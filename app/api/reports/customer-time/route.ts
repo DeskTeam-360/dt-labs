@@ -172,6 +172,15 @@ export async function GET(request: Request) {
   }
 
   const companyById = new Map(companyRows.map((c) => [c.id, c]))
+  // Manual "Display order" first (1 = first), unnumbered companies after, then by name.
+  companyIds.sort((a, b) => {
+    const ca = companyById.get(a)
+    const cb = companyById.get(b)
+    const oa = ca?.displayOrder ?? Number.MAX_SAFE_INTEGER
+    const ob = cb?.displayOrder ?? Number.MAX_SAFE_INTEGER
+    if (oa !== ob) return oa - ob
+    return (ca?.name ?? '').localeCompare(cb?.name ?? '')
+  })
   const companiesPayload = companyIds
     .map((id) => {
       const row = companyById.get(id)
@@ -203,8 +212,8 @@ export async function GET(request: Request) {
         .filter(Boolean)
     : null
 
-  const startDate = startParam ? new Date(startParam) : null
-  const endDate = endParam ? new Date(endParam) : null
+  let startDate = startParam ? new Date(startParam) : null
+  let endDate = endParam ? new Date(endParam) : null
   if (startDate && Number.isNaN(startDate.getTime())) {
     return NextResponse.json({ error: 'Invalid start' }, { status: 400 })
   }
@@ -212,17 +221,33 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Invalid end' }, { status: 400 })
   }
 
+  // When the calendar dates are sent (start_date / end_date, YYYY-MM-DD), the window is always the whole WIB days:
+  // from 00:00:00.000 of the first day to 23:59:59.999 of the last day, whatever time zone the browser is in.
+  const ymdOf = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null)
+  const wibMs = (ymd: string) => {
+    const [y, m, d] = ymd.split('-').map(Number)
+    return Date.UTC(y, m - 1, d) - 7 * 60 * 60 * 1000
+  }
+  const startYmd = ymdOf(url.searchParams.get('start_date'))
+  const endYmd = ymdOf(url.searchParams.get('end_date'))
+  if (startYmd) startDate = new Date(wibMs(startYmd))
+  if (endYmd) endDate = new Date(wibMs(endYmd) + 24 * 60 * 60 * 1000 - 1)
+
   const hasDateWindow = startDate != null || endDate != null
 
   const logConds = [
     inArray(companyDailyActiveAssignments.companyId, companyIds),
     sql`extract(dow from ${companyDailyActiveAssignments.snapshotDate}::date) not in (0, 6)`,
   ]
-  if (startDate) {
-    logConds.push(gte(companyDailyActiveAssignments.snapshotDate, startDate.toISOString().slice(0, 10)))
+  // Company-log days use the calendar dates the user picked (start_date / end_date). Falling back to the UTC date of
+  // the ISO bounds would move a local-midnight start back by a day.
+  const logStartYmd = startYmd ?? (startDate ? startDate.toISOString().slice(0, 10) : null)
+  const logEndYmd = endYmd ?? (endDate ? endDate.toISOString().slice(0, 10) : null)
+  if (logStartYmd) {
+    logConds.push(gte(companyDailyActiveAssignments.snapshotDate, logStartYmd))
   }
-  if (endDate) {
-    logConds.push(lte(companyDailyActiveAssignments.snapshotDate, endDate.toISOString().slice(0, 10)))
+  if (logEndYmd) {
+    logConds.push(lte(companyDailyActiveAssignments.snapshotDate, logEndYmd))
   }
 
   const [logAggRows, jobTypeRows, lastTicketRows, lastWorkedRows, statusRows] = await Promise.all([

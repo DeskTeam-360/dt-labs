@@ -48,7 +48,7 @@ export interface TicketRecord {
   by_label?: string
   team_name?: string
   type?: { id: number; title: string; slug: string; color: string } | null
-  company?: { id: string; name: string; color?: string; email?: string | null } | null
+  company?: { id: string; name: string; color?: string; email?: string | null; display_order?: number | null } | null
   tags?: Array<{ id: string; name: string; slug: string; color?: string }>
   assignees?: Array<{ id: string; user_id: string; user_name?: string }>
   checklist_items?: Array<unknown>

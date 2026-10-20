@@ -12,6 +12,13 @@ function normalizeUuidBody(v: unknown): string | null {
   return v
 }
 
+function parseDisplayOrder(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null
+  const n = typeof v === 'number' ? v : Number(v)
+  if (!Number.isFinite(n)) return null
+  return Math.max(0, Math.min(100000, Math.floor(n)))
+}
+
 function parseActiveTime(v: unknown): number {
   if (typeof v !== 'number' || !Number.isFinite(v)) return 0
   return Math.max(0, Math.floor(v))
@@ -84,6 +91,7 @@ export async function GET(request: Request) {
     active_team_id: r.activeTeamId ?? null,
     active_manager_id: r.activeManagerId ?? null,
     active_time: r.activeTime ?? 0,
+    display_order: r.displayOrder ?? null,
     is_customer: r.isCustomer ?? false,
     created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
     updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
@@ -105,6 +113,7 @@ export async function POST(request: Request) {
   const activeTeamId = normalizeUuidBody(body.active_team_id)
   const activeManagerId = normalizeUuidBody(body.active_manager_id)
   const activeTime = parseActiveTime(body.active_time)
+  const displayOrder = parseDisplayOrder(body.display_order)
   const isCustomerCompany = body.is_customer === true
 
   if (!name) {
@@ -158,6 +167,7 @@ export async function POST(request: Request) {
       activeTeamId,
       activeManagerId,
       activeTime,
+      displayOrder,
       isCustomer: isCustomerCompany,
     })
     .returning()
@@ -191,6 +201,7 @@ export async function POST(request: Request) {
         active_team_id: row.activeTeamId ?? null,
         active_manager_id: row.activeManagerId ?? null,
         active_time: row.activeTime ?? 0,
+        display_order: row.displayOrder ?? null,
         is_customer: row.isCustomer ?? false,
         created_at: row.createdAt ? new Date(row.createdAt).toISOString() : '',
         updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : '',
