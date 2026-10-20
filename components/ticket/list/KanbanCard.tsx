@@ -307,6 +307,7 @@ export default function KanbanCard({
                 <span>Last update <DateDisplay date={ticket.updated_at} format="date-only" /></span>
               </Flex>
             )}
+            {!isCustomer && (
             <Tooltip title={<TrackerTooltipContent stat={trackerStat} />} placement="top" mouseEnterDelay={0.2}>
               <Flex align="center" gap={4} style={{ fontSize: 11, color: 'var(--kanban-card-muted)', cursor: 'default' }}>
                 <FieldTimeOutlined />
@@ -316,6 +317,7 @@ export default function KanbanCard({
                 )}
               </Flex>
             </Tooltip>
+            )}
             {ticket.has_unread_replies && (
               <Tooltip title="Unread replies">
                 <CommentOutlined style={{ color: 'var(--kanban-card-muted)', fontSize: 12 }} />

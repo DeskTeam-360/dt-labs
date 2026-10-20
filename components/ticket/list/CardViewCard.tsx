@@ -139,6 +139,7 @@ export default function CardViewCard({
             <ClockCircleOutlined style={{ fontSize: 12 }} />
             Last update {dayjs(ticket.updated_at).format('MMM DD, YYYY')}
           </span>
+          {!isCustomer && (
           <Tooltip title={<TrackerTooltipContent stat={trackerStat} />} placement="top" mouseEnterDelay={0.2}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--kanban-card-muted)', cursor: 'default', userSelect: 'none' }}>
               <FieldTimeOutlined style={{ fontSize: 12 }} />
@@ -150,6 +151,7 @@ export default function CardViewCard({
               )}
             </span>
           </Tooltip>
+          )}
         </div>
         {Number(ticket.checklist_total) > 0 && (
           <span style={{ marginTop: 4, fontSize: 12, color: 'var(--kanban-card-muted)' }}>
