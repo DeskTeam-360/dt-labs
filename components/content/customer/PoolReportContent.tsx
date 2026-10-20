@@ -60,8 +60,8 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
   useEffect(() => {
     fetch('/api/companies', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j: { data?: { id: string; name: string; is_customer?: boolean }[] } | null) =>
-        setCompanyOptions((j?.data ?? []).filter((c) => c.is_customer).map((c) => ({ value: c.id, label: c.name })))
+      .then((j: { data?: { id: string; name: string; is_customer?: boolean; is_active?: boolean }[] } | null) =>
+        setCompanyOptions((j?.data ?? []).filter((c) => c.is_customer && c.is_active !== false).map((c) => ({ value: c.id, label: c.name })))
       )
       .catch(() => setCompanyOptions([]))
   }, [])

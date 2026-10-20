@@ -67,7 +67,13 @@ export async function GET(request: Request) {
   const companyRows = await db
     .select()
     .from(companies)
-    .where(companyIds.length ? inArray(companies.id, companyIds) : eq(companies.isCustomer, true))
+    .where(
+      and(
+        eq(companies.isCustomer, true),
+        eq(companies.isActive, true),
+        companyIds.length ? inArray(companies.id, companyIds) : undefined
+      )
+    )
   if (companyRows.length === 0) {
     return NextResponse.json({ generated_at: now.toISOString(), search_found: highlightId != null, companies: [] })
   }
