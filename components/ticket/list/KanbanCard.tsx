@@ -246,8 +246,8 @@ export default function KanbanCard({
         {/* Title + subtitle - use <a> for native right-click "Open in new tab" */}
         <a
           href={`/tickets/${ticket.id}`}
-          target="_blank"
-          rel="noopener noreferrer"
+          target={isCustomer ? undefined : '_blank'}
+          rel={isCustomer ? undefined : 'noopener noreferrer'}
           style={{ cursor: 'pointer', display: 'block', color: 'inherit', textDecoration: 'none' }}
           onClick={(e) => e.stopPropagation()}
         >
