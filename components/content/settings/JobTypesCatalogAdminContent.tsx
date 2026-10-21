@@ -348,7 +348,7 @@ export default function JobTypesCatalogAdminContent({ user: currentUser }: JobTy
               loading={listLoading}
               columns={columns}
               dataSource={rows}
-              pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('job types') }}
+              pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('job types') }}
               size="small"
             />
 

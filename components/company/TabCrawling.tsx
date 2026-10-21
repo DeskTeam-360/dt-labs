@@ -172,7 +172,7 @@ export default function TabCrawling({
           rowKey="id"
           columns={columns}
           pagination={{
-            pageSize: 15,
+            defaultPageSize: 15,
             showSizeChanger: true,
             pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
             showTotal: (total) => `Total ${total} crawl sessions`,

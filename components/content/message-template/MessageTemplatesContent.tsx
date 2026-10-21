@@ -150,7 +150,7 @@ function GroupTabPanel({
           loading={loading}
           columns={columns}
           dataSource={rows}
-          pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: (t) => `${t} in this group` }}
+          pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: (t) => `${t} in this group` }}
           scroll={{ x: 1100 }}
           size="middle"
         />

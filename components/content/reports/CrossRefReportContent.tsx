@@ -476,7 +476,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                     columns={customerColumns}
                     dataSource={data.rows}
                     size="small"
-                    pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('customers') }}
+                    pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('customers') }}
                     locale={{ emptyText: 'No data' }}
                     expandable={{
                       expandRowByClick: true,
@@ -528,7 +528,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                     columns={userColumns}
                     dataSource={data.rows}
                     size="small"
-                    pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('users') }}
+                    pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('users') }}
                     locale={{ emptyText: 'No data' }}
                     expandable={{
                       expandRowByClick: true,
@@ -580,7 +580,7 @@ export default function CrossRefReportContent({ user: currentUser }: Props) {
                     columns={teamColumns}
                     dataSource={data.rows}
                     size="small"
-                    pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('teams') }}
+                    pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('teams') }}
                     locale={{ emptyText: 'No data' }}
                     expandable={{
                       expandRowByClick: true,

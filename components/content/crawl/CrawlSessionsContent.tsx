@@ -325,7 +325,7 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
                 dataSource={crawlSessions}
                 rowKey="id"
                 pagination={{
-                  pageSize: 15,
+                  defaultPageSize: 15,
                   showSizeChanger: true,
                   pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
                   showTotal: (total) => `Total ${total} crawl sessions`,

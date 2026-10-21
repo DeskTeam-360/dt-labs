@@ -262,7 +262,7 @@ export default function DashboardAnnouncementsSettingsContent({
                 loading={loading}
                 columns={columns}
                 dataSource={rows}
-                pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('announcements') }}
+                pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('announcements') }}
               />
             </Space>
           </Card>

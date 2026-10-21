@@ -264,7 +264,7 @@ export default function ProjectDetailContent({ user: currentUser, projectId }: P
                 size="small"
                 columns={activityColumns}
                 dataSource={boardTickets}
-                pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('entries') }}
+                pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('entries') }}
               />
             </Card>
           ),

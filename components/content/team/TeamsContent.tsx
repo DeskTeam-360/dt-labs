@@ -478,7 +478,7 @@ export default function TeamsContent({ user: currentUser }: TeamsContentProps) {
               rowKey="id"
               loading={loading}
               pagination={{
-                pageSize: 15,
+                defaultPageSize: 15,
                 showSizeChanger: true,
                 pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
                 showTotal: appTableShowTotal('teams'),

@@ -93,7 +93,7 @@ export default function RecurringTicketRunsDrawer({ ruleId }: { ruleId: string }
       dataSource={runs}
       columns={columns}
       rowKey="id"
-      pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('runs') }}
+      pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('runs') }}
       locale={{ emptyText: <Empty description="No runs yet" /> }}
       size="small"
     />

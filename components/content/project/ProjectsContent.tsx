@@ -157,7 +157,7 @@ export default function ProjectsContent({ user: currentUser }: ProjectsContentPr
 
             <Card>
               <Spin spinning={loading}>
-                <Table rowKey="id" columns={columns} dataSource={projects} pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('projects') }} />
+                <Table rowKey="id" columns={columns} dataSource={projects} pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: appTableShowTotal('projects') }} />
               </Spin>
             </Card>
           </Space>

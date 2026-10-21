@@ -1313,7 +1313,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
             rowKey="id"
             loading={loading}
             pagination={{
-              pageSize: 20,
+              defaultPageSize: 20,
               showSizeChanger: true,
               showTotal: (total) => `Total ${total} pages`,
             }}

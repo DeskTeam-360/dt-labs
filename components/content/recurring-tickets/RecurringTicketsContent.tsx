@@ -110,6 +110,7 @@ export default function RecurringTicketsContent({ user }: Props) {
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
   const [filterCompany, setFilterCompany] = useState<string | undefined>(undefined)
   const [filterTitle, setFilterTitle] = useState('')
+  const [page, setPage] = useState({ current: 1, pageSize: 15 })
   const [runsDrawer, setRunsDrawer] = useState<RecurringTicketRow | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
   const [running, setRunning] = useState<string | null>(null)
@@ -334,7 +335,10 @@ export default function RecurringTicketsContent({ user }: Props) {
                 allowClear
                 style={{ width: 200 }}
                 value={filterTitle}
-                onChange={(e) => setFilterTitle(e.target.value)}
+                onChange={(e) => {
+                  setFilterTitle(e.target.value)
+                  setPage((p) => ({ ...p, current: 1 }))
+                }}
               />
               <Select
                 allowClear
@@ -342,7 +346,10 @@ export default function RecurringTicketsContent({ user }: Props) {
                 placeholder="Filter by company"
                 style={{ width: 200 }}
                 value={filterCompany}
-                onChange={setFilterCompany}
+                onChange={(v) => {
+                  setFilterCompany(v)
+                  setPage((p) => ({ ...p, current: 1 }))
+                }}
                 filterOption={(input, option) =>
                   (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                 }
@@ -369,7 +376,9 @@ export default function RecurringTicketsContent({ user }: Props) {
             rowKey="id"
             loading={loading}
             pagination={{
-              pageSize: 15,
+              current: page.current,
+              pageSize: page.pageSize,
+              onChange: (current, pageSize) => setPage({ current, pageSize }),
               showSizeChanger: true,
               pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
               showTotal: appTableShowTotal('rules'),

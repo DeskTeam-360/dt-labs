@@ -173,7 +173,7 @@ export default function KnowledgeBaseContent({ user: currentUser }: KnowledgeBas
             dataSource={articles}
             columns={columns}
             loading={loading}
-            pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: (t) => `Total ${t} articles` }}
+            pagination={{ defaultPageSize: 15, showSizeChanger: true, pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS, showTotal: (t) => `Total ${t} articles` }}
           />
         </Content>
       </AdminMainColumn>

@@ -1325,7 +1325,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           loading={timeTrackerLoading}
                           dataSource={drawerEntryTimesForTicket}
                           pagination={{
-                            pageSize: 15,
+                            defaultPageSize: 15,
                             showSizeChanger: true,
                             pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
                             showTotal: appTableShowTotal('entries'),
@@ -1520,7 +1520,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         rowKey="id"
                         loading={timeTrackerLoading}
                         pagination={{
-                          pageSize: 15,
+                          defaultPageSize: 15,
                           showSizeChanger: true,
                           pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
                           showTotal: appTableShowTotal('records'),

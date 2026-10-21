@@ -1849,7 +1849,7 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                         loading={reportLoading}
                         dataSource={report.extra_time_sessions ?? []}
                         locale={{ emptyText: 'No Extra time sessions in this period' }}
-                        pagination={{ pageSize: 25, showSizeChanger: true, pageSizeOptions: [25, 50, 100] }}
+                        pagination={{ defaultPageSize: 25, showSizeChanger: true, pageSizeOptions: [25, 50, 100] }}
                         scroll={{ x: 900 }}
                         columns={[
                           {
@@ -1925,7 +1925,7 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                     columns={isNew ? columns.filter((c) => c.key !== 'priority') : columns}
                     dataSource={tableData}
                     loading={reportLoading}
-                    pagination={{ pageSize: 25, showSizeChanger: true, pageSizeOptions: [25, 50, 100] }}
+                    pagination={{ defaultPageSize: 25, showSizeChanger: true, pageSizeOptions: [25, 50, 100] }}
                     scroll={{ x: 1232 }}
                     onRow={(record) => ({
                       onClick: () => openWorkersDrawer(record),
@@ -1996,7 +1996,7 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                         bordered
                         columns={sessionColumns}
                         dataSource={workersSessions}
-                        pagination={{ pageSize: 10, showSizeChanger: true }}
+                        pagination={{ defaultPageSize: 10, showSizeChanger: true }}
                         scroll={{ x: 640 }}
                       />
                     </>

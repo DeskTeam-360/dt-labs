@@ -313,7 +313,7 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
                 return true
               })}
               pagination={{
-                pageSize: 15,
+                defaultPageSize: 15,
                 showSizeChanger: true,
                 pageSizeOptions: APP_TABLE_PAGE_SIZE_OPTIONS,
                 showTotal: appTableShowTotal('rules'),
