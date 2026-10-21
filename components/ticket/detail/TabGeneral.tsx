@@ -43,6 +43,8 @@ import {
   Typography,
 } from 'antd'
 
+import AssigneeSuggestions from '@/components/skills/AssigneeSuggestions'
+import TicketSkillsField from '@/components/skills/TicketSkillsField'
 import { attachmentDownloadHref } from '@/lib/attachment-download-url'
 
 const { useBreakpoint } = Grid
@@ -1091,6 +1093,14 @@ export default function TabGeneral({
               )}
             </div>
 
+            {/* Skills needed */}
+            {ticketData?.id ? (
+              <div>
+                <Text style={LBL}>Skills</Text>
+                <TicketSkillsField ticketId={Number(ticketData.id)} />
+              </div>
+            ) : null}
+
             {/* Contact */}
             {canEditCompanyAndTags ? (
               <div>
@@ -1157,7 +1167,16 @@ export default function TabGeneral({
 
             {/* Assignees */}
             <div>
-              <Text style={LBL}>Assignees</Text>
+              <Flex justify="space-between" align="center">
+                <Text style={LBL}>Assignees</Text>
+                {canEditAssignees && ticketData?.id ? (
+                  <AssigneeSuggestions
+                    ticketId={Number(ticketData.id)}
+                    assignedIds={sidebarDraft.assigneeIds}
+                    onAdd={(id) => setSidebarDraft((d) => (d.assigneeIds.includes(id) ? d : { ...d, assigneeIds: [...d.assigneeIds, id] }))}
+                  />
+                ) : null}
+              </Flex>
               {canEditAssignees ? (
                 <Select
                   mode="multiple"

@@ -25,6 +25,7 @@ import {
   TabUsers,
   TabWebsites,
 } from '@/components/company'
+import TabCompanySkills from '@/components/company/TabCompanySkills'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import CustomerNavbar from '@/components/layout/CustomerNavbar'
@@ -480,6 +481,15 @@ export default function CompanyDetailContent({
       ),
       children: <TabCompanyLog companyId={companyData.id} />,
     },
+    ...(isCustomer
+      ? []
+      : [
+          {
+            key: 'skills',
+            label: 'Skills',
+            children: <TabCompanySkills companyId={companyData.id} canEdit={canEdit} />,
+          },
+        ]),
     {
       key: 'websites',
       label: (

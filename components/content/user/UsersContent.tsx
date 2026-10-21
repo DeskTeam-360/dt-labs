@@ -112,6 +112,11 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const [audienceTab, setAudienceTab] = useState<UserAudienceTab>('non_customer')
   const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined)
   const [filterRole, setFilterRole] = useState<string | undefined>(undefined)
+  const [skillOptions, setSkillOptions] = useState<{ value: string; label: string }[]>([])
+  const [filterSkill, setFilterSkill] = useState<string | undefined>(undefined)
+  const [filterSkillLevel, setFilterSkillLevel] = useState<number>(1)
+  /** Users who have the chosen skill at the chosen level or higher (null = no skill filter). */
+  const [skillUserIds, setSkillUserIds] = useState<Set<string> | null>(null)
   const [form] = Form.useForm()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
@@ -161,9 +166,37 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       }
       if (filterStatus && u.status !== filterStatus) return false
       if (filterRole && u.role !== filterRole) return false
+      if (skillUserIds && !skillUserIds.has(u.id)) return false
       return true
     })
-  }, [users, searchText, audienceTab, filterStatus, filterRole, isCustomer])
+  }, [users, searchText, audienceTab, filterStatus, filterRole, isCustomer, skillUserIds])
+
+  useEffect(() => {
+    if (isCustomer) return
+    fetch('/api/skills', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: { id: string; name: string }[]) => setSkillOptions(rows.map((s) => ({ value: s.id, label: s.name }))))
+      .catch(() => setSkillOptions([]))
+  }, [isCustomer])
+
+  useEffect(() => {
+    if (!filterSkill) {
+      setSkillUserIds(null)
+      return
+    }
+    let cancelled = false
+    fetch(`/api/skills/people?skill_id=${filterSkill}&min_level=${filterSkillLevel}`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { user_ids: [] }))
+      .then((j: { user_ids?: string[] }) => {
+        if (!cancelled) setSkillUserIds(new Set(j.user_ids ?? []))
+      })
+      .catch(() => {
+        if (!cancelled) setSkillUserIds(new Set())
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [filterSkill, filterSkillLevel])
 
   const customerCount = useMemo(() => users.filter((u) => u.role === 'customer').length, [users])
   const nonCustomerCount = useMemo(() => users.filter((u) => u.role !== 'customer').length, [users])
@@ -797,6 +830,36 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                     <Option value="manager">Manager</Option>
                     <Option value="staff">Staff</Option>
                   </Select>
+                )}
+                {audienceTab === 'non_customer' && !isCustomer && (
+                  <Space.Compact>
+                    <Select
+                      placeholder="Filter by Skill"
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                      value={filterSkill}
+                      options={skillOptions}
+                      onChange={(v) => {
+                        setFilterSkill(v)
+                        setPagination((p) => ({ ...p, current: 1 }))
+                      }}
+                      style={{ width: 170 }}
+                    />
+                    <InputNumber
+                      min={1}
+                      max={10}
+                      precision={0}
+                      value={filterSkillLevel}
+                      disabled={!filterSkill}
+                      addonBefore="Level ≥"
+                      onChange={(v) => {
+                        setFilterSkillLevel(Number(v) || 1)
+                        setPagination((p) => ({ ...p, current: 1 }))
+                      }}
+                      style={{ width: 120 }}
+                    />
+                  </Space.Compact>
                 )}
                 <Button
                   type="primary"

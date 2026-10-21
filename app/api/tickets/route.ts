@@ -25,6 +25,7 @@ import {
 } from '@/lib/db'
 import { notifyTicketUsers } from '@/lib/firebase/ticket-notifications-server'
 import { sendRequesterTicketCreatedEmail } from '@/lib/requester-new-ticket-email'
+import { applyDefaultSkillsToTicket, setTicketSkills, validSkillIds } from '@/lib/skills'
 import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
 import { getPublicUrl } from '@/lib/storage-idrive'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
@@ -737,6 +738,20 @@ export async function POST(request: Request) {
         tagId,
       }))
     )
+  }
+
+  // Skills: the ones picked on the form, otherwise the company + ticket type defaults (pre-skills).
+  try {
+    // Skills are internal: only staff may pick them. Customer tickets always start from the defaults.
+    const creatorIsStaff = ['admin', 'manager', 'staff'].includes(String((authUser as { role?: string }).role ?? '').toLowerCase())
+    if (creatorIsStaff && Array.isArray(body.skill_ids)) {
+      const ids = await validSkillIds(body.skill_ids)
+      await setTicketSkills(ticket.id, ids, body.primary_skill_id)
+    } else {
+      await applyDefaultSkillsToTicket(ticket.id, ticket.companyId, ticket.typeId)
+    }
+  } catch (skillErr) {
+    console.error('Ticket skills error:', skillErr)
   }
 
   try {

@@ -389,6 +389,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
+                {canAccessTeams(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Skills"
+                      description="Skill list used on people, tickets and company defaults"
+                      href="/settings/skills"
+                      icon={<TeamOutlined />}
+                    />
+                  </Col>
+                )}
                 {canAccessCustomerTimeReport(role) && (
                   <Col xs={24} sm={12} md={8}>
                     <HubTile

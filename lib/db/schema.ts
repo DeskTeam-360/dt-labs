@@ -953,3 +953,50 @@ export const holidays = pgTable('holidays', {
   createdBy: uuid('created_by'),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
+
+// ============ Skills ============
+/** Skill catalog (e.g. "WordPress", "Design"). */
+export const skills = pgTable('skills', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 100 }).notNull().unique(),
+  color: varchar('color', { length: 20 }).default('#1677ff'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+})
+
+export const userSkills = pgTable(
+  'user_skills',
+  {
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    skillId: uuid('skill_id').notNull().references(() => skills.id, { onDelete: 'cascade' }),
+    /** Proficiency 1..10 (stored only; not used by the recommendation yet). */
+    level: integer('level').notNull().default(5),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.skillId] })]
+)
+
+/** Skills a ticket needs (starts from the company + type defaults, editable per ticket). */
+export const ticketSkills = pgTable(
+  'ticket_skills',
+  {
+    ticketId: integer('ticket_id').notNull().references(() => tickets.id, { onDelete: 'cascade' }),
+    skillId: uuid('skill_id').notNull().references(() => skills.id, { onDelete: 'cascade' }),
+    /** The skill that matters most for this ticket (at most one). */
+    isPrimary: boolean('is_primary').notNull().default(false),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.ticketId, t.skillId] })]
+)
+
+/** Pre-skills: new tickets of this type for this company start with these skills. */
+export const companyTypeSkills = pgTable(
+  'company_type_skills',
+  {
+    companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+    typeId: integer('type_id').notNull().references(() => ticketTypes.id, { onDelete: 'cascade' }),
+    skillId: uuid('skill_id').notNull().references(() => skills.id, { onDelete: 'cascade' }),
+    isPrimary: boolean('is_primary').notNull().default(false),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.companyId, t.typeId, t.skillId] })]
+)

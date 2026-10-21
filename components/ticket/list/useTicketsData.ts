@@ -1296,6 +1296,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
           visibility: 'public',
           description: values.description || null,
           tag_ids: selectedTagIds,
+          ...(Array.isArray(values.skill_ids) ? { skill_ids: values.skill_ids, primary_skill_id: values.primary_skill_id ?? null } : {}),
           contact_user_id: effectiveValues.contact_user_id ?? null,
           attachments: newTicketAttachments.map((a) => ({
             file_url: a.url,
