@@ -43,7 +43,7 @@ export default function SkillsContent({ user }: { user: { id: string; email?: st
       body: body ? JSON.stringify(body) : undefined,
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error((data as { error?: string }).error || res.statusText)
+    if (!res.ok) throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)
     return data
   }
 

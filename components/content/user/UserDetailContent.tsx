@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeftOutlined, BankOutlined, CalendarOutlined, ClockCircleOutlined, CloseOutlined, EditOutlined, GlobalOutlined, HistoryOutlined, IdcardOutlined, LockOutlined, MailOutlined, NumberOutlined,PhoneOutlined, SaveOutlined, TranslationOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, BankOutlined, CalendarOutlined, ClockCircleOutlined, CloseOutlined, EditOutlined, GlobalOutlined, HistoryOutlined, IdcardOutlined, LockOutlined, MailOutlined, NumberOutlined,PhoneOutlined, SaveOutlined, ToolOutlined, TranslationOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons'
 import { Avatar, Button, Card, Col, DatePicker, Descriptions, Divider, Drawer, Flex,Form, Input, Layout, message, Modal, Radio, Row, Select, Space, Statistic, Switch, Table, Tabs, Tag, Typography, Upload } from 'antd'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
@@ -911,14 +911,6 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             </Descriptions.Item>
                           </>
                         )}
-                        {!isCustomer && userData?.id && ['admin', 'manager', 'staff'].includes(((currentUser as { role?: string }).role ?? '').toLowerCase()) && (
-                          <Descriptions.Item label="Skills">
-                            <UserSkillsField
-                              userId={String(userData.id)}
-                              readOnly={((currentUser as { role?: string }).role ?? '').toLowerCase() !== 'admin'}
-                            />
-                          </Descriptions.Item>
-                        )}
                         <Descriptions.Item label="Timezone">
                           <Space>
                             <GlobalOutlined />
@@ -1547,6 +1539,27 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                     </div>
                   ),
                 },
+                ...(!isCustomer && userData?.id && ['admin', 'manager', 'staff'].includes(((currentUser as { role?: string }).role ?? '').toLowerCase())
+                  ? [
+                      {
+                        key: 'skills',
+                        label: (
+                          <span>
+                            <ToolOutlined />
+                            Skills
+                          </span>
+                        ),
+                        children: (
+                          <Card title="Skills" size="small" style={{ maxWidth: 640 }}>
+                            <UserSkillsField
+                              userId={String(userData.id)}
+                              readOnly={((currentUser as { role?: string }).role ?? '').toLowerCase() !== 'admin'}
+                            />
+                          </Card>
+                        ),
+                      },
+                    ]
+                  : []),
               ]}
             />
             </Form>
