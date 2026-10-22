@@ -199,12 +199,7 @@ function PersonHeader({ lane, agent, status, count }: { lane: Lane; agent?: Agen
           </Flex>
         </Flex>
         <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>Shift: {shiftText}</Text>
-        {isActive ? (
-          <div style={{ marginTop: 8, background: GREEN, color: '#fff', fontWeight: 700, borderRadius: 8, padding: '5px 8px', fontSize: 12 }}>
-            ● Working at {active[0].company ?? 'no company'} · #{active[0].ticket_id}
-            {active.length > 1 ? ` (+${active.length - 1})` : ''}
-          </div>
-        ) : null}
+        <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Tracked today: <Text strong style={{ fontSize: 12 }}>{fmtDur(status?.tracked_seconds ?? 0)}</Text></Text>
       </div>
     </Popover>
   )
@@ -371,6 +366,8 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
     if (agents.length === 0 && agentIds.length > 0) return
     void load()
   }, [load, agents.length, agentIds.length])
+
+  const rank = (t: TicketRecord) => (t.id === highlightId ? 2 : (stats.get(t.id)?.active_trackers.length ?? 0) > 0 ? 1 : 0)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -573,7 +570,10 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                         {lane.tickets.length === 0 ? (
                           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No tickets. Drop a ticket here." />
                         ) : (
-                          lane.tickets.map((t) => (
+                          [...lane.tickets]
+                            // The searched ticket first, then tickets with a running timer (whatever their priority), then the rest.
+                            .sort((x, y) => rank(y) - rank(x))
+                            .map((t) => (
                             <DraggableTicket key={`${lane.key}-${t.id}`} laneKey={lane.key} t={t}>
                               <TicketCard
                                 t={t}
