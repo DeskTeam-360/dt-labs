@@ -14,6 +14,7 @@ import {
 import {
   Button,
   Drawer,
+  Dropdown,
   Empty,
   Input,
   Layout,
@@ -174,13 +175,17 @@ export default function RecurringTicketsContent({ user }: Props) {
   }
 
 
-  const handleRunNow = async (row: RecurringTicketRow) => {
+  const handleRunNow = async (row: RecurringTicketRow, mode: 'just_run' | 'advance') => {
     setRunning(row.id)
     try {
-      const res = await fetch(`/api/recurring-tickets/${row.id}/run-now`, { method: 'POST' })
+      const res = await fetch(`/api/recurring-tickets/${row.id}/run-now`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Failed')
-      messageApi.success(`Ticket created successfully`)
+      messageApi.success(mode === 'advance' ? 'Ticket created. The schedule moved to the following run.' : 'Ticket created. The schedule is unchanged.')
       fetchRules()
     } catch (e: unknown) {
       messageApi.error(e instanceof Error ? e.message : 'Failed to run')
@@ -286,14 +291,20 @@ export default function RecurringTicketsContent({ user }: Props) {
       key: 'actions',
       render: (_: unknown, row: RecurringTicketRow) => (
         <Space>
-          <Tooltip title="Run now — create ticket immediately">
-            <Button
-              type="primary"
-              icon={<ThunderboltOutlined />}
-              loading={running === row.id}
-              onClick={() => handleRunNow(row)}
-            />
-          </Tooltip>
+          <Dropdown
+            trigger={['click']}
+            menu={{
+              items: [
+                { key: 'just_run', label: 'Run now (schedule unchanged)' },
+                { key: 'advance', label: 'Run now and skip the next scheduled run' },
+              ],
+              onClick: ({ key }) => void handleRunNow(row, key as 'just_run' | 'advance'),
+            }}
+          >
+            <Tooltip title="Create the ticket now">
+              <Button type="primary" icon={<ThunderboltOutlined />} loading={running === row.id} />
+            </Tooltip>
+          </Dropdown>
           <Tooltip title="View run history">
             <Button
               icon={<EyeOutlined />}

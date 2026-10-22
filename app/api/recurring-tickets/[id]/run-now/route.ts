@@ -9,7 +9,13 @@ import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedul
 import { applyRecurringTicketTemplate } from '@/lib/recurring-ticket-template'
 import { assignCompanySupportTicketRank, assignCreatorSupportTicketRank, parseCompanyTicketDesiredRank, resolveSupportQueueScope } from '@/lib/ticket-company-priority-order'
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+/**
+ * POST /api/recurring-tickets/[id]/run-now   body: { mode?: 'just_run' | 'advance' }
+ * - just_run (default): create the ticket now and leave the schedule exactly as it is.
+ * - advance: the ticket counts as the next scheduled run, so the schedule moves on to the occurrence after it.
+ *   The next run only ever moves forward.
+ */
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!canAccessRecurringTickets((session.user as { role?: string }).role)) {
@@ -21,6 +27,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (!rule) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const now = new Date()
+  const body = (await req.json().catch(() => ({}))) as { mode?: string }
+  const advance = body.mode === 'advance'
 
   try {
     const desiredRank = parseCompanyTicketDesiredRank(rule.ticketPriority ?? 0)
@@ -88,16 +96,18 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       startDate: rule.startDate,
       endDate: rule.endDate ?? null,
     }
-    // Always schedule next run from tomorrow midnight so the cron doesn't fire again today
-    const tomorrowMidnight = new Date(now)
-    tomorrowMidnight.setUTCDate(tomorrowMidnight.getUTCDate() + 1)
-    tomorrowMidnight.setUTCHours(0, 0, 0, 0)
-    const nextRunAt = computeNextRunAt(schedule, tomorrowMidnight)
-
-    await db
-      .update(recurringTickets)
-      .set({ lastRunAt: now, nextRunAt: nextRunAt ?? null, updatedAt: now })
-      .where(eq(recurringTickets.id, id))
+    if (advance) {
+      // This ticket takes the place of the upcoming scheduled run: continue from that run (never earlier than now).
+      const upcoming = rule.nextRunAt && rule.nextRunAt > now ? rule.nextRunAt : now
+      const nextRunAt = computeNextRunAt(schedule, upcoming)
+      await db
+        .update(recurringTickets)
+        .set({ lastRunAt: now, nextRunAt: nextRunAt ?? null, updatedAt: now })
+        .where(eq(recurringTickets.id, id))
+    } else {
+      // Just run: the schedule is untouched.
+      await db.update(recurringTickets).set({ lastRunAt: now, updatedAt: now }).where(eq(recurringTickets.id, id))
+    }
 
     await db.insert(recurringTicketRuns).values({
       recurringTicketId: id,
