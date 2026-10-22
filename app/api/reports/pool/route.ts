@@ -154,6 +154,13 @@ export async function GET(request: Request) {
     const dailySeconds = dailyByCompany.get(c.id) ?? 0
     const weeklySeconds = weeklyByCompany.get(c.id) ?? 0
     const pct = (sec: number, hours: number) => (hours > 0 ? Math.round((sec / 3600 / hours) * 1000) / 10 : null)
+    const activeUsers = [
+      ...new Set(
+        ticketRows
+          .filter((t) => t.companyId === c.id)
+          .flatMap((t) => (running.get(t.id) ?? []).map((r) => nameOf.get(r.userId) ?? 'Unknown'))
+      ),
+    ]
     const list = ticketRows
       .filter((t) => t.companyId === c.id)
       .map((t) => ({
@@ -162,6 +169,7 @@ export async function GET(request: Request) {
         status: t.status,
         priority: t.priority ?? null,
         assignees: assigneesByTicket.get(t.id) ?? [],
+        updated_at: t.updatedAt instanceof Date ? t.updatedAt.toISOString() : t.updatedAt ? new Date(t.updatedAt).toISOString() : null,
         today_seconds: todayByTicket.get(t.id) ?? 0,
         running: (running.get(t.id) ?? []).map((r) => ({
           user: nameOf.get(r.userId) ?? 'Unknown',
@@ -175,6 +183,7 @@ export async function GET(request: Request) {
       name: c.name,
       display_order: c.displayOrder ?? null,
       plan_hours: plan,
+      active_users: activeUsers,
       daily_seconds: dailySeconds,
       daily_pct: pct(dailySeconds, plan),
       weekly_seconds: weeklySeconds,

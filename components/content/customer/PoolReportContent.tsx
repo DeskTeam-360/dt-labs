@@ -1,19 +1,24 @@
 'use client'
 
 import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Col, Input, Layout, message, Row, Select, Space, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Col, Flex, Input, Layout, message, Row, Select, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useState } from 'react'
 
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 
+dayjs.extend(relativeTime)
+
 const { Content } = Layout
 const { Title, Text } = Typography
 
 type PoolTicket = {
   id: number
+  updated_at: string | null
   title: string
   status: string
   priority: number | null
@@ -26,6 +31,7 @@ type PoolCompany = {
   company_id: string
   name: string
   plan_hours: number
+  active_users: string[]
   daily_seconds: number
   daily_pct: number | null
   weekly_seconds: number
@@ -107,6 +113,19 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
     },
     { title: 'Status', dataIndex: 'status', width: 140, render: (v: string) => STATUS_LABEL[v] ?? v },
     {
+      title: 'Last update',
+      dataIndex: 'updated_at',
+      width: 150,
+      render: (v: string | null) =>
+        v ? (
+          <Tooltip title={dayjs(v).format('MMM DD, YYYY HH:mm')}>
+            <Text type="secondary">{dayjs(v).fromNow()}</Text>
+          </Tooltip>
+        ) : (
+          '—'
+        ),
+    },
+    {
       title: 'Assigned to',
       dataIndex: 'assignees',
       width: 200,
@@ -115,11 +134,11 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
     {
       title: 'Total Time now',
       key: 'now',
-      width: 220,
+      width: 300,
       render: (_: unknown, t) =>
         t.running.length ? (
           <Tag color="green" style={{ margin: 0 }}>
-            Timer active ({fmtDur(Math.max(...t.running.map((r) => r.seconds)))})
+            Timer active ({fmtDur(Math.max(...t.running.map((r) => r.seconds)))}) · {t.running.map((r) => r.user.split(' ')[0]).join(', ')}
           </Tag>
         ) : t.today_seconds > 0 ? (
           <Text>Worked today ({fmtDur(t.today_seconds)})</Text>
@@ -136,6 +155,21 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
     { title: 'Company Name', dataIndex: 'name', render: (v: string) => <Text strong>{v}</Text> },
     { title: 'Plan Package', dataIndex: 'plan_hours', width: 110, align: 'center' },
     { title: 'Open Tickets', key: 'count', width: 110, align: 'center', render: (_: unknown, c) => c.tickets.length },
+    {
+      title: 'Active now',
+      key: 'active',
+      width: 190,
+      render: (_: unknown, c) =>
+        c.active_users.length ? (
+          <Flex gap={4} wrap>
+            {c.active_users.map((n) => (
+              <Tag key={n} color="green" style={{ margin: 0 }}>{n.split(' ')[0]}</Tag>
+            ))}
+          </Flex>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
     { title: 'Daily Spend', key: 'daily', width: 130, align: 'center', render: (_: unknown, c) => fmtDur(c.daily_seconds) },
     { title: '% Today', key: 'dpct', width: 100, align: 'center', render: (_: unknown, c) => pctTag(c.daily_pct) },
     { title: 'Weekly Spend', key: 'weekly', width: 130, align: 'center', render: (_: unknown, c) => fmtDur(c.weekly_seconds) },

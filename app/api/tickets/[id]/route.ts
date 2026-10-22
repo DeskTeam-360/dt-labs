@@ -639,6 +639,8 @@ export async function PATCH(
       }
 
       if (priorityRankReorder) {
+        // The ticket whose priority was edited counts as updated; the others that only shift in the queue do not.
+        await tx.update(tickets).set({ updatedAt: new Date() }).where(eq(tickets.id, ticketId))
         if (priority === null || priority === '') {
           const scope = await resolveSupportQueueScope(tx, ticketId)
           await tx

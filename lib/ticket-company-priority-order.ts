@@ -99,17 +99,17 @@ export async function resolveSupportQueueScope(
  */
 async function writeOrderedSupportPriorities(dbTx: TicketPriorityDbExecutor, orderedIds: number[]): Promise<void> {
   if (orderedIds.length === 0) return
-  const now = new Date()
+  // updated_at is deliberately not touched: renumbering the queue is not an edit of those tickets.
   for (const id of orderedIds) {
     await dbTx
       .update(tickets)
-      .set({ priority: -Math.abs(id), updatedAt: now })
+      .set({ priority: -Math.abs(id) })
       .where(eq(tickets.id, id))
   }
   for (let i = 0; i < orderedIds.length; i++) {
     await dbTx
       .update(tickets)
-      .set({ priority: i + 1, updatedAt: now })
+      .set({ priority: i + 1 })
       .where(eq(tickets.id, orderedIds[i]!))
   }
 }
