@@ -20,10 +20,12 @@ const { Title, Text } = Typography
 /** Only tickets still waiting for or in work are on the board. */
 const BOARD_STATUSES = 'open,received,working_team'
 const GREEN = '#52c41a'
+/** "No assign" shows at most this many tickets; agent lanes always show everything they have. */
+const NO_ASSIGN_LIMIT = 50
 
 type CompanyOption = { id: string; name: string; is_customer?: boolean; plan_hours: number; spent_hours: number; has_active_timer: boolean }
 type Agent = { id: string; name: string; position: string | null }
-type Lane = { key: string; title: string; subtitle?: string; tickets: TicketRecord[] }
+type Lane = { key: string; title: string; subtitle?: string; tickets: TicketRecord[]; total?: number }
 type Match = { tickets: Record<string, { has_skills: boolean; users: Record<string, number> }>; load: Record<string, number> }
 type Active = { ticket_id: number; title: string; company: string | null; since: string }
 type PersonStatus = {
@@ -65,6 +67,15 @@ async function fetchTickets(params: Record<string, string>): Promise<TicketRecor
   return (Array.isArray(data) ? data : (data.data ?? [])) as TicketRecord[]
 }
 
+async function fetchTicketsPage(params: Record<string, string>): Promise<{ items: TicketRecord[]; total: number }> {
+  const qs = new URLSearchParams({ paginated: '1', ...params })
+  const res = await fetch(`/api/tickets?${qs.toString()}`, { credentials: 'include' })
+  if (!res.ok) throw new Error('Failed to load tickets')
+  const data = await res.json()
+  const items = (Array.isArray(data) ? data : (data.data ?? [])) as TicketRecord[]
+  return { items, total: Array.isArray(data) ? items.length : Number(data.total ?? items.length) }
+}
+
 function StatusChip({ status }: { status: string }) {
   const col = DEFAULT_ALL_STATUS_COLUMNS.find((c) => c.id === status)
   return (
@@ -75,7 +86,7 @@ function StatusChip({ status }: { status: string }) {
 }
 
 /** One ticket. Short on purpose: the rest shows on hover. */
-function TicketCard({ t, stat, hint }: { t: TicketRecord; stat?: TicketTrackerStat; hint?: React.ReactNode }) {
+function TicketCard({ t, stat, hint, highlight }: { t: TicketRecord; stat?: TicketTrackerStat; hint?: React.ReactNode; highlight?: boolean }) {
   const active = stat?.active_trackers ?? []
   const isActive = active.length > 0
 
@@ -103,13 +114,14 @@ function TicketCard({ t, stat, hint }: { t: TicketRecord; stat?: TicketTrackerSt
         rel="noopener noreferrer"
         style={{
           display: 'block',
+          flexShrink: 0,
           color: 'inherit',
           textDecoration: 'none',
           borderRadius: 10,
           overflow: 'hidden',
           background: isActive ? '#f6ffed' : 'var(--kanban-card-bg, #fff)',
-          border: isActive ? `2px solid ${GREEN}` : '1px solid var(--kanban-card-border, #e8e8e8)',
-          boxShadow: isActive ? `0 0 0 3px rgba(82,196,26,0.18)` : undefined,
+          border: isActive ? `2px solid ${GREEN}` : highlight ? '2px solid #1677ff' : '1px solid var(--kanban-card-border, #e8e8e8)',
+          boxShadow: isActive ? `0 0 0 3px rgba(82,196,26,0.18)` : highlight ? '0 0 0 3px rgba(22,119,255,0.18)' : undefined,
         }}
       >
         {isActive ? (
@@ -205,6 +217,8 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
   const [match, setMatch] = useState<Match | null>(null)
   const [people, setPeople] = useState<Record<string, PersonStatus>>({})
   const [notFound, setNotFound] = useState(false)
+  const [highlightId, setHighlightId] = useState<number | null>(null)
+  const [searchNote, setSearchNote] = useState('')
 
   useEffect(() => {
     fetch('/api/board/company-load', { credentials: 'include' })
@@ -230,50 +244,56 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
     setLoading(true)
     setNotFound(false)
     try {
-      const out: Lane[] = []
-      let all: TicketRecord[] = []
       const idSearch = activeSearch.replace(/\D/g, '')
+      const baseStatus: Record<string, string> = { status: BOARD_STATUSES, sort_by: 'priority', sort_order: 'asc' }
+      const pool: Lane = { key: 'unassigned', title: 'No assign', tickets: [], total: 0 }
+      const personIds = [...agentIds]
+      let highlight: number | null = null
+      setSearchNote('')
 
       if (idSearch) {
-        // One ticket: shown under "No assign" or under whoever has it, whatever the other filters say.
+        // A ticket search only touches "No assign" (the ticket if nobody has it) and adds the owner's lane.
         const found = await fetchTickets({ search: idSearch, search_by: 'id' })
         const t = found.find((x) => String(x.id) === idSearch)
         if (!t) {
           setNotFound(true)
         } else {
-          all = [t]
-          const assignees = t.assignees ?? []
-          if (assignees.length === 0) out.push({ key: 'unassigned', title: 'No assign', tickets: [t] })
-          for (const a of assignees) {
-            const ag = agentById.get(a.user_id)
-            out.push({ key: a.user_id, title: ag?.name ?? a.user_name ?? 'Agent', subtitle: ag?.position ?? undefined, tickets: [t] })
+          highlight = t.id
+          const owners = t.assignees ?? []
+          if (owners.length === 0) {
+            pool.tickets = [t]
+            pool.total = 1
+            setSearchNote(`Ticket ${t.id} has no assignee.`)
+          } else {
+            for (const a of owners) if (!personIds.includes(a.user_id)) personIds.push(a.user_id)
+            setSearchNote(`Ticket ${t.id} is assigned to ${owners.map((a) => a.user_name).filter(Boolean).join(', ')}. It is highlighted in their column.`)
           }
         }
       } else {
-        const base: Record<string, string> = { status: BOARD_STATUSES, sort_by: 'priority', sort_order: 'asc' }
+        const base = { ...baseStatus }
         if (companyIds.length) base.company_ids = companyIds.join(',')
-        const [unassigned, assigned] = await Promise.all([
-          fetchTickets({ ...base, unassigned: '1' }),
-          agentIds.length ? fetchTickets({ ...base, assignee_ids: agentIds.join(',') }) : Promise.resolve([] as TicketRecord[]),
-        ])
-        const persons: Lane[] = agentIds.map((id) => {
-          const ag = agentById.get(id)
-          return {
-            key: id,
-            title: ag?.name ?? 'Agent',
-            subtitle: ag?.position ?? undefined,
-            tickets: assigned.filter((t) => (t.assignees ?? []).some((a) => a.user_id === id)),
-          }
-        })
-        // Lightest workload sits next to "No assign", the busiest person is furthest right.
-        persons.sort((x, y) => x.tickets.length - y.tickets.length || x.title.localeCompare(y.title))
-        out.push({ key: 'unassigned', title: 'No assign', tickets: unassigned }, ...persons)
-        all = [...unassigned, ...assigned]
+        const page = await fetchTicketsPage({ ...base, unassigned: '1', limit: String(NO_ASSIGN_LIMIT) })
+        pool.tickets = page.items
+        pool.total = page.total
       }
 
+      // Agent lanes are never narrowed by the company filter or the ticket search: they show everything the person has.
+      const assigned = personIds.length ? await fetchTickets({ ...baseStatus, assignee_ids: personIds.join(',') }) : []
+      const persons: Lane[] = personIds.map((id) => {
+        const ag = agentById.get(id)
+        const mine = assigned.filter((t) => (t.assignees ?? []).some((a) => a.user_id === id))
+        // The searched ticket goes to the top of the lane.
+        mine.sort((x, y) => Number(y.id === highlight) - Number(x.id === highlight))
+        return { key: id, title: ag?.name ?? 'Agent', subtitle: ag?.position ?? undefined, tickets: mine }
+      })
+      // Lightest workload sits next to "No assign", the busiest person is furthest right.
+      persons.sort((x, y) => x.tickets.length - y.tickets.length || x.title.localeCompare(y.title))
+
+      const out: Lane[] = [pool, ...persons]
+      const all: TicketRecord[] = [...pool.tickets, ...assigned]
+      setHighlightId(highlight)
       setLanes(out)
       const ticketIds = [...new Set(all.map((t) => t.id))]
-      const personIds = out.filter((l) => l.key !== 'unassigned').map((l) => l.key)
 
       if (ticketIds.length) {
         fetch(`/api/tickets/ticket-time-stats?ticket_ids=${ticketIds.join(',')}`, { credentials: 'include' })
@@ -363,7 +383,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                   mode="multiple"
                   allowClear
                   showSearch
-                  placeholder="Company: all"
+                  placeholder="Company: pick to load No assign"
                   style={{ width: '100%' }}
                   maxTagCount="responsive"
                   value={companyIds}
@@ -396,7 +416,6 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                   maxTagCount="responsive"
                   value={agentIds}
                   onChange={setAgentIds}
-                  disabled={!!activeSearch}
                   options={agents.map((a) => ({ value: a.id, label: agentLabel(a) }))}
                 />
               </div>
@@ -415,7 +434,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
             </Flex>
 
             {notFound ? <Alert type="info" showIcon title={`Ticket ${activeSearch} was not found.`} /> : null}
-            {activeSearch && !notFound ? <Alert type="info" showIcon title={`Showing ticket ${activeSearch} only. Clear the search to see the board again.`} /> : null}
+            {activeSearch && !notFound && searchNote ? <Alert type="info" showIcon title={searchNote} /> : null}
           </Space>
 
           <Spin spinning={loading}>
@@ -428,15 +447,21 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                       <div style={{ borderRadius: 12, padding: '10px 12px', background: '#fff7e6', border: '1px solid #ffd591' }}>
                         <Flex justify="space-between" align="center">
                           <Text strong style={{ fontSize: 15 }}>{lane.title}</Text>
-                          <Badge count={lane.tickets.length} showZero style={{ backgroundColor: '#fa8c16', boxShadow: 'none' }} />
+                          <Badge count={lane.total ?? lane.tickets.length} showZero overflowCount={9999} style={{ backgroundColor: '#fa8c16', boxShadow: 'none' }} />
                         </Flex>
+                        {lane.total != null && lane.total > lane.tickets.length ? (
+                          <Text type="secondary" style={{ fontSize: 12 }}>Showing the first {lane.tickets.length} of {lane.total}. Pick a company to narrow.</Text>
+                        ) : null}
                       </div>
                     ) : (
                       <PersonHeader lane={lane} agent={agentById.get(lane.key)} status={people[lane.key]} count={lane.tickets.length} />
                     )}
                     <Flex vertical gap={8} style={{ marginTop: 10, maxHeight: 'calc(100vh - 360px)', overflowY: 'auto', paddingRight: 2 }}>
                       {lane.tickets.length === 0 ? (
-                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No tickets" />
+                        <Empty
+                          image={Empty.PRESENTED_IMAGE_SIMPLE}
+                          description="No tickets"
+                        />
                       ) : (
                         lane.tickets.map((t) => (
                           <TicketCard
@@ -444,6 +469,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                             t={t}
                             stat={stats.get(t.id)}
                             hint={isPool ? bestFit(t) : fitFor(t, lane.key)}
+                            highlight={t.id === highlightId}
                           />
                         ))
                       )}

@@ -1,7 +1,7 @@
 'use client'
 
 import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Card, DatePicker, Layout, message, Space, Typography } from 'antd'
+import { Button, Card, DatePicker, Layout, message, Space, Tag, Typography } from 'antd'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
@@ -33,6 +33,7 @@ type Cell = {
 type GridRow = {
   company_id: string
   company_name: string
+  company_inactive?: boolean
   any_embedded: boolean
   cells: Record<string, Cell>
 }
@@ -156,6 +157,9 @@ function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows
                 }}
               >
                 {r.company_name}
+                {r.company_inactive ? (
+                  <Tag color="red" style={{ marginLeft: 8, marginInlineEnd: 0 }}>Inactive</Tag>
+                ) : null}
               </td>
               {weeksDisplay.map((w) => {
                 const cell = r.cells[w.week_start]

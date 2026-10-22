@@ -96,6 +96,11 @@ export default function TicketFormModal({
   const fileInputId = `ticket-files-${rawId.replace(/:/g, '')}`
   const watchedContactUserId = Form.useWatch('contact_user_id', form)
   const watchedCompanyId = Form.useWatch('company_id', form)
+  // A ticket whose company was made inactive keeps showing that company (not a raw id) while it is edited.
+  const companyChoices = useMemo(() => {
+    const c = editingTicket?.company
+    return c && !companies.some((x) => x.id === c.id) ? [...companies, { ...c, name: `${c.name} (inactive)` }] : companies
+  }, [companies, editingTicket])
   const watchedTypeId = Form.useWatch('type_id', form)
   const watchedSkillIds = Form.useWatch('skill_ids', form) as string[] | undefined
 
@@ -320,12 +325,12 @@ export default function TicketFormModal({
                   allowClear
                   showSearch
                   optionFilterProp="label"
-                  options={companies.map((c) => ({
+                  options={companyChoices.map((c) => ({
                     value: c.id,
                     label: c.name,
                   }))}
                   >
-                    {companies.map((c) => (
+                    {companyChoices.map((c) => (
                       <Option key={c.id} value={c.id} label={c.name}>
                         {c.name}
                       </Option>

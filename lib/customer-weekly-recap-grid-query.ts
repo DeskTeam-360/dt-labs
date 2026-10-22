@@ -13,6 +13,8 @@ export type WeeklyRecapGridCellDto = {
 export type WeeklyRecapGridRowDto = {
   company_id: string
   company_name: string
+  /** True when the company was made inactive: it stays in the recap, just marked. */
+  company_inactive: boolean
   any_embedded: boolean
   cells: Record<string, WeeklyRecapGridCellDto>
 }
@@ -49,13 +51,15 @@ export async function fetchWeeklyRecapRowsForTeam(
 
   const companyIds = [...new Set(cells.map((c) => c.companyId))]
   const namesById = new Map<string, string>()
+  const inactiveIds = new Set<string>()
   if (companyIds.length > 0) {
     const crows = await db
-      .select({ id: companies.id, name: companies.name })
+      .select({ id: companies.id, name: companies.name, isActive: companies.isActive })
       .from(companies)
       .where(inArray(companies.id, companyIds))
     for (const c of crows) {
       namesById.set(c.id, c.name ?? c.id)
+      if (c.isActive === false) inactiveIds.add(c.id)
     }
   }
 
@@ -79,6 +83,7 @@ export async function fetchWeeklyRecapRowsForTeam(
     return {
       company_id,
       company_name: namesById.get(company_id) ?? company_id,
+      company_inactive: inactiveIds.has(company_id),
       any_embedded: anyEmbedded,
       cells: cellsByWeek,
     }

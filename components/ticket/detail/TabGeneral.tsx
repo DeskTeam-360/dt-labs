@@ -1068,7 +1068,12 @@ export default function TabGeneral({
                   value={sidebarDraft.companyId ?? undefined}
                   onChange={(v) => setSidebarDraft((d) => ({ ...d, companyId: v ?? null }))}
                   loading={sidebarAttributesSaving}
-                  options={companyOptions.map((c) => ({ value: c.id, label: c.name }))}
+                  options={[
+                    ...companyOptions.map((c) => ({ value: c.id, label: c.name })),
+                    ...(ticketData.company_id && ticketData.company && !companyOptions.some((c) => c.id === ticketData.company_id)
+                      ? [{ value: ticketData.company_id as string, label: `${ticketData.company.name} (inactive)` }]
+                      : []),
+                  ]}
                   showSearch optionFilterProp="label" style={{ width: '100%' }} allowClear placeholder="Select company"
                 />
               ) : (

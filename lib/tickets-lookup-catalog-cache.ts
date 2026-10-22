@@ -66,6 +66,7 @@ async function loadTicketsLookupCatalog() {
     db
       .select({ id: companies.id, name: companies.name, color: companies.color, email: companies.email })
       .from(companies)
+      .where(eq(companies.isActive, true))
       .orderBy(asc(companies.name)),
     db.select({ id: tags.id, name: tags.name, slug: tags.slug, color: tags.color }).from(tags).orderBy(asc(tags.name)),
     db

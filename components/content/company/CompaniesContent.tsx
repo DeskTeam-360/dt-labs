@@ -140,7 +140,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
   const fetchCompanies = async () => {
     setLoading(true)
     try {
-      const res = await apiFetch<{ data: CompanyRecord[] }>('/api/companies')
+      const res = await apiFetch<{ data: CompanyRecord[] }>('/api/companies?include_inactive=1')
       setCompanies(res.data || [])
     } catch (error: unknown) {
       message.error((error as Error).message || 'Failed to fetch companies')
@@ -197,6 +197,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       active_time: 0,
       display_order: undefined,
       is_customer: false,
+      is_active: true,
     })
     setModalVisible(true)
   }
@@ -213,6 +214,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       active_time: record.active_time ?? 0,
       display_order: record.display_order ?? undefined,
       is_customer: record.is_customer ?? false,
+      is_active: record.is_active ?? true,
     })
     setModalVisible(true)
   }
@@ -237,6 +239,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
     active_time?: number | null
     display_order?: number | null
     is_customer?: boolean
+    is_active?: boolean
   }) => {
     const staffPayload = {
       active_team_id: values.active_team_id ?? null,
@@ -244,6 +247,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       active_time: values.active_time ?? 0,
       display_order: values.display_order ?? null,
       is_customer: values.is_customer === true,
+      is_active: values.is_active !== false,
     }
     setSaving(true)
     try {
@@ -295,7 +299,10 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
       sortDirections: ['ascend', 'descend'],
       render: (name: string, record: CompanyRecord) => (
-        <Tag style={kanbanTagStyle({ fillHex: tagPreviewFillHex(record.color) })}>{name}</Tag>
+        <Space size={6}>
+          <Tag style={kanbanTagStyle({ fillHex: tagPreviewFillHex(record.color) })}>{name}</Tag>
+          {record.is_active === false ? <Tag color="red">Inactive</Tag> : null}
+        </Space>
       ),
     },
     {
@@ -421,6 +428,20 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                     setPagination((p) => ({ ...p, current: 1 }))
                   }}
                   style={{ width: 260 }}
+                />
+                <Select
+                  placeholder="Status"
+                  allowClear
+                  value={filterStatus}
+                  onChange={(v) => {
+                    setFilterStatus(v)
+                    setPagination((p) => ({ ...p, current: 1 }))
+                  }}
+                  style={{ width: 140 }}
+                  options={[
+                    { value: true, label: 'Active' },
+                    { value: false, label: 'Inactive' },
+                  ]}
                 />
                 {/* <Select
                   placeholder="Filter Is Customer"
@@ -566,6 +587,17 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
                     tooltip="Position in Round Robin and reports (1 = first). Leave empty to list after the numbered companies."
                   >
                     <InputNumber min={0} precision={0} placeholder="—" style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={4}>
+                  <Form.Item
+                    name="is_active"
+                    label="Active"
+                    valuePropName="checked"
+                    initialValue={true}
+                    tooltip="Inactive companies are hidden from every filter and list. They only appear here in Company management."
+                  >
+                    <Switch checkedChildren="Yes" unCheckedChildren="No" />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={5}>

@@ -33,6 +33,8 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url)
   const isActiveParam = url.searchParams.get('is_active')
+  // Inactive companies disappear from every picker and filter; only Company management asks for them.
+  const includeInactive = url.searchParams.get('include_inactive') === '1'
 
   const [rows, ticketActivity] = await Promise.all([
     db.select().from(companies).orderBy(desc(companies.createdAt)),
@@ -79,6 +81,8 @@ export async function GET(request: Request) {
   if (isActiveParam !== null && isActiveParam !== undefined) {
     const active = isActiveParam === 'true'
     filtered = rows.filter((r) => r.isActive === active)
+  } else if (!includeInactive) {
+    filtered = rows.filter((r) => r.isActive !== false)
   }
 
   const data = filtered.map((r) => ({
