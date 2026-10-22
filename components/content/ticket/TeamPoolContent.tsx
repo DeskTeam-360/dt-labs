@@ -19,7 +19,7 @@ const { Title, Text } = Typography
 /** Only tickets still waiting for or in work are on the board. */
 const BOARD_STATUSES = 'open,received,working_team'
 
-type CompanyOption = { id: string; name: string; plan_hours: number; spent_hours: number; has_active_timer: boolean }
+type CompanyOption = { id: string; name: string; is_customer?: boolean; plan_hours: number; spent_hours: number; has_active_timer: boolean }
 type Agent = { id: string; name: string; position: string | null }
 type Match = { tickets: Record<string, { has_skills: boolean; users: Record<string, number> }>; load: Record<string, number> }
 type Column = { key: string; title: string; subtitle?: string; color: string; tickets: TicketRecord[] }
@@ -241,6 +241,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                           <span>
                             {c.name}{' '}
                             <Text type="secondary">({c.spent_hours}H/{c.plan_hours}H)</Text>
+                            {c.is_customer === false ? <Text type="secondary" italic> · internal</Text> : null}
                           </span>
                           {c.has_active_timer ? <Badge color="#52c41a" title="A timer is running" /> : null}
                         </Flex>

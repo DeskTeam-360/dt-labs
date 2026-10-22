@@ -10,7 +10,7 @@ const WIB_MS = 7 * 60 * 60 * 1000
 
 /**
  * GET /api/board/company-load
- * Admin only. Active customer companies with the plan hours per day, the time spent today (WIB) and whether a timer is running
+ * Admin only. All active companies (customers and internal) with the plan hours per day, the time spent today (WIB) and whether a timer is running
  * on any of their tickets right now. Feeds the company filter of the Team Pool.
  */
 export async function GET() {
@@ -27,7 +27,7 @@ export async function GET() {
   const rows = await db
     .select()
     .from(companies)
-    .where(and(eq(companies.isCustomer, true), eq(companies.isActive, true)))
+    .where(eq(companies.isActive, true))
     .orderBy(asc(companies.name))
   if (rows.length === 0) return NextResponse.json({ companies: [] })
   const ids = rows.map((c) => c.id)
@@ -68,6 +68,7 @@ export async function GET() {
       .map((c) => ({
         id: c.id,
         name: c.name,
+        is_customer: c.isCustomer,
         display_order: c.displayOrder ?? null,
         plan_hours: c.activeTime ?? 0,
         spent_hours: Math.round(((spent.get(c.id) ?? 0) / 3600) * 10) / 10,
