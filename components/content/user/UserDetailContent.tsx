@@ -1550,7 +1550,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           </span>
                         ),
                         children: (
-                          <Card title="Skills" size="small" style={{ maxWidth: 640 }}>
+                          <Card title="Skills" size="small" style={{ maxWidth: 760 }}>
                             <UserSkillsField
                               userId={String(userData.id)}
                               readOnly={((currentUser as { role?: string }).role ?? '').toLowerCase() !== 'admin'}
