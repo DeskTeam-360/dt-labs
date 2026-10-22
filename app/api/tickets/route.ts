@@ -225,6 +225,18 @@ export async function GET(request: Request) {
   if (noCompany) conditions.push(isNull(tickets.companyId))
   if (noTags) conditions.push(sql`${tickets.id} NOT IN (SELECT ticket_id FROM ticket_tags)`)
   if (noTeam) conditions.push(isNull(tickets.teamId))
+  // Board filters (staff only): tickets nobody is assigned to, or assigned to any of the given people.
+  if (!isCustomerList) {
+    if (url.searchParams.get('unassigned') === '1') {
+      conditions.push(sql`NOT EXISTS (SELECT 1 FROM ticket_assignees ta WHERE ta.ticket_id = ${tickets.id})`)
+    }
+    const assigneeIds = (url.searchParams.get('assignee_ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+    if (assigneeIds.length > 0) {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM ticket_assignees ta WHERE ta.ticket_id = ${tickets.id} AND ta.user_id IN (${sql.join(assigneeIds.map((id) => sql`${id}`), sql`, `)}))`
+      )
+    }
+  }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 

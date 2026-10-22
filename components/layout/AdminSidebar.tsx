@@ -129,6 +129,15 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
                   icon: <CheckSquareOutlined />,
                   label: linkLabel('/tickets', 'All tickets'),
                 },
+                ...(role === 'admin'
+                  ? [
+                      {
+                        key: '/team-pool',
+                        icon: <TeamOutlined />,
+                        label: linkLabel('/team-pool', 'Team Pool'),
+                      },
+                    ]
+                  : []),
                 {
                   key: '/tickets/latest',
                   icon: <ClockCircleOutlined />,
