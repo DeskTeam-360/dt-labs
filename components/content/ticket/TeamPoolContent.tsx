@@ -1,7 +1,8 @@
 'use client'
 
 import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Badge, Button, Card, Empty, Flex, Input, Layout, message, Popover, Select, Space, Spin, Tag, Typography } from 'antd'
+import { DndContext, type DragEndEvent, DragOverlay, type DragStartEvent, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core'
+import { Alert, Badge, Button, Empty, Flex, Input, Layout, message, Modal, Popover, Select, Space, Spin, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -20,6 +21,8 @@ const { Title, Text } = Typography
 /** Only tickets still waiting for or in work are on the board. */
 const BOARD_STATUSES = 'open,received,working_team'
 const GREEN = '#52c41a'
+/** True for a moment after a drag ends, so releasing the card does not follow its link. */
+let justDragged = false
 /** "No assign" shows at most this many tickets; agent lanes always show everything they have. */
 const NO_ASSIGN_LIMIT = 50
 
@@ -112,6 +115,10 @@ function TicketCard({ t, stat, hint, highlight }: { t: TicketRecord; stat?: Tick
         href={`/tickets/${t.id}`}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={(e) => {
+          if (justDragged) e.preventDefault()
+        }}
+        draggable={false}
         style={{
           display: 'block',
           flexShrink: 0,
@@ -203,6 +210,37 @@ function PersonHeader({ lane, agent, status, count }: { lane: Lane; agent?: Agen
   )
 }
 
+/** A ticket card that can be dragged to another lane. */
+function DraggableTicket({ laneKey, t, children }: { laneKey: string; t: TicketRecord; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `${laneKey}:${t.id}`, data: { ticketId: t.id, fromLane: laneKey } })
+  return (
+    <div ref={setNodeRef} {...attributes} {...listeners} style={{ opacity: isDragging ? 0.35 : 1, touchAction: 'none', flexShrink: 0 }}>
+      {children}
+    </div>
+  )
+}
+
+/** One lane: a bordered column that accepts dropped tickets. */
+function LaneColumn({ laneKey, isPool, children }: { laneKey: string; isPool: boolean; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: laneKey })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        width: 316,
+        flexShrink: 0,
+        padding: 8,
+        borderRadius: 16,
+        border: isOver ? '2px dashed #1677ff' : isPool ? '2px solid #ffc069' : '2px solid #d0d7de',
+        background: isOver ? '#e6f4ff' : isPool ? '#fffaf0' : 'var(--kanban-column-bg, #f5f6f8)',
+        transition: 'background 0.15s, border-color 0.15s',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 export default function TeamPoolContent({ user: currentUser }: { user: { id: string; email?: string | null; name?: string | null; role?: string | null } }) {
   const [collapsed, setCollapsed] = useState(false)
   const [companies, setCompanies] = useState<CompanyOption[]>([])
@@ -217,6 +255,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
   const [match, setMatch] = useState<Match | null>(null)
   const [people, setPeople] = useState<Record<string, PersonStatus>>({})
   const [notFound, setNotFound] = useState(false)
+  const [dragging, setDragging] = useState<TicketRecord | null>(null)
   const [highlightId, setHighlightId] = useState<number | null>(null)
   const [searchNote, setSearchNote] = useState('')
 
@@ -333,6 +372,79 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
     void load()
   }, [load, agents.length, agentIds.length])
 
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+
+  /** Drop a ticket on a lane: assign it to that person (moving it away from the person it came from). */
+  const moveTicket = useCallback(
+    async (ticketId: number, fromKey: string, toKey: string) => {
+      if (fromKey === toKey) return
+      const source = lanes.find((l) => l.key === fromKey)
+      const t = source?.tickets.find((x) => x.id === ticketId)
+      if (!t) return
+      const current = (t.assignees ?? []).map((a) => a.user_id)
+      const next = [
+        ...new Set([...(toKey === 'unassigned' ? [] : [toKey]), ...current.filter((id) => id !== fromKey && id !== toKey)]),
+      ]
+      const names = new Map((t.assignees ?? []).map((a) => [a.user_id, a.user_name]))
+      const nextAssignees = next.map((id) => ({ id: '', user_id: id, user_name: agentById.get(id)?.name ?? names.get(id) }))
+
+      const previous = lanes
+      setLanes((ls) =>
+        ls.map((l) => {
+          if (l.key === fromKey && l.key !== toKey) {
+            return { ...l, tickets: l.tickets.filter((x) => x.id !== ticketId), total: l.total != null ? Math.max(0, l.total - 1) : l.total }
+          }
+          if (l.key === toKey) {
+            const moved = { ...t, assignees: nextAssignees }
+            return { ...l, tickets: [moved, ...l.tickets.filter((x) => x.id !== ticketId)], total: l.total != null ? l.total + 1 : l.total }
+          }
+          return l
+        })
+      )
+      try {
+        const res = await fetch(`/api/tickets/${ticketId}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assignees: next }),
+        })
+        if (!res.ok) throw new Error('Could not change the assignee')
+        message.success(toKey === 'unassigned' ? `#${ticketId} is unassigned` : `#${ticketId} assigned to ${agentById.get(toKey)?.name ?? 'the agent'}`)
+      } catch (e) {
+        setLanes(previous)
+        message.error((e as Error).message)
+      }
+    },
+    [lanes, agentById]
+  )
+
+  const onDragStart = (e: DragStartEvent) => {
+    const d = e.active.data.current as { ticketId: number; fromLane: string } | undefined
+    setDragging(lanes.find((l) => l.key === d?.fromLane)?.tickets.find((x) => x.id === d?.ticketId) ?? null)
+  }
+
+  const onDragEnd = (e: DragEndEvent) => {
+    setDragging(null)
+    justDragged = true
+    setTimeout(() => {
+      justDragged = false
+    }, 150)
+    const d = e.active.data.current as { ticketId: number; fromLane: string } | undefined
+    const to = e.over?.id ? String(e.over.id) : null
+    if (!d || !to || to === d.fromLane) return
+    if (to === 'unassigned') {
+      const from = agentById.get(d.fromLane)?.name ?? 'this person'
+      Modal.confirm({
+        title: `Remove #${d.ticketId} from ${from}?`,
+        content: 'The ticket goes back to No assign.',
+        okText: 'Unassign',
+        onOk: () => moveTicket(d.ticketId, d.fromLane, to),
+      })
+      return
+    }
+    void moveTicket(d.ticketId, d.fromLane, to)
+  }
+
   /** Under a "No assign" ticket: the best people for it (100% first, then lightest workload, then higher match). */
   const bestFit = (t: TicketRecord) => {
     const m = match?.tickets[String(t.id)]
@@ -438,46 +550,54 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
           </Space>
 
           <Spin spinning={loading}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, overflowX: 'auto', paddingTop: 16, paddingBottom: 12 }}>
-              {lanes.map((lane) => {
-                const isPool = lane.key === 'unassigned'
-                return (
-                  <div key={lane.key} style={{ width: 300, flexShrink: 0 }}>
-                    {isPool ? (
-                      <div style={{ borderRadius: 12, padding: '10px 12px', background: '#fff7e6', border: '1px solid #ffd591' }}>
-                        <Flex justify="space-between" align="center">
-                          <Text strong style={{ fontSize: 15 }}>{lane.title}</Text>
-                          <Badge count={lane.total ?? lane.tickets.length} showZero overflowCount={9999} style={{ backgroundColor: '#fa8c16', boxShadow: 'none' }} />
-                        </Flex>
-                        {lane.total != null && lane.total > lane.tickets.length ? (
-                          <Text type="secondary" style={{ fontSize: 12 }}>Showing the first {lane.tickets.length} of {lane.total}. Pick a company to narrow.</Text>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <PersonHeader lane={lane} agent={agentById.get(lane.key)} status={people[lane.key]} count={lane.tickets.length} />
-                    )}
-                    <Flex vertical gap={8} style={{ marginTop: 10, maxHeight: 'calc(100vh - 360px)', overflowY: 'auto', paddingRight: 2 }}>
-                      {lane.tickets.length === 0 ? (
-                        <Empty
-                          image={Empty.PRESENTED_IMAGE_SIMPLE}
-                          description="No tickets"
-                        />
+            <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, overflowX: 'auto', paddingTop: 16, paddingBottom: 12 }}>
+                {lanes.map((lane) => {
+                  const isPool = lane.key === 'unassigned'
+                  return (
+                    <LaneColumn key={lane.key} laneKey={lane.key} isPool={isPool}>
+                      {isPool ? (
+                        <div style={{ borderRadius: 12, padding: '10px 12px', background: '#fff7e6', border: '1px solid #ffd591' }}>
+                          <Flex justify="space-between" align="center">
+                            <Text strong style={{ fontSize: 15 }}>{lane.title}</Text>
+                            <Badge count={lane.total ?? lane.tickets.length} showZero overflowCount={9999} style={{ backgroundColor: '#fa8c16', boxShadow: 'none' }} />
+                          </Flex>
+                          {lane.total != null && lane.total > lane.tickets.length ? (
+                            <Text type="secondary" style={{ fontSize: 12 }}>Showing the first {lane.tickets.length} of {lane.total}. Pick a company to narrow.</Text>
+                          ) : null}
+                        </div>
                       ) : (
-                        lane.tickets.map((t) => (
-                          <TicketCard
-                            key={`${lane.key}-${t.id}`}
-                            t={t}
-                            stat={stats.get(t.id)}
-                            hint={isPool ? bestFit(t) : fitFor(t, lane.key)}
-                            highlight={t.id === highlightId}
-                          />
-                        ))
+                        <PersonHeader lane={lane} agent={agentById.get(lane.key)} status={people[lane.key]} count={lane.tickets.length} />
                       )}
-                    </Flex>
+                      <Flex vertical gap={8} style={{ marginTop: 10, minHeight: 80, maxHeight: 'calc(100vh - 380px)', overflowY: 'auto', paddingRight: 2 }}>
+                        {lane.tickets.length === 0 ? (
+                          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No tickets. Drop a ticket here." />
+                        ) : (
+                          lane.tickets.map((t) => (
+                            <DraggableTicket key={`${lane.key}-${t.id}`} laneKey={lane.key} t={t}>
+                              <TicketCard
+                                t={t}
+                                stat={stats.get(t.id)}
+                                hint={isPool ? bestFit(t) : fitFor(t, lane.key)}
+                                highlight={t.id === highlightId}
+                              />
+                            </DraggableTicket>
+                          ))
+                        )}
+                      </Flex>
+                    </LaneColumn>
+                  )
+                })}
+              </div>
+              <DragOverlay>
+                {dragging ? (
+                  <div style={{ width: 290, padding: '8px 10px', borderRadius: 10, background: '#fff', border: '2px solid #1677ff', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>#{dragging.id}</Text>
+                    <Text strong style={{ display: 'block' }}>{dragging.title}</Text>
                   </div>
-                )
-              })}
-            </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           </Spin>
         </Content>
       </AdminMainColumn>
