@@ -312,19 +312,20 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                         col.tickets.map((t) => {
                           const hint = col.key === 'unassigned' ? bestFit(t) : fitFor(t, col.key)
                           return (
-                            <div key={`${col.key}-${t.id}`}>
-                              <KanbanCard
-                                ticket={t}
-                                dragDisabled
-                                onEdit={openTicket}
-                                onDelete={() => {}}
-                                trackerStat={stats.get(t.id)}
-                              />
-                              <Flex gap={8} wrap align="center" style={{ margin: '-2px 12px 10px' }}>
-                                {statusTag(t)}
-                                {hint}
-                              </Flex>
-                            </div>
+                            <KanbanCard
+                              key={`${col.key}-${t.id}`}
+                              ticket={t}
+                              dragDisabled
+                              onEdit={openTicket}
+                              onDelete={() => {}}
+                              trackerStat={stats.get(t.id)}
+                              footer={
+                                <Flex gap={8} wrap align="center">
+                                  {statusTag(t)}
+                                  {hint}
+                                </Flex>
+                              }
+                            />
                           )
                         })
                       )}

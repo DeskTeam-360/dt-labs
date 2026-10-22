@@ -61,6 +61,8 @@ interface KanbanCardProps {
   onFilterByCompany?: (companyId: string) => void
   allStatusColumns?: StatusColumn[]
   trackerStat?: TicketTrackerStat
+  /** Extra content shown at the bottom inside the card (used by Team Pool). */
+  footer?: ReactNode
 }
 
 export default function KanbanCard({
@@ -76,6 +78,7 @@ export default function KanbanCard({
   onFilterByCompany,
   allStatusColumns,
   trackerStat,
+  footer,
 }: KanbanCardProps) {
   const statusCols = allStatusColumns?.length ? allStatusColumns : DEFAULT_ALL_STATUS_COLUMNS
   const statusCol = statusCols.find((c) => c.id === ticket.status)
@@ -335,6 +338,14 @@ export default function KanbanCard({
           )}
         </Flex>
 
+        {footer ? (
+          <div
+            style={{ marginTop: 10 }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {footer}
+          </div>
+        ) : null}
       </Card>
     </div>
   )
