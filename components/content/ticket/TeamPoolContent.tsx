@@ -3,7 +3,7 @@
 import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
 import { DndContext } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Alert, Badge, Button, Card, Empty, Flex, Input, Layout, message, Select, Space, Typography } from 'antd'
+import { Alert, Badge, Button, Card, Empty, Flex, Input, Layout, message, Select, Space, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { TicketTrackerStat } from '@/app/api/tickets/ticket-time-stats/route'
@@ -11,7 +11,7 @@ import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import KanbanCard from '@/components/ticket/list/KanbanCard'
-import type { TicketRecord } from '@/components/ticket/list/types'
+import { DEFAULT_ALL_STATUS_COLUMNS, type TicketRecord } from '@/components/ticket/list/types'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -21,6 +21,7 @@ const BOARD_STATUSES = 'open,received,working_team'
 
 type CompanyOption = { id: string; name: string; plan_hours: number; spent_hours: number; has_active_timer: boolean }
 type Agent = { id: string; name: string; position: string | null }
+type Match = { tickets: Record<string, { has_skills: boolean; users: Record<string, number> }>; load: Record<string, number> }
 type Column = { key: string; title: string; subtitle?: string; color: string; tickets: TicketRecord[] }
 
 const agentLabel = (a: Agent) => (a.position ? `${a.name} - ${a.position}` : a.name)
@@ -44,6 +45,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
   const [loading, setLoading] = useState(false)
   const [columns, setColumns] = useState<Column[]>([])
   const [stats, setStats] = useState<Map<number, TicketTrackerStat>>(new Map())
+  const [match, setMatch] = useState<Match | null>(null)
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
@@ -128,6 +130,17 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
       } else {
         setStats(new Map())
       }
+
+      // Skill match between each ticket and the people on the board (people = every column except No assign).
+      const personIds = cols.filter((c) => c.key !== 'unassigned').map((c) => c.key)
+      if (ids.length && personIds.length) {
+        fetch(`/api/board/skill-match?ticket_ids=${ids.join(',')}&user_ids=${personIds.join(',')}`, { credentials: 'include' })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((j: Match | null) => setMatch(j))
+          .catch(() => setMatch(null))
+      } else {
+        setMatch(null)
+      }
     } catch (e) {
       message.error((e as Error).message)
       setColumns([])
@@ -141,6 +154,51 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
     if (agents.length === 0 && agentIds.length > 0) return
     void load()
   }, [load, agents.length, agentIds.length])
+
+  /** Under a "No assign" card: the best people for it (100% first, then lightest workload, then higher match). */
+  const bestFit = (t: TicketRecord) => {
+    const m = match?.tickets[String(t.id)]
+    if (!m?.has_skills) return null
+    const load = (id: string) => match?.load[id] ?? 0
+    const people = Object.entries(m.users)
+      .filter(([, pct]) => pct >= 50)
+      .sort(([ia, pa], [ib, pb]) => Number(pb === 100) - Number(pa === 100) || load(ia) - load(ib) || pb - pa)
+      .slice(0, 3)
+    if (people.length === 0) return <Text type="secondary" style={{ fontSize: 12 }}>No one on the board matches 50% of the skills</Text>
+    return (
+      <Flex gap={4} wrap align="center">
+        <Text type="secondary" style={{ fontSize: 12 }}>Best fit:</Text>
+        {people.map(([id, pct]) => (
+          <Tag key={id} color={pct === 100 ? 'green' : 'gold'} style={{ margin: 0 }}>
+            {(agentById.get(id)?.name ?? 'Agent').split(' ')[0]} {pct}%
+          </Tag>
+        ))}
+      </Flex>
+    )
+  }
+
+  /** Under a card inside a person's column: how well the ticket fits that person. */
+  const fitFor = (t: TicketRecord, userId: string) => {
+    const m = match?.tickets[String(t.id)]
+    if (!m?.has_skills) return null
+    const pct = m.users[userId]
+    if (pct == null) return null
+    return (
+      <Tag color={pct === 100 ? 'green' : pct >= 50 ? 'gold' : 'default'} style={{ margin: 0 }}>
+        Skill match {pct}%
+      </Tag>
+    )
+  }
+
+  /** The ticket's current status (the board columns are people, so the card has to say it). */
+  const statusTag = (t: TicketRecord) => {
+    const col = DEFAULT_ALL_STATUS_COLUMNS.find((c) => c.id === t.status)
+    return (
+      <Tag style={{ margin: 0, backgroundColor: col?.color ?? '#d9d9d9', color: '#262626', border: 'none', fontWeight: 600 }}>
+        {col?.title ?? t.status}
+      </Tag>
+    )
+  }
 
   const openTicket = (t: TicketRecord) => window.open(`/tickets/${t.id}`, '_blank', 'noopener')
 
@@ -251,16 +309,24 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                       {col.tickets.length === 0 ? (
                         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No tickets" />
                       ) : (
-                        col.tickets.map((t) => (
-                          <KanbanCard
-                            key={`${col.key}-${t.id}`}
-                            ticket={t}
-                            dragDisabled
-                            onEdit={openTicket}
-                            onDelete={() => {}}
-                            trackerStat={stats.get(t.id)}
-                          />
-                        ))
+                        col.tickets.map((t) => {
+                          const hint = col.key === 'unassigned' ? bestFit(t) : fitFor(t, col.key)
+                          return (
+                            <div key={`${col.key}-${t.id}`}>
+                              <KanbanCard
+                                ticket={t}
+                                dragDisabled
+                                onEdit={openTicket}
+                                onDelete={() => {}}
+                                trackerStat={stats.get(t.id)}
+                              />
+                              <Flex gap={8} wrap align="center" style={{ margin: '-2px 12px 10px' }}>
+                                {statusTag(t)}
+                                {hint}
+                              </Flex>
+                            </div>
+                          )
+                        })
                       )}
                     </SortableContext>
                   </Card>
