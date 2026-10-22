@@ -12,6 +12,7 @@ import {
   pgTable,
   primaryKey,
   text,
+  time,
   timestamp,
   unique,
   uniqueIndex,
@@ -48,6 +49,8 @@ export const users = pgTable('users', {
   /** First / last working day (WIB calendar date). Used for team capacity. */
   joinedAt: date('joined_at'),
   leftAt: date('left_at'),
+  /** The shift this person is on right now (catalog: shifts). */
+  shiftId: uuid('shift_id'),
   metadata: jsonb('metadata'),
   companyId: uuid('company_id'),
   createdAt: ts('created_at').notNull().defaultNow(),
@@ -1000,3 +1003,14 @@ export const companyTypeSkills = pgTable(
   },
   (t) => [primaryKey({ columns: [t.companyId, t.typeId, t.skillId] })]
 )
+
+// ============ Shifts ============
+/** Work shifts (WIB). An end earlier than the start means the shift crosses midnight. */
+export const shifts = pgTable('shifts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 100 }).notNull().unique(),
+  startTime: time('start_time').notNull(),
+  endTime: time('end_time').notNull(),
+  description: text('description'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+})

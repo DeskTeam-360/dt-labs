@@ -68,6 +68,13 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const [userData, setUserData] = useState(initialUserData)
   const extraCompanies: { id: string; name: string }[] = userData.extra_companies ?? []
   const isOwnProfile = String(currentUser.id) === String(userData?.id)
+  const [shiftOptions, setShiftOptions] = useState<{ id: string; title: string; start: string; end: string; crosses_midnight: boolean }[]>([])
+  useEffect(() => {
+    fetch('/api/shifts', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => setShiftOptions(Array.isArray(rows) ? rows : []))
+      .catch(() => setShiftOptions([]))
+  }, [])
   const isCustomer = ((userData?.role ?? '').toLowerCase() === 'customer')
   const [createdTickets, setCreatedTickets] = useState<{
     rows: { id: number; title: string; status: string; ticket_type: string; created_at: string | null; company_name: string | null }[]
@@ -350,6 +357,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       locale: userData.locale || 'en',
       joined_at: userData.joined_at ? dayjs(userData.joined_at) : null,
       left_at: userData.left_at ? dayjs(userData.left_at) : null,
+      shift_id: userData.shift_id || undefined,
       is_email_verified: userData.is_email_verified || false,
     })
   }
@@ -426,6 +434,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
           ? {
               joined_at: values.joined_at ? values.joined_at.format('YYYY-MM-DD') : null,
               left_at: values.left_at ? values.left_at.format('YYYY-MM-DD') : null,
+              shift_id: values.shift_id || null,
             }
           : {}),
         is_email_verified: values.is_email_verified || false,
@@ -859,6 +868,16 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         </Form.Item>
                         {isAdmin && (
                           <>
+                            <Form.Item name="shift_id" label="Shift" extra="Times are WIB. Manage the list in Settings, Shifts.">
+                              <Select
+                                allowClear
+                                placeholder="No shift"
+                                options={shiftOptions.map((s) => ({
+                                  value: s.id,
+                                  label: `${s.title} (${s.start} - ${s.end}${s.crosses_midnight ? ', next day' : ''})`,
+                                }))}
+                              />
+                            </Form.Item>
                             <Form.Item name="joined_at" label="First working day" extra="Used for team capacity (WIB date).">
                               <DatePicker style={{ width: '100%' }} />
                             </Form.Item>
@@ -917,6 +936,21 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             <Text>{userData.timezone || 'UTC'}</Text>
                           </Space>
                         </Descriptions.Item>
+                        {!isCustomer && (
+                          <Descriptions.Item label="Shift">
+                            {(() => {
+                              const sh = shiftOptions.find((x) => x.id === userData?.shift_id)
+                              return sh ? (
+                                <Space>
+                                  <Tag color="geekblue" style={{ margin: 0 }}>{sh.title}</Tag>
+                                  <Text type="secondary">{sh.start} - {sh.end} WIB{sh.crosses_midnight ? ' (next day)' : ''}</Text>
+                                </Space>
+                              ) : (
+                                <Text type="secondary">No shift</Text>
+                              )
+                            })()}
+                          </Descriptions.Item>
+                        )}
                         {isAdmin && (
                           <>
                             <Descriptions.Item label="First working day">{userData.joined_at || '—'}</Descriptions.Item>

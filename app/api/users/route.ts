@@ -92,6 +92,7 @@ export async function GET() {
       bio: u.bio,
       timezone: u.timezone,
       locale: u.locale,
+      shift_id: u.shiftId ?? null,
       is_email_verified: u.isEmailVerified,
     }
   })

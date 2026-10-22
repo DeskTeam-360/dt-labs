@@ -27,7 +27,8 @@ let justDragged = false
 const NO_ASSIGN_LIMIT = 50
 
 type CompanyOption = { id: string; name: string; is_customer?: boolean; plan_hours: number; spent_hours: number; has_active_timer: boolean }
-type Agent = { id: string; name: string; position: string | null }
+type Agent = { id: string; name: string; position: string | null; shift_id: string | null }
+type ShiftOption = { id: string; title: string; start: string; end: string; crosses_midnight: boolean }
 type Lane = { key: string; title: string; subtitle?: string; tickets: TicketRecord[]; total?: number }
 type Match = { tickets: Record<string, { has_skills: boolean; users: Record<string, number> }>; load: Record<string, number> }
 type Active = { ticket_id: number; title: string; company: string | null; since: string }
@@ -156,17 +157,19 @@ function TicketCard({ t, stat, hint, highlight }: { t: TicketRecord; stat?: Tick
 }
 
 /** Top of a person's lane: who, duty/leave, shift, and where they are working right now. */
-function PersonHeader({ lane, agent, status, count }: { lane: Lane; agent?: Agent; status?: PersonStatus; count: number }) {
+function PersonHeader({ lane, agent, shift, status, count }: { lane: Lane; agent?: Agent; shift?: ShiftOption; status?: PersonStatus; count: number }) {
   const duty = status?.reason ? DUTY[status.reason] ?? { label: status.reason, color: 'default' } : null
   const active = status?.active ?? []
   const start = wibTime(status?.shift_start ?? null)
-  const shiftText = start ? `${start} – ${active.length ? 'now' : wibTime(status?.shift_end ?? null)}` : 'Not started yet'
+  const trackerText = start ? `${start} – ${active.length ? 'now' : wibTime(status?.shift_end ?? null)}` : 'Not started yet'
+  const shiftLabel = shift ? `${shift.title} (${shift.start} - ${shift.end}${shift.crosses_midnight ? ' +1' : ''})` : 'not set'
 
   const detail = (
     <Flex vertical gap={4} style={{ width: 280 }}>
       <Text strong>{lane.title}{agent?.position ? ` · ${agent.position}` : ''}</Text>
       <Text>Today: {duty?.label ?? 'no availability data'}{status?.capacity_hours != null ? ` (${status.capacity_hours} h planned)` : ''}</Text>
-      <Text>Shift seen from the tracker: {shiftText}</Text>
+      <Text>Shift: {shiftLabel} WIB</Text>
+      <Text>Seen from the tracker today: {trackerText}</Text>
       <Text>Tracked today: {fmtDur(status?.tracked_seconds ?? 0)}</Text>
       <Text>Open tickets: {count}</Text>
       {active.map((a) => (
@@ -198,7 +201,8 @@ function PersonHeader({ lane, agent, status, count }: { lane: Lane; agent?: Agen
             <Badge count={count} showZero style={{ backgroundColor: '#8c8c8c', boxShadow: 'none' }} />
           </Flex>
         </Flex>
-        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>Shift: {shiftText}</Text>
+        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>Shift: {shiftLabel}</Text>
+        <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Today: {trackerText}</Text>
         <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Tracked today: <Text strong style={{ fontSize: 12 }}>{fmtDur(status?.tracked_seconds ?? 0)}</Text></Text>
       </div>
     </Popover>
@@ -240,6 +244,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
   const [collapsed, setCollapsed] = useState(false)
   const [companies, setCompanies] = useState<CompanyOption[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
+  const [shifts, setShifts] = useState<ShiftOption[]>([])
   const [companyIds, setCompanyIds] = useState<string[]>([])
   const [agentIds, setAgentIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
@@ -259,13 +264,17 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
       .then((r) => (r.ok ? r.json() : { companies: [] }))
       .then((j: { companies?: CompanyOption[] }) => setCompanies(j.companies ?? []))
       .catch(() => setCompanies([]))
+    fetch('/api/shifts', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: ShiftOption[]) => setShifts(Array.isArray(rows) ? rows : []))
+      .catch(() => setShifts([]))
     fetch('/api/users', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
-      .then((rows: { id: string; full_name?: string | null; email: string; position?: string | null; role?: string | null; status?: string | null }[]) =>
+      .then((rows: { id: string; full_name?: string | null; email: string; position?: string | null; role?: string | null; status?: string | null; shift_id?: string | null }[]) =>
         setAgents(
           (Array.isArray(rows) ? rows : [])
             .filter((u) => ['admin', 'manager', 'staff'].includes((u.role ?? '').toLowerCase()) && (u.status ?? 'active') === 'active')
-            .map((u) => ({ id: u.id, name: u.full_name || u.email, position: u.position ?? null }))
+            .map((u) => ({ id: u.id, name: u.full_name || u.email, position: u.position ?? null, shift_id: u.shift_id ?? null }))
             .sort((a, b) => a.name.localeCompare(b.name))
         )
       )
@@ -564,7 +573,13 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                           ) : null}
                         </div>
                       ) : (
-                        <PersonHeader lane={lane} agent={agentById.get(lane.key)} status={people[lane.key]} count={lane.tickets.length} />
+                        <PersonHeader
+                          lane={lane}
+                          agent={agentById.get(lane.key)}
+                          shift={shifts.find((x) => x.id === agentById.get(lane.key)?.shift_id)}
+                          status={people[lane.key]}
+                          count={lane.tickets.length}
+                        />
                       )}
                       <Flex vertical gap={8} style={{ marginTop: 10, minHeight: 80, maxHeight: 'calc(100vh - 380px)', overflowY: 'auto', paddingRight: 2 }}>
                         {lane.tickets.length === 0 ? (

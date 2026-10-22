@@ -389,6 +389,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
+                {isAdmin(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Shifts"
+                      description="Work shifts (WIB) that can be given to people"
+                      href="/settings/shifts"
+                      icon={<ClockCircleOutlined />}
+                    />
+                  </Col>
+                )}
                 {canAccessTeams(role) && (
                   <Col xs={24} sm={12} md={8}>
                     <HubTile

@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
 import { getExtraCompanies } from '@/lib/customer-company'
-import { companies, companyUsers, db, emailIntegrations, messageTemplates, users } from '@/lib/db'
+import { companies, companyUsers, db, emailIntegrations, messageTemplates, shifts, users } from '@/lib/db'
 import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-template-merge'
 import {
   actorRoleFromSession,
@@ -323,6 +323,7 @@ export async function GET(
     locale: u.locale,
     joined_at: u.joinedAt ?? null,
     left_at: u.leftAt ?? null,
+    shift_id: u.shiftId ?? null,
     is_email_verified: u.isEmailVerified,
   })
 }
@@ -449,6 +450,15 @@ export async function PATCH(
       updateData[col] = v
       capacityDatesChanged = true
     }
+  }
+  // Shift (admin only): must be a shift from the catalog, or empty for none.
+  if (isAdmin && body.shift_id !== undefined) {
+    const sid = body.shift_id ? String(body.shift_id) : null
+    if (sid) {
+      const [exists] = await db.select({ id: shifts.id }).from(shifts).where(eq(shifts.id, sid)).limit(1)
+      if (!exists) return NextResponse.json({ error: 'Shift not found' }, { status: 400 })
+    }
+    updateData.shiftId = sid
   }
   if (body.locale !== undefined) updateData.locale = body.locale || 'en'
   if (body.is_email_verified !== undefined) updateData.isEmailVerified = body.is_email_verified
