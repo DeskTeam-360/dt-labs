@@ -243,6 +243,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
   const [companies, setCompanies] = useState<CompanyOption[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
   const [shifts, setShifts] = useState<ShiftOption[]>([])
+  const [everyone, setEveryone] = useState<Record<string, PersonStatus>>({})
   const [companyIds, setCompanyIds] = useState<string[]>([])
   const [agentIds, setAgentIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
@@ -278,6 +279,37 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
       )
       .catch(() => setAgents([]))
   }, [])
+
+  useEffect(() => {
+    if (agents.length === 0) return
+    fetch(`/api/board/people-status?user_ids=${agents.map((a) => a.id).join(',')}`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { people: {} }))
+      .then((j: { people?: Record<string, PersonStatus> }) => setEveryone(j.people ?? {}))
+      .catch(() => setEveryone({}))
+  }, [agents])
+
+  /** Quick select: everyone with the same position, or on the same shift, in one click. */
+  const quickGroups = useMemo(() => {
+    const build = (keyOf: (a: Agent) => string | null) => {
+      const m = new Map<string, string[]>()
+      for (const a of agents) {
+        const k = keyOf(a)
+        if (!k) continue
+        const list = m.get(k) ?? []
+        list.push(a.id)
+        m.set(k, list)
+      }
+      return [...m.entries()].sort(([x], [y]) => x.localeCompare(y)).map(([label, ids]) => ({ label, ids }))
+    }
+    return {
+      positions: build((a) => a.position?.trim() || null),
+      shifts: build((a) => shifts.find((x) => x.id === a.shift_id)?.title ?? null),
+    }
+  }, [agents, shifts])
+
+  /** Adds the whole group to the selection, or removes it again when every member is already selected. */
+  const toggleGroup = (ids: string[]) =>
+    setAgentIds((cur) => (ids.every((id) => cur.includes(id)) ? cur.filter((id) => !ids.includes(id)) : [...new Set([...cur, ...ids])]))
 
   const agentById = useMemo(() => new Map(agents.map((a) => [a.id, a])), [agents])
 
@@ -532,7 +564,31 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                   maxTagCount="responsive"
                   value={agentIds}
                   onChange={setAgentIds}
-                  options={agents.map((a) => ({ value: a.id, label: agentLabel(a) }))}
+                  options={agents.map((a) => ({ value: a.id, label: agentLabel(a), agent: a }))}
+                  optionRender={(o) => {
+                    const a = (o.data as { agent: Agent }).agent
+                    const st = everyone[a.id]
+                    const duty = st?.reason ? DUTY[st.reason] ?? { label: st.reason, color: 'default' } : null
+                    const shift = shifts.find((x) => x.id === a.shift_id)
+                    const started = wibTime(st?.shift_start ?? null)
+                    const working = st?.reason === 'work' || st?.reason === 'piket'
+                    return (
+                      <Flex justify="space-between" align="center" gap={8}>
+                        <span>{agentLabel(a)}</span>
+                        <Flex gap={4} align="center">
+                          {shift ? <Tag color="geekblue" style={{ margin: 0 }}>{shift.title}</Tag> : null}
+                          {duty ? <Tag color={duty.color} style={{ margin: 0 }}>{duty.label}</Tag> : null}
+                          {working ? (
+                            started ? (
+                              <Text style={{ fontSize: 12, color: GREEN }}>in {started}</Text>
+                            ) : (
+                              <Text type="secondary" style={{ fontSize: 12 }}>not in yet</Text>
+                            )
+                          ) : null}
+                        </Flex>
+                      </Flex>
+                    )
+                  }}
                 />
               </div>
               <Input.Search
@@ -548,6 +604,26 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
               />
               <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>Reload</Button>
             </Flex>
+
+            {quickGroups.positions.length + quickGroups.shifts.length > 0 ? (
+              <Flex gap={6} wrap align="center">
+                <Text type="secondary" style={{ fontSize: 12 }}>Quick select:</Text>
+                {quickGroups.positions.map((g) => (
+                  <Tag.CheckableTag key={`p-${g.label}`} checked={g.ids.every((id) => agentIds.includes(id))} onChange={() => toggleGroup(g.ids)}>
+                    {g.label} ({g.ids.length})
+                  </Tag.CheckableTag>
+                ))}
+                {quickGroups.positions.length > 0 && quickGroups.shifts.length > 0 ? <Text type="secondary">|</Text> : null}
+                {quickGroups.shifts.map((g) => (
+                  <Tag.CheckableTag key={`s-${g.label}`} checked={g.ids.every((id) => agentIds.includes(id))} onChange={() => toggleGroup(g.ids)}>
+                    Shift {g.label} ({g.ids.length})
+                  </Tag.CheckableTag>
+                ))}
+                {agentIds.length > 0 ? (
+                  <Button type="link" size="small" onClick={() => setAgentIds([])}>Clear</Button>
+                ) : null}
+              </Flex>
+            ) : null}
 
             {notFound ? <Alert type="info" showIcon title={`Ticket ${activeSearch} was not found.`} /> : null}
             {activeSearch && !notFound && searchNote ? <Alert type="info" showIcon title={searchNote} /> : null}
