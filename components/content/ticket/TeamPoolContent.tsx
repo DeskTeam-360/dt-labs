@@ -191,18 +191,16 @@ function PersonHeader({ lane, agent, shift, status, count }: { lane: Lane; agent
           border: isActive ? `2px solid ${GREEN}` : '1px solid #e8e8e8',
         }}
       >
-        <Flex justify="space-between" align="flex-start" gap={8}>
-          <Flex vertical gap={0} style={{ minWidth: 0 }}>
-            <Text strong style={{ fontSize: 15 }}>{lane.title}</Text>
-            {lane.subtitle ? <Text type="secondary" style={{ fontSize: 12 }}>{lane.subtitle}</Text> : null}
-          </Flex>
-          <Flex vertical align="flex-end" gap={4}>
-            {duty ? <Tag color={duty.color} style={{ margin: 0 }}>{duty.label}</Tag> : null}
-            <Badge count={count} showZero style={{ backgroundColor: '#8c8c8c', boxShadow: 'none' }} />
-          </Flex>
+        <Flex justify="space-between" align="center" gap={6}>
+          <Text style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <Text strong style={{ fontSize: 14 }}>{lane.title.split(' ')[0]}</Text>
+            {lane.subtitle ? <Text type="secondary" style={{ fontSize: 11 }}> · {lane.subtitle}</Text> : null}
+          </Text>
+          <Tag color={duty?.color ?? 'default'} style={{ margin: 0, flexShrink: 0 }}>
+            {duty ? `${duty.label}: ${count}` : count}
+          </Tag>
         </Flex>
-        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>Shift: {shiftLabel}</Text>
-        <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Today: {trackerText}</Text>
+        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>Shift: {shift?.title ?? 'not set'}</Text>
         <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Tracked today: <Text strong style={{ fontSize: 12 }}>{fmtDur(status?.tracked_seconds ?? 0)}</Text></Text>
       </div>
     </Popover>
