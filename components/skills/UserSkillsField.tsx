@@ -96,7 +96,9 @@ export default function UserSkillsField({ userId, readOnly = false }: { userId: 
             loading={saving}
             value={null}
             options={addable.map((s) => ({ value: s.id, label: s.name }))}
-            onSelect={(id: string) => apply([...items, { skill_id: id, level: DEFAULT_LEVEL }])}
+            onSelect={(id: string | null) => {
+              if (id) apply([...items, { skill_id: id, level: DEFAULT_LEVEL }])
+            }}
           />
           <Tooltip title={LEVEL_GUIDE}>
             <Text type="secondary" style={{ fontSize: 12, cursor: 'help' }}>How are levels scored?</Text>

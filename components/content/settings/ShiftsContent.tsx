@@ -1,7 +1,7 @@
 'use client'
 
-import { ArrowLeftOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
-import { Alert, Button, Form, Input, Layout, message, Modal, Popconfirm, Space, Table, Tag, TimePicker, Typography } from 'antd'
+import { ArrowLeftOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons'
+import { Alert, Button, Flex, Form, Input, Layout, message, Modal, Popconfirm, Select, Space, Table, Tag, TimePicker, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -22,6 +22,8 @@ type Shift = {
   people: number
 }
 
+type Person = { id: string; name: string; position: string | null; shift_id: string | null }
+
 type FormValues = { title: string; start: Dayjs; end: Dayjs; description?: string }
 
 const toTime = (hhmm: string) => dayjs(`2000-01-01 ${hhmm}`)
@@ -34,6 +36,65 @@ export default function ShiftsContent({ user }: { user: { id: string; email?: st
   const [editing, setEditing] = useState<Shift | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm<FormValues>()
+  const [people, setPeople] = useState<Person[]>([])
+  const [addTo, setAddTo] = useState<Shift | null>(null)
+  const [picked, setPicked] = useState<string[]>([])
+  const [adding, setAdding] = useState(false)
+
+  const loadPeople = useCallback(async () => {
+    try {
+      const res = await fetch('/api/users', { credentials: 'include' })
+      const list = res.ok ? ((await res.json()) as { id: string; full_name?: string | null; email: string; position?: string | null; role?: string | null; status?: string | null; shift_id?: string | null }[]) : []
+      setPeople(
+        (Array.isArray(list) ? list : [])
+          .filter((u) => ['admin', 'manager', 'staff'].includes((u.role ?? '').toLowerCase()) && (u.status ?? 'active') === 'active')
+          .map((u) => ({ id: u.id, name: u.full_name || u.email, position: u.position ?? null, shift_id: u.shift_id ?? null }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      )
+    } catch {
+      setPeople([])
+    }
+  }, [])
+
+  const shiftTitle = (id: string | null) => rows.find((r) => r.id === id)?.title ?? null
+  const membersOf = (id: string) => people.filter((p) => p.shift_id === id)
+
+  /** People picked who are on a different shift today: they will be moved. */
+  const willMove = people.filter((p) => picked.includes(p.id) && p.shift_id && p.shift_id !== addTo?.id)
+
+  const openAdd = (sh: Shift) => {
+    setAddTo(sh)
+    setPicked([])
+  }
+
+  const addPeople = async () => {
+    if (!addTo || picked.length === 0) return
+    setAdding(true)
+    try {
+      const data = (await call(`/api/shifts/${addTo.id}/members`, 'POST', { user_ids: picked })) as { added: number; moved: { name: string; from_shift: string }[] }
+      message.success(
+        data.moved.length > 0
+          ? `${data.added} added to ${addTo.title}. Moved: ${data.moved.map((m) => `${m.name} (from ${m.from_shift})`).join(', ')}`
+          : `${data.added} added to ${addTo.title}`
+      )
+      setAddTo(null)
+      await Promise.all([load(), loadPeople()])
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const removePerson = async (sh: Shift, p: Person) => {
+    try {
+      await call(`/api/shifts/${sh.id}/members?user_id=${p.id}`, 'DELETE')
+      message.success(`${p.name} removed from ${sh.title}`)
+      await Promise.all([load(), loadPeople()])
+    } catch (e) {
+      message.error((e as Error).message)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -47,7 +108,8 @@ export default function ShiftsContent({ user }: { user: { id: string; email?: st
 
   useEffect(() => {
     void load()
-  }, [load])
+    void loadPeople()
+  }, [load, loadPeople])
 
   const call = async (url: string, method: string, body?: unknown) => {
     const res = await fetch(url, {
@@ -128,6 +190,18 @@ export default function ShiftsContent({ user }: { user: { id: string; email?: st
               loading={loading}
               dataSource={rows}
               pagination={false}
+              expandable={{
+                rowExpandable: (r) => membersOf(r.id).length > 0,
+                expandedRowRender: (r) => (
+                  <Flex gap={6} wrap>
+                    {membersOf(r.id).map((m) => (
+                      <Tag key={m.id} closable onClose={(e) => { e.preventDefault(); void removePerson(r, m) }} style={{ margin: 0 }}>
+                        {m.name}{m.position ? ` - ${m.position}` : ''}
+                      </Tag>
+                    ))}
+                  </Flex>
+                ),
+              }}
               locale={{ emptyText: 'No shifts yet. Add the first one.' }}
               columns={[
                 { title: 'Title', dataIndex: 'title', width: 200, render: (v: string) => <Text strong>{v}</Text> },
@@ -149,10 +223,11 @@ export default function ShiftsContent({ user }: { user: { id: string; email?: st
                 {
                   title: '',
                   key: 'actions',
-                  width: 110,
+                  width: 140,
                   align: 'right',
                   render: (_: unknown, r) => (
                     <Space>
+                      <Button size="small" icon={<UserAddOutlined />} onClick={() => openAdd(r)} title="Add people" />
                       <Button size="small" icon={<EditOutlined />} onClick={() => openForm(r)} />
                       <Popconfirm
                         title="Delete this shift?"
@@ -168,6 +243,52 @@ export default function ShiftsContent({ user }: { user: { id: string; email?: st
               ]}
             />
           </Space>
+
+          <Modal
+            title={addTo ? `Add people to ${addTo.title}` : 'Add people'}
+            open={!!addTo}
+            onCancel={() => setAddTo(null)}
+            onOk={() => void addPeople()}
+            okText={willMove.length > 0 ? `Add and move ${willMove.length}` : 'Add'}
+            okButtonProps={{ disabled: picked.length === 0 }}
+            confirmLoading={adding}
+            destroyOnHidden
+          >
+            <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+              <Select
+                mode="multiple"
+                showSearch
+                allowClear
+                autoFocus
+                optionFilterProp="label"
+                placeholder="Pick people"
+                style={{ width: '100%' }}
+                value={picked}
+                onChange={setPicked}
+                options={people
+                  .filter((p) => p.shift_id !== addTo?.id)
+                  .map((p) => ({ value: p.id, label: p.position ? `${p.name} - ${p.position}` : p.name, person: p }))}
+                optionRender={(o) => {
+                  const p = (o.data as { person: Person }).person
+                  const cur = shiftTitle(p.shift_id)
+                  return (
+                    <Flex justify="space-between" align="center" gap={8}>
+                      <span>{p.position ? `${p.name} - ${p.position}` : p.name}</span>
+                      {cur ? <Tag color="geekblue" style={{ margin: 0 }}>{cur}</Tag> : <Text type="secondary" style={{ fontSize: 12 }}>no shift</Text>}
+                    </Flex>
+                  )
+                }}
+              />
+              {willMove.length > 0 ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  title={`${willMove.length} ${willMove.length === 1 ? 'person is' : 'people are'} on another shift and will be moved`}
+                  description={willMove.map((p) => `${p.name} (${shiftTitle(p.shift_id)} to ${addTo?.title})`).join(', ')}
+                />
+              ) : null}
+            </Space>
+          </Modal>
 
           <Modal
             title={editing ? 'Edit shift' : 'Add shift'}
