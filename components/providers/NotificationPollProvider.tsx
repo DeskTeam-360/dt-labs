@@ -19,6 +19,7 @@ export type TicketNotificationItem = {
   createdAt: string | null
   actorUserId: string
   actorName: string
+  actorAvatarUrl?: string | null
 }
 
 type Ctx = {

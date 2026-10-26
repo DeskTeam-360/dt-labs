@@ -1,8 +1,8 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { db, ticketNotifications } from '@/lib/db'
+import { db, ticketNotifications, users } from '@/lib/db'
 
 /** How many notifications the bell shows (newest first). */
 const LIMIT = 5
@@ -28,6 +28,12 @@ export async function GET() {
         .where(and(eq(ticketNotifications.userId, uid), eq(ticketNotifications.read, false))),
     ])
 
+    const actorIds = [...new Set(rows.map((r) => r.actorUserId).filter((v): v is string => Boolean(v)))]
+    const avatarRows = actorIds.length
+      ? await db.select({ id: users.id, avatarUrl: users.avatarUrl }).from(users).where(inArray(users.id, actorIds))
+      : []
+    const avatarById = new Map(avatarRows.map((a) => [a.id, a.avatarUrl]))
+
     const items = rows.map((r) => ({
       id: r.id,
       ticketId: r.ticketId,
@@ -39,6 +45,7 @@ export async function GET() {
       createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
       actorUserId: r.actorUserId ?? '',
       actorName: r.actorName,
+      actorAvatarUrl: (r.actorUserId ? avatarById.get(r.actorUserId) : null) ?? null,
     }))
     return NextResponse.json({ items, unread_total: unread })
   } catch {
