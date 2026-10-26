@@ -35,12 +35,12 @@ import {
   TICKETS_LIST_SORT_ORDER,
 } from './types'
 
-type ColKey = 'company' | 'priority' | 'type' | 'tags' | 'due_date' | 'team' | 'status' | 'updated_at'
+type ColKey = 'company' | 'priority' | 'type' | 'tags' | 'due_date' | 'team' | 'status' | 'created_at' | 'updated_at'
 
-const ALL_COL_KEYS: ColKey[] = ['company', 'priority', 'type', 'tags', 'due_date', 'team', 'status', 'updated_at']
+const ALL_COL_KEYS: ColKey[] = ['company', 'priority', 'type', 'tags', 'due_date', 'team', 'status', 'created_at', 'updated_at']
 const COL_LABELS: Record<ColKey, string> = {
   company: 'Company', priority: 'Priority', type: 'Type',
-  tags: 'Tags', due_date: 'Due date', team: 'Team', status: 'Status', updated_at: 'Last update',
+  tags: 'Tags', due_date: 'Due date', team: 'Team', status: 'Status', created_at: 'Date created', updated_at: 'Last update',
 }
 const LS_KEY = 'tickets_list_col_config'
 
@@ -100,6 +100,7 @@ const SORTABLE_COLUMN_FIELDS: Partial<Record<string, TicketSortField>> = {
   due_date: 'due_date',
   team: 'team',
   status: 'status',
+  created_at: 'created_at',
   updated_at: 'updated_at',
 }
 
@@ -297,6 +298,17 @@ export default function TicketsListView({
         record.team_name
           ? <Tag style={kanbanTagStyle({ fillHex: KANBAN_SEMANTIC_BLUE })}>{record.team_name}</Tag>
           : '—',
+    },
+    created_at: {
+      title: 'Date created', dataIndex: 'created_at', key: 'created_at', width: 160,
+      render: (_: unknown, record: TicketRecord) =>
+        record.created_at ? (
+          <span title={new Date(record.created_at).toLocaleString()} style={{ fontSize: 12, color: '#8c8c8c' }}>
+            {new Date(record.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+            {' '}
+            {new Date(record.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        ) : '—',
     },
     updated_at: {
       title: 'Last update', dataIndex: 'updated_at', key: 'updated_at', width: 160,
