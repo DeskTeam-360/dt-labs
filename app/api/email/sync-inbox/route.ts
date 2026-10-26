@@ -114,6 +114,9 @@ function escapeIlike(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
 }
 
+/** Same company + same subject within this window = the same email delivered twice, not a new request. */
+const DUPLICATE_SUBJECT_WINDOW_MS = 15 * 60 * 1000
+
 /** Normalize subject for dedup: strip Re:/Fw:, trim, lowercase */
 function normalizeSubject(s: string): string {
   return s.replace(/^(Re:\s*|Fwd?:\s*)+/i, '').trim().toLowerCase()
@@ -1200,7 +1203,9 @@ export async function POST(request: NextRequest) {
 
         if (!existingTicketId && ticketCompanyId) {
           const normSubj = normalizeSubject(subject)
-          const since = new Date(Date.now() - 48 * 60 * 60 * 1000)
+          // Only emails that arrive almost together count as the same request (e.g. one mail sent to several addresses).
+          // A request sent again later, even with the same subject, becomes its own ticket.
+          const since = new Date(Date.now() - DUPLICATE_SUBJECT_WINDOW_MS)
           const dupBySubject = await db
             .select({ id: tickets.id, title: tickets.title })
             .from(tickets)

@@ -210,6 +210,20 @@ export default function TicketNotificationBell() {
           ))}
         </div>
       )}
+      <div style={{ borderTop: '1px solid var(--ticket-nav-icon-btn-border, #f0f0f0)', marginTop: 8, paddingTop: 8, textAlign: 'center' }}>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false)
+            router.push('/notifications')
+          }}
+          style={navControlButtonStyle({ width: '100%', justifyContent: 'center', fontWeight: 600 })}
+          onMouseEnter={hoverSurface}
+          onMouseLeave={hoverSurfaceLeave}
+        >
+          View all notifications
+        </button>
+      </div>
     </div>
   )
 

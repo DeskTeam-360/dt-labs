@@ -14,7 +14,7 @@ import TicketsKanbanView from '@/components/ticket/list/TicketsKanbanView'
 import TicketsListView from '@/components/ticket/list/TicketsListView'
 import TicketsRoundRobinView from '@/components/ticket/list/TicketsRoundRobinView'
 import { useTicketsData } from '@/components/ticket/list/useTicketsData'
-import { canDeleteTickets } from '@/lib/auth-utils'
+import { canDeleteTickets, isAdmin } from '@/lib/auth-utils'
 import { addSavedTicketFilterPreset } from '@/lib/ticket-saved-filters'
 
 interface TicketsContentProps {
@@ -117,6 +117,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     handleDelete,
     handleBulkMoveToTrash,
     handleBulkMoveToSpam,
+    handleBulkDeletePermanently,
+    fetchAllIdsInCurrentList,
     handleSubmit,
     handleModalCancel,
     handleDragStart,
@@ -191,7 +193,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               type="warning"
               showIcon
               message="Spam tickets"
-              description="Tickets marked as spam (card view). Use the sidebar to open All tickets or Trash."
+              description="Tickets marked as spam. Tick tickets (or Select all) to move them to Trash. Use the sidebar to open All tickets or Trash."
               style={{ marginLeft: '24px', marginRight: '48px', marginBottom: '12px' }}
             />
           )}
@@ -200,7 +202,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               type="info"
               showIcon
               message="Trash tickets"
-              description="Tickets moved to trash are kept here; use the sidebar to open All tickets or Spam."
+              description={isAdmin(currentUser.role) ? 'Tickets moved to trash are kept here. Tick tickets (or Select all) to delete them permanently, which cannot be undone.' : 'Tickets moved to trash are kept here; use the sidebar to open All tickets or Spam.'}
               style={{ marginLeft: '24px', marginRight: '48px', marginBottom: '12px' }}
             />
           )}
@@ -241,6 +243,8 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
               sortOrder={sortOrder}
               onBulkMoveToSpam={!isCustomer ? handleBulkMoveToSpam : undefined}
               onBulkMoveToTrash={!isCustomer && canDeleteTicket ? handleBulkMoveToTrash : undefined}
+              onBulkDeletePermanently={!isCustomer && isAdmin(currentUser.role) ? handleBulkDeletePermanently : undefined}
+              onSelectAllMatching={!isCustomer && canDeleteTicket ? fetchAllIdsInCurrentList : undefined}
               onFilterByStatus={filterByStatusFromChip}
               onFilterByTag={filterByTagFromChip}
               onFilterByCompany={filterByCompanyFromChip}

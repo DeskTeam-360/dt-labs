@@ -75,6 +75,10 @@ interface TicketsListViewProps {
   onDelete: (id: number) => void
   onBulkMoveToSpam?: (ids: number[]) => void | Promise<void>
   onBulkMoveToTrash?: (ids: number[]) => void | Promise<void>
+  /** Trash only, admin only. */
+  onBulkDeletePermanently?: (ids: number[]) => void | Promise<void>
+  /** Ids of every ticket in the current list (all pages), for "select all". */
+  onSelectAllMatching?: () => Promise<number[]>
   onFilterByStatus?: (statusSlug: string) => void
   onFilterByTag?: (tagId: string) => void
   onFilterByCompany?: (companyId: string) => void
@@ -109,6 +113,8 @@ export default function TicketsListView({
   onDelete,
   onBulkMoveToSpam,
   onBulkMoveToTrash,
+  onBulkDeletePermanently,
+  onSelectAllMatching,
   onFilterByStatus,
   onFilterByTag,
   onFilterByCompany,
@@ -176,7 +182,8 @@ export default function TicketsListView({
     try { sessionStorage.setItem('tickets_list_page', JSON.stringify(effectivePagination)) } catch { /* ignore */ }
   }, [effectivePagination])
 
-  const bulkEnabled = !isCustomer && (onBulkMoveToSpam || onBulkMoveToTrash)
+  const bulkEnabled = !isCustomer && (onBulkMoveToSpam || onBulkMoveToTrash || onBulkDeletePermanently)
+  const [selectingAll, setSelectingAll] = useState(false)
   const inSpamFolder = filterTicketType === 'spam'
   const inTrashFolder = filterTicketType === 'trash'
   const selectedIds = selectedRowKeys.map((k) => Number(k)).filter((n) => !Number.isNaN(n))
@@ -193,6 +200,31 @@ export default function TicketsListView({
         setSelectedRowKeys([])
       },
     })
+  }
+
+  const runBulkPurge = () => {
+    if (!onBulkDeletePermanently || selectedIds.length === 0) return
+    Modal.confirm({
+      title: `Delete ${selectedIds.length} ticket(s) permanently?`,
+      content: 'This removes the tickets with their comments, attachments, time entries and history. It cannot be undone.',
+      okText: 'Delete permanently',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancel',
+      onOk: async () => {
+        await onBulkDeletePermanently(selectedIds)
+        setSelectedRowKeys([])
+      },
+    })
+  }
+
+  const selectEverything = async () => {
+    if (!onSelectAllMatching) return
+    setSelectingAll(true)
+    try {
+      setSelectedRowKeys(await onSelectAllMatching())
+    } finally {
+      setSelectingAll(false)
+    }
   }
 
   const runBulkTrash = () => {
@@ -343,16 +375,33 @@ export default function TicketsListView({
   return (
     <div style={{ width: '100%' }}>
       <Flex justify="space-between" align="center" style={{ padding: '0 24px 8px' }}>
-        {bulkEnabled && selectedIds.length > 0 ? (
+        {bulkEnabled && (selectedIds.length > 0 || inSpamFolder || inTrashFolder) ? (
           <Flex align="center" wrap="wrap" gap={8}>
-            <span style={{ color: 'var(--ant-color-text-secondary, #8c8c8c)', fontSize: 13 }}>
-              {selectedIds.length} selected
-            </span>
-            {!inSpamFolder && onBulkMoveToSpam ? (
+            {selectedIds.length > 0 ? (
+              <span style={{ color: 'var(--ant-color-text-secondary, #8c8c8c)', fontSize: 13 }}>
+                {selectedIds.length} selected
+              </span>
+            ) : (
+              <span style={{ color: 'var(--ant-color-text-secondary, #8c8c8c)', fontSize: 13 }}>
+                Tick tickets to move or delete them
+              </span>
+            )}
+            {(inSpamFolder || inTrashFolder) && onSelectAllMatching && (serverPaging?.total ?? 0) > 0 ? (
+              <Button type="link" size="small" loading={selectingAll} onClick={() => void selectEverything()}>
+                Select all {serverPaging!.total > 500 ? 'first 500' : serverPaging!.total}
+              </Button>
+            ) : null}
+            {selectedIds.length > 0 ? (
+              <Button type="link" size="small" onClick={() => setSelectedRowKeys([])}>Clear selection</Button>
+            ) : null}
+            {selectedIds.length > 0 && !inSpamFolder && onBulkMoveToSpam ? (
               <Button type="default" icon={<WarningOutlined />} onClick={runBulkSpam}>Move to spam</Button>
             ) : null}
-            {!inTrashFolder && onBulkMoveToTrash ? (
+            {selectedIds.length > 0 && !inTrashFolder && onBulkMoveToTrash ? (
               <Button type="default" icon={<InboxOutlined />} onClick={runBulkTrash}>Move to trash</Button>
+            ) : null}
+            {selectedIds.length > 0 && inTrashFolder && onBulkDeletePermanently ? (
+              <Button danger type="primary" icon={<DeleteOutlined />} onClick={runBulkPurge}>Delete permanently</Button>
             ) : null}
           </Flex>
         ) : <div />}

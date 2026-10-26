@@ -1,0 +1,15 @@
+import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
+
+import { auth } from '@/auth'
+import NotificationsContent from '@/components/content/notifications/NotificationsContent'
+
+export const metadata: Metadata = { title: 'Notifications' }
+
+export default async function NotificationsPage() {
+  const session = await auth()
+  if (!session?.user) {
+    redirect('/login')
+  }
+  return <NotificationsContent user={session.user as { id: string; email?: string | null; name?: string | null; role?: string | null }} />
+}
