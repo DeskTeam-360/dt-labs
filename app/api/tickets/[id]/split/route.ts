@@ -9,18 +9,13 @@ import { applyDefaultSkillsToTicket } from '@/lib/skills'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { assignCompanySupportTicketRank, assignCreatorSupportTicketRank } from '@/lib/ticket-company-priority-order'
 
-function esc(s: string | null | undefined): string {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
 /**
  * POST /api/tickets/[id]/split { comment_id, title? }
- * Moves one comment (a reply that is really a new request) out of this ticket into a new ticket: its text becomes the
- * description, its files move along, and it is written by the same person. A note on each ticket links the two.
+ * Makes a new ticket out of one reply (usually a customer reply that is really a new request).
+ * - The reply STAYS on this ticket and is marked "Split to #N" (a link).
+ * - The new ticket starts clean: the reply text is its description, the reply's files are linked to it, and it has no
+ *   comments. It is written by the same person and keeps this ticket's company, team and type.
+ * - No email is sent to anyone (tickets are not created through the email flow).
  * Admin, manager and staff.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -29,7 +24,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const role = ((session.user as { role?: string }).role ?? '').toLowerCase()
   if (!['admin', 'manager', 'staff'].includes(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const actorId = session.user.id
-  const actorName = session.user.name || session.user.email || 'An agent'
 
   const sourceId = parseInt((await params).id, 10)
   if (Number.isNaN(sourceId)) return NextResponse.json({ error: 'Invalid ticket ID' }, { status: 400 })
@@ -45,6 +39,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .where(and(eq(ticketComments.id, commentId), eq(ticketComments.ticketId, sourceId)))
     .limit(1)
   if (!comment) return NextResponse.json({ error: 'Comment not found on this ticket' }, { status: 404 })
+  if (comment.authorType === 'automation') return NextResponse.json({ error: 'An automation note cannot be split' }, { status: 400 })
+  if (comment.splitToTicketId) {
+    return NextResponse.json({ error: `This reply was already split to #${comment.splitToTicketId}` }, { status: 409 })
+  }
 
   const plain = comment.comment.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim()
   const requested = typeof body.title === 'string' ? body.title.trim().slice(0, 255) : ''
@@ -73,42 +71,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .returning({ id: tickets.id })
     newId = row.id
 
-    // New ticket goes to the end of its queue.
+    // The new ticket goes to the end of its queue.
     if (source.companyId) await assignCompanySupportTicketRank(tx, source.companyId, newId, 'append')
     else await assignCreatorSupportTicketRank(tx, comment.userId, newId, 'append')
 
-    // The files move with the text (same stored file, now owned by the new ticket).
+    // Linked copies of the files. The empty path means deleting one copy never removes the stored file the other uses.
     if (files.length > 0) {
       await tx.insert(ticketAttachments).values(
-        files.map((f) => ({ ticketId: newId, fileUrl: f.fileUrl, fileName: f.fileName, filePath: f.filePath, uploadedBy: f.uploadedBy }))
+        files.map((f) => ({ ticketId: newId, fileUrl: f.fileUrl, fileName: f.fileName, filePath: '', uploadedBy: f.uploadedBy }))
       )
-      await tx.delete(commentAttachments).where(eq(commentAttachments.commentId, commentId))
     }
-    await tx.delete(ticketComments).where(eq(ticketComments.id, commentId))
 
-    const link = (id: number) => `<a href="/tickets/${id}" target="_blank" rel="noopener noreferrer">#${id}</a>`
-    await tx.insert(ticketComments).values([
-      {
-        ticketId: sourceId,
-        userId: actorId,
-        comment: `<p><strong>Split into ${link(newId)}</strong> — ${esc(title)}<br><em>by ${esc(actorName)}. The reply and its files moved to the new ticket.</em></p>`,
-        visibility: 'note',
-        authorType: 'agent',
-      },
-      {
-        ticketId: newId,
-        userId: actorId,
-        comment: `<p><strong>Split from ${link(sourceId)}</strong> — ${esc(source.title)}<br><em>by ${esc(actorName)}</em></p>`,
-        visibility: 'note',
-        authorType: 'agent',
-      },
-    ])
+    // The reply stays where it is; it is only marked.
+    await tx.update(ticketComments).set({ splitToTicketId: newId }).where(eq(ticketComments.id, commentId))
   })
 
   await logTicketActivity({ ticketId: sourceId, actorUserId: actorId, actorRole: 'agent', action: 'ticket_split', metadata: { role: 'source', other_id: newId, title } })
   await logTicketActivity({ ticketId: newId, actorUserId: actorId, actorRole: 'agent', action: 'ticket_split', metadata: { role: 'new', other_id: sourceId } })
 
-  // Same start as any new ticket: default skills, then the "ticket created" rules.
+  // Same start as any new ticket (default skills, "ticket created" rules). Automation rules never send email.
   try {
     await applyDefaultSkillsToTicket(newId, source.companyId, source.typeId)
   } catch (e) {

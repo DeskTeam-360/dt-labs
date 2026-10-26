@@ -113,6 +113,7 @@ async function mapCommentRowsToClient(rows: CommentRowJoined[]) {
     created_at: r.comment.createdAt ? new Date(r.comment.createdAt).toISOString() : '',
     visibility: r.comment.visibility ?? 'reply',
     author_type: r.comment.authorType ?? 'agent',
+    split_to_ticket_id: r.comment.splitToTicketId ?? null,
     tagged_user_ids: r.comment.taggedUserIds ?? [],
     tagged_users: (r.comment.taggedUserIds ?? []).flatMap((id) => {
       const u = taggedUserById[id]

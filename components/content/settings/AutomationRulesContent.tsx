@@ -1,6 +1,6 @@
 'use client'
 
-import { DeleteOutlined, EditOutlined, PlusOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, ExperimentOutlined, PlusOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import {
   Button,
   Card,
@@ -79,6 +79,7 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
   const [filterCompany, setFilterCompany] = useState<string | null>(null)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingRule, setEditingRule] = useState<AutomationRuleRecord | null>(null)
+  const [testRule, setTestRule] = useState<AutomationRuleRecord | null>(null)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
 
@@ -243,9 +244,12 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
     {
       title: 'Actions',
       key: 'actions',
-      width: 200,
+      width: 280,
       render: (_, record) => (
         <Space>
+          <Button icon={<ExperimentOutlined />} onClick={() => setTestRule(record)}>
+            Test
+          </Button>
           <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             Edit
           </Button>
@@ -320,6 +324,27 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
                 showTotal: appTableShowTotal('rules'),
               }}
             />
+
+          <Modal
+            title={testRule ? `Test rule: ${testRule.name || `#${testRule.id}`}` : 'Test rule'}
+            open={!!testRule}
+            onCancel={() => setTestRule(null)}
+            footer={null}
+            width={720}
+            destroyOnHidden
+          >
+            {testRule ? (
+              <RuleTestPanel
+                bare
+                getRule={() => ({
+                  event_type: testRule.event_type,
+                  conditions: testRule.conditions,
+                  actions: testRule.actions,
+                  company_id: testRule.company_id,
+                })}
+              />
+            ) : null}
+          </Modal>
 
           <Modal
             title={editingRule ? 'Edit Rule' : 'Add Rule'}

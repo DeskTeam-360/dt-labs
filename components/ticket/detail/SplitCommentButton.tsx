@@ -9,7 +9,7 @@ const { Text } = Typography
 const toPlain = (html: string) =>
   html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim()
 
-/** Moves one reply out of this ticket into a new ticket (for a new request that landed in an old thread). */
+/** Makes a new ticket from one reply (a new request that landed in an old thread). The reply stays, marked. */
 export default function SplitCommentButton({ ticketId, commentId, commentHtml }: { ticketId: number; commentId: string; commentHtml: string }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
@@ -34,7 +34,7 @@ export default function SplitCommentButton({ ticketId, commentId, commentHtml }:
       message.success(`New ticket #${data.new_ticket_id} created`)
       setOpen(false)
       window.open(`/tickets/${data.new_ticket_id}`, '_blank', 'noopener')
-      // This ticket lost the reply: show it without the moved comment.
+      // Show the "Split to #N" mark on the reply.
       window.location.reload()
     } catch (e) {
       message.error((e as Error).message)
@@ -62,8 +62,8 @@ export default function SplitCommentButton({ ticketId, commentId, commentHtml }:
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
-          title="This reply moves to a new ticket"
-          description="Its text becomes the description of the new ticket and its files move with it. The new ticket keeps this ticket's company, team and type, and is written by the same person. A note on both tickets links them."
+          title="Make a new ticket from this reply"
+          description="The reply stays on this ticket and is marked Split to #(new ticket), with a link. The new ticket gets its text as the description and its files, with no comments. It keeps this ticket's company, team and type, is written by the same person, and no email is sent."
         />
         <Text strong>Title of the new ticket</Text>
         <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255} style={{ marginTop: 4 }} />

@@ -356,6 +356,8 @@ export const ticketComments = pgTable('ticket_comments', {
   editedByUserId: uuid('edited_by_user_id').references(() => users.id, { onDelete: 'set null' }),
   /** When the comment was last edited. */
   editedAt: ts('edited_at'),
+  /** Set when this reply was split into its own ticket (the reply stays, marked "Split to #N"). */
+  splitToTicketId: integer('split_to_ticket_id'),
 })
 
 /** One saved AI summary per anchor (per comment, description, or ticket header). */

@@ -124,6 +124,8 @@ interface Comment {
   created_at: string
   visibility?: 'note' | 'reply'
   author_type?: 'customer' | 'agent' | 'automation'
+  /** Set when this reply was split into its own ticket. */
+  split_to_ticket_id?: number | null
   user?: { id: string; full_name: string | null; email: string; avatar_url?: string | null }
   comment_attachments?: CommentAttachment[] | null
   tagged_user_ids?: string[]
@@ -767,6 +769,13 @@ export default function TabGeneral({
                                 {comment.visibility === 'note' ? 'Note' : 'Reply'}
                               </Tag>
                             )}
+                            {comment.split_to_ticket_id ? (
+                              <Tag color="purple" style={{ margin: 0 }}>
+                                <a href={`/tickets/${comment.split_to_ticket_id}`} target="_blank" rel="noopener noreferrer">
+                                  Split to #{comment.split_to_ticket_id}
+                                </a>
+                              </Tag>
+                            ) : null}
                             <Text style={{ fontSize: 12, color: 'var(--ticket-thread-meta)' }}>
                               <DateDisplay date={comment.created_at} format="relative" />
                             </Text>
@@ -784,7 +793,7 @@ export default function TabGeneral({
                                   onAddChecklistItems={onAddChecklistItemsBulk}
                                 />
                               ) : null}
-                              {!isCustomer && ticketData?.id ? (
+                              {ticketData?.id && !comment.split_to_ticket_id ? (
                                 <SplitCommentButton ticketId={Number(ticketData.id)} commentId={comment.id} commentHtml={comment.comment} />
                               ) : null}
                               {!isCustomer && (comment.user_id === currentUserId || comment.visibility === 'note') ? (

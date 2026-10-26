@@ -22,7 +22,7 @@ type Result = {
  * "Test this rule": runs the rule as it is in the form (saved or not) against one ticket and shows which
  * conditions pass and what the actions would do. Nothing on the ticket changes.
  */
-export default function RuleTestPanel({ getRule }: { getRule: () => Record<string, unknown> }) {
+export default function RuleTestPanel({ getRule, bare = false }: { getRule: () => Record<string, unknown>; bare?: boolean }) {
   const [ticket, setTicket] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -50,7 +50,13 @@ export default function RuleTestPanel({ getRule }: { getRule: () => Record<strin
   }
 
   return (
-    <Card size="small" title={<Space><ExperimentOutlined />Test this rule on a ticket</Space>} style={{ marginBottom: 16 }}>
+    <Card
+      size="small"
+      variant={bare ? 'borderless' : undefined}
+      title={bare ? undefined : <Space><ExperimentOutlined />Test this rule on a ticket</Space>}
+      style={{ marginBottom: bare ? 0 : 16 }}
+      styles={bare ? { body: { padding: 0 } } : undefined}
+    >
       <Flex gap={8} wrap align="center">
         <Input
           placeholder="Ticket number, e.g. 204730"
