@@ -1014,3 +1014,21 @@ export const shifts = pgTable('shifts', {
   description: text('description'),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
+
+// ============ User company history ============
+/** Every change of a person's company, with where it came from (admin edit, email CC, company leader ...). */
+export const userCompanyChanges = pgTable(
+  'user_company_changes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    fromCompanyId: uuid('from_company_id'),
+    toCompanyId: uuid('to_company_id'),
+    source: varchar('source', { length: 40 }).notNull(),
+    actorUserId: uuid('actor_user_id'),
+    ticketId: integer('ticket_id'),
+    note: text('note'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('user_company_changes_user_idx').on(t.userId, t.createdAt)]
+)

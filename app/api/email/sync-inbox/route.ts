@@ -32,6 +32,7 @@ import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { DEFAULT_TICKET_TYPE } from '@/lib/ticket-classification'
 import { assignCompanySupportTicketRank } from '@/lib/ticket-company-priority-order'
 import { sendNewTicketAgentNotificationEmail } from '@/lib/ticket-notification-emails'
+import { linkCcUserToCompany, logUserCompanyChange } from '@/lib/user-company'
 
 /** Parse Gmail internalDate to ISO string for created_at */
 function getEmailDateIso(msg: { internalDate?: string }): string | null {
@@ -911,13 +912,7 @@ export async function POST(request: NextRequest) {
             .limit(1)
           if (existingCcUser) {
             commentUserId = existingCcUser.id
-            await db.update(users).set({ companyId: ticketRow.companyId, updatedAt: new Date() }).where(eq(users.id, existingCcUser.id))
-            try {
-              await db
-                .insert(companyUsers)
-                .values({ companyId: ticketRow.companyId, userId: existingCcUser.id })
-                .onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
-            } catch {}
+            await linkCcUserToCompany({ userId: existingCcUser.id, companyId: ticketRow.companyId, source: 'email_cc_reply', ticketId })
           } else {
             const displayName = parseNameFromHeader(from) || senderEmail.split('@')[0] || 'User'
             const ccNewUserPassword = randomPassword()
@@ -997,10 +992,7 @@ export async function POST(request: NextRequest) {
           }
           const [ccUser] = await db.select({ id: users.id }).from(users).where(ilike(users.email, escapeIlike(ccEmail))).limit(1)
           if (ccUser) {
-            await db.update(users).set({ companyId: ticketRow.companyId, updatedAt: new Date() }).where(eq(users.id, ccUser.id))
-            try {
-              await db.insert(companyUsers).values({ companyId: ticketRow.companyId, userId: ccUser.id }).onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
-            } catch {}
+            await linkCcUserToCompany({ userId: ccUser.id, companyId: ticketRow.companyId, source: 'email_cc', ticketId })
           } else {
             try {
               const [newCcUser] = await db
@@ -1116,7 +1108,7 @@ export async function POST(request: NextRequest) {
         let shouldSendActivationForNewUser = false
 
         const [existingUser] = await db
-          .select({ id: users.id, companyId: users.companyId })
+          .select({ id: users.id, companyId: users.companyId, role: users.role })
           .from(users)
           .where(ilike(users.email, escapeIlike(senderEmail)))
           .limit(1)
@@ -1125,8 +1117,10 @@ export async function POST(request: NextRequest) {
           creatorUserId = existingUser.id
           ticketCompanyId = existingUser.companyId ?? company?.id ?? null
           // Update user's companyId if they belong to company (email match or domain match) but weren't linked
-          if (company?.id && !existingUser.companyId) {
+          // Agents (admin / manager / staff) are never put into a customer company.
+          if (company?.id && !existingUser.companyId && String(existingUser.role ?? '').toLowerCase() === 'customer') {
             await db.update(users).set({ companyId: company.id, updatedAt: new Date() }).where(eq(users.id, existingUser.id))
+            await logUserCompanyChange({ userId: existingUser.id, from: null, to: company.id, source: 'email_sender' })
             ticketCompanyId = company.id
           }
         } else {
@@ -1135,7 +1129,7 @@ export async function POST(request: NextRequest) {
           const passwordHash = await bcrypt.hash(password, 10)
           // Use select-then-insert/update to avoid ON CONFLICT (works when users.email UNIQUE constraint is missing)
           const [byEmail] = await db
-            .select({ id: users.id })
+            .select({ id: users.id, companyId: users.companyId, role: users.role })
             .from(users)
             .where(eq(users.email, truncateVarchar(senderEmail, 255)))
             .limit(1)
@@ -1144,8 +1138,10 @@ export async function POST(request: NextRequest) {
               fullName: truncateVarchar(displayName, 255),
               updatedAt: new Date(),
             }
-            if (company?.id) updateData.companyId = company.id
+            // Only attach a company when the person has none; a domain match must never move them.
+            if (company?.id && !byEmail.companyId && String(byEmail.role ?? '').toLowerCase() === 'customer') updateData.companyId = company.id
             await db.update(users).set(updateData).where(eq(users.id, byEmail.id))
+            if (updateData.companyId) await logUserCompanyChange({ userId: byEmail.id, from: null, to: updateData.companyId, source: 'email_sender' })
             creatorUserId = byEmail.id
           } else {
             const [inserted] = await db
@@ -1284,13 +1280,7 @@ export async function POST(request: NextRequest) {
                 .limit(1)
               if (ccUser) {
                 commentUserId = ccUser.id
-                await db.update(users).set({ companyId: extTicket.companyId, updatedAt: new Date() }).where(eq(users.id, ccUser.id))
-                try {
-                  await db
-                    .insert(companyUsers)
-                    .values({ companyId: extTicket.companyId, userId: ccUser.id })
-                    .onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
-                } catch {}
+                await linkCcUserToCompany({ userId: ccUser.id, companyId: extTicket.companyId, source: 'email_cc_external', ticketId })
               } else {
                 const displayName = parseNameFromHeader(from) || senderEmail.split('@')[0] || 'User'
                 const [newCcUser] = await db
@@ -1326,10 +1316,7 @@ export async function POST(request: NextRequest) {
               }
               const [ccUser] = await db.select({ id: users.id }).from(users).where(ilike(users.email, escapeIlike(ccEmail))).limit(1)
               if (ccUser) {
-                await db.update(users).set({ companyId: extTicket.companyId, updatedAt: new Date() }).where(eq(users.id, ccUser.id))
-                try {
-                  await db.insert(companyUsers).values({ companyId: extTicket.companyId, userId: ccUser.id }).onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
-                } catch {}
+                await linkCcUserToCompany({ userId: ccUser.id, companyId: extTicket.companyId, source: 'email_cc_external', ticketId })
               } else {
                 try {
                   const [newCcUser] = await db
@@ -1482,10 +1469,7 @@ export async function POST(request: NextRequest) {
               }
               const [ccUser] = await db.select({ id: users.id }).from(users).where(ilike(users.email, escapeIlike(ccEmail))).limit(1)
               if (ccUser) {
-                await db.update(users).set({ companyId: ticketCompanyId, updatedAt: new Date() }).where(eq(users.id, ccUser.id))
-                try {
-                  await db.insert(companyUsers).values({ companyId: ticketCompanyId, userId: ccUser.id }).onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
-                } catch {}
+                await linkCcUserToCompany({ userId: ccUser.id, companyId: ticketCompanyId, source: 'email_cc_new_ticket' })
               } else {
                 try {
                   const ccNewPassword = randomPassword()

@@ -3,6 +3,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { appSettings, companies, companyUsers, db, ticketComments, tickets, users } from '@/lib/db'
 import { type FdAttachment, type FdAttachmentImportResult, importFdTicketAttachments } from '@/lib/freshdesk-attachments'
 import { FD_STATUS_MAP, FD_TYPE_MAP } from '@/lib/freshdesk-maps'
+import { logUserCompanyChange } from '@/lib/user-company'
 
 type FdTicket = {
   id: number
@@ -137,13 +138,14 @@ async function resolveRequester(fd: FdClient, requesterId: number, companyId: st
   if (!email) return null
 
   const [existing] = await db
-    .select({ id: users.id, companyId: users.companyId })
+    .select({ id: users.id, companyId: users.companyId, role: users.role })
     .from(users)
     .where(eq(users.email, email))
     .limit(1)
   if (existing) {
-    if (!existing.companyId && companyId) {
+    if (!existing.companyId && companyId && String(existing.role ?? '').toLowerCase() === 'customer') {
       await db.update(users).set({ companyId, updatedAt: new Date() }).where(eq(users.id, existing.id))
+      await logUserCompanyChange({ userId: existing.id, from: null, to: companyId, source: 'freshdesk_import' })
       await db.insert(companyUsers).values({ companyId, userId: existing.id, companyRole: 'member' }).onConflictDoNothing()
     }
     return existing.id

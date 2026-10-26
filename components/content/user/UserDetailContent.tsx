@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo,useRef, useState } from 'react'
 
 import UserSkillsField from '@/components/skills/UserSkillsField'
+import UserCompanyHistory from '@/components/user/UserCompanyHistory'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import {
   getUserDepartmentAccentColor,
@@ -1153,6 +1154,9 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                 </Card>
               </Col>
             </Row>
+                    {isCustomer && userData?.id && ['admin', 'manager', 'staff'].includes(((currentUser as { role?: string }).role ?? '').toLowerCase()) ? (
+                      <UserCompanyHistory userId={String(userData.id)} />
+                    ) : null}
                     </>
                   ),
                 },

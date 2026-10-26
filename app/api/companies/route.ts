@@ -5,6 +5,7 @@ import { auth } from '@/auth'
 import { companies, companyUsers, db, teams, tickets, users } from '@/lib/db'
 import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
+import { logUserCompanyChange } from '@/lib/user-company'
 
 function normalizeUuidBody(v: unknown): string | null {
   if (v === null || v === undefined || v === '') return null
@@ -181,10 +182,12 @@ export async function POST(request: Request) {
   }
 
   if (leader_user_id) {
+    const [prevLeader] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, leader_user_id)).limit(1)
     await db
       .update(users)
       .set({ companyId: row.id, updatedAt: new Date() })
       .where(eq(users.id, leader_user_id))
+    await logUserCompanyChange({ userId: leader_user_id, from: prevLeader?.companyId ?? null, to: row.id, source: 'company_leader', actorUserId: session.user.id })
     await upsertCompanyUserMembership({
       companyId: row.id,
       userId: leader_user_id,

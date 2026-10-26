@@ -26,6 +26,7 @@ import { mergeMessageTemplateHtml, userRowToMergeMap } from '@/lib/message-templ
 import { notifySlackTicketEvent } from '@/lib/slack-ticket-notify'
 import { logTicketActivity } from '@/lib/ticket-activity-log'
 import { sendNoteAddedNotificationEmail } from '@/lib/ticket-notification-emails'
+import { linkCcUserToCompany } from '@/lib/user-company'
 
 const AGENT_REQUESTER_REPLIES_TEMPLATE_KEY = 'agent_notification_requester_replies' as const
 
@@ -317,10 +318,7 @@ export async function POST(
     if (ticketCompanyId) {
       const [ccUser] = await db.select({ id: users.id }).from(users).where(ilike(users.email, escapeIlike(trimmed))).limit(1)
       if (ccUser) {
-        await db.update(users).set({ companyId: ticketCompanyId, updatedAt: new Date() }).where(eq(users.id, ccUser.id))
-        try {
-          await db.insert(companyUsers).values({ companyId: ticketCompanyId, userId: ccUser.id }).onConflictDoNothing({ target: [companyUsers.companyId, companyUsers.userId] })
-        } catch {}
+        await linkCcUserToCompany({ userId: ccUser.id, companyId: ticketCompanyId, source: 'portal_cc', ticketId })
       } else {
         try {
           const [newCcUser] = await db

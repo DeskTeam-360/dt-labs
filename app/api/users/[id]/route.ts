@@ -17,6 +17,7 @@ import {
 } from '@/lib/system-activity-log'
 import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 import { isValidYmd, syncUserCapacityFromToday } from '@/lib/user-capacity'
+import { logUserCompanyChange } from '@/lib/user-company'
 
 function encodeSubjectHeader(subject: string): string {
   if (/^[\x01-\x7F]*$/.test(subject)) return subject
@@ -473,6 +474,9 @@ export async function PATCH(
 
   const passwordChanged = Boolean(isAdmin && body.password)
   await db.update(users).set({ ...updateData, updatedAt: new Date() }).where(eq(users.id, id))
+  if ('companyId' in updateData) {
+    await logUserCompanyChange({ userId: id, from: targetUser.companyId ?? null, to: (updateData.companyId as string | null) ?? null, source: 'admin_edit', actorUserId: session.user?.id ?? null })
+  }
   if (capacityDatesChanged || body.status !== undefined || body.role !== undefined) {
     try {
       await syncUserCapacityFromToday(id)

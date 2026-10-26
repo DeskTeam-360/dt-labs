@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { appSettings, companies, companyUsers, db, ticketComments, tickets, users } from '@/lib/db'
 import { FD_STATUS_MAP, FD_TYPE_MAP } from '@/lib/freshdesk-maps'
+import { logUserCompanyChange } from '@/lib/user-company'
 
 function sessionRole(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string } | undefined)?.role ?? ''
@@ -201,7 +202,7 @@ export async function POST(req: NextRequest) {
           const email = contact.email?.trim().toLowerCase()
           if (!email) { result.contacts.skipped++; continue }
 
-          const existingUser = await db.select({ id: users.id, companyId: users.companyId })
+          const existingUser = await db.select({ id: users.id, companyId: users.companyId, role: users.role })
             .from(users)
             .where(eq(users.email, email))
             .limit(1)
@@ -209,8 +210,9 @@ export async function POST(req: NextRequest) {
           if (existingUser.length > 0) {
             fdContactIdToOurUserId[contact.id] = existingUser[0].id
             emailToUserId[email] = existingUser[0].id
-            if (!existingUser[0].companyId) {
+            if (!existingUser[0].companyId && String(existingUser[0].role ?? '').toLowerCase() === 'customer') {
               await db.update(users).set({ companyId: ourCompanyId, updatedAt: new Date() }).where(eq(users.id, existingUser[0].id))
+              await logUserCompanyChange({ userId: existingUser[0].id, from: null, to: ourCompanyId, source: 'freshdesk_import' })
               await db.insert(companyUsers).values({ companyId: ourCompanyId, userId: existingUser[0].id, companyRole: 'member' }).onConflictDoNothing()
             }
             result.contacts.skipped++
