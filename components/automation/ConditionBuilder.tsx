@@ -72,6 +72,8 @@ export const CONDITION_FIELDS: Field[] = [
   { name: 'type', label: 'Ticket type', valueEditorType: 'select', values: [] },
   { name: 'sender_domain', label: 'Sender Domain' },
   { name: 'sender_email', label: 'Sender Email' },
+  { name: 'real_sender_domain', label: 'Real Sender Domain (Reply-To / "via" name)' },
+  { name: 'real_sender_email', label: 'Real Sender Email (Reply-To / "via" name)' },
   // { name: 'assignee_id', label: 'Assignee ID' },
   { name: 'created_via', label: 'Created Via', valueEditorType: 'select', values: [
     { name: 'portal', label: 'Portal (Admin App)' },

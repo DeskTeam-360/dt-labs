@@ -6,10 +6,12 @@ import { useEffect, useState } from 'react'
 
 import CommentWysiwyg from '@/components/ticket/detail/CommentWysiwyg'
 import type { AutomationActions } from '@/lib/automation-actions-types'
+import { AUTOMATION_REAL_SENDER } from '@/lib/automation-constants'
 
 type ActionType =
   | 'team_id'
   | 'company_id'
+  | 'contact_user_id'
   | 'assignee_ids'
   | 'priority'
   | 'status_slug'
@@ -39,6 +41,7 @@ const TICKET_CLASSIFICATION_OPTIONS = [
 const ACTION_LABELS: Record<ActionType, string> = {
   team_id: 'Assign to Team',
   company_id: 'Set Company',
+  contact_user_id: 'Set Contact (email replies)',
   assignee_ids: 'Assign to Agent(s)',
   priority: 'Set Priority (number)',
   status_slug: 'Set Status',
@@ -72,6 +75,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
   const ORDERED_ACTION_KEYS: ActionType[] = [
     'team_id',
     'company_id',
+    'contact_user_id',
     'assignee_ids',
     'priority',
     'status_slug',
@@ -149,6 +153,7 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
     [
       'team_id',
       'company_id',
+      'contact_user_id',
       'assignee_ids',
       'priority',
       'status_slug',
@@ -233,6 +238,31 @@ export default function ActionBuilder({ value, onChange = () => {} }: ActionBuil
                     onChange={(v) => update('company_id', v)}
                     options={lookup.companies.map((c) => ({ value: c.id, label: c.name }))}
                   />
+                )}
+                {type === 'contact_user_id' && (
+                  <>
+                    <Select
+                      allowClear
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
+                      placeholder="Select contact"
+                      style={{ width: '100%' }}
+                      value={(actions as Record<string, unknown>).contact_user_id as string | undefined}
+                      onChange={(v) => update('contact_user_id', v)}
+                      options={[
+                        { value: AUTOMATION_REAL_SENDER, label: 'The real sender (from Reply-To or the "via Service" name)' },
+                        ...(lookup.users ?? [])
+                          .filter((u) => u.id && (u.email ?? '').trim())
+                          .map((u) => ({ value: u.id, label: `${u.full_name || u.email} (${u.email})` })),
+                      ]}
+                    />
+                    <div style={{ fontSize: 12, color: 'var(--ant-color-text-description)', marginTop: 4 }}>
+                      Email replies go to this person. &quot;The real sender&quot; is for mail sent through a service such as Airtable, where the
+                      email comes from a no-reply address.
+                    </div>
+                  </>
                 )}
                 {type === 'assignee_ids' && (
                   <Select

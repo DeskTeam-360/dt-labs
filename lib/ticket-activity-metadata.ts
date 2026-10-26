@@ -87,7 +87,6 @@ function fullValue(v: unknown, key: string, labels: EntityLabels | undefined): s
 export function ticketActivityChangeRows(action: string, metadata: unknown): TicketActivityChangeRow[] {
   if (action !== 'ticket_updated' || !metadata || typeof metadata !== 'object') return []
   const m = metadata as Record<string, unknown>
-  if (m.source === 'automation_rule') return []
   const changes = m.changes
   if (!changes || typeof changes !== 'object' || Array.isArray(changes)) return []
   const labels = m.entity_labels as EntityLabels | undefined
@@ -126,6 +125,28 @@ export function ticketActivityAttachmentChanges(metadata: unknown): { added: str
   }
 }
 
+export type AutomationWhy = { event: string; matched: string[]; companyScoped: boolean }
+
+const AUTOMATION_EVENT_TEXT: Record<string, string> = {
+  ticket_created: 'a ticket is created',
+  ticket_updated: 'a ticket is updated',
+  ticket_comment_added: 'a comment is added',
+  ticket_reply_added: 'a reply is added',
+  ticket_note_added: 'a note is added',
+  time_trigger: 'a ticket has not been updated for a while',
+}
+
+/** Why an automation rule ran: the event and the conditions that matched. Null for entries saved before this existed. */
+export function ticketActivityAutomationWhy(metadata: unknown): AutomationWhy | null {
+  if (!metadata || typeof metadata !== 'object') return null
+  const m = metadata as Record<string, unknown>
+  if (m.source !== 'automation_rule' || !m.why || typeof m.why !== 'object') return null
+  const w = m.why as { event?: unknown; matched?: unknown; company_scoped?: unknown }
+  const event = typeof w.event === 'string' ? (AUTOMATION_EVENT_TEXT[w.event] ?? w.event) : ''
+  const matched = Array.isArray(w.matched) ? w.matched.filter((x): x is string => typeof x === 'string') : []
+  return { event, matched, companyScoped: w.company_scoped === true }
+}
+
 /** One-line preview of stored metadata (especially ticket_updated.changes). */
 export function summarizeTicketActivityMetadata(action: string, metadata: unknown): string {
   if (!metadata || typeof metadata !== 'object') return ''
@@ -134,7 +155,9 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
   /** Automation rows: short label only (no field-by-field diff). */
   if (m.source === 'automation_rule') {
     const title = typeof m.rule_name === 'string' ? m.rule_name.trim() : ''
-    return title ? `RUN ${title}` : 'RUN'
+    const why = ticketActivityAutomationWhy(metadata)
+    const base = title ? `RUN ${title}` : 'RUN'
+    return why && why.matched.length > 0 ? `${base} · because ${why.matched.join(' and ')}` : base
   }
 
   if (action === 'ticket_updated') {

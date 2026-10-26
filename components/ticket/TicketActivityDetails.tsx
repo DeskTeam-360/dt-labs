@@ -7,6 +7,7 @@ import CommentHtml from '@/components/ticket/detail/CommentHtml'
 import {
   summarizeTicketActivityMetadata,
   ticketActivityAttachmentChanges,
+  ticketActivityAutomationWhy,
   type TicketActivityChangeRow,
   ticketActivityChangeRows,
 } from '@/lib/ticket-activity-metadata'
@@ -40,7 +41,8 @@ export default function TicketActivityDetails({
   const rows = ticketActivityChangeRows(action, metadata)
   const attachments = action === 'ticket_updated' ? ticketActivityAttachmentChanges(metadata) : null
   const hasAttachmentChanges = !!attachments && (attachments.addedCount > 0 || attachments.removedCount > 0)
-  const hasDetails = rows.length > 0 || hasAttachmentChanges
+  const why = ticketActivityAutomationWhy(metadata)
+  const hasDetails = rows.length > 0 || hasAttachmentChanges || !!why
 
   return (
     <div style={{ minWidth: 0 }}>
@@ -73,6 +75,27 @@ export default function TicketActivityDetails({
         destroyOnHidden
       >
         <div onClick={(e) => e.stopPropagation()}>
+          {why && (
+            <div style={{ marginBottom: rows.length > 0 ? 16 : 0 }}>
+              <Text strong>Why this rule ran</Text>
+              <div style={{ marginTop: 4 }}>
+                {why.event ? <div>It ran when {why.event}{why.companyScoped ? ', for this ticket\'s company only' : ''}.</div> : null}
+                {why.matched.length > 0 ? (
+                  <div style={{ marginTop: 4 }}>
+                    <Text type="secondary">Because all of these were true:</Text>
+                    <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+                      {why.matched.map((m) => (
+                        <li key={m}>{m}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 4 }}><Text type="secondary">The rule has no conditions, so it runs every time.</Text></div>
+                )}
+              </div>
+            </div>
+          )}
+          {rows.length > 0 && why && <Text strong>What it changed</Text>}
           {rows.length > 0 && (
             <Table<TicketActivityChangeRow>
               rowKey="key"

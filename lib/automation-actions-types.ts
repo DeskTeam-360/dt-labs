@@ -21,6 +21,8 @@ export interface AutomationActions {
   visibility?: string
   /** Assign ticket to this company (uuid) */
   company_id?: string
+  /** Set the ticket contact (who email replies go to): a user uuid, or "__real_sender__" for the person behind a "via Service" email */
+  contact_user_id?: string
   /** Assign these agents to the ticket (array of user uuids) */
   assignee_ids?: string[]
   /** Add an automatic note (comment) to the ticket — shown as "Automation", no user picker */
