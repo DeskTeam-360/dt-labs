@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { canViewCustomerReports } from '@/lib/auth-utils'
 import { companies, db, ticketAssignees, tickets, ticketTimeTracker, users } from '@/lib/db'
+import { getLastActivity } from '@/lib/ticket-last-activity'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 
 /** Only tickets still waiting for or in work are listed in the pool. */
@@ -149,6 +150,8 @@ export async function GET(request: Request) {
     assigneesByTicket.set(a.ticketId, arr)
   }
 
+  const lastActivity = await getLastActivity(ticketRows.map((t) => ({ id: t.id, createdAt: t.createdAt })))
+
   const out = companyRows.map((c) => {
     const plan = c.activeTime ?? 0
     const dailySeconds = dailyByCompany.get(c.id) ?? 0
@@ -170,6 +173,7 @@ export async function GET(request: Request) {
         priority: t.priority ?? null,
         assignees: assigneesByTicket.get(t.id) ?? [],
         updated_at: t.updatedAt instanceof Date ? t.updatedAt.toISOString() : t.updatedAt ? new Date(t.updatedAt).toISOString() : null,
+        last_activity_at: lastActivity.get(t.id) ?? null,
         today_seconds: todayByTicket.get(t.id) ?? 0,
         running: (running.get(t.id) ?? []).map((r) => ({
           user: nameOf.get(r.userId) ?? 'Unknown',

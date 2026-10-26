@@ -45,6 +45,7 @@ import {
 
 import AssigneeSuggestions from '@/components/skills/AssigneeSuggestions'
 import TicketSkillsField from '@/components/skills/TicketSkillsField'
+import SplitCommentButton from '@/components/ticket/detail/SplitCommentButton'
 import { attachmentDownloadHref } from '@/lib/attachment-download-url'
 
 const { useBreakpoint } = Grid
@@ -782,6 +783,9 @@ export default function TabGeneral({
                                   onAddComment={onAddAiSummaryComment}
                                   onAddChecklistItems={onAddChecklistItemsBulk}
                                 />
+                              ) : null}
+                              {!isCustomer && ticketData?.id ? (
+                                <SplitCommentButton ticketId={Number(ticketData.id)} commentId={comment.id} commentHtml={comment.comment} />
                               ) : null}
                               {!isCustomer && (comment.user_id === currentUserId || comment.visibility === 'note') ? (
                                 <>

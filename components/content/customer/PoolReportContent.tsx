@@ -19,6 +19,7 @@ const { Title, Text } = Typography
 type PoolTicket = {
   id: number
   updated_at: string | null
+  last_activity_at: string | null
   title: string
   status: string
   priority: number | null
@@ -112,6 +113,19 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
       ),
     },
     { title: 'Status', dataIndex: 'status', width: 140, render: (v: string) => STATUS_LABEL[v] ?? v },
+    {
+      title: 'Last activity',
+      dataIndex: 'last_activity_at',
+      width: 150,
+      render: (v: string | null) =>
+        v ? (
+          <Tooltip title={`${dayjs(v).format('MMM DD, YYYY HH:mm')}. A comment, a change or time tracked by a person (automation not counted).`}>
+            <Text>{dayjs(v).fromNow()}</Text>
+          </Tooltip>
+        ) : (
+          '—'
+        ),
+    },
     {
       title: 'Last update',
       dataIndex: 'updated_at',

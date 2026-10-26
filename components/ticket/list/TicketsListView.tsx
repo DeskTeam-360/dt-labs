@@ -35,20 +35,26 @@ import {
   TICKETS_LIST_SORT_ORDER,
 } from './types'
 
-type ColKey = 'company' | 'priority' | 'type' | 'tags' | 'due_date' | 'team' | 'status' | 'created_at' | 'updated_at'
+type ColKey = 'company' | 'priority' | 'type' | 'tags' | 'due_date' | 'team' | 'status' | 'created_at' | 'updated_at' | 'last_activity'
 
-const ALL_COL_KEYS: ColKey[] = ['company', 'priority', 'type', 'tags', 'due_date', 'team', 'status', 'created_at', 'updated_at']
+const ALL_COL_KEYS: ColKey[] = ['company', 'priority', 'type', 'tags', 'due_date', 'team', 'status', 'created_at', 'updated_at', 'last_activity']
 const COL_LABELS: Record<ColKey, string> = {
   company: 'Company', priority: 'Priority', type: 'Type',
-  tags: 'Tags', due_date: 'Due date', team: 'Team', status: 'Status', created_at: 'Date created', updated_at: 'Last update',
+  tags: 'Tags', due_date: 'Due date', team: 'Team', status: 'Status', created_at: 'Date created', updated_at: 'Last update', last_activity: 'Last activity',
 }
 const LS_KEY = 'tickets_list_col_config'
 
 interface ColConfig { order: ColKey[]; hidden: ColKey[] }
 
-const CUSTOMER_HIDDEN_COLS: ColKey[] = ['company', 'team']
+const CUSTOMER_HIDDEN_COLS: ColKey[] = ['company', 'team', 'last_activity']
 
+/** Customers never get the staff-only Last activity column. */
 function readColConfig(isCustomer = false): ColConfig {
+  const cfg = readColConfigRaw(isCustomer)
+  return isCustomer ? { order: cfg.order.filter((k) => k !== 'last_activity'), hidden: cfg.hidden.filter((k) => k !== 'last_activity') } : cfg
+}
+
+function readColConfigRaw(isCustomer = false): ColConfig {
   const defaultHidden = isCustomer ? [...CUSTOMER_HIDDEN_COLS] : []
   try {
     const key = isCustomer ? `${LS_KEY}_customer` : LS_KEY
@@ -310,6 +316,20 @@ export default function TicketsListView({
           </span>
         ) : '—',
     },
+    last_activity: {
+      title: 'Last activity', dataIndex: 'last_activity_at', key: 'last_activity', width: 160,
+      render: (_: unknown, record: TicketRecord) =>
+        record.last_activity_at ? (
+          <span
+            title={`${new Date(record.last_activity_at).toLocaleString()}. Last comment, change or tracked time by a person (automation and queue renumbering not counted).`}
+            style={{ fontSize: 12 }}
+          >
+            {new Date(record.last_activity_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+            {' '}
+            {new Date(record.last_activity_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        ) : '—',
+    },
     updated_at: {
       title: 'Last update', dataIndex: 'updated_at', key: 'updated_at', width: 160,
       render: (_: unknown, record: TicketRecord) =>
@@ -377,7 +397,7 @@ export default function TicketsListView({
       ))}
       <div style={{ borderTop: '1px solid #f0f0f0', marginTop: 8, paddingTop: 8 }}>
         <Button size="small" type="link" style={{ padding: 0, fontSize: 12 }}
-          onClick={() => saveColConfig({ order: [...ALL_COL_KEYS], hidden: [] })}>
+          onClick={() => saveColConfig({ order: ALL_COL_KEYS.filter((k) => !isCustomer || k !== 'last_activity'), hidden: [] })}>
           Reset to default
         </Button>
       </div>

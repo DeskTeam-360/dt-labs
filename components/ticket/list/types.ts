@@ -40,6 +40,8 @@ export interface TicketRecord {
   company_id: string | null
   created_at: string
   updated_at: string
+  /** Staff only: last comment, change or tracked time by a person. */
+  last_activity_at?: string | null
   /** Populated for ticket_type project (board/API). */
   project_id?: string | null
   project_status_id?: number | null

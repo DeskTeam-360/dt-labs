@@ -170,6 +170,12 @@ export function summarizeTicketActivityMetadata(action: string, metadata: unknow
     return parts.join(' · ')
   }
 
+  if (action === 'ticket_split') {
+    if (m.role === 'source' && m.other_id != null) return `a reply moved to new ticket #${m.other_id}`
+    if (m.role === 'new' && m.other_id != null) return `split from #${m.other_id}`
+    return ''
+  }
+
   if (action === 'ticket_merged') {
     if (m.role === 'primary' && Array.isArray(m.merged_ids)) return `merged ${m.merged_ids.map((i) => `#${i}`).join(', ')} into this ticket`
     if (m.role === 'secondary' && m.primary_id != null) return `part of #${m.primary_id}`

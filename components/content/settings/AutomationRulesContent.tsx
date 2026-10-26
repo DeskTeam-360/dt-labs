@@ -23,6 +23,7 @@ import { useEffect,useState } from 'react'
 
 import ActionBuilder from '@/components/automation/ActionBuilder'
 import ConditionBuilder from '@/components/automation/ConditionBuilder'
+import RuleTestPanel from '@/components/automation/RuleTestPanel'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
@@ -406,6 +407,13 @@ export default function AutomationRulesContent({ user: currentUser }: Automation
               >
                 <ActionBuilder />
               </Form.Item>
+
+              <RuleTestPanel
+                getRule={() => {
+                  const v = form.getFieldsValue()
+                  return { event_type: v.event_type, conditions: v.conditions, actions: v.actions, company_id: v.company_id || null }
+                }}
+              />
 
               <Form.Item>
                 <Space>

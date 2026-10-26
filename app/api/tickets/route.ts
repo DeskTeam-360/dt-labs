@@ -40,6 +40,7 @@ import {
   getContactCompanyIds,
   getEffectiveCompanyIdForUser,
 } from '@/lib/ticket-contact-user'
+import { getLastActivity } from '@/lib/ticket-last-activity'
 import { sendNewTicketAgentNotificationEmail } from '@/lib/ticket-notification-emails'
 import { assertCustomerMayUseTicketType } from '@/lib/ticket-type-customer-access'
 
@@ -428,6 +429,11 @@ export async function GET(request: Request) {
     checklistByTicket[row.ticketId].items.push(row)
   })
 
+  // When a person last did something on the ticket (staff only; customers would see internal activity timing).
+  const lastActivity = isCustomerViewer
+    ? new Map<number, string>()
+    : await getLastActivity(ticketsRows.map((r) => ({ id: r.ticket.id, createdAt: r.ticket.createdAt })))
+
   const result = ticketsRows.map((r) => {
     const t = r.ticket
     const cl = checklistByTicket[t.id] || { completed: 0, total: 0, items: [] }
@@ -460,6 +466,7 @@ export async function GET(request: Request) {
       company_id: t.companyId,
       created_at: t.createdAt ? new Date(t.createdAt).toISOString() : '',
       updated_at: t.updatedAt ? new Date(t.updatedAt).toISOString() : '',
+      last_activity_at: lastActivity.get(t.id) ?? null,
       creator: r.creator
         ? { id: r.creator.id, full_name: r.creator.fullName, email: r.creator.email }
         : null,

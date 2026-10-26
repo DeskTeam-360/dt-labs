@@ -341,17 +341,37 @@ function describeMatch(cond: OurConditionGroup, ctx: TicketContext): string[] {
       continue
     }
     if (!evalLeaf(c, ctx)) continue
-    const field = String(c.field || '').toLowerCase()
-    const op = String(c.operator || '=').toLowerCase().replace(/\s+/g, '')
-    const label = FIELD_LABEL[field] ?? field
-    const verb = OPERATOR_TEXT[op] ?? op
-    const empty = op === 'null' || op === 'isnull' || op === 'notnull' || op === 'isnotnull'
-    const expected = empty ? '' : ` "${clip(c.value)}"`
-    const actual = fieldValueForLog(field, ctx)
-    const showActual = !empty && op !== '=' && actual !== null && actual !== undefined && String(actual).trim() !== ''
-    out.push(`${label} ${verb}${expected}${showActual ? ` (was "${clip(actual)}")` : ''}`)
+    out.push(describeLeaf(c, ctx))
   }
   return out
+}
+
+/**
+ * One condition in words, e.g. `Sender Domain is "provencontent.com"`.
+ * `withActual` always adds what the ticket has (used by Test rule); otherwise only when it is not an exact match.
+ */
+export function describeLeaf(c: OurConditionLeaf, ctx: TicketContext, withActual = false): string {
+  const field = String(c.field || '').toLowerCase()
+  const op = String(c.operator || '=').toLowerCase().replace(/\s+/g, '')
+  const label = FIELD_LABEL[field] ?? field
+  const verb = OPERATOR_TEXT[op] ?? op
+  const empty = op === 'null' || op === 'isnull' || op === 'notnull' || op === 'isnotnull'
+  const expected = empty ? '' : ` "${clip(c.value)}"`
+  const actual = fieldValueForLog(field, ctx)
+  const hasActual = actual !== null && actual !== undefined && String(actual).trim() !== ''
+  if (withActual) return `${label} ${verb}${expected} (ticket has ${hasActual ? `"${clip(actual)}"` : 'nothing'})`
+  const showActual = !empty && op !== '=' && hasActual
+  return `${label} ${verb}${expected}${showActual ? ` (was "${clip(actual)}")` : ''}`
+}
+
+/** Whether one condition is true for this ticket (Test rule). */
+export function conditionLeafPasses(leaf: OurConditionLeaf, ctx: TicketContext): boolean {
+  return evalLeaf(leaf, ctx)
+}
+
+/** Whether a condition group is true for this ticket (Test rule). */
+export function conditionsPass(cond: OurConditionGroup, ctx: TicketContext): boolean {
+  return evalConditions(cond, ctx)
 }
 
 /** Load ticket + assignees for automation context (shared across triggers). */
