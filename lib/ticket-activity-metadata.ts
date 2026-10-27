@@ -35,6 +35,7 @@ type EntityLabels = {
   statuses?: Record<string, string>
   project_statuses?: Record<string, string>
   companies?: Record<string, string>
+  types?: Record<string, string>
 }
 
 export type TicketActivityChangeRow = {
@@ -54,9 +55,15 @@ const REF_MAP_BY_KEY: Record<string, keyof EntityLabels> = {
   contactUserId: 'contacts',
   project_status_id: 'project_statuses',
   companyId: 'companies',
+  typeId: 'types',
 }
 
 function fullValue(v: unknown, key: string, labels: EntityLabels | undefined): string {
+  // A due date is stored as an ISO instant; show it as a date and time.
+  if (key === 'dueDateIso' && typeof v === 'string' && v) {
+    const d = new Date(v)
+    if (!Number.isNaN(d.getTime())) return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
   const map = REF_MAP_BY_KEY[key] ? labels?.[REF_MAP_BY_KEY[key]] : undefined
   const one = (id: unknown): string => {
     if (id == null || id === '') return 'None'

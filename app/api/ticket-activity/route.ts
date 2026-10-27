@@ -7,6 +7,7 @@ import { getCustomerCompanyIds } from '@/lib/customer-company'
 import { customerTicketsAccessCondition } from '@/lib/customer-ticket-access'
 import { db, tags, ticketActivityLog, tickets, ticketTags, users } from '@/lib/db'
 import { TICKET_ACTIVITY_ACTIONS, type TicketActivityAction } from '@/lib/ticket-activity-actions'
+import { withEntityLabels } from '@/lib/ticket-activity-log'
 import { buildTicketVisibilityAccessSql } from '@/lib/ticket-visibility-server'
 
 const DEFAULT_LIMIT = 50
@@ -135,7 +136,8 @@ export async function GET(request: Request) {
     tagsByTicket[t.ticketId].push({ id: t.tagId, name: t.tagName ?? '', color: t.tagColor ?? null })
   }
 
-  const data = rows.map((r) => ({
+  const labelled = await withEntityLabels(rows)
+  const data = labelled.map((r) => ({
     id: r.id,
     ticket_id: r.ticket_id,
     ticket_title: r.ticket_title,

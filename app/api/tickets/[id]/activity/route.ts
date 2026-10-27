@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { db, ticketActivityLog, users } from '@/lib/db'
+import { withEntityLabels } from '@/lib/ticket-activity-log'
 
 const DEFAULT_LIMIT = 20
 
@@ -50,7 +51,8 @@ export async function GET(
       .offset(offset),
   ])
 
-  const data = rows.map((r) => ({
+  const labelled = await withEntityLabels(rows)
+  const data = labelled.map((r) => ({
     id: r.id,
     ticket_id: r.ticket_id,
     actor_user_id: r.actor_user_id,

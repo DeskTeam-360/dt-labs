@@ -27,7 +27,7 @@ import type { AutomationActions } from './automation-actions-types'
 import { AUTOMATION_NOTE_USER_ID, AUTOMATION_REAL_SENDER } from './automation-constants'
 import type { OurCondition, OurConditionGroup, OurConditionLeaf } from './condition-builder-utils'
 import { bumpTicketDataVersion } from './firebase/ticket-sync-server'
-import { diffTicketSnapshots, loadTicketActivitySnapshot, logTicketActivity } from './ticket-activity-log'
+import { diffTicketSnapshots, enrichActivityEntityLabels, loadTicketActivitySnapshot, logTicketActivity } from './ticket-activity-log'
 import { coerceTicketType, DEFAULT_TICKET_TYPE, parseTicketType } from './ticket-classification'
 import { applyCompanySupportPriorityRank } from './ticket-company-priority-order'
 
@@ -651,6 +651,7 @@ export async function runAutomationRules(
               why,
               changed_keys: Object.keys(diff),
               changes: diff,
+              entity_labels: await enrichActivityEntityLabels(diff),
             },
           })
         }

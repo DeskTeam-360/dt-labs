@@ -1,6 +1,6 @@
 import { eq, inArray } from 'drizzle-orm'
 
-import { companies, db, projectStatuses, tags, teams, ticketActivityLog, ticketAssignees, tickets, ticketStatuses, ticketTags, users } from '@/lib/db'
+import { companies, db, projectStatuses, tags, teams, ticketActivityLog, ticketAssignees, tickets, ticketStatuses, ticketTags, ticketTypes, users } from '@/lib/db'
 
 import type { TicketActivityAction } from './ticket-activity-actions'
 
@@ -111,11 +111,33 @@ export function diffTicketSnapshots(
   return changes
 }
 
+/**
+ * Activity rows saved without names (older rows, and automation rows before names were stored) show raw ids for tags,
+ * teams, people and so on. This adds `entity_labels` to such rows when they are read.
+ */
+export async function withEntityLabels<T extends { metadata: unknown }>(rows: T[]): Promise<T[]> {
+  return Promise.all(
+    rows.map(async (r) => {
+      const m = r.metadata
+      if (!m || typeof m !== 'object' || Array.isArray(m)) return r
+      const meta = m as Record<string, unknown>
+      const changes = meta.changes
+      if (meta.entity_labels || !changes || typeof changes !== 'object' || Array.isArray(changes)) return r
+      try {
+        const labels = await enrichActivityEntityLabels(changes as Record<string, { from: unknown; to: unknown }>)
+        return Object.keys(labels).length > 0 ? { ...r, metadata: { ...meta, entity_labels: labels } } : r
+      } catch {
+        return r
+      }
+    })
+  )
+}
+
 /** Resolve UUIDs in activity `changes` to display names for ticket activity UI. */
 export async function enrichActivityEntityLabels(
   changes: Record<string, { from: unknown; to: unknown }>
-): Promise<{ teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string>; companies?: Record<string, string> }> {
-  const out: { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string>; companies?: Record<string, string> } = {}
+): Promise<{ teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string>; companies?: Record<string, string>; types?: Record<string, string> }> {
+  const out: { teams?: Record<string, string>; tags?: Record<string, string>; contacts?: Record<string, string>; assignees?: Record<string, string>; statuses?: Record<string, string>; project_statuses?: Record<string, string>; companies?: Record<string, string>; types?: Record<string, string> } = {}
 
   // Teams
   const teamDelta = changes.teamId
@@ -200,6 +222,22 @@ export async function enrichActivityEntityLabels(
       const map: Record<string, string> = {}
       for (const r of rows) map[r.id] = (r.name?.trim() || r.id) as string
       out.companies = map
+    }
+  }
+
+  // Ticket types (Type)
+  const typeDelta = changes.typeId
+  if (typeDelta) {
+    const ids = new Set<number>()
+    for (const v of [typeDelta.from, typeDelta.to]) {
+      const n = Number(v)
+      if (v != null && v !== '' && !isNaN(n)) ids.add(n)
+    }
+    if (ids.size > 0) {
+      const rows = await db.select({ id: ticketTypes.id, title: ticketTypes.title }).from(ticketTypes).where(inArray(ticketTypes.id, [...ids]))
+      const map: Record<string, string> = {}
+      for (const r of rows) map[String(r.id)] = (r.title?.trim() || String(r.id)) as string
+      out.types = map
     }
   }
 
