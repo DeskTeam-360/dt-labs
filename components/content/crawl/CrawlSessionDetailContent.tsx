@@ -1,15 +1,17 @@
 'use client'
 
 import { ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, GlobalOutlined,ReloadOutlined } from '@ant-design/icons'
-import { Button, Card, Descriptions, Layout, message, Progress, Select,Space, Table, Tabs, Tag, Typography } from 'antd'
+import { Button, Card, Descriptions, Empty, Flex, Layout, message, Progress, Select,Space, Table, Tabs, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useRouter } from 'next/navigation'
 import { useEffect,useState } from 'react'
 
 import { getCrawlPages } from '@/app/actions/crawl'
 import DateDisplay from '@/components/common/DateDisplay'
+import CrawlGenerateModal from '@/components/content/crawl/CrawlGenerateModal'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { buildGroups, type CrawlPageLite, groupKeyOf } from '@/lib/crawl-groups'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -65,6 +67,9 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
   const [loading, setLoading] = useState(false)
   const [mainPagePreview, setMainPagePreview] = useState<CrawlPageRecord | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [groupFilter, setGroupFilter] = useState<string>('all')
+  const [activeTab, setActiveTab] = useState('overview')
+  const [generate, setGenerate] = useState<'sitemap' | 'robots' | null>(null)
 
   const getHeadingColor = (level: number) => {
     const colors: { [key: number]: string } = {
@@ -1095,9 +1100,11 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
   }
 
   // Filter crawl pages based on status
-  const filteredCrawlPages = statusFilter === 'all' 
-    ? crawlPages 
-    : crawlPages.filter(page => page.status === statusFilter)
+  const filteredCrawlPages = crawlPages.filter(
+    (page) => (statusFilter === 'all' || page.status === statusFilter) && (groupFilter === 'all' || groupKeyOf(page.url) === groupFilter)
+  )
+
+  const groups = buildGroups(crawlPages as unknown as CrawlPageLite[])
 
   // Get unique statuses from crawl pages for filter options
   const availableStatuses: string[] = Array.from(new Set(crawlPages.map(page => page.status))).sort()
@@ -1124,6 +1131,15 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       dataIndex: 'title',
       key: 'title',
       ellipsis: true,
+    },
+    {
+      title: 'Group',
+      key: 'group',
+      width: 150,
+      render: (_: unknown, record: CrawlPageRecord) => {
+        const g = groups.find((x) => x.key === groupKeyOf(record.url))
+        return <Tag style={{ margin: 0 }}>{g?.label ?? '-'}</Tag>
+      },
     },
     {
       title: 'Depth',
@@ -1303,6 +1319,18 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                 ]}
               />
             </Space>
+            <Space>
+              <Text strong>Group:</Text>
+              <Select
+                value={groupFilter}
+                onChange={setGroupFilter}
+                style={{ width: 220 }}
+                options={[
+                  { label: 'All groups', value: 'all' },
+                  ...groups.map((g) => ({ label: `${g.label} (${g.pages.length})`, value: g.key })),
+                ]}
+              />
+            </Space>
             <Text type="secondary">
               Showing {filteredCrawlPages.length} of {crawlPages.length} pages
             </Text>
@@ -1391,6 +1419,59 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       ),
     },
     {
+      key: 'groups',
+      label: `Groups (${groups.length})`,
+      children: (
+        <div>
+          <Flex justify="space-between" align="center" wrap gap={12} style={{ marginBottom: 16 }}>
+            <Text type="secondary">
+              Pages are grouped by the first part of their address: /services/seo belongs to Services (/services/*). Pages directly
+              under the site address are Top-level pages.
+            </Text>
+            <Space>
+              <Button disabled={crawlPages.length === 0} onClick={() => setGenerate('sitemap')}>Generate sitemap.xml</Button>
+              <Button disabled={crawlPages.length === 0} onClick={() => setGenerate('robots')}>Generate robots.txt</Button>
+            </Space>
+          </Flex>
+          {groups.length === 0 ? (
+            <Empty description="No pages crawled yet" />
+          ) : (
+            <Table
+              rowKey="key"
+              size="middle"
+              pagination={false}
+              dataSource={groups}
+              columns={[
+                { title: 'Group', dataIndex: 'label', render: (v: string) => <Text strong>{v}</Text> },
+                { title: 'Address', dataIndex: 'prefix', render: (v: string, g) => <Text code>{g.key === '/' ? '/ (and /page)' : `${v}*`}</Text> },
+                { title: 'Pages', key: 'total', width: 90, align: 'center', sorter: (a, b) => a.pages.length - b.pages.length, render: (_: unknown, g) => g.pages.length },
+                { title: 'OK', dataIndex: 'ok', width: 80, align: 'center', render: (v: number) => <Tag color="green" style={{ margin: 0 }}>{v}</Tag> },
+                { title: 'Broken', dataIndex: 'broken', width: 90, align: 'center', render: (v: number) => (v > 0 ? <Tag color="red" style={{ margin: 0 }}>{v}</Tag> : '-') },
+                { title: 'Other', dataIndex: 'other', width: 90, align: 'center', render: (v: number) => (v > 0 ? v : '-') },
+                {
+                  title: '',
+                  key: 'open',
+                  width: 130,
+                  render: (_: unknown, g) => (
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setGroupFilter(g.key)
+                        setStatusFilter('all')
+                        setActiveTab('pages')
+                      }}
+                    >
+                      View pages
+                    </Button>
+                  ),
+                },
+              ]}
+            />
+          )}
+        </div>
+      ),
+    },
+    {
       key: 'share-preview',
       label: 'Share Preview',
       children: (
@@ -1458,7 +1539,16 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
               </Space>
             </div>
 
-            <Tabs items={tabItems} />
+            <Tabs items={tabItems} activeKey={activeTab} onChange={setActiveTab} />
+            {generate ? (
+              <CrawlGenerateModal
+                kind={generate}
+                open
+                onClose={() => setGenerate(null)}
+                pages={crawlPages as unknown as CrawlPageLite[]}
+                websiteUrl={crawlSession.company_websites?.url}
+              />
+            ) : null}
           {/* </Card> */}
         </Content>
       </AdminMainColumn>

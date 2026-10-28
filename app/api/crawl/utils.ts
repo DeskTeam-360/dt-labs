@@ -4,9 +4,11 @@ import { db } from '@/lib/db'
 import { companyWebsites, crawlPages, crawlSessions } from '@/lib/db/schema'
 
 // Normalize URL to avoid duplicate crawling (normalize trailing slash)
+// The #fragment is never part of the page: /who-we-help/#practices and /who-we-help/#small are the same page.
 // For root URLs (e.g., https://example.com/ and https://example.com), always use with trailing slash
 // For other URLs, remove trailing slash
 export function normalizeUrl(url: string): string {
+  url = url.replace(/#.*$/, '')
   try {
     const urlObj = new URL(url)
     // For root URLs (pathname is '/' or empty), always use with trailing slash
@@ -325,7 +327,9 @@ export async function startCrawlProcess(
       const linkMatches = html.matchAll(/<a[^>]*href=["']([^"']+)["'][^>]*>/gi)
       const links: string[] = []
       for (const match of linkMatches) {
-        let linkUrl = match[1]
+        // The part after # only points inside the page, so the page address ends before it.
+        let linkUrl = match[1].replace(/#.*$/, '')
+        if (!linkUrl) continue
         // Convert relative URLs to absolute
         if (linkUrl.startsWith('/')) {
           try {
