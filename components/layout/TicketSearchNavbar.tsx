@@ -2,7 +2,7 @@
 
 import 'dayjs/locale/en'
 
-import { CloseOutlined, HistoryOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons'
+import { CloseOutlined, HistoryOutlined, SearchOutlined, SettingOutlined, StarFilled, StarOutlined } from '@ant-design/icons'
 import { Button, Input, Modal, Popover, Space, Spin, Switch, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -22,9 +22,11 @@ import {
 } from '@/lib/ticket-activity-labels'
 import {
   loadSavedTicketFilterPresets,
+  refreshSavedTicketFilterPresets,
   removeSavedTicketFilterPreset,
   SAVED_FILTERS_CHANGED_EVENT,
   type SavedTicketFilterPreset,
+  setDefaultTicketFilterPreset,
 } from '@/lib/ticket-saved-filters'
 
 dayjs.extend(relativeTime)
@@ -136,6 +138,7 @@ export default function TicketSearchNavbar({
     }
     const load = () => setSavedPresets(loadSavedTicketFilterPresets(savedFiltersUserId))
     load()
+    void refreshSavedTicketFilterPresets(savedFiltersUserId)
     window.addEventListener(SAVED_FILTERS_CHANGED_EVENT, load)
     return () => window.removeEventListener(SAVED_FILTERS_CHANGED_EVENT, load)
   }, [savedFiltersUserId])
@@ -589,6 +592,28 @@ export default function TicketSearchNavbar({
                 >
                   {p.name}
                 </SpaNavLink>
+                <button
+                  type="button"
+                  aria-label={p.isDefault ? `Stop opening ${p.name} first` : `Open ${p.name} first`}
+                  title={p.isDefault ? 'Default view: opens first. Click to remove.' : 'Make this the view that opens first'}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (savedFiltersUserId) void setDefaultTicketFilterPreset(savedFiltersUserId, p.id, !p.isDefault)
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    padding: '4px 4px',
+                    lineHeight: 1,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    color: p.isDefault ? '#faad14' : 'var(--ticket-nav-muted)',
+                  }}
+                >
+                  {p.isDefault ? <StarFilled style={{ fontSize: 11 }} /> : <StarOutlined style={{ fontSize: 11 }} />}
+                </button>
                 <button
                   type="button"
                   aria-label={`Remove ${p.name}`}

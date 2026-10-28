@@ -45,7 +45,7 @@ interface FilterSidebarProps {
   /** When true, show only Status, Type, created/due date ranges, Search */
   isCustomer?: boolean
   /** Staff/admin: save current filters as a named shortcut (navbar). */
-  onSaveViewPreset?: (name: string) => { ok: boolean; error?: string }
+  onSaveViewPreset?: (name: string) => Promise<{ ok: boolean; error?: string }>
 }
 
 export default function FilterSidebar({
@@ -317,9 +317,9 @@ export default function FilterSidebar({
         <Form
           form={savePresetForm}
           layout="vertical"
-          onFinish={(v) => {
+          onFinish={async (v) => {
             if (!onSaveViewPreset) return
-            const r = onSaveViewPreset((v.name || '').trim())
+            const r = await onSaveViewPreset((v.name || '').trim())
             if (r.ok) {
               message.success('Saved next to search bar')
               setSavePresetOpen(false)

@@ -6,6 +6,7 @@ import {
   ClockCircleOutlined,
   DashboardOutlined,
   DeleteOutlined,
+  EditOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   ReadOutlined,
@@ -27,6 +28,7 @@ import {
   canAccessTickets,
   isSettingsHrefPathname,
 } from '@/lib/auth-utils'
+import { applyMenuPreferences, type MenuPreferences } from '@/lib/sidebar-menu'
 
 const { Sider } = Layout
 
@@ -81,6 +83,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
   const [openKeys, setOpenKeys] = useState<string[]>([])
   const [appName, setAppName] = useState<string>(process.env.NEXT_PUBLIC_APP_NAME ?? 'DeskTeam360')
   const [appLogoUrl, setAppLogoUrl] = useState<string | null>(null)
+  const [menuPrefs, setMenuPrefs] = useState<MenuPreferences | null>(null)
 
   useEffect(() => {
     fetch('/api/app-settings')
@@ -92,13 +95,22 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       .catch(() => {})
   }, [])
 
+  // Staff can reorder and hide items (My menu); customers keep the fixed menu.
+  useEffect(() => {
+    if (!role || isCustomer) return
+    fetch('/api/menu-preferences', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p: MenuPreferences | null) => setMenuPrefs(p))
+      .catch(() => setMenuPrefs(null))
+  }, [role, isCustomer])
+
   const linkLabel = (path: string, text: string) => (
     <SpaNavLink href={path} title={text} className="admin-sidebar-menu-link" onClick={(e) => e.stopPropagation()}>
       {text}
     </SpaNavLink>
   )
 
-  const menuItems = [
+  const defaultMenuItems = [
     {
       key: '/dashboard',
       icon: <DashboardOutlined />,
@@ -197,6 +209,8 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
     if (item.key === '/settings' && !canAccessSettingsHub(role)) return false
     return true
   })
+
+  const menuItems = menuPrefs && !isCustomer ? applyMenuPreferences(defaultMenuItems, menuPrefs) : defaultMenuItems
 
   const selectedKeys = useMemo(
     () => selectedKeysForPathname(pathname, pathname?.startsWith('/tickets') ? ticketsListSearch : ''),
@@ -311,6 +325,11 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         />
       </div>
 
+      {!isCustomer && !collapsed ? (
+        <SpaNavLink href="/my-menu" title="Customize menu" className="admin-sidebar-menu-link" style={{ display: 'block', padding: '12px 24px', color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
+          <EditOutlined /> Customize menu
+        </SpaNavLink>
+      ) : null}
     </Sider>
   )
 }

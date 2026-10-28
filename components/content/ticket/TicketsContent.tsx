@@ -15,7 +15,7 @@ import TicketsListView from '@/components/ticket/list/TicketsListView'
 import TicketsRoundRobinView from '@/components/ticket/list/TicketsRoundRobinView'
 import { useTicketsData } from '@/components/ticket/list/useTicketsData'
 import { canDeleteTickets, isAdmin } from '@/lib/auth-utils'
-import { addSavedTicketFilterPreset } from '@/lib/ticket-saved-filters'
+import { addSavedTicketFilterPreset, refreshSavedTicketFilterPresets } from '@/lib/ticket-saved-filters'
 
 interface TicketsContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string }
@@ -53,6 +53,23 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     const q = next.toString()
     router.replace(q ? `/tickets?${q}` : '/tickets', { scroll: false })
   }, [searchParams, router])
+
+  // The default view opens once per browser tab, and only when /tickets is opened without filters of its own.
+  useEffect(() => {
+    if (searchParams.toString()) return
+    try {
+      if (sessionStorage.getItem('deskteam-default-ticket-view-applied') === '1') return
+      sessionStorage.setItem('deskteam-default-ticket-view-applied', '1')
+    } catch {
+      return
+    }
+    void refreshSavedTicketFilterPresets(currentUser.id).then((list) => {
+      const def = list.find((p) => p.isDefault)
+      if (def?.query) router.replace(`/tickets?${def.query}`, { scroll: false })
+    })
+    // Runs once when the page opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const isCustomer = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'customer'
   const canDeleteTicket = canDeleteTickets(currentUser.role)
