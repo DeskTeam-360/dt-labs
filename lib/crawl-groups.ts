@@ -161,8 +161,33 @@ export function generateSitemapXml(pages: CrawlPageLite[], opts: SitemapOptions)
   return { xml, count: lines.length }
 }
 
+export type AiBot = { agent: string; owner: string; note: string; defaultOn: boolean }
+
+/** Crawlers of AI products. Listing one with Allow lets it read the site; a bot with its own block ignores the * block. */
+export const AI_BOTS: AiBot[] = [
+  { agent: 'GPTBot', owner: 'OpenAI', note: 'collects pages for training', defaultOn: true },
+  { agent: 'OAI-SearchBot', owner: 'OpenAI', note: 'ChatGPT search results', defaultOn: true },
+  { agent: 'ChatGPT-User', owner: 'OpenAI', note: 'opens a page when a ChatGPT user asks for it', defaultOn: true },
+  { agent: 'ClaudeBot', owner: 'Anthropic', note: 'collects pages for training', defaultOn: true },
+  { agent: 'Claude-SearchBot', owner: 'Anthropic', note: 'Claude search results', defaultOn: true },
+  { agent: 'Claude-User', owner: 'Anthropic', note: 'opens a page when a Claude user asks for it', defaultOn: true },
+  { agent: 'PerplexityBot', owner: 'Perplexity', note: 'Perplexity search index', defaultOn: true },
+  { agent: 'Perplexity-User', owner: 'Perplexity', note: 'opens a page when a user asks for it', defaultOn: true },
+  { agent: 'Google-Extended', owner: 'Google', note: 'lets Gemini use the content (search ranking is not affected)', defaultOn: true },
+  { agent: 'Applebot-Extended', owner: 'Apple', note: 'lets Apple Intelligence use the content', defaultOn: true },
+  { agent: 'DuckAssistBot', owner: 'DuckDuckGo', note: 'DuckDuckGo AI answers', defaultOn: false },
+  { agent: 'Meta-ExternalAgent', owner: 'Meta', note: 'collects pages for Meta AI', defaultOn: false },
+  { agent: 'Amazonbot', owner: 'Amazon', note: 'Alexa and Amazon AI', defaultOn: false },
+  { agent: 'CCBot', owner: 'Common Crawl', note: 'open dataset many AI models learn from', defaultOn: false },
+  { agent: 'cohere-ai', owner: 'Cohere', note: 'Cohere AI', defaultOn: false },
+  { agent: 'MistralAI-User', owner: 'Mistral', note: 'opens a page when a Le Chat user asks for it', defaultOn: false },
+  { agent: 'Bytespider', owner: 'ByteDance', note: 'collects pages for ByteDance AI', defaultOn: false },
+]
+
 export type RobotsOptions = {
   origin: string
+  /** User-agent names of AI crawlers to let in explicitly */
+  aiBots?: string[]
   /** Group keys to block (Disallow) */
   blocked: string[]
   /** Extra Disallow paths, one per line */
@@ -182,6 +207,14 @@ export function generateRobotsTxt(opts: RobotsOptions): string {
   const unique = [...new Set(disallow.map((d) => (d.startsWith('/') ? d : `/${d}`)))]
   if (unique.length === 0) lines.push('Allow: /')
   else for (const d of unique) lines.push(`Disallow: ${d}`)
+  // A crawler that has its own block ignores the * block, so the AI bots repeat the same rules.
+  const bots = (opts.aiBots ?? []).filter(Boolean)
+  if (bots.length > 0) {
+    lines.push('', '# AI crawlers allowed to read the site (they follow the same rules as everyone else)')
+    for (const b of bots) lines.push(`User-agent: ${b}`)
+    if (unique.length === 0) lines.push('Allow: /')
+    else for (const d of unique) lines.push(`Disallow: ${d}`)
+  }
   if (opts.sitemap && opts.origin) lines.push('', `Sitemap: ${opts.origin}/sitemap.xml`)
   return lines.join('\n') + '\n'
 }

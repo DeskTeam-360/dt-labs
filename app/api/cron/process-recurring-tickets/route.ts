@@ -7,6 +7,7 @@
 import { and, eq, inArray, isNotNull, lte } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 
+import { runDueCrawlSchedules } from '@/lib/crawl-schedule-runner'
 import { db, recurringTicketRuns, recurringTickets, tags, ticketAssignees, tickets, ticketTags } from '@/lib/db'
 import { sendRecurringTicketCreatedEmail } from '@/lib/recurring-ticket-email'
 import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
@@ -29,6 +30,12 @@ export async function POST(req: NextRequest) {
 
   const now = new Date()
 
+  // Scheduled website crawls share this every-minute cron call.
+  const crawls = await runDueCrawlSchedules(now).catch((e) => {
+    console.error('[crawl-schedule] Runner failed:', e)
+    return { started: 0, failed: 0 }
+  })
+
   // Find all active rules whose nextRunAt is due
   const due = await db
     .select()
@@ -42,7 +49,7 @@ export async function POST(req: NextRequest) {
     )
 
   if (due.length === 0) {
-    return NextResponse.json({ processed: 0 })
+    return NextResponse.json({ processed: 0, crawls })
   }
 
   let created = 0
@@ -175,5 +182,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ processed: due.length, created, failed })
+  return NextResponse.json({ processed: due.length, created, failed, crawls })
 }

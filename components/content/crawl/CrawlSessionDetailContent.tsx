@@ -11,7 +11,10 @@ import DateDisplay from '@/components/common/DateDisplay'
 import CrawlGenerateModal from '@/components/content/crawl/CrawlGenerateModal'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { compareCrawls,type CompareRow } from '@/lib/crawl-compare'
 import { buildGroups, type CrawlPageLite, groupKeyOf } from '@/lib/crawl-groups'
+import { analyzeSeo, findBrokenLinks, SEO_ISSUE_LABELS, type SeoPage, summarizeByGroup } from '@/lib/crawl-seo'
+import { compareWithSitemap, type SiteFiles } from '@/lib/crawl-site-files'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -68,7 +71,60 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
   const [mainPagePreview, setMainPagePreview] = useState<CrawlPageRecord | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [groupFilter, setGroupFilter] = useState<string>('all')
-  const [activeTab, setActiveTab] = useState('overview')
+  const [seoCode, setSeoCode] = useState<string>('all')
+  const [otherSessions, setOtherSessions] = useState<Array<{ id: string; created_at: string; crawled_pages: number | null }>>([])
+  const [baselineId, setBaselineId] = useState<string | null>(null)
+  const [baselinePages, setBaselinePages] = useState<CrawlPageRecord[] | null>(null)
+  const [compareLoading, setCompareLoading] = useState(false)
+  const [compareKind, setCompareKind] = useState<string>('all')
+  const [siteFiles, setSiteFiles] = useState<SiteFiles | null>(null)
+  const [siteFilesLoading, setSiteFilesLoading] = useState(false)
+  const [siteFilesError, setSiteFilesError] = useState<string | null>(null)
+  const [siteList, setSiteList] = useState<string>('notCrawled')
+
+  const loadSiteFiles = async () => {
+    setSiteFilesLoading(true)
+    setSiteFilesError(null)
+    try {
+      const res = await fetch(`/api/crawl-sessions/${crawlSession.id}/site-files`, { credentials: 'include' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to read the website files')
+      setSiteFiles(json.data as SiteFiles)
+    } catch (e) {
+      setSiteFilesError(e instanceof Error ? e.message : 'Failed to read the website files')
+    } finally {
+      setSiteFilesLoading(false)
+    }
+  }
+
+  // earlier crawls of the same website are the ones a person can compare with
+  useEffect(() => {
+    let live = true
+    fetch('/api/crawl-sessions', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: Array<{ id: string; company_website_id: string | null; status: string; created_at: string; crawled_pages: number | null }>) => {
+        if (!live) return
+        setOtherSessions(rows.filter((r) => r.company_website_id === crawlSession.company_website_id && r.id !== crawlSession.id && r.status === 'completed'))
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [crawlSession.id, crawlSession.company_website_id])
+
+  const pickBaseline = async (id: string | null) => {
+    setBaselineId(id)
+    setBaselinePages(null)
+    if (!id) return
+    setCompareLoading(true)
+    try {
+      const res = await getCrawlPages(id)
+      if (res.error) message.error(res.error)
+      else setBaselinePages((res.data || []) as CrawlPageRecord[])
+    } finally {
+      setCompareLoading(false)
+    }
+  }
   const [generate, setGenerate] = useState<'sitemap' | 'robots' | null>(null)
 
   const getHeadingColor = (level: number) => {
@@ -516,14 +572,14 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                     border: isEmpty && isRequired ? crawlUi.errBorderSolid : crawlUi.neutralBorderSolid,
                   }}
                 >
-                  <div style={{ marginBottom: 4 }}>
-                    <Tag color={isRequired ? (isEmpty ? 'red' : 'green') : 'default'}>
-                      {isRequired ? 'Required' : 'Optional'}
-                    </Tag>
-                    <Text strong style={{ color: isEmpty && isRequired ? '#ff4d4f' : undefined }}>
+                  <Flex justify="space-between" align="center" gap={8} style={{ marginBottom: 4 }}>
+                    <Text strong style={{ color: isEmpty && isRequired ? '#ff4d4f' : undefined, wordBreak: 'break-word' }}>
                       {key}
                     </Text>
-                  </div>
+                    <Tag color={isRequired ? (isEmpty ? 'red' : 'green') : 'default'} style={{ margin: 0, flexShrink: 0 }}>
+                      {isRequired ? 'Required' : 'Optional'}
+                    </Tag>
+                  </Flex>
                   <Text
                     style={{
                       color: isEmpty && isRequired ? '#ff4d4f' : crawlUi.textSecondary,
@@ -1106,6 +1162,31 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
 
   const groups = buildGroups(crawlPages as unknown as CrawlPageLite[])
 
+  const compareRows: CompareRow[] = baselinePages ? compareCrawls(baselinePages as unknown as Parameters<typeof compareCrawls>[0], crawlPages as unknown as Parameters<typeof compareCrawls>[1]) : []
+  const compareShown = compareKind === 'all' ? compareRows : compareRows.filter((r) => r.kind === compareKind)
+  const compareKinds: Record<string, { label: string; color: string }> = {
+    added: { label: 'New', color: 'green' },
+    removed: { label: 'Gone', color: 'red' },
+    'newly-broken': { label: 'Newly broken', color: 'volcano' },
+    fixed: { label: 'Fixed', color: 'cyan' },
+    changed: { label: 'Changed', color: 'gold' },
+  }
+  const siteCmp = siteFiles ? compareWithSitemap(crawlPages as unknown as CrawlPageLite[], siteFiles) : null
+  const siteLists: Record<string, { label: string; hint: string; items: string[] }> = siteCmp
+    ? {
+        notCrawled: { label: 'In sitemap, not crawled', hint: 'The sitemap lists these but the crawler never reached them. Nothing links to them, or the crawl limit (depth / pages) stopped before them.', items: siteCmp.notCrawled },
+        notInSitemap: { label: 'Crawled, not in sitemap', hint: 'These pages load fine but the sitemap does not list them (pages with ? parameters are left out).', items: siteCmp.notInSitemap },
+        brokenInSitemap: { label: 'In sitemap, but broken', hint: 'The sitemap tells search engines about pages that fail or return an error.', items: siteCmp.brokenInSitemap },
+        blockedInSitemap: { label: 'In sitemap, blocked by robots.txt', hint: 'The sitemap and robots.txt contradict each other for these pages.', items: siteCmp.blockedInSitemap },
+        crawledButBlocked: { label: 'Crawled, blocked by robots.txt', hint: 'Search engines are told not to fetch these, although the crawler could open them.', items: siteCmp.crawledButBlocked },
+      }
+    : {}
+  const brokenLinks = findBrokenLinks(crawlPages as unknown as Parameters<typeof findBrokenLinks>[0]).filter((b) => groupFilter === 'all' || b.groupKey === groupFilter)
+  const seoIssues = analyzeSeo(crawlPages as unknown as SeoPage[])
+  const seoInGroup = groupFilter === 'all' ? seoIssues : seoIssues.filter((i) => i.groupKey === groupFilter)
+  const seoFiltered = seoCode === 'all' ? seoInGroup : seoInGroup.filter((i) => i.code === seoCode)
+  const seoGroups = summarizeByGroup(crawlPages as unknown as SeoPage[], seoIssues).filter((g) => groupFilter === 'all' || g.key === groupFilter)
+
   // Get unique statuses from crawl pages for filter options
   const availableStatuses: string[] = Array.from(new Set(crawlPages.map(page => page.status))).sort()
 
@@ -1114,6 +1195,8 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       title: 'URL',
       dataIndex: 'url',
       key: 'url',
+      sorter: (a: CrawlPageRecord, b: CrawlPageRecord) => a.url.localeCompare(b.url),
+      sortDirections: ['ascend', 'descend'],
       render: (url: string, record: CrawlPageRecord) => (
         <a 
           href={url} 
@@ -1131,11 +1214,14 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       dataIndex: 'title',
       key: 'title',
       ellipsis: true,
+      sorter: (a: CrawlPageRecord, b: CrawlPageRecord) => (a.title ?? '').localeCompare(b.title ?? ''),
+      sortDirections: ['ascend', 'descend'],
     },
     {
       title: 'Group',
       key: 'group',
       width: 150,
+      sorter: (a: CrawlPageRecord, b: CrawlPageRecord) => groupKeyOf(a.url).localeCompare(groupKeyOf(b.url)),
       render: (_: unknown, record: CrawlPageRecord) => {
         const g = groups.find((x) => x.key === groupKeyOf(record.url))
         return <Tag style={{ margin: 0 }}>{g?.label ?? '-'}</Tag>
@@ -1146,11 +1232,13 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       dataIndex: 'depth',
       key: 'depth',
       width: 80,
+      sorter: (a: CrawlPageRecord, b: CrawlPageRecord) => a.depth - b.depth,
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      sorter: (a: CrawlPageRecord, b: CrawlPageRecord) => a.status.localeCompare(b.status),
       render: (status: string) => (
         <Tag color={getStatusColor(status)} style={{ textTransform: 'uppercase' }}>
           {status}
@@ -1162,6 +1250,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       title: 'HTTP Status',
       dataIndex: 'http_status_code',
       key: 'http_status_code',
+      sorter: (a: CrawlPageRecord, b: CrawlPageRecord) => (a.http_status_code ?? 0) - (b.http_status_code ?? 0),
       render: (code: number | null) => code ? (
         <Tag color={code >= 200 && code < 300 ? 'green' : code >= 300 && code < 400 ? 'orange' : 'red'}>
           {code}
@@ -1172,6 +1261,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
     {
       title: 'Crawled At',
       key: 'crawled_at',
+      sorter: (a: CrawlPageRecord, b: CrawlPageRecord) => (a.crawled_at ?? '').localeCompare(b.crawled_at ?? ''),
       render: (_, record) => record.crawled_at ? <DateDisplay date={record.crawled_at} /> : '-',
     },
     {
@@ -1331,6 +1421,10 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                 ]}
               />
             </Space>
+            <Space>
+              <Button disabled={crawlPages.length === 0} onClick={() => setGenerate('sitemap')}>Generate sitemap.xml</Button>
+              <Button disabled={crawlPages.length === 0} onClick={() => setGenerate('robots')}>Generate robots.txt</Button>
+            </Space>
             <Text type="secondary">
               Showing {filteredCrawlPages.length} of {crawlPages.length} pages
             </Text>
@@ -1419,54 +1513,278 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       ),
     },
     {
-      key: 'groups',
-      label: `Groups (${groups.length})`,
+      key: 'broken-links',
+      label: `Broken Links (${brokenLinks.length})`,
       children: (
         <div>
-          <Flex justify="space-between" align="center" wrap gap={12} style={{ marginBottom: 16 }}>
+          <Flex justify="space-between" align="center" wrap gap={12} style={{ marginBottom: 12 }}>
             <Text type="secondary">
-              Pages are grouped by the first part of their address: /services/seo belongs to Services (/services/*). Pages directly
-              under the site address are Top-level pages.
+              Pages that failed or returned an error, and the pages that link to them. Fix the link on those pages, or restore the broken page.
+              Crawls made before this update only list part of the linking pages; run a new crawl for the full list.
             </Text>
             <Space>
-              <Button disabled={crawlPages.length === 0} onClick={() => setGenerate('sitemap')}>Generate sitemap.xml</Button>
-              <Button disabled={crawlPages.length === 0} onClick={() => setGenerate('robots')}>Generate robots.txt</Button>
+              <Text strong>Group:</Text>
+              <Select
+                value={groupFilter}
+                onChange={setGroupFilter}
+                style={{ width: 220 }}
+                options={[{ label: 'All groups', value: 'all' }, ...groups.map((g) => ({ label: `${g.label} (${g.pages.length})`, value: g.key }))]}
+              />
             </Space>
           </Flex>
-          {groups.length === 0 ? (
-            <Empty description="No pages crawled yet" />
+          {brokenLinks.length === 0 ? (
+            <Empty description="No broken pages found" />
           ) : (
             <Table
-              rowKey="key"
               size="middle"
-              pagination={false}
-              dataSource={groups}
+              rowKey="url"
+              dataSource={brokenLinks}
+              pagination={{ defaultPageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} broken pages` }}
               columns={[
-                { title: 'Group', dataIndex: 'label', render: (v: string) => <Text strong>{v}</Text> },
-                { title: 'Address', dataIndex: 'prefix', render: (v: string, g) => <Text code>{g.key === '/' ? '/ (and /page)' : `${v}*`}</Text> },
-                { title: 'Pages', key: 'total', width: 90, align: 'center', sorter: (a, b) => a.pages.length - b.pages.length, render: (_: unknown, g) => g.pages.length },
-                { title: 'OK', dataIndex: 'ok', width: 80, align: 'center', render: (v: number) => <Tag color="green" style={{ margin: 0 }}>{v}</Tag> },
-                { title: 'Broken', dataIndex: 'broken', width: 90, align: 'center', render: (v: number) => (v > 0 ? <Tag color="red" style={{ margin: 0 }}>{v}</Tag> : '-') },
-                { title: 'Other', dataIndex: 'other', width: 90, align: 'center', render: (v: number) => (v > 0 ? v : '-') },
                 {
-                  title: '',
-                  key: 'open',
-                  width: 130,
-                  render: (_: unknown, g) => (
-                    <Button
-                      size="small"
-                      onClick={() => {
-                        setGroupFilter(g.key)
-                        setStatusFilter('all')
-                        setActiveTab('pages')
-                      }}
-                    >
-                      View pages
-                    </Button>
-                  ),
+                  title: 'Broken page',
+                  dataIndex: 'url',
+                  ellipsis: true,
+                  sorter: (x, y) => x.url.localeCompare(y.url),
+                  render: (v: string) => <a href={v} target="_blank" rel="noopener noreferrer">{v}</a>,
+                },
+                {
+                  title: 'Status',
+                  dataIndex: 'statusCode',
+                  width: 110,
+                  sorter: (x, y) => (x.statusCode ?? 0) - (y.statusCode ?? 0),
+                  render: (v: number | null, r) => <Tag color="red" style={{ margin: 0 }}>{v ?? r.status}</Tag>,
+                },
+                {
+                  title: 'Found on',
+                  dataIndex: 'foundOn',
+                  sorter: (x, y) => x.foundOn.length - y.foundOn.length,
+                  render: (v: string[]) =>
+                    v.length === 0 ? (
+                      <Text type="secondary">Not recorded</Text>
+                    ) : (
+                      <div>
+                        <Text type="secondary">{v.length} page(s)</Text>
+                        <div style={{ maxHeight: 120, overflowY: 'auto' }}>
+                          {v.map((u) => (
+                            <div key={u} style={{ wordBreak: 'break-all' }}>
+                              <a href={u} target="_blank" rel="noopener noreferrer">{u}</a>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ),
                 },
               ]}
             />
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'compare',
+      label: 'Compare',
+      children: (
+        <div>
+          <Flex align="center" gap={12} wrap style={{ marginBottom: 12 }}>
+            <Text strong>Compare this crawl with an earlier one:</Text>
+            <Select
+              allowClear
+              showSearch={false}
+              placeholder={otherSessions.length ? 'Choose a crawl' : 'No other completed crawl of this website'}
+              disabled={otherSessions.length === 0}
+              value={baselineId ?? undefined}
+              onChange={(v) => void pickBaseline(v ?? null)}
+              style={{ minWidth: 320 }}
+              options={otherSessions.map((o) => ({ value: o.id, label: `${new Date(o.created_at).toLocaleString()} · ${o.crawled_pages ?? 0} pages` }))}
+            />
+          </Flex>
+          {!baselineId ? (
+            <Text type="secondary">Pick the crawl from before a redesign or migration to see which pages are new, gone, newly broken, fixed or changed (title, description, status).</Text>
+          ) : compareLoading || !baselinePages ? (
+            <Text type="secondary">Loading…</Text>
+          ) : (
+            <>
+              <Flex gap={8} wrap style={{ marginBottom: 12 }}>
+                <Tag.CheckableTag checked={compareKind === 'all'} onChange={() => setCompareKind('all')}>All ({compareRows.length})</Tag.CheckableTag>
+                {Object.entries(compareKinds).map(([k, m]) => {
+                  const n = compareRows.filter((r) => r.kind === k).length
+                  return n === 0 ? null : (
+                    <Tag.CheckableTag key={k} checked={compareKind === k} onChange={() => setCompareKind(compareKind === k ? 'all' : k)}>
+                      {m.label} ({n})
+                    </Tag.CheckableTag>
+                  )
+                })}
+              </Flex>
+              <Table
+                size="middle"
+                rowKey="key"
+                dataSource={compareShown}
+                locale={{ emptyText: 'No differences' }}
+                pagination={{ defaultPageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} pages` }}
+                columns={[
+                  {
+                    title: 'Page',
+                    dataIndex: 'url',
+                    ellipsis: true,
+                    sorter: (x, y) => x.url.localeCompare(y.url),
+                    render: (v: string) => <a href={v} target="_blank" rel="noopener noreferrer">{v}</a>,
+                  },
+                  {
+                    title: 'Change',
+                    dataIndex: 'kind',
+                    width: 140,
+                    sorter: (x, y) => x.kind.localeCompare(y.kind),
+                    render: (k: string) => <Tag color={compareKinds[k]?.color} style={{ margin: 0 }}>{compareKinds[k]?.label ?? k}</Tag>,
+                  },
+                  {
+                    title: 'Details',
+                    dataIndex: 'changes',
+                    render: (c: CompareRow['changes']) =>
+                      c.map((x) => (
+                        <div key={x.field} style={{ wordBreak: 'break-word' }}>
+                          <Text strong style={{ textTransform: 'capitalize' }}>{x.field}: </Text>
+                          <Text delete type="secondary">{x.before || '(empty)'}</Text> → <Text>{x.after || '(empty)'}</Text>
+                        </div>
+                      )),
+                  },
+                ]}
+              />
+            </>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'site-files',
+      label: 'Sitemap & robots',
+      children: (
+        <div>
+          <Flex align="center" gap={12} wrap style={{ marginBottom: 12 }}>
+            <Button type="primary" loading={siteFilesLoading} onClick={() => void loadSiteFiles()}>
+              {siteFiles ? 'Read again' : "Read the website's robots.txt and sitemap"}
+            </Button>
+            <Text type="secondary">Reads the files live from the website and compares them with the pages this crawl found.</Text>
+          </Flex>
+          {siteFilesError ? <Text type="danger">{siteFilesError}</Text> : null}
+          {siteFiles && siteCmp ? (
+            <>
+              <Descriptions size="small" bordered column={1} style={{ marginBottom: 16 }}>
+                <Descriptions.Item label="robots.txt">
+                  {siteFiles.robots?.text ? `Found (${siteFiles.robots.text.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith('#')).length} lines)` : `Not found (HTTP ${siteFiles.robots?.status ?? 'no answer'})`}
+                </Descriptions.Item>
+                <Descriptions.Item label="Sitemaps">
+                  {siteFiles.sitemaps.length === 0
+                    ? 'None'
+                    : siteFiles.sitemaps.map((m) => (
+                        <div key={m.url}>
+                          <a href={m.url} target="_blank" rel="noopener noreferrer">{m.url}</a>{' '}
+                          <Text type="secondary">{m.status === 200 ? `${m.count} entries` : `HTTP ${m.status ?? 'no answer'}`}</Text>
+                        </div>
+                      ))}
+                </Descriptions.Item>
+                <Descriptions.Item label="Matched">{siteCmp.matched} page(s) are in the sitemap and crawled fine ({siteFiles.urls.length} URLs in the sitemap in total)</Descriptions.Item>
+              </Descriptions>
+              {siteFiles.truncated ? <Text type="warning">The sitemap is very large: only the first {siteFiles.urls.length} URLs were read.</Text> : null}
+              <Flex gap={8} wrap style={{ marginBottom: 8 }}>
+                {Object.entries(siteLists).map(([k, l]) => (
+                  <Tag.CheckableTag key={k} checked={siteList === k} onChange={() => setSiteList(k)}>
+                    {l.label} ({l.items.length})
+                  </Tag.CheckableTag>
+                ))}
+              </Flex>
+              <div style={{ marginBottom: 8 }}>
+                <Text type="secondary">{siteLists[siteList]?.hint}</Text>
+              </div>
+              <Table
+                size="small"
+                rowKey="url"
+                dataSource={(siteLists[siteList]?.items ?? []).map((url) => ({ url }))}
+                locale={{ emptyText: 'Nothing here' }}
+                pagination={{ defaultPageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} pages` }}
+                columns={[{ title: 'Page', dataIndex: 'url', sorter: (x, y) => x.url.localeCompare(y.url), render: (v: string) => <a href={v} target="_blank" rel="noopener noreferrer">{v}</a> }]}
+              />
+            </>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: 'seo',
+      label: `SEO Issues (${seoFiltered.length})`,
+      children: (
+        <div>
+          <Flex justify="space-between" align="center" wrap gap={12} style={{ marginBottom: 12 }}>
+            <Text type="secondary">
+              Checks on pages that loaded fine: titles and descriptions (missing, too short or long, duplicate), H1 headings and noindex.
+              Each page is counted once, whatever comes after # in its address.
+            </Text>
+            <Space>
+              <Text strong>Group:</Text>
+              <Select
+                value={groupFilter}
+                onChange={setGroupFilter}
+                style={{ width: 220 }}
+                options={[{ label: 'All groups', value: 'all' }, ...groups.map((g) => ({ label: `${g.label} (${g.pages.length})`, value: g.key }))]}
+              />
+            </Space>
+          </Flex>
+          {seoIssues.length === 0 ? (
+            <Empty description={crawlPages.length === 0 ? 'No pages crawled yet' : 'No SEO issues found'} />
+          ) : (
+            <>
+              <Flex gap={8} wrap style={{ marginBottom: 12 }}>
+                <Tag.CheckableTag checked={seoCode === 'all'} onChange={() => setSeoCode('all')}>All ({seoInGroup.length})</Tag.CheckableTag>
+                {Object.entries(SEO_ISSUE_LABELS).map(([code, meta]) => {
+                  const n = seoInGroup.filter((i) => i.code === code).length
+                  if (n === 0) return null
+                  return (
+                    <Tag.CheckableTag key={code} checked={seoCode === code} onChange={() => setSeoCode(seoCode === code ? 'all' : code)}>
+                      {meta.label} ({n})
+                    </Tag.CheckableTag>
+                  )
+                })}
+              </Flex>
+              <Table
+                size="small"
+                bordered
+                style={{ marginBottom: 16 }}
+                pagination={false}
+                rowKey="key"
+                dataSource={seoGroups}
+                columns={[
+                  { title: 'Group', dataIndex: 'label', render: (v: string) => <Text strong>{v}</Text> },
+                  { title: 'Pages checked', dataIndex: 'pages', width: 130, align: 'center', sorter: (x, y) => x.pages - y.pages },
+                  { title: 'Errors', dataIndex: 'error', width: 100, align: 'center', sorter: (x, y) => x.error - y.error, render: (v: number) => (v ? <Tag color="red" style={{ margin: 0 }}>{v}</Tag> : '-') },
+                  { title: 'Warnings', dataIndex: 'warning', width: 100, align: 'center', sorter: (x, y) => x.warning - y.warning, render: (v: number) => (v ? <Tag color="orange" style={{ margin: 0 }}>{v}</Tag> : '-') },
+                  { title: 'Info', dataIndex: 'info', width: 90, align: 'center', render: (v: number) => (v ? v : '-') },
+                ]}
+              />
+              <Table
+                size="middle"
+                rowKey="id"
+                dataSource={seoFiltered}
+                pagination={{ defaultPageSize: 20, showSizeChanger: true, showTotal: (t) => `${t} issues` }}
+                columns={[
+                  {
+                    title: 'Page',
+                    dataIndex: 'url',
+                    ellipsis: true,
+                    sorter: (x, y) => x.url.localeCompare(y.url),
+                    render: (v: string) => <a href={v} target="_blank" rel="noopener noreferrer">{v}</a>,
+                  },
+                  { title: 'Issue', dataIndex: 'label', width: 230, sorter: (x, y) => x.label.localeCompare(y.label) },
+                  {
+                    title: 'Severity',
+                    dataIndex: 'severity',
+                    width: 110,
+                    sorter: (x, y) => ['error', 'warning', 'info'].indexOf(x.severity) - ['error', 'warning', 'info'].indexOf(y.severity),
+                    render: (v: string) => <Tag color={v === 'error' ? 'red' : v === 'warning' ? 'orange' : 'blue'} style={{ margin: 0, textTransform: 'capitalize' }}>{v}</Tag>,
+                  },
+                  { title: 'Detail', dataIndex: 'detail', ellipsis: true },
+                ]}
+              />
+            </>
           )}
         </div>
       ),
@@ -1539,7 +1857,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
               </Space>
             </div>
 
-            <Tabs items={tabItems} activeKey={activeTab} onChange={setActiveTab} />
+            <Tabs items={tabItems} />
             {generate ? (
               <CrawlGenerateModal
                 kind={generate}

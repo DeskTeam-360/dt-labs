@@ -340,3 +340,5 @@ export async function sendNoteAddedNotificationEmail(params: {
     await sendRawEmail(gmailSender, recipient.email, subject, bodyHtml, fromHeader)
   }
 }
+
+export { getGmailSender, sendRawEmail }

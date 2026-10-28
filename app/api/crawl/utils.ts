@@ -348,9 +348,12 @@ export async function startCrawlProcess(
           const linkDomain = new URL(linkUrl).hostname
           // Normalize link URL for duplicate checking
           const normalizedLinkUrl = normalizeUrl(linkUrl)
-          if (linkDomain === currentDomain && !visitedUrls.has(normalizedLinkUrl) && depth < maxDepth) {
-            links.push(linkUrl)
-            queue.push({ url: linkUrl, depth: depth + 1 })
+          if (linkDomain === currentDomain) {
+            // Every internal link is kept (once per page) so a broken page can be traced to the pages that link to it.
+            if (!links.includes(linkUrl)) links.push(linkUrl)
+            if (!visitedUrls.has(normalizedLinkUrl) && depth < maxDepth) {
+              queue.push({ url: linkUrl, depth: depth + 1 })
+            }
           }
         } catch {
           continue

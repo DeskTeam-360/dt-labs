@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckCircleOutlined, CloseCircleOutlined, DeleteOutlined, EyeOutlined, GlobalOutlined,PlayCircleOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EyeOutlined, GlobalOutlined,PlayCircleOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, Card, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Progress, Select, Space, Spin,Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useRouter } from 'next/navigation'
@@ -8,6 +8,7 @@ import { useEffect,useState } from 'react'
 
 import { startCrawl } from '@/app/actions/crawl'
 import DateDisplay from '@/components/common/DateDisplay'
+import CrawlSchedulesModal from '@/components/content/crawl/CrawlSchedulesModal'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { APP_TABLE_PAGE_SIZE_OPTIONS } from '@/lib/app-table'
@@ -72,6 +73,7 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
   const [companies, setCompanies] = useState<any[]>([])
   const [companyWebsites, setCompanyWebsites] = useState<CompanyWebsiteRecord[]>([])
   const [loadingWebsites, setLoadingWebsites] = useState(false)
+  const [schedulesOpen, setSchedulesOpen] = useState(false)
 
   const fetchCrawlSessions = async () => {
     setLoading(true)
@@ -314,6 +316,9 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
               >
                 Start New Crawl
               </Button>
+              <Button size="large" icon={<ClockCircleOutlined />} onClick={() => setSchedulesOpen(true)}>
+                Scheduled crawls
+              </Button>
               <Text type="secondary">Manage crawl sessions</Text>
             </Space>
 
@@ -347,6 +352,13 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
               </Card>
             )}
           </Card>
+
+          <CrawlSchedulesModal
+            open={schedulesOpen}
+            onClose={() => setSchedulesOpen(false)}
+            defaultEmail={currentUser.email}
+            websites={[...new Map(crawlSessions.filter((c) => c.company_websites).map((c) => [c.company_website_id, { id: c.company_website_id, url: c.company_websites!.url, company: c.company_websites!.companies?.name ?? '-' }])).values()]}
+          />
 
           <Modal
             title="Start New Crawl Session"

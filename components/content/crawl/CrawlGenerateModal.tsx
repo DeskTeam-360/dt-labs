@@ -5,6 +5,7 @@ import { Alert, Button, Checkbox, Flex, Input, message, Modal, Space, Typography
 import { useEffect, useMemo, useState } from 'react'
 
 import {
+  AI_BOTS,
   buildGroups,
   type CrawlPageLite,
   downloadTextFile,
@@ -43,6 +44,7 @@ export default function CrawlGenerateModal({
   const [blocked, setBlocked] = useState<string[]>([])
   const [extra, setExtra] = useState('')
   const [withSitemap, setWithSitemap] = useState(true)
+  const [aiBots, setAiBots] = useState<string[]>(() => AI_BOTS.filter((b) => b.defaultOn).map((b) => b.agent))
   // the text itself can be edited by hand
   const [text, setText] = useState('')
   const [edited, setEdited] = useState(false)
@@ -56,8 +58,8 @@ export default function CrawlGenerateModal({
 
   const generated = useMemo(() => {
     if (kind === 'sitemap') return generateSitemapXml(pages, { groups: included, skipQuery, skipNoindex, addLastmod, addPriority })
-    return { xml: generateRobotsTxt({ origin, blocked, extraDisallow: extra, sitemap: withSitemap }), count: blocked.length }
-  }, [kind, pages, included, skipQuery, skipNoindex, addLastmod, addPriority, origin, blocked, extra, withSitemap])
+    return { xml: generateRobotsTxt({ origin, blocked, extraDisallow: extra, sitemap: withSitemap, aiBots }), count: blocked.length }
+  }, [kind, pages, included, skipQuery, skipNoindex, addLastmod, addPriority, origin, blocked, extra, withSitemap, aiBots])
 
   useEffect(() => {
     if (!edited) setText(generated.xml)
@@ -145,6 +147,33 @@ export default function CrawlGenerateModal({
                   setEdited(false)
                 }}
               />
+            </div>
+            <div>
+              <Flex justify="space-between" align="center">
+                <Text strong>Let AI crawlers read the site</Text>
+                <Space size={0}>
+                  <Button type="link" size="small" onClick={() => { setAiBots(AI_BOTS.map((b) => b.agent)); setEdited(false) }}>All</Button>
+                  <Button type="link" size="small" onClick={() => { setAiBots(AI_BOTS.filter((b) => b.defaultOn).map((b) => b.agent)); setEdited(false) }}>Recommended</Button>
+                  <Button type="link" size="small" onClick={() => { setAiBots([]); setEdited(false) }}>None</Button>
+                </Space>
+              </Flex>
+              <Checkbox.Group
+                value={aiBots}
+                onChange={(v) => {
+                  setAiBots(v as string[])
+                  setEdited(false)
+                }}
+                style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}
+              >
+                {AI_BOTS.map((b) => (
+                  <Checkbox key={b.agent} value={b.agent}>
+                    <Text strong>{b.agent}</Text> <Text type="secondary">· {b.owner}, {b.note}</Text>
+                  </Checkbox>
+                ))}
+              </Checkbox.Group>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Ticked crawlers get their own entry in the file. Without it they are already allowed unless a rule blocks them. Untick one to leave it out.
+              </Text>
             </div>
             <Checkbox checked={withSitemap} onChange={(e) => { setWithSitemap(e.target.checked); setEdited(false) }}>
               Add the Sitemap line ({origin ? `${origin}/sitemap.xml` : 'site address unknown'})
