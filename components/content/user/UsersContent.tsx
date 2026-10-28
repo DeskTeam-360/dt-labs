@@ -42,6 +42,7 @@ import { type Key,useEffect, useMemo, useState } from 'react'
 import { createUser } from '@/app/actions/users'
 import AppTable from '@/components/common/AppTable'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
+import { TIMEZONE_OPTIONS } from '@/lib/timezones'
 import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
 import { uploadAvatar } from '@/utils/storage'
 
@@ -250,29 +251,6 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
       timezone: 'UTC',
       locale: 'en',
       is_email_verified: false,
-    })
-    setModalVisible(true)
-  }
-
-  const handleEdit = (record: UserRecord) => {
-    setEditingUser(record)
-    setAvatarUrl(record.avatar_url)
-    form.setFieldsValue({
-      email: record.email,
-      first_name: record.first_name || '',
-      last_name: record.last_name || '',
-      full_name: record.full_name || '',
-      role: record.role,
-      status: record.status,
-      company_id: record.company_id || undefined,
-      extra_company_ids: record.extra_company_ids ?? [],
-      phone: record.phone || '',
-      department: record.department || '',
-      position: record.position || '',
-      bio: record.bio || '',
-      timezone: record.timezone || 'UTC',
-      locale: record.locale || 'en',
-      is_email_verified: record.is_email_verified || false,
     })
     setModalVisible(true)
   }
@@ -725,7 +703,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               type="primary"
               icon={<EditOutlined />}
 
-              onClick={() => handleEdit(record)}
+              onClick={() => router.push(`/settings/users/${record.id}?edit=1`)}
             />
           </Tooltip>
           {isAdmin && record.role === 'customer' && (
@@ -1304,19 +1282,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                     name="timezone"
                     label="Timezone"
                   >
-                    <Select placeholder="Select Timezone" showSearch>
-                      <Option value="UTC">UTC</Option>
-                      <Option value="America/New_York">America/New_York (EST)</Option>
-                      <Option value="America/Chicago">America/Chicago (CST)</Option>
-                      <Option value="America/Denver">America/Denver (MST)</Option>
-                      <Option value="America/Los_Angeles">America/Los_Angeles (PST)</Option>
-                      <Option value="Europe/London">Europe/London (GMT)</Option>
-                      <Option value="Europe/Paris">Europe/Paris (CET)</Option>
-                      <Option value="Asia/Tokyo">Asia/Tokyo (JST)</Option>
-                      <Option value="Asia/Shanghai">Asia/Shanghai (CST)</Option>
-                      <Option value="Asia/Jakarta">Asia/Jakarta (WIB)</Option>
-                      <Option value="Asia/Singapore">Asia/Singapore (SGT)</Option>
-                    </Select>
+                    <Select options={TIMEZONE_OPTIONS} placeholder="Select Timezone" showSearch />
                   </Form.Item>
                 </Col>
                 <Col span={12}>

@@ -1,14 +1,22 @@
 'use client'
 
-import { CloseOutlined } from '@ant-design/icons'
-import { Button, Empty, Flex, message, Popconfirm, Progress, Select, Slider, Tag, Tooltip, Typography } from 'antd'
-import { useEffect, useRef, useState } from 'react'
+import { ArrowDownOutlined, ArrowUpOutlined, CloseOutlined } from '@ant-design/icons'
+import { Button, Empty, Flex, message, Popconfirm, Progress, Select, Slider, Table, Tag, Tooltip, Typography } from 'antd'
+import dayjs from 'dayjs'
+import { useCallback, useEffect, useState } from 'react'
 
 import { useSkillCatalog } from './SkillsSelect'
 
 const { Text } = Typography
 
 type Item = { skill_id: string; level: number }
+type HistoryRow = { id: string; skill_id: string; skill_name: string | null; old_level: number | null; new_level: number | null; changed_at: string | null; changed_by: string | null }
+
+const sameItems = (a: Item[], b: Item[]) => {
+  if (a.length !== b.length) return false
+  const m = new Map(b.map((x) => [x.skill_id, x.level]))
+  return a.every((x) => m.get(x.skill_id) === x.level)
+}
 
 const DEFAULT_LEVEL = 5
 
@@ -24,14 +32,26 @@ function band(level: number): { label: string; color: string } {
 
 /**
  * Skills a user has, each with a level from 1 (beginner) to 10 (expert).
- * Loads and saves on its own; `readOnly` for people who may not edit.
+ * Changes are kept as a draft until Save is pressed; every saved change is written to the history below.
+ * `readOnly` for people who may not edit.
  */
 export default function UserSkillsField({ userId, readOnly = false }: { userId: string; readOnly?: boolean }) {
   const { skills: catalog, loading: catalogLoading } = useSkillCatalog()
   const [items, setItems] = useState<Item[]>([])
+  const [saved, setSaved] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [history, setHistory] = useState<HistoryRow[]>([])
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/users/${userId}/skills/history`, { credentials: 'include' })
+      const j = (await res.json()) as { history?: HistoryRow[] }
+      setHistory(res.ok ? (j.history ?? []) : [])
+    } catch {
+      setHistory([])
+    }
+  }, [userId])
 
   useEffect(() => {
     let cancelled = false
@@ -39,10 +59,16 @@ export default function UserSkillsField({ userId, readOnly = false }: { userId: 
     fetch(`/api/users/${userId}/skills`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : { skills: [] }))
       .then((j: { skills?: Item[] }) => {
-        if (!cancelled) setItems(j.skills ?? [])
+        if (!cancelled) {
+          setItems(j.skills ?? [])
+          setSaved(j.skills ?? [])
+        }
       })
       .catch(() => {
-        if (!cancelled) setItems([])
+        if (!cancelled) {
+          setItems([])
+          setSaved([])
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -50,34 +76,34 @@ export default function UserSkillsField({ userId, readOnly = false }: { userId: 
     return () => {
       cancelled = true
     }
-  }, [userId])
+    void loadHistory()
+  }, [userId, loadHistory])
 
-  const persist = async (next: Item[], previous: Item[]) => {
+  const dirty = !sameItems(items, saved)
+
+  const save = async () => {
     setSaving(true)
     try {
       const res = await fetch(`/api/users/${userId}/skills`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skills: next }),
+        body: JSON.stringify({ skills: items }),
       })
       if (!res.ok) throw new Error('Failed to save skills')
+      const j = (await res.json()) as { skills?: Item[] }
+      setItems(j.skills ?? items)
+      setSaved(j.skills ?? items)
+      message.success('Skills saved')
+      void loadHistory()
     } catch (e) {
-      setItems(previous)
       message.error((e as Error).message)
     } finally {
       setSaving(false)
     }
   }
 
-  /** Add/remove right away; level edits wait a moment so dragging the slider does not save every step. */
-  const apply = (next: Item[], debounce = false) => {
-    const previous = items
-    setItems(next)
-    if (timer.current) clearTimeout(timer.current)
-    if (debounce) timer.current = setTimeout(() => void persist(next, previous), 600)
-    else void persist(next, previous)
-  }
+  const apply = (next: Item[]) => setItems(next)
 
   const sorted = [...items].sort((a, b) => b.level - a.level)
   const owned = new Set(items.map((i) => i.skill_id))
@@ -93,13 +119,22 @@ export default function UserSkillsField({ userId, readOnly = false }: { userId: 
             placeholder={catalogLoading ? 'Loading skills…' : addable.length ? 'Add a skill…' : 'All skills already added'}
             style={{ minWidth: 260 }}
             disabled={loading || catalogLoading || addable.length === 0}
-            loading={saving}
             value={null}
             options={addable.map((s) => ({ value: s.id, label: s.name }))}
             onSelect={(id: string | null) => {
               if (id) apply([...items, { skill_id: id, level: DEFAULT_LEVEL }])
             }}
           />
+          {dirty ? (
+            <>
+              <Button type="primary" loading={saving} onClick={() => void save()}>
+                Save changes
+              </Button>
+              <Button disabled={saving} onClick={() => setItems(saved)}>
+                Discard
+              </Button>
+            </>
+          ) : null}
           <Tooltip title={LEVEL_GUIDE}>
             <Text type="secondary" style={{ fontSize: 12, cursor: 'help' }}>How are levels scored?</Text>
           </Tooltip>
@@ -135,7 +170,7 @@ export default function UserSkillsField({ userId, readOnly = false }: { userId: 
                       value={i.level}
                       tooltip={{ formatter: (v) => `${v}/10` }}
                       styles={{ track: { background: b.color }, handle: { color: b.color } }}
-                      onChange={(v) => apply(items.map((x) => (x.skill_id === i.skill_id ? { ...x, level: v } : x)), true)}
+                      onChange={(v) => apply(items.map((x) => (x.skill_id === i.skill_id ? { ...x, level: v } : x)))}
                       style={{ margin: '6px 0' }}
                     />
                   )}
@@ -159,6 +194,38 @@ export default function UserSkillsField({ userId, readOnly = false }: { userId: 
           })}
         </Flex>
       )}
+
+      <div>
+        <Text strong>History</Text>
+        <Table<HistoryRow>
+          size="small"
+          rowKey="id"
+          style={{ marginTop: 8 }}
+          dataSource={history}
+          locale={{ emptyText: 'No changes yet. Saved changes to levels appear here.' }}
+          pagination={history.length > 8 ? { pageSize: 8, size: 'small' } : false}
+          columns={[
+            { title: 'When', dataIndex: 'changed_at', width: 150, render: (v: string | null) => (v ? dayjs(v).format('MMM DD, YYYY HH:mm') : '—') },
+            { title: 'Skill', dataIndex: 'skill_name', render: (v: string | null) => v ?? '—' },
+            {
+              title: 'Level',
+              key: 'change',
+              width: 170,
+              render: (_: unknown, r) => {
+                if (r.old_level == null) return <Tag color="green" style={{ margin: 0 }}>Added at {r.new_level}/10</Tag>
+                if (r.new_level == null) return <Tag style={{ margin: 0 }}>Removed (was {r.old_level}/10)</Tag>
+                const up = r.new_level > r.old_level
+                return (
+                  <Text style={{ color: up ? '#52c41a' : '#ff4d4f' }}>
+                    {r.old_level} → {r.new_level} {up ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
+                  </Text>
+                )
+              },
+            },
+            { title: 'By', dataIndex: 'changed_by', width: 160, render: (v: string | null) => v ?? '—' },
+          ]}
+        />
+      </div>
     </Flex>
   )
 }

@@ -44,14 +44,26 @@ type PoolReport = { generated_at: string; search_found: boolean; companies: Pool
 const STATUS_LABEL: Record<string, string> = { open: 'Open', received: 'Received', working_team: 'Working Team' }
 const SORT_OPTIONS = [
   { value: 'customer', label: 'Customer priority' },
-  { value: 'weekly', label: 'Weekly spend' },
-  { value: 'daily', label: 'Daily spend' },
+  { value: 'weekly', label: '% Used This Week' },
+  { value: 'daily', label: '% Used Today' },
 ]
 
 const fmtDur = (sec: number) => {
-  const m = Math.round(sec / 60)
-  if (m < 60) return `${m}m`
-  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
+  const m = Math.round(Math.abs(sec) / 60)
+  const sign = sec < 0 && m > 0 ? '-' : ''
+  if (m < 60) return `${sign}${m}m`
+  return `${sign}${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
+}
+
+/** Time left of the plan: counts down as time is spent, and turns negative (red) once the plan is used up. */
+const remainingTag = (budgetSeconds: number, spentSeconds: number) => {
+  if (budgetSeconds <= 0) return '—'
+  const left = budgetSeconds - spentSeconds
+  return (
+    <Tooltip title={`Spent ${fmtDur(spentSeconds)} of ${fmtDur(budgetSeconds)}`}>
+      <Text strong style={{ color: left < 0 ? '#ff4d4f' : undefined }}>{fmtDur(left)}</Text>
+    </Tooltip>
+  )
 }
 
 export default function PoolReportContent({ user: currentUser }: { user: { id: string; email?: string | null; name?: string | null; role?: string | null } }) {
@@ -184,10 +196,10 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
           <Text type="secondary">—</Text>
         ),
     },
-    { title: 'Daily Spend', key: 'daily', width: 130, align: 'center', render: (_: unknown, c) => fmtDur(c.daily_seconds) },
-    { title: '% Today', key: 'dpct', width: 100, align: 'center', render: (_: unknown, c) => pctTag(c.daily_pct) },
-    { title: 'Weekly Spend', key: 'weekly', width: 130, align: 'center', render: (_: unknown, c) => fmtDur(c.weekly_seconds) },
-    { title: '% This Week', key: 'wpct', width: 110, align: 'center', render: (_: unknown, c) => pctTag(c.weekly_pct) },
+    { title: 'Daily Remaining', key: 'daily', width: 140, align: 'center', render: (_: unknown, c) => remainingTag(c.plan_hours * 3600, c.daily_seconds) },
+    { title: '% Used Today', key: 'dpct', width: 100, align: 'center', render: (_: unknown, c) => pctTag(c.daily_pct) },
+    { title: 'Weekly Remaining', key: 'weekly', width: 150, align: 'center', render: (_: unknown, c) => remainingTag(c.plan_hours * 3600 * 5, c.weekly_seconds) },
+    { title: '% Used This Week', key: 'wpct', width: 140, align: 'center', render: (_: unknown, c) => pctTag(c.weekly_pct) },
   ]
 
   return (
@@ -202,8 +214,8 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
               </SpaNavLink>
               <Title level={2} style={{ margin: '8px 0 0' }}>Pool Report</Title>
               <Text type="secondary">
-                Customers and the tickets still waiting or in work (Open, Received, Working Team), with time spent today and this week (WIB).
-                Weekly % is measured against 5 days of the plan hours.
+                Customers and the tickets still waiting or in work (Open, Received, Working Team), with the plan time left today and this week (WIB). The time counts down as it is spent and turns red with a minus when the plan is used up.
+                Daily is measured against the plan hours, weekly against 5 days of them.
               </Text>
             </div>
 

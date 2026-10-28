@@ -25,6 +25,7 @@ import {
   TabUsers,
   TabWebsites,
 } from '@/components/company'
+import TabCompanyPics from '@/components/company/TabCompanyPics'
 import TabCompanySkills from '@/components/company/TabCompanySkills'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
@@ -484,6 +485,11 @@ export default function CompanyDetailContent({
     ...(isCustomer
       ? []
       : [
+          {
+            key: 'pics',
+            label: 'PIC',
+            children: <TabCompanyPics companyId={companyData.id} canEdit={canEdit} />,
+          },
           {
             key: 'skills',
             label: 'Skills',

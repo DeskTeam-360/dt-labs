@@ -26,6 +26,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     .filter((s) => valid.has(String(s.skill_id)))
     .map((s) => ({ skillId: String(s.skill_id), level: s.level }))
   const userId = (await params).id
-  await setUserSkills(userId, items)
+  await setUserSkills(userId, items, session.user.id)
   return NextResponse.json({ skills: await getUserSkillLevels(userId) })
 }

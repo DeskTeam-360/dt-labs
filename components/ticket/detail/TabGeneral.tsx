@@ -342,7 +342,6 @@ export default function TabGeneral({
   onSaveEditComment,
   onCancelEditComment,
   onDeleteComment,
-  canDeleteComment,
   onRemoveCommentAttachment,
   removingCommentAttachmentKey = null,
   onAddCommentAttachments,
@@ -805,17 +804,15 @@ export default function TabGeneral({
                                       onEditComment(comment.id, comment.comment)
                                     }}
                                   />
-                                  {canDeleteComment(comment.created_at) ? (
-                                    <Popconfirm
-                                      title="Delete comment"
-                                      description="Are you sure?"
-                                      onConfirm={() => onDeleteComment(comment.id)}
-                                      okText="Yes"
-                                      cancelText="No"
-                                    >
-                                      <Button danger icon={<DeleteOutlined />} size="middle" />
-                                    </Popconfirm>
-                                  ) : null}
+                                  <Popconfirm
+                                    title="Delete comment"
+                                    description="Are you sure?"
+                                    onConfirm={() => onDeleteComment(comment.id)}
+                                    okText="Yes"
+                                    cancelText="No"
+                                  >
+                                    <Button danger icon={<DeleteOutlined />} size="middle" />
+                                  </Popconfirm>
                                 </>
                               ) : null}
                             </Space>

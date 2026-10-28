@@ -1,6 +1,6 @@
 import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 
-import { companyTypeSkills, db, skills, teamMembers, ticketAssignees, tickets, ticketSkills, users,userSkills } from '@/lib/db'
+import { companyTypeSkills, db, skills, teamMembers, ticketAssignees, tickets, ticketSkills, users, userSkillHistory, userSkills } from '@/lib/db'
 import { getCapacityHoursByUser, wibTodayYmd } from '@/lib/user-capacity'
 
 /** Keep only ids that exist in the catalog (a deleted skill must not break a save). */
@@ -56,14 +56,25 @@ export async function getUserSkillLevels(userId: string): Promise<UserSkillLevel
 }
 
 /** Replace a user's skills. Each item carries its level (1-10); a missing or invalid level becomes the default. */
-export async function setUserSkills(userId: string, items: { skillId: string; level?: unknown }[]): Promise<void> {
+export async function setUserSkills(userId: string, items: { skillId: string; level?: unknown }[], changedBy?: string | null): Promise<void> {
   const clamp = (v: unknown) => {
     const n = Math.round(Number(v))
     return Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : DEFAULT_SKILL_LEVEL
   }
   await db.transaction(async (tx) => {
+    const before = new Map((await tx.select({ id: userSkills.skillId, level: userSkills.level }).from(userSkills).where(eq(userSkills.userId, userId))).map((r) => [r.id, r.level]))
+    const next = items.map((i) => ({ userId, skillId: i.skillId, level: clamp(i.level) }))
+    const after = new Map(next.map((i) => [i.skillId, i.level]))
     await tx.delete(userSkills).where(eq(userSkills.userId, userId))
-    if (items.length) await tx.insert(userSkills).values(items.map((i) => ({ userId, skillId: i.skillId, level: clamp(i.level) })))
+    if (next.length) await tx.insert(userSkills).values(next)
+    // Only real changes are logged: a new skill, a different level, a removed skill.
+    const log: (typeof userSkillHistory.$inferInsert)[] = []
+    for (const [skillId, level] of after) {
+      const old = before.get(skillId) ?? null
+      if (old !== level) log.push({ userId, skillId, oldLevel: old, newLevel: level, changedBy: changedBy ?? null })
+    }
+    for (const [skillId, old] of before) if (!after.has(skillId)) log.push({ userId, skillId, oldLevel: old, newLevel: null, changedBy: changedBy ?? null })
+    if (log.length) await tx.insert(userSkillHistory).values(log)
   })
 }
 

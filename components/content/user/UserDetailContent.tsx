@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo,useRef, useState } from 'react'
 import UserSkillsField from '@/components/skills/UserSkillsField'
 import UserCompanyHistory from '@/components/user/UserCompanyHistory'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
+import { TIMEZONE_OPTIONS } from '@/lib/timezones'
 import {
   getUserDepartmentAccentColor,
   getUserPositionAccentColor,
@@ -853,19 +854,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                           </>
                         )}
                         <Form.Item name="timezone" label="Timezone">
-                          <Select prefix={<GlobalOutlined />} placeholder="Select Timezone" showSearch>
-                            <Option value="UTC">UTC</Option>
-                            <Option value="America/New_York">America/New_York (EST)</Option>
-                            <Option value="America/Chicago">America/Chicago (CST)</Option>
-                            <Option value="America/Denver">America/Denver (MST)</Option>
-                            <Option value="America/Los_Angeles">America/Los_Angeles (PST)</Option>
-                            <Option value="Europe/London">Europe/London (GMT)</Option>
-                            <Option value="Europe/Paris">Europe/Paris (CET)</Option>
-                            <Option value="Asia/Tokyo">Asia/Tokyo (JST)</Option>
-                            <Option value="Asia/Shanghai">Asia/Shanghai (CST)</Option>
-                            <Option value="Asia/Jakarta">Asia/Jakarta (WIB)</Option>
-                            <Option value="Asia/Singapore">Asia/Singapore (SGT)</Option>
-                          </Select>
+                          <Select options={TIMEZONE_OPTIONS} prefix={<GlobalOutlined />} placeholder="Select Timezone" showSearch />
                         </Form.Item>
                         {isAdmin && (
                           <>

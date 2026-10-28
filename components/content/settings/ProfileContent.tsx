@@ -10,6 +10,7 @@ import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import MyTeamReportCard from '@/components/profile/MyTeamReportCard'
 import { canViewCustomerReports } from '@/lib/auth-utils'
+import { TIMEZONE_OPTIONS } from '@/lib/timezones'
 import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
 import { uploadAvatar } from '@/utils/storage'
 
@@ -388,25 +389,12 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
                     name="timezone"
                     label="Timezone"
                   >
-                    <Select
+                    <Select options={TIMEZONE_OPTIONS}
                       placeholder="Select Timezone"
                       showSearch
                       filterOption={(input, option) =>
                         String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                    >
-                      <Option value="UTC">UTC</Option>
-                      <Option value="America/New_York">America/New_York (EST)</Option>
-                      <Option value="America/Chicago">America/Chicago (CST)</Option>
-                      <Option value="America/Denver">America/Denver (MST)</Option>
-                      <Option value="America/Los_Angeles">America/Los_Angeles (PST)</Option>
-                      <Option value="Europe/London">Europe/London (GMT)</Option>
-                      <Option value="Europe/Paris">Europe/Paris (CET)</Option>
-                      <Option value="Asia/Tokyo">Asia/Tokyo (JST)</Option>
-                      <Option value="Asia/Shanghai">Asia/Shanghai (CST)</Option>
-                      <Option value="Asia/Jakarta">Asia/Jakarta (WIB)</Option>
-                      <Option value="Australia/Sydney">Australia/Sydney (AEST)</Option>
-                    </Select>
+                      } />
                   </Form.Item>
                 </Col>
               </Row>

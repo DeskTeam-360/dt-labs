@@ -3,13 +3,18 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { isAdmin } from '@/lib/auth-utils'
-import { db, skills, users,userSkills } from '@/lib/db'
+import { db, skills, users, userSkillHistory, userSkills } from '@/lib/db'
 
 async function guard() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!isAdmin((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   return null
+}
+
+async function actorId(): Promise<string | null> {
+  const session = await auth()
+  return session?.user?.id ?? null
 }
 
 /**
@@ -39,6 +44,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .values(staff.map((u) => ({ userId: u.id, skillId, level })))
     .onConflictDoNothing()
     .returning({ userId: userSkills.userId })
+  if (added.length) {
+    const by = await actorId()
+    await db.insert(userSkillHistory).values(added.map((a) => ({ userId: a.userId, skillId, oldLevel: null, newLevel: level, changedBy: by })))
+  }
   return NextResponse.json({ added: added.length, skipped: staff.length - added.length })
 }
 
@@ -48,6 +57,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (denied) return denied
   const userId = new URL(request.url).searchParams.get('user_id')
   if (!userId) return NextResponse.json({ error: 'user_id required' }, { status: 400 })
-  await db.delete(userSkills).where(and(eq(userSkills.skillId, (await params).id), eq(userSkills.userId, userId)))
+  const skillId = (await params).id
+  const removed = await db
+    .delete(userSkills)
+    .where(and(eq(userSkills.skillId, skillId), eq(userSkills.userId, userId)))
+    .returning({ level: userSkills.level })
+  if (removed[0]) await db.insert(userSkillHistory).values({ userId, skillId, oldLevel: removed[0].level, newLevel: null, changedBy: await actorId() })
   return NextResponse.json({ ok: true })
 }
