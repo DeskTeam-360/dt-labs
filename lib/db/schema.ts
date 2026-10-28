@@ -863,6 +863,31 @@ export const recurringTickets = pgTable('recurring_tickets', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
 
+/** Website crawls that start on their own, on the same kind of schedule as recurring tickets. */
+export const crawlSchedules = pgTable('crawl_schedules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  companyWebsiteId: uuid('company_website_id').notNull(),
+  frequency: varchar('frequency', { length: 32 }).notNull().default('specific_days'),
+  specificDays: jsonb('specific_days').$type<number[]>(),
+  specificDate: jsonb('specific_date').$type<number[]>(),
+  intervalDays: integer('interval_days'),
+  timeOfDay: varchar('time_of_day', { length: 5 }).notNull().default('02:00'),
+  timezone: varchar('timezone', { length: 64 }).notNull().default('Asia/Jakarta'),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date'),
+  maxDepth: integer('max_depth').notNull().default(3),
+  maxPages: integer('max_pages').notNull().default(100),
+  notifyEmails: jsonb('notify_emails').$type<string[]>().notNull().default([]),
+  isActive: boolean('is_active').notNull().default(true),
+  lastRunAt: ts('last_run_at'),
+  nextRunAt: ts('next_run_at'),
+  lastSessionId: uuid('last_session_id'),
+  lastNewBroken: integer('last_new_broken'),
+  createdBy: uuid('created_by'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
 /** Append-only log of every ticket created by a recurring rule. */
 export const recurringTicketRuns = pgTable(
   'recurring_ticket_runs',
@@ -978,6 +1003,55 @@ export const userSkills = pgTable(
     createdAt: ts('created_at').notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.skillId] })]
+)
+
+/** "My Filters" on the tickets page: a name and the filter query string, one of them can be the default view. */
+export const ticketSavedFilters = pgTable(
+  'ticket_saved_filters',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 100 }).notNull(),
+    query: text('query').notNull().default(''),
+    isDefault: boolean('is_default').notNull().default(false),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('ticket_saved_filters_user_idx').on(t.userId, t.createdAt)]
+)
+
+/** A staff member's own sidebar: item order and hidden items (differences from the default only). */
+export const userMenuPreferences = pgTable('user_menu_preferences', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  itemOrder: jsonb('item_order').$type<string[]>().notNull().default([]),
+  hiddenItems: jsonb('hidden_items').$type<string[]>().notNull().default([]),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
+/** People in charge of a customer company: several allowed, one primary. */
+export const companyPics = pgTable(
+  'company_pics',
+  {
+    companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    role: varchar('role', { length: 16 }).notNull().default('secondary'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.companyId, t.userId] })]
+)
+
+/** Log of every skill level change: old_level null = skill added, new_level null = skill removed. */
+export const userSkillHistory = pgTable(
+  'user_skill_history',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    skillId: uuid('skill_id').notNull().references(() => skills.id, { onDelete: 'cascade' }),
+    oldLevel: integer('old_level'),
+    newLevel: integer('new_level'),
+    changedBy: uuid('changed_by'),
+    changedAt: ts('changed_at').notNull().defaultNow(),
+  },
+  (t) => [index('user_skill_history_user_idx').on(t.userId, t.changedAt)]
 )
 
 /** Skills a ticket needs (starts from the company + type defaults, editable per ticket). */
