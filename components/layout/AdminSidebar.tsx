@@ -265,7 +265,9 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           flex: 1,
           minHeight: 0,
           overflowX: 'hidden',
-          overflowY: 'hidden',
+          overflowY: 'auto',
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(255,255,255,0.3) transparent',
           display: 'flex',
           flexDirection: 'column',
         }}

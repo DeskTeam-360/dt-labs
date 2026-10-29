@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isAdminOrManager } from '@/lib/auth-utils'
+import { isAdminOrOperations } from '@/lib/auth-utils'
 import { CALENDAR_EVENT_TYPES, type CalendarEventType } from '@/lib/calendar-events'
 import { calendarEvents, db } from '@/lib/db'
 
@@ -36,11 +36,11 @@ export function parseEventBody(b: Record<string, unknown>, requireAll: boolean):
   return { values: v }
 }
 
-/** POST /api/calendar/events - Admin, Operations and Team Leader add entries. */
+/** POST /api/calendar/events - Admin and Operations add entries. */
 export async function POST(request: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!isAdminOrManager((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!isAdminOrOperations((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const parsed = parseEventBody((await request.json().catch(() => ({}))) as Record<string, unknown>, true)
   if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 })
   const v = parsed.values

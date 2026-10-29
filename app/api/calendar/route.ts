@@ -85,7 +85,7 @@ export async function GET(request: Request) {
     })),
     holidays: holidayRows,
     events,
-    can_edit: ['admin', 'operations', 'manager'].includes(role),
+    can_edit: ['admin', 'operations'].includes(role),
   })
 }
 

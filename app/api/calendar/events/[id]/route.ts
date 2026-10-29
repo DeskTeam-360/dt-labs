@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isAdminOrManager } from '@/lib/auth-utils'
+import { isAdminOrOperations } from '@/lib/auth-utils'
 import { calendarEvents, db } from '@/lib/db'
 
 import { parseEventBody } from '../route'
@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> }
 async function gate() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!isAdminOrManager((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!isAdminOrOperations((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   return null
 }
 
