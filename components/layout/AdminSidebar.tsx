@@ -40,6 +40,10 @@ import { applyMenuPreferences, type MenuPreferences, SIDEBAR_SECTIONS, sidebarIt
 const { Sider } = Layout
 
 const SIDEBAR_BG = '#2b1252'
+/** Expanded / collapsed widths — keep in sync with AdminMainColumn marginLeft. */
+export const SIDEBAR_WIDTH = 250
+/** Wide enough for longest section label ("Customers") without ellipsis. */
+export const SIDEBAR_COLLAPSED_WIDTH = 104
 
 const MENU_ICONS: Record<string, React.ReactNode> = {
   '/my-tickets': <UserOutlined />,
@@ -198,7 +202,8 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       trigger={null}
       collapsible
       collapsed={collapsed}
-      width={250}
+      width={SIDEBAR_WIDTH}
+      collapsedWidth={SIDEBAR_COLLAPSED_WIDTH}
       className="admin-sidebar-deskteam deskteam-app-sidebar"
       style={{
         overflow: 'hidden',
@@ -209,7 +214,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
         height: undefined,
         minHeight: '100dvh',
         background: SIDEBAR_BG,
-        paddingLeft: 5,
+        paddingLeft: collapsed ? 0 : 5,
         display: 'flex',
         flexDirection: 'column',
       }}

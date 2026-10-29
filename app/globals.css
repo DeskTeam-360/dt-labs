@@ -529,6 +529,17 @@ html.dark .ticket-thread-bubble.ticket-thread-bubble--agent-reply,
   min-height: 100vh;
   min-height: 100dvh;
 }
+/* Collapsed rail: section labels must fit without ellipsis (Team / Customers / Settings) */
+.admin-sidebar-deskteam.ant-layout-sider-collapsed .ant-menu-item-group-title {
+  padding: 8px 4px !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}
 .deskteam-app-sidebar.ant-layout-sider > .ant-layout-sider-children {
   flex: 1 !important;
   min-height: 0 !important;
