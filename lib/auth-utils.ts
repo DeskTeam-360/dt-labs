@@ -25,6 +25,17 @@ export function isAdminOrOperations(role: string | undefined): boolean {
   return r === 'admin' || r === 'operations'
 }
 
+/** API keys with chosen access: Admin, Operations and Team Leader. */
+export function canManageApiKeys(role: string | undefined): boolean {
+  return isAdminOrManager(role)
+}
+
+/** Anyone on the team (Admin, Operations, Team Leader, Staff); not customers. */
+export function isInternalUser(role: string | undefined): boolean {
+  const r = (role ?? '').toLowerCase()
+  return !!r && r !== 'customer'
+}
+
 export function isManager(role: string | undefined): boolean {
   return (role ?? '').toLowerCase() === 'manager'
 }

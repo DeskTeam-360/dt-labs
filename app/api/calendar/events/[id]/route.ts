@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { isAdminOrOperations } from '@/lib/auth-utils'
 import { calendarEvents, db } from '@/lib/db'
+import { removeLinkedGoogleEvents, syncLinkedGoogleEvents } from '@/lib/google-calendar'
 
 import { parseEventBody } from '../route'
 
@@ -28,6 +29,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
   const start = parsed.values.startDate ?? cur.startDate
   if (end < start) return NextResponse.json({ error: 'The end date is before the start date' }, { status: 400 })
   await db.update(calendarEvents).set(parsed.values).where(eq(calendarEvents.id, id))
+  // Google Calendars the entry was sent to get the new version.
+  await syncLinkedGoogleEvents(id).catch(() => {})
   return NextResponse.json({ ok: true })
 }
 
@@ -35,6 +38,8 @@ export async function DELETE(_request: Request, ctx: Ctx) {
   const denied = await gate()
   if (denied) return denied
   const { id } = await ctx.params
+  // Remove it from the Google Calendars it was sent to before the links disappear with the entry.
+  await removeLinkedGoogleEvents(id).catch(() => {})
   await db.delete(calendarEvents).where(eq(calendarEvents.id, id))
   return NextResponse.json({ ok: true })
 }

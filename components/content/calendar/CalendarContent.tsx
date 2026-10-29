@@ -1,7 +1,7 @@
 'use client'
 
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
-import { Alert, Badge, Button, Calendar, Card, DatePicker, Flex, Form, Input, Layout, message, Modal, Popconfirm, Segmented, Select, Space, Switch, Tag, Typography } from 'antd'
+import { DeleteOutlined, EditOutlined, GoogleOutlined, PlusOutlined } from '@ant-design/icons'
+import { Alert, Badge, Button, Calendar, Card, Checkbox, DatePicker, Flex, Form, Input, Layout, message, Modal, Popconfirm, Segmented, Select, Space, Switch, Tag, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -48,6 +48,9 @@ export default function CalendarContent({ user }: { user: { id: string; email?: 
   const [editing, setEditing] = useState<CalendarEventOut | 'new' | null>(null)
   const [saving, setSaving] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const [google, setGoogle] = useState<{ configured: boolean; connected: boolean; email: string | null } | null>(null)
+  const [picked, setPicked] = useState<string[]>([])
+  const [pushing, setPushing] = useState(false)
   const [form] = Form.useForm<FormValues>()
   const formType = Form.useWatch('type', form)
 
@@ -75,6 +78,27 @@ export default function CalendarContent({ user }: { user: { id: string; email?: 
       cancelled = true
     }
   }, [from, to, scope, reloadKey])
+
+  // Every team member can connect their own Google account. Tell them how the connection went when Google sends them back.
+  useEffect(() => {
+    fetch('/api/calendar/google', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { configured: boolean; connected: boolean; email: string | null } | null) => setGoogle(j))
+      .catch(() => {})
+    const code = new URLSearchParams(window.location.search).get('google')
+    if (code) {
+      const text: Record<string, string> = {
+        connected: 'Google Calendar connected',
+        denied: 'Google access was not allowed',
+        missing_config: 'Google sign-in is not set up on the server',
+        forbidden: 'Only the team can connect Google Calendar',
+        error: 'Could not connect Google Calendar',
+      }
+      if (code === 'connected') message.success(text[code])
+      else message.error(text[code] ?? text.error)
+      window.history.replaceState(null, '', '/calendar')
+    }
+  }, [reloadKey])
 
   useEffect(() => {
     if (!canEdit) return
@@ -191,6 +215,46 @@ export default function CalendarContent({ user }: { user: { id: string; email?: 
     }
   }
 
+  const togglePick = (id: string, on: boolean) => setPicked((p) => (on ? [...new Set([...p, id])] : p.filter((x) => x !== id)))
+
+  // Every entry of the month on screen (of the kinds that are switched on).
+  const monthEntryIds = useMemo(
+    () => [...new Set(events.filter((e) => show.includes(e.type) && e.end_date >= month.startOf('month').format('YYYY-MM-DD') && e.start_date <= month.endOf('month').format('YYYY-MM-DD')).map((e) => e.id))],
+    [events, show, month]
+  )
+
+  const pushPicked = async () => {
+    setPushing(true)
+    try {
+      const res = await fetch('/api/calendar/google/push', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: picked }),
+      })
+      const j = (await res.json().catch(() => ({}))) as { created?: number; updated?: number; failed?: Array<{ title: string; error: string }>; error?: string }
+      if (!res.ok) throw new Error(j.error || 'Failed to send')
+      const failed = j.failed?.length ?? 0
+      const text = `${j.created ?? 0} added, ${j.updated ?? 0} updated in Google Calendar`
+      if (failed) message.warning(`${text}. ${failed} failed: ${j.failed!.map((f) => f.title).slice(0, 3).join(', ')}`)
+      else message.success(text)
+      setPicked([])
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setPushing(false)
+    }
+  }
+
+  const disconnectGoogle = async () => {
+    const res = await fetch('/api/calendar/google', { method: 'DELETE', credentials: 'include' })
+    if (!res.ok) return message.error('Failed to disconnect')
+    setGoogle((g) => (g ? { ...g, connected: false, email: null } : g))
+    setPicked([])
+    setReloadKey((k) => k + 1)
+  }
+
   const remove = async (id: string) => {
     const res = await fetch(`/api/calendar/events/${id}`, { method: 'DELETE', credentials: 'include' })
     if (!res.ok) return message.error('Failed to delete')
@@ -224,6 +288,44 @@ export default function CalendarContent({ user }: { user: { id: string; email?: 
                 ) : null}
               </Space>
             </Flex>
+
+            {google ? (
+              <Card size="small">
+                <Flex justify="space-between" align="center" gap={12} wrap>
+                  {google.connected ? (
+                    <>
+                      <Space wrap>
+                        <Tag icon={<GoogleOutlined />} color="blue" style={{ margin: 0 }}>Google Calendar: {google.email ?? 'connected'}</Tag>
+                        <Text type="secondary">Tick entries below, or pick the whole month, then send them to your own Google Calendar.</Text>
+                      </Space>
+                      <Space wrap>
+                        <Button size="small" onClick={() => setPicked(monthEntryIds)} disabled={monthEntryIds.length === 0}>
+                          Select this month ({monthEntryIds.length})
+                        </Button>
+                        <Button size="small" onClick={() => setPicked([])} disabled={picked.length === 0}>
+                          Clear
+                        </Button>
+                        <Button type="primary" size="small" icon={<GoogleOutlined />} loading={pushing} disabled={picked.length === 0} onClick={() => void pushPicked()}>
+                          Send {picked.length || ''} to Google Calendar
+                        </Button>
+                        <Popconfirm title="Disconnect Google Calendar?" description="Entries already in Google stay there, but later edits will no longer follow." okText="Disconnect" onConfirm={() => void disconnectGoogle()}>
+                          <Button size="small" type="link">Disconnect</Button>
+                        </Popconfirm>
+                      </Space>
+                    </>
+                  ) : (
+                    <>
+                      <Text type="secondary">
+                        {google.configured ? 'Connect your Google account to send these entries to your own Google Calendar.' : 'Google sign-in is not set up on the server yet.'}
+                      </Text>
+                      <Button icon={<GoogleOutlined />} disabled={!google.configured} href="/api/calendar/google/connect">
+                        Connect Google Calendar
+                      </Button>
+                    </>
+                  )}
+                </Flex>
+              </Card>
+            ) : null}
 
             <Flex gap={8} wrap>
               <Tag.CheckableTag checked={showTickets} onChange={(c) => setShow((s) => (c ? [...s, 'tickets'] : s.filter((x) => x !== 'tickets')))}>
@@ -280,11 +382,13 @@ export default function CalendarContent({ user }: { user: { id: string; email?: 
                   {dayEvents.map((e) => (
                     <Flex key={`${e.id}-${e.start_date}`} justify="space-between" align="center" gap={12} wrap>
                       <Space wrap>
+                        {google?.connected ? <Checkbox checked={picked.includes(e.id)} onChange={(ev) => togglePick(e.id, ev.target.checked)} /> : null}
                         <Tag color={CALENDAR_TYPE_META[e.type].color} style={{ margin: 0 }}>{CALENDAR_TYPE_META[e.type].label}</Tag>
                         <Text strong>{e.title}</Text>
                         {e.user_name && !e.title.includes(e.user_name) ? <Text type="secondary">{e.user_name}</Text> : null}
                         {e.start_date !== e.end_date ? <Text type="secondary">{dayjs(e.start_date).format('MMM D')} - {dayjs(e.end_date).format('MMM D')}</Text> : null}
                         {e.repeat_yearly ? <Tag style={{ margin: 0 }}>Every year</Tag> : null}
+                        {e.synced ? <Tag icon={<GoogleOutlined />} color="green" style={{ margin: 0 }}>In your Google Calendar</Tag> : null}
                         {e.notes ? <Text type="secondary">{e.notes}</Text> : null}
                       </Space>
                       {canEdit ? (

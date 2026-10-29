@@ -18,8 +18,11 @@ export type CalendarEventOut = {
   end_date: string
   user_id: string | null
   user_name: string | null
+  user_email?: string | null
   repeat_yearly: boolean
   notes: string | null
+  /** Already sent to the caller's own Google Calendar */
+  synced?: boolean
   /** The stored first date, used when editing */
   origin_start: string
   origin_end: string
