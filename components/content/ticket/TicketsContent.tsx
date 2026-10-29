@@ -302,6 +302,7 @@ export default function TicketsContent({ user: currentUser, mineOnly = false }: 
         </div>
       </AdminMainColumn>
 
+      {!mineOnly ? (
       <FilterSidebar
         collapsed={filterSidebarCollapsed}
         onCollapsedChange={setFilterSidebarCollapsed}
@@ -333,6 +334,7 @@ export default function TicketsContent({ user: currentUser, mineOnly = false }: 
         isCustomer={isCustomer}
         onSaveViewPreset={(name) => addSavedTicketFilterPreset(currentUser.id, name, getFilterQueryString())}
       />
+      ) : null}
 
       <TicketFormModal
         open={modalVisible}
