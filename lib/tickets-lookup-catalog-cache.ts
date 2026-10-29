@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm'
+import { asc, eq, notInArray } from 'drizzle-orm'
 import { revalidateTag, unstable_cache } from 'next/cache'
 
 import {
@@ -12,6 +12,8 @@ import {
   ticketTypes,
   users,
 } from '@/lib/db'
+import { INACTIVE_USER_STATUSES } from '@/lib/user-status'
+
 /** Seconds; clamp 30s–24h. Default 30 min if env unset or invalid. */
 const DEFAULT_TICKETS_LOOKUP_CATALOG_REVALIDATE_SEC = 30 * 60
 
@@ -42,6 +44,8 @@ async function loadTicketsLookupCatalog() {
         companyId: users.companyId,
       })
       .from(users)
+      // Inactive people are not offered in any picker.
+      .where(notInArray(users.status, INACTIVE_USER_STATUSES))
       .orderBy(asc(users.fullName)),
     db
       .select({
@@ -135,7 +139,7 @@ export function revalidateTicketsLookupCatalog() {
   revalidateTag(TICKETS_LOOKUP_CATALOG_TAG, { expire: 0 })
 }
 
-export const getTicketsLookupCatalog = unstable_cache(loadTicketsLookupCatalog, ['tickets-lookup-catalog-v2'], {
+export const getTicketsLookupCatalog = unstable_cache(loadTicketsLookupCatalog, ['tickets-lookup-catalog-v3'], {
   revalidate: catalogRevalidateSeconds(),
   tags: [TICKETS_LOOKUP_CATALOG_TAG],
 })

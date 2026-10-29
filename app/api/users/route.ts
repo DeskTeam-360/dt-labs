@@ -3,9 +3,10 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { companies, companyUsers,db, users } from '@/lib/db'
+import { isUserInactive } from '@/lib/user-status'
 
 /** GET /api/users - List users with company. When customer: only users in same company */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await auth()
     if (!session?.user) {
@@ -56,7 +57,10 @@ export async function GET() {
       query = query.where(inArray(users.id, ids)) as typeof query
     }
 
-    const rows = await query
+    // Inactive people only come back for Users management (?include_inactive=1, staff).
+    const includeInactive =
+      new URL(request.url).searchParams.get('include_inactive') === '1' && ['admin', 'operations', 'manager'].includes(role ?? '')
+    const rows = (await query).filter((r) => includeInactive || !isUserInactive(r.user.status))
 
     const extraAccessRows = await db
       .select({ userId: companyUsers.userId, companyId: companyUsers.companyId })

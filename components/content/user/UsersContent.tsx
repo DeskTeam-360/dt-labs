@@ -61,13 +61,14 @@ import { shouldOpenHrefInNewTab,SpaNavLink } from '@/components/common/SpaNavLin
 import { confirmUserCompanyMove } from '@/components/company/confirm-user-company-move'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { isUserInactive } from '@/lib/user-status'
 
 const { Content } = Layout
 const { Title, Text } = Typography
 const { Option } = Select
 const { TextArea } = Input
 
-type UserAudienceTab = 'customer' | 'non_customer'
+type UserAudienceTab = 'customer' | 'non_customer' | 'inactive'
 
 interface UsersContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string }
@@ -167,8 +168,14 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
         if (!matchesSearch) return false
       }
       if (!isCustomer) {
-        if (audienceTab === 'customer' && u.role !== 'customer') return false
-        if (audienceTab === 'non_customer' && u.role === 'customer') return false
+        // Inactive people have their own tab (any role); the other tabs only hold active people.
+        if (audienceTab === 'inactive') {
+          if (!isUserInactive(u.status)) return false
+        } else {
+          if (isUserInactive(u.status)) return false
+          if (audienceTab === 'customer' && u.role !== 'customer') return false
+          if (audienceTab === 'non_customer' && u.role === 'customer') return false
+        }
       }
       if (filterStatus && u.status !== filterStatus) return false
       if (filterRole && u.role !== filterRole) return false
@@ -212,13 +219,14 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
     }
   }, [filterSkill, filterSkillLevel])
 
-  const customerCount = useMemo(() => users.filter((u) => u.role === 'customer').length, [users])
-  const nonCustomerCount = useMemo(() => users.filter((u) => u.role !== 'customer').length, [users])
+  const customerCount = useMemo(() => users.filter((u) => u.role === 'customer' && !isUserInactive(u.status)).length, [users])
+  const nonCustomerCount = useMemo(() => users.filter((u) => u.role !== 'customer' && !isUserInactive(u.status)).length, [users])
+  const inactiveCount = useMemo(() => users.filter((u) => isUserInactive(u.status)).length, [users])
 
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const data = await apiFetch<any[]>('/api/users')
+      const data = await apiFetch<any[]>('/api/users?include_inactive=1')
       setUsers(data || [])
     } catch (error: any) {
       message.error(error.message || 'Failed to fetch users')
@@ -896,6 +904,10 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                   {
                     key: 'non_customer',
                     label: <span title="Admin, manager, staff — internal Deskteam roles">Agents & staff ({nonCustomerCount})</span>,
+                  },
+                  {
+                    key: 'inactive',
+                    label: <span title="Switched off or suspended. They cannot be picked anywhere else.">Inactive ({inactiveCount})</span>,
                   },
                 ]}
                 style={{ marginBottom: 16 }}

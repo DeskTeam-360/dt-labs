@@ -1,8 +1,9 @@
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, notInArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { companyUsers,db, users } from '@/lib/db'
+import { INACTIVE_USER_STATUSES } from '@/lib/user-status'
 
 /** GET /api/companies/[id]/users - List users in company (for CC/BCC preselect) */
 export async function GET(
@@ -23,7 +24,7 @@ export async function GET(
     db
       .select({ id: users.id, fullName: users.fullName, email: users.email })
       .from(users)
-      .where(and(eq(users.companyId, companyId), eq(users.role, 'customer'))),
+      .where(and(eq(users.companyId, companyId), eq(users.role, 'customer'), notInArray(users.status, INACTIVE_USER_STATUSES))),
     db
       .select({ userId: companyUsers.userId })
       .from(companyUsers)
@@ -36,7 +37,7 @@ export async function GET(
       ? await db
           .select({ id: users.id, fullName: users.fullName, email: users.email })
           .from(users)
-          .where(and(inArray(users.id, userIdsFromCu), eq(users.role, 'customer')))
+          .where(and(inArray(users.id, userIdsFromCu), eq(users.role, 'customer'), notInArray(users.status, INACTIVE_USER_STATUSES)))
       : []
 
   const seen = new Set<string>()
