@@ -1,6 +1,7 @@
 'use client'
 
 import {
+  ApiOutlined,
   AppstoreOutlined,
   BankOutlined,
   BarChartOutlined,
@@ -48,6 +49,7 @@ import {
   canAccessTeams,
   canAccessTicketAttributes,
   canAccessUsers,
+  canManageApiKeys,
   canManageDashboardAnnouncements,
   canManageGlobalAnnouncement,
   canManageTeamAvailability,
@@ -257,6 +259,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                       description="Triggers and actions on tickets"
                       href="/settings/automation-rules"
                       icon={<ThunderboltOutlined />}
+                    />
+                  </Col>
+                )}
+                {canManageApiKeys(role) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="API Keys"
+                      description="Keys with chosen access for scripts and AI assistants"
+                      href="/settings/api-keys"
+                      icon={<ApiOutlined />}
                     />
                   </Col>
                 )}

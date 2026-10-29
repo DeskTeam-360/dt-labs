@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { getApiUser, isTeamRole } from '@/lib/api-auth'
 import { isAdminOrOperations } from '@/lib/auth-utils'
 import { CALENDAR_EVENT_TYPES, type CalendarEventType } from '@/lib/calendar-events'
+import { daysBetween, loadCalendarEntries } from '@/lib/calendar-query'
+import { loadDueTickets } from '@/lib/calendar-tickets'
 import { calendarEvents, db } from '@/lib/db'
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/
@@ -49,4 +52,61 @@ export async function POST(request: Request) {
     .values({ ...v, type: v.type!, title: v.title!, startDate: v.startDate!, endDate: v.endDate!, createdBy: session.user.id })
     .returning({ id: calendarEvents.id })
   return NextResponse.json({ id: row.id }, { status: 201 })
+}
+
+const MAX_RANGE_DAYS = 366
+
+/**
+ * GET /api/calendar/events?from=YYYY-MM-DD&to=YYYY-MM-DD&type=leave,duty&email=person@company.com
+ * The calendar entries and holidays in a date range. `type` (birthday, holiday, leave, duty, event) and `email`
+ * (whose entries) are optional filters; yearly entries are placed in each year of the range. At most 366 days.
+ * include=tickets also returns tickets_due (with `email`: only tickets assigned to that person; done=0: unfinished only);
+ * that needs the Tickets scope as well.
+ * Auth: browser session, or an API key with the `calendar:read` scope (`Authorization: Bearer dtk_...`, made on the API Keys page).
+ */
+export async function GET(request: Request) {
+  const me = await getApiUser(request, 'calendar:read')
+  if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isTeamRole(me.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const q = new URL(request.url).searchParams
+  const from = q.get('from') ?? ''
+  const to = q.get('to') ?? ''
+  if (!YMD.test(from) || !YMD.test(to)) return NextResponse.json({ error: 'from and to must be YYYY-MM-DD' }, { status: 400 })
+  if (to < from) return NextResponse.json({ error: 'to is before from' }, { status: 400 })
+  if (daysBetween(from, to) > MAX_RANGE_DAYS) return NextResponse.json({ error: `The range can be at most ${MAX_RANGE_DAYS} days` }, { status: 400 })
+
+  const types = (q.get('type') ?? '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
+  const bad = types.filter((t) => !CALENDAR_EVENT_TYPES.includes(t as CalendarEventType))
+  if (bad.length) return NextResponse.json({ error: `Unknown type: ${bad.join(', ')}. Use ${CALENDAR_EVENT_TYPES.join(', ')}` }, { status: 400 })
+  const email = (q.get('email') ?? '').trim().toLowerCase()
+
+  // include=tickets adds the tickets that are due in the range; that is ticket data, so the key needs the Tickets scope too.
+  const includeTickets = (q.get('include') ?? '').split(',').includes('tickets')
+  if (includeTickets && !(await getApiUser(request, 'tickets:read', { log: false }))) {
+    return NextResponse.json({ error: 'include=tickets needs a key that also has Tickets (read)' }, { status: 403 })
+  }
+  const unfinishedOnly = q.get('done') === '0'
+
+  const { events, holidays } = await loadCalendarEntries(from, to)
+  const filtered = events.filter((e) => (types.length === 0 || types.includes(e.type)) && (!email || (e.user_email ?? '').toLowerCase() === email))
+  const includeHolidays = !email && (types.length === 0 || types.includes('holiday'))
+
+  return NextResponse.json({
+    from,
+    to,
+    events: filtered.map((e) => ({
+      id: e.id,
+      type: e.type,
+      title: e.title,
+      start_date: e.start_date,
+      end_date: e.end_date,
+      user_name: e.user_name,
+      user_email: e.user_email ?? null,
+      repeat_yearly: e.repeat_yearly,
+      notes: e.notes,
+    })),
+    holidays: includeHolidays ? holidays : [],
+    ...(includeTickets ? { tickets_due: await loadDueTickets(me, from, to, { email: email || undefined, unfinishedOnly }) } : {}),
+  })
 }
