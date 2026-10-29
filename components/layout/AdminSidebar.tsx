@@ -268,10 +268,13 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
           overflowY: 'auto',
           scrollbarWidth: 'thin',
           scrollbarColor: 'rgba(255,255,255,0.3) transparent',
+          // rtl puts the scrollbar on the left; the menu itself is set back to ltr below.
+          direction: 'rtl',
           display: 'flex',
           flexDirection: 'column',
         }}
       >
+        <div style={{ direction: 'ltr' }}>
         <Menu
           theme="dark"
           mode="inline"
@@ -301,6 +304,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
             }
           }}
         />
+        </div>
       </div>
 
       {!isCustomer && !collapsed ? (
