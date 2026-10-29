@@ -3,7 +3,7 @@ import { and, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { db, holidays, userDailyCapacity, users } from '@/lib/db'
 
 /** Roles whose time counts toward team capacity. */
-export const CAPACITY_ROLES = ['admin', 'manager', 'staff'] as const
+export const CAPACITY_ROLES = ['admin', 'operations', 'manager', 'staff'] as const
 export const DEFAULT_WORK_HOURS = 8
 
 export const CAPACITY_REASONS = ['work', 'weekend', 'holiday', 'leave', 'sick', 'piket', 'other'] as const

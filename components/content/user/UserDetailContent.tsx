@@ -61,7 +61,7 @@ interface UserDetailContentProps {
 
 export default function UserDetailContent({ user: currentUser, userData: initialUserData }: UserDetailContentProps) {
   const isViewerCustomer = (initialUserData.role ?? '').toLowerCase() === 'customer'
-  const isAdmin = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'admin'
+  const isAdmin = ['admin', 'operations'].includes(((currentUser as { role?: string }).role ?? '').toLowerCase())
   const router = useRouter()
   const searchParams = useSearchParams()
   const openedEditFromQueryRef = useRef(false)
@@ -651,7 +651,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         <Form.Item name="role" style={{ margin: 0 }}>
                           <Select style={{ width: 120 }}>
                             <Option value="admin">Admin</Option>
-                            <Option value="manager">Manager</Option>
+                            <Option value="operations">Operations</Option>
+<Option value="manager">Team Leader / PIC</Option>
                             <Option value="staff">Staff</Option>
                             {/* <Option value="customer">Customer</Option> */}
                           </Select>
@@ -991,7 +992,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         >
                           <Select>
                             <Option value="admin">Admin</Option>
-                            <Option value="manager">Manager</Option>
+                            <Option value="operations">Operations</Option>
+<Option value="manager">Team Leader / PIC</Option>
                             <Option value="staff">Staff</Option>
                             <Option value="customer">Customer</Option>
                           </Select>
@@ -1143,7 +1145,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                 </Card>
               </Col>
             </Row>
-                    {isCustomer && userData?.id && ['admin', 'manager', 'staff'].includes(((currentUser as { role?: string }).role ?? '').toLowerCase()) ? (
+                    {isCustomer && userData?.id && ['admin', 'operations', 'manager', 'staff'].includes(((currentUser as { role?: string }).role ?? '').toLowerCase()) ? (
                       <UserCompanyHistory userId={String(userData.id)} />
                     ) : null}
                     </>
@@ -1566,7 +1568,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                     </div>
                   ),
                 },
-                ...(!isCustomer && userData?.id && ['admin', 'manager', 'staff'].includes(((currentUser as { role?: string }).role ?? '').toLowerCase())
+                ...(!isCustomer && userData?.id && ['admin', 'operations', 'manager', 'staff'].includes(((currentUser as { role?: string }).role ?? '').toLowerCase())
                   ? [
                       {
                         key: 'skills',

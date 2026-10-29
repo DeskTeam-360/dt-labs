@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { canViewCustomerReports } from '@/lib/auth-utils'
+import { canAccessPoolReport } from '@/lib/auth-utils'
 import { companies, db, ticketAssignees, tickets, ticketTimeTracker, users } from '@/lib/db'
 import { getLastActivity } from '@/lib/ticket-last-activity'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
@@ -35,7 +35,7 @@ function wibBounds(now = new Date()) {
 export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!canViewCustomerReports((session.user as { role?: string }).role)) {
+  if (!canAccessPoolReport((session.user as { role?: string }).role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

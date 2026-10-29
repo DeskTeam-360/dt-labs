@@ -1005,6 +1005,24 @@ export const userSkills = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.skillId] })]
 )
 
+/** The team calendar's own entries: birthday, holiday, leave, duty or other event; may repeat every year. */
+export const calendarEvents = pgTable(
+  'calendar_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    type: varchar('type', { length: 20 }).notNull().default('event'),
+    title: varchar('title', { length: 200 }).notNull(),
+    startDate: date('start_date').notNull(),
+    endDate: date('end_date').notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    repeatYearly: boolean('repeat_yearly').notNull().default(false),
+    notes: text('notes'),
+    createdBy: uuid('created_by'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('calendar_events_range_idx').on(t.startDate, t.endDate)]
+)
+
 /** "My Filters" on the tickets page: a name and the filter query string, one of them can be the default view. */
 export const ticketSavedFilters = pgTable(
   'ticket_saved_filters',

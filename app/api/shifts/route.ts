@@ -2,7 +2,7 @@ import { asc, eq, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isAdmin } from '@/lib/auth-utils'
+import { isAdminOrOperations } from '@/lib/auth-utils'
 import { db, shifts, users } from '@/lib/db'
 import { parseShiftBody, shiftToDto } from '@/lib/shifts'
 
@@ -11,7 +11,7 @@ export async function GET() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const role = ((session.user as { role?: string }).role ?? '').toLowerCase()
-  if (!['admin', 'manager', 'staff'].includes(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['admin', 'operations', 'manager', 'staff'].includes(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const [rows, counts] = await Promise.all([
     db.select().from(shifts).orderBy(asc(shifts.startTime), asc(shifts.title)),
@@ -29,7 +29,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!isAdmin((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!isAdminOrOperations((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const parsed = parseShiftBody(await request.json().catch(() => ({})))
   if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 })

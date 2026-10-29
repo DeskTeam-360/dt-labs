@@ -25,7 +25,7 @@ export async function GET() {
 
   const userId = session.user.id
   const role = (sessionRole(session) ?? '').toLowerCase()
-  const isAdmin = role === 'admin'
+  const isAdmin = role === 'admin' || role === 'operations'
   const isManager = role === 'manager'
 
   let teamIds: string[]

@@ -1,20 +1,30 @@
 'use client'
 
 import {
+  AuditOutlined,
   BarChartOutlined,
+  CalendarOutlined,
   CheckSquareOutlined,
   ClockCircleOutlined,
+  ContainerOutlined,
   DashboardOutlined,
   DeleteOutlined,
   EditOutlined,
+  FieldTimeOutlined,
+  FileSearchOutlined,
+  FundOutlined,
+  HistoryOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  ProfileOutlined,
   ReadOutlined,
+  ScheduleOutlined,
   SettingOutlined,
   TeamOutlined,
+  UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
-import { Layout, Menu } from 'antd'
+import { Badge, Layout, Menu } from 'antd'
 import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -22,17 +32,37 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { shouldOpenHrefInNewTab,SpaNavLink } from '@/components/common/SpaNavLink'
 import {
-  canAccessMyTeams,
-  canAccessSettingsHub,
-  canAccessTeams,
   canAccessTickets,
   isSettingsHrefPathname,
 } from '@/lib/auth-utils'
-import { applyMenuPreferences, type MenuPreferences } from '@/lib/sidebar-menu'
+import { applyMenuPreferences, type MenuPreferences, SIDEBAR_SECTIONS, sidebarItemsForRole } from '@/lib/sidebar-menu'
 
 const { Sider } = Layout
 
 const SIDEBAR_BG = '#2b1252'
+
+const MENU_ICONS: Record<string, React.ReactNode> = {
+  '/my-tickets': <UserOutlined />,
+  '/dashboard': <DashboardOutlined />,
+  '/tickets': <CheckSquareOutlined />,
+  '/tickets/latest': <ClockCircleOutlined />,
+  '/team-pool': <TeamOutlined />,
+  '/calendar': <CalendarOutlined />,
+  '/reference': <ReadOutlined />,
+  '/tickets?ticket_type=spam': <WarningOutlined />,
+  '/tickets?ticket_type=trash': <DeleteOutlined />,
+  '/my-teams': <TeamOutlined />,
+  '/team-report': <BarChartOutlined />,
+  '/reports': <FundOutlined />,
+  '/settings/team-availability': <FieldTimeOutlined />,
+  '/pool-report': <ContainerOutlined />,
+  '/customer-time-report': <ProfileOutlined />,
+  '/settings/customer-weekly-recap': <ScheduleOutlined />,
+  '/new-customer-report': <FileSearchOutlined />,
+  '/settings/company-log': <HistoryOutlined />,
+  '/settings/recap-snapshots': <AuditOutlined />,
+  '/settings': <SettingOutlined />,
+}
 
 interface SessionUser {
   id: string
@@ -63,8 +93,11 @@ function selectedKeysForPathname(pathname: string | null, ticketsSearch: string)
   if (pathname === '/tickets/latest') return ['/tickets/latest']
   if (pathname === '/reference' || pathname.startsWith('/reference/')) return ['/reference']
   if (pathname === '/projects' || pathname.startsWith('/projects/')) return ['/projects']
+  const settingsReports = ['/settings/team-availability', '/settings/customer-weekly-recap', '/settings/company-log', '/settings/recap-snapshots']
+  const settingsReport = settingsReports.find((k) => pathname === k || pathname.startsWith(`${k}/`))
+  if (settingsReport) return [settingsReport]
   if (isSettingsHrefPathname(pathname)) return ['/settings']
-  const topLevel = ['/dashboard', '/my-teams', '/team-report']
+  const topLevel = ['/dashboard', '/my-tickets', '/my-teams', '/team-report', '/team-pool', '/calendar', '/pool-report', '/customer-time-report', '/new-customer-report', '/reports']
   const top = topLevel.find((k) => pathname === k || (k !== '/dashboard' && pathname.startsWith(`${k}/`)))
   if (top) return [top]
   const ticketsDetail = pathname.startsWith('/tickets/')
@@ -84,6 +117,7 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
   const [appName, setAppName] = useState<string>(process.env.NEXT_PUBLIC_APP_NAME ?? 'DeskTeam360')
   const [appLogoUrl, setAppLogoUrl] = useState<string | null>(null)
   const [menuPrefs, setMenuPrefs] = useState<MenuPreferences | null>(null)
+  const [myTicketCount, setMyTicketCount] = useState<number | null>(null)
 
   useEffect(() => {
     fetch('/api/app-settings')
@@ -104,113 +138,55 @@ export default function AdminSidebar({ user, collapsed, onCollapse }: AdminSideb
       .catch(() => setMenuPrefs(null))
   }, [role, isCustomer])
 
+  // Badge on My Tickets: how many assigned tickets still need work.
+  useEffect(() => {
+    if (!role || isCustomer) return
+    const load = () =>
+      fetch('/api/tickets/my-count', { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j: { count?: number } | null) => setMyTicketCount(j?.count ?? null))
+        .catch(() => {})
+    void load()
+    const t = setInterval(load, 120000)
+    return () => clearInterval(t)
+  }, [role, isCustomer, pathname])
+
   const linkLabel = (path: string, text: string) => (
     <SpaNavLink href={path} title={text} className="admin-sidebar-menu-link" onClick={(e) => e.stopPropagation()}>
       {text}
     </SpaNavLink>
   )
 
-  const defaultMenuItems = [
-    {
-      key: '/dashboard',
-      icon: <DashboardOutlined />,
-      label: linkLabel('/dashboard', 'Dashboard'),
-    },
-    // ...(canAccessProjects(role)
-    //   ? [
-    //       {
-    //         key: '/projects',
-    //         icon: <FolderOutlined />,
-    //         label: linkLabel('/projects', 'Projects'),
-    //       },
-    //     ]
-    //   : []),
-    ...(canAccessTickets(role)
-      ? [
-          ...(isCustomer
-            ? [
-                {
-                  key: '/tickets',
-                  icon: <CheckSquareOutlined />,
-                  label: linkLabel('/tickets', 'Tickets'),
-                },
-              ]
-            : [
-                {
-                  key: '/tickets',
-                  icon: <CheckSquareOutlined />,
-                  label: linkLabel('/tickets', 'All tickets'),
-                },
-                ...(role === 'admin'
-                  ? [
-                      {
-                        key: '/team-pool',
-                        icon: <TeamOutlined />,
-                        label: linkLabel('/team-pool', 'Team Pool'),
-                      },
-                    ]
-                  : []),
-                {
-                  key: '/tickets/latest',
-                  icon: <ClockCircleOutlined />,
-                  label: linkLabel('/tickets/latest', 'Latest tickets'),
-                },
-                {
-                  key: '/tickets?ticket_type=spam',
-                  icon: <WarningOutlined />,
-                  label: linkLabel('/tickets?ticket_type=spam', 'Spam'),
-                },
-                {
-                  key: '/tickets?ticket_type=trash',
-                  icon: <DeleteOutlined />,
-                  label: linkLabel('/tickets?ticket_type=trash', 'Trash'),
-                },
-              ]),
-          {
-            key: '/reference',
-            icon: <ReadOutlined />,
-            label: linkLabel('/reference', 'Reference'),
-          },
-          ...(canAccessMyTeams(role)
-            ? [
-                {
-                  key: '/my-teams',
-                  icon: <TeamOutlined />,
-                  label: linkLabel('/my-teams', 'E Report'),
-                },
-              ]
-            : []),
-          ...(canAccessTeams(role)
-            ? [
-                {
-                  key: '/team-report',
-                  icon: <BarChartOutlined />,
-                  label: linkLabel('/team-report', 'Team Report'),
-                },
-              ]
-            : []),
-        ]
-      : []),
-    ...(canAccessSettingsHub(role)
-      ? [
-          {
-            key: '/settings',
-            icon: <SettingOutlined />,
-            label: linkLabel('/settings', 'Settings'),
-          },
-        ]
-      : []),
-  ].filter((item) => {
-    if (isCustomer) {
-      return item.key !== '/settings'
-    }
-    const ticketMenuKeys = ['/tickets', '/tickets/latest', '/tickets?ticket_type=spam', '/tickets?ticket_type=trash']
-    if (ticketMenuKeys.includes(item.key as string) && !canAccessTickets(role)) return false
-    if (item.key === '/settings' && !canAccessSettingsHub(role)) return false
-    return true
-  })
+  // Customers keep a fixed menu.
+  const customerMenuItems = [
+    { key: '/dashboard', icon: <DashboardOutlined />, label: linkLabel('/dashboard', 'Dashboard') },
+    ...(canAccessTickets(role) ? [{ key: '/tickets', icon: <CheckSquareOutlined />, label: linkLabel('/tickets', 'Tickets') }] : []),
+    { key: '/reference', icon: <ReadOutlined />, label: linkLabel('/reference', 'Reference') },
+  ]
 
-  const menuItems = menuPrefs && !isCustomer ? applyMenuPreferences(defaultMenuItems, menuPrefs) : defaultMenuItems
+  // Staff menu: one catalog (lib/sidebar-menu) decides what each role sees, grouped in sections, then the person's own order and hidden items apply.
+  const staffFlat = sidebarItemsForRole(role).map((i) => ({
+    key: i.key,
+    icon: MENU_ICONS[i.key],
+    label: i.key === '/my-tickets' && myTicketCount ? (
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        {linkLabel(i.key, i.label)}
+        <Badge count={myTicketCount} overflowCount={99} size="small" color="#fa8c16" />
+      </span>
+    ) : (
+      linkLabel(i.key, i.label)
+    ),
+    section: i.section,
+  }))
+  const staffOrdered = menuPrefs ? applyMenuPreferences(staffFlat, menuPrefs) : staffFlat
+  const staffMenuItems = SIDEBAR_SECTIONS.map((sec) => ({
+    type: 'group' as const,
+    key: `group-${sec.key}`,
+    label: sec.label,
+    children: staffOrdered.filter((i) => i.section === sec.key).map((i) => ({ key: i.key, icon: i.icon, label: i.label })),
+  })).filter((g) => g.children.length > 0)
+
+  const menuItems = isCustomer ? customerMenuItems : staffMenuItems
 
   const selectedKeys = useMemo(
     () => selectedKeysForPathname(pathname, pathname?.startsWith('/tickets') ? ticketsListSearch : ''),

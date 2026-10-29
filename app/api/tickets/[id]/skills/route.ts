@@ -6,7 +6,7 @@ import { cleanPrimary, getTicketSkillSet, setTicketSkills, validSkillIds } from 
 
 function isStaff(session: { user?: unknown } | null) {
   const role = ((session?.user as { role?: string } | undefined)?.role ?? '').toLowerCase()
-  return ['admin', 'manager', 'staff'].includes(role)
+  return ['admin', 'operations', 'manager', 'staff'].includes(role)
 }
 
 /** GET /api/tickets/[id]/skills -> { skill_ids, primary_skill_id } */

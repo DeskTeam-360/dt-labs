@@ -58,7 +58,7 @@ export default function SkillsSelect({ value, onChange, disabled, loading, place
   const { data: session } = useSession()
   const role = ((session?.user as { role?: string } | undefined)?.role ?? '').toLowerCase()
   // Only admin/manager can add to the catalog; others just pick from it.
-  const canCreate = canCreateProp ?? (role === 'admin' || role === 'manager')
+  const canCreate = canCreateProp ?? (role === 'admin' || role === 'operations' || role === 'manager')
   const { skills, loading: catalogLoading, create } = useSkillCatalog()
   const [search, setSearch] = useState('')
 

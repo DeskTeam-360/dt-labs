@@ -5,7 +5,7 @@ import { auth } from '@/auth'
 import { companyAttributes, db } from '@/lib/db'
 
 function canEdit(role?: string) {
-  return ['admin', 'manager'].includes((role ?? '').toLowerCase())
+  return ['admin', 'operations', 'manager'].includes((role ?? '').toLowerCase())
 }
 
 /** PATCH /api/companies/[id]/attributes/[attrId] */

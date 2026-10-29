@@ -137,7 +137,7 @@ export async function recommendAssignees(ticketId: number, limit = 5): Promise<{
   let candidates = await db
     .select({ id: users.id, fullName: users.fullName, email: users.email })
     .from(users)
-    .where(and(inArray(users.role, ['admin', 'manager', 'staff']), eq(users.status, 'active')))
+    .where(and(inArray(users.role, ['admin', 'operations', 'manager', 'staff']), eq(users.status, 'active')))
   if (ticket?.teamId) {
     const members = await db.select({ userId: teamMembers.userId }).from(teamMembers).where(eq(teamMembers.teamId, ticket.teamId))
     const inTeam = new Set(members.map((m) => m.userId))

@@ -385,7 +385,7 @@ export default function TabGeneral({
   rightCollapsed: rightCollapsedProp,
   onRightCollapsedChange,
 }: TabGeneralProps) {
-  const canAccessTicketSummary = aiConfigured && ['admin', 'manager'].includes((currentUserRole ?? '').toLowerCase())
+  const canAccessTicketSummary = aiConfigured && ['admin', 'operations', 'manager'].includes((currentUserRole ?? '').toLowerCase())
   const [rightCollapsedLocal, setRightCollapsedLocal] = useState(false)
   const rightCollapsed = rightCollapsedProp ?? rightCollapsedLocal
   const setRightCollapsed = (v: boolean | ((prev: boolean) => boolean)) => {

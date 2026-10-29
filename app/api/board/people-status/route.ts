@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isAdmin } from '@/lib/auth-utils'
+import { canAccessTeamPool } from '@/lib/auth-utils'
 import { companies, db, tickets, ticketTimeTracker } from '@/lib/db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 import { getCapacityDaily, wibTodayYmd } from '@/lib/user-capacity'
@@ -18,7 +18,7 @@ const WIB_MS = 7 * 60 * 60 * 1000
 export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!isAdmin((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!canAccessTeamPool((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const userIds = (new URL(request.url).searchParams.get('user_ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   if (userIds.length === 0) return NextResponse.json({ people: {} })

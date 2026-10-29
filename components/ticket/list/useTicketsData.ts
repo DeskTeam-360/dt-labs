@@ -213,7 +213,7 @@ function getInitialViewModeCustomer(isCustomer: boolean, stored: StoredFilter | 
   return storedMode || 'kanban'
 }
 
-export function useTicketsData(currentUserId: string, isCustomer = false, canDeleteTicket = false) {
+export function useTicketsData(currentUserId: string, isCustomer = false, canDeleteTicket = false, mineOnly = false) {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const router = useRouter()
@@ -405,7 +405,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
   const pageKey = isPagedView ? `${listPage}:${listPageSize}:${listSort.sortBy}:${listSort.sortOrder}` : ''
   const effectiveTicketsLimit = ticketsPageLimit
 
-  const ticketsListQueryKey = useMemo(
+  const baseListQueryKey = useMemo(
     () =>
       buildTicketsListQueryKey({
         isCustomer,
@@ -441,6 +441,9 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
     ]
   )
 
+  // My Tickets keeps its own cache, apart from All tickets.
+  const ticketsListQueryKey = useMemo(() => (mineOnly ? ([...baseListQueryKey, 'mine'] as unknown as typeof baseListQueryKey) : baseListQueryKey), [baseListQueryKey, mineOnly])
+
   // Any filter, search or sort change starts List/Card from page 1.
   const listResetKey = JSON.stringify([ticketsListQueryKey[2], listPageSize, listSort]).replace(/"pageKey":"[^"]*"/, '')
   const prevListResetKeyRef = useRef(listResetKey)
@@ -474,6 +477,7 @@ export function useTicketsData(currentUserId: string, isCustomer = false, canDel
       const inJunkFolder =
         !isCustomer && (filterTicketType === 'spam' || filterTicketType === 'trash')
       if (inJunkFolder) params.set('ticket_type', filterTicketType!)
+      if (mineOnly && !isCustomer) params.set('assignee_ids', currentUserId)
       if (isCustomer) {
         const customerCompanyIds = filterCompanyIds.filter((id) => id !== '__none__')
         if (customerCompanyIds.length > 0) params.set('company_ids', customerCompanyIds.join(','))

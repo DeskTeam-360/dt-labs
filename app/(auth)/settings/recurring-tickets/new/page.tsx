@@ -6,7 +6,7 @@ import RecurringTicketFormPage from '@/components/content/recurring-tickets/Recu
 export default async function NewRecurringTicketPage() {
   const session = await auth()
   const role = (session?.user as { role?: string })?.role?.toLowerCase()
-  if (!session?.user || !['admin', 'manager'].includes(role ?? '')) redirect('/settings/recurring-tickets')
+  if (!session?.user || !['admin', 'operations', 'manager'].includes(role ?? '')) redirect('/settings/recurring-tickets')
 
   return <RecurringTicketFormPage initialValues={null} />
 }

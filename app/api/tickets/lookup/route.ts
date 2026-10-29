@@ -32,7 +32,7 @@ export async function GET() {
       .filter((t) => role !== 'customer' || !t.isAgentOnly)
       .map(({ id, title, slug, color }) => ({ id, title, slug, color }))
     // Admin sees all teams; non-admin sees public teams + teams they belong to
-    const visibleTeams = role === 'admin'
+    const visibleTeams = role === 'admin' || role === 'operations'
       ? catalog.teams
       : catalog.teams.filter((t) => t.type === 'public' || userTeamIds.includes(t.id))
 

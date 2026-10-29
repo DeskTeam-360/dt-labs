@@ -22,7 +22,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const role = ((session.user as { role?: string }).role ?? '').toLowerCase()
-  if (!['admin', 'manager', 'staff'].includes(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['admin', 'operations', 'manager', 'staff'].includes(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const actorId = session.user.id
 
   const sourceId = parseInt((await params).id, 10)

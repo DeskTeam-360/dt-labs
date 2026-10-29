@@ -10,7 +10,7 @@ export async function GET() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const role = ((session.user as { role?: string }).role ?? '').toLowerCase()
-  if (!['admin', 'manager', 'staff'].includes(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['admin', 'operations', 'manager', 'staff'].includes(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const rows = await db.select().from(skills).orderBy(asc(skills.name))
   return NextResponse.json(rows.map((r) => ({ id: r.id, name: r.name, color: r.color ?? '#1677ff' })))
 }

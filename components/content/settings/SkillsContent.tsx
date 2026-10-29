@@ -24,7 +24,7 @@ export default function SkillsContent({ user }: { user: { id: string; email?: st
   const [newName, setNewName] = useState('')
   const [editing, setEditing] = useState<Skill | null>(null)
   const [editName, setEditName] = useState('')
-  const isAdminUser = (user.role ?? '').toLowerCase() === 'admin'
+  const isAdminUser = ['admin', 'operations'].includes((user.role ?? '').toLowerCase())
   const [people, setPeople] = useState<Person[]>([])
   const [members, setMembers] = useState<Record<string, Member[]>>({})
   const [addTo, setAddTo] = useState<Skill | null>(null)
@@ -41,7 +41,7 @@ export default function SkillsContent({ user }: { user: { id: string; email?: st
       const list = uRes.ok ? ((await uRes.json()) as { id: string; full_name?: string | null; email: string; position?: string | null; role?: string | null; status?: string | null }[]) : []
       setPeople(
         (Array.isArray(list) ? list : [])
-          .filter((u) => ['admin', 'manager', 'staff'].includes((u.role ?? '').toLowerCase()) && (u.status ?? 'active') === 'active')
+          .filter((u) => ['admin', 'operations', 'manager', 'staff'].includes((u.role ?? '').toLowerCase()) && (u.status ?? 'active') === 'active')
           .map((u) => ({ id: u.id, name: u.full_name || u.email, position: u.position ?? null }))
           .sort((a, b) => a.name.localeCompare(b.name))
       )

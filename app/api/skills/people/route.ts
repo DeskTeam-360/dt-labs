@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const role = ((session.user as { role?: string }).role ?? '').toLowerCase()
-  if (!['admin', 'manager', 'staff'].includes(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['admin', 'operations', 'manager', 'staff'].includes(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const url = new URL(request.url)
   const skillId = url.searchParams.get('skill_id')
   if (!skillId) return NextResponse.json({ error: 'skill_id required' }, { status: 400 })

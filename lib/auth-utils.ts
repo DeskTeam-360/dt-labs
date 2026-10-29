@@ -1,7 +1,8 @@
 /**
  * Role-based access control helpers.
  * - Admin: full access
- * - Manager: tickets + dashboard, ticket attributes
+ * - Operations: like Admin for day-to-day work and HR (users, shifts, skills, availability), but no system config
+ * - Manager (shown as "Team Leader / PIC"): tickets + dashboard, ticket attributes
  * - Staff: dashboard (no companies, teams, email, knowledge-base, tickets, ticket attributes)
  * - Customer: limited (handled separately in sidebar)
  */
@@ -14,13 +15,23 @@ export function isAdmin(role: string | undefined): boolean {
   return (role ?? '').toLowerCase() === 'admin'
 }
 
+/** Operations: HR and helps the admin; no email/Slack/AI/templates/announcements/connection config. */
+export function isOperations(role: string | undefined): boolean {
+  return (role ?? '').toLowerCase() === 'operations'
+}
+
+export function isAdminOrOperations(role: string | undefined): boolean {
+  const r = (role ?? '').toLowerCase()
+  return r === 'admin' || r === 'operations'
+}
+
 export function isManager(role: string | undefined): boolean {
   return (role ?? '').toLowerCase() === 'manager'
 }
 
 export function isAdminOrManager(role: string | undefined): boolean {
   const r = (role ?? '').toLowerCase()
-  return r === 'admin' || r === 'manager'
+  return r === 'admin' || r === 'operations' || r === 'manager'
 }
 
 /** Move ticket to trash (DELETE or `ticket_type: trash`): Admin & Manager only */
@@ -31,7 +42,7 @@ export function canDeleteTickets(role: string | undefined): boolean {
 /** Companies view + resync: Admin, Manager, Staff (and Customer for own company) */
 export function canAccessCompanies(role: string | undefined): boolean {
   const r = (role ?? '').toLowerCase()
-  return r === 'admin' || r === 'manager' || r === 'staff' || r === 'customer'
+  return r === 'admin' || r === 'operations' || r === 'manager' || r === 'staff' || r === 'customer'
 }
 
 /** Companies edit (create/update/delete): Admin & Manager only */
@@ -86,7 +97,7 @@ export function canAccessKnowledgeBase(role: string | undefined): boolean {
 
 /** Team availability (daily capacity, leave, piket, public holidays) in Settings: Admin only */
 export function canManageTeamAvailability(role: string | undefined): boolean {
-  return isAdmin(role)
+  return isAdminOrOperations(role)
 }
 
 /** Company Log (`company_daily_active_assignments`) in Settings → General: Admin & Manager */
@@ -102,12 +113,27 @@ export function canAccessRecapSnapshots(role: string | undefined): boolean {
 /** Read-only access to customer reports (time report, weekly recap): Admin, Manager & Staff */
 export function canViewCustomerReports(role: string | undefined): boolean {
   const r = (role ?? '').toLowerCase()
-  return r === 'admin' || r === 'manager' || r === 'staff'
+  return r === 'admin' || r === 'operations' || r === 'manager' || r === 'staff'
+}
+
+/** Pool Report: everyone on the team can look (staff view only). */
+export function canAccessPoolReport(role: string | undefined): boolean {
+  return canViewCustomerReports(role)
+}
+
+/** Team Pool board: Admin, Operations and Team Leader. */
+export function canAccessTeamPool(role: string | undefined): boolean {
+  return isAdminOrManager(role)
+}
+
+/** Customer Report, New Customer Report, Weekly Recap, Company Log, Recap Snapshots: not for staff. */
+export function canAccessCustomerReportsFull(role: string | undefined): boolean {
+  return isAdminOrManager(role)
 }
 
 /** Customer weekly recap grid (`customer_weekly_recap_cells`): Admin, Manager & Staff (materialize stays Admin & Manager) */
 export function canAccessCustomerWeeklyRecap(role: string | undefined): boolean {
-  return canViewCustomerReports(role)
+  return canAccessCustomerReportsFull(role)
 }
 
 /** Global running-text announcement (Settings): Admin only */
@@ -122,7 +148,7 @@ export function canManageDashboardAnnouncements(role: string | undefined): boole
 
 /** Customer (company) time & ticket summary report: Admin, Manager & Staff */
 export function canAccessCustomerTimeReport(role: string | undefined): boolean {
-  return canViewCustomerReports(role)
+  return canAccessCustomerReportsFull(role)
 }
 
 /** My Teams: work time & activity for teams the user belongs to (not customers) */
@@ -141,7 +167,7 @@ export function canAccessProjects(role: string | undefined): boolean {
 
 /** Users: Admin only */
 export function canAccessUsers(role: string | undefined): boolean {
-  return isAdmin(role)
+  return isAdminOrOperations(role)
 }
 
 /** Message / email templates (auto-response & notifications): Admin only */

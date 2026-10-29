@@ -19,6 +19,8 @@ import { addSavedTicketFilterPreset, refreshSavedTicketFilterPresets } from '@/l
 
 interface TicketsContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string }
+  /** My Tickets: only the tickets assigned to the signed-in person. */
+  mineOnly?: boolean
 }
 
 const TICKET_ERROR_MESSAGES: Record<string, string> = {
@@ -27,7 +29,7 @@ const TICKET_ERROR_MESSAGES: Record<string, string> = {
   invalid: 'That ticket link is not valid.',
 }
 
-export default function TicketsContent({ user: currentUser }: TicketsContentProps) {
+export default function TicketsContent({ user: currentUser, mineOnly = false }: TicketsContentProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const ticketErrorHandledRef = useRef<string | null>(null)
@@ -56,7 +58,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
 
   // The default view opens once per browser tab, and only when /tickets is opened without filters of its own.
   useEffect(() => {
-    if (searchParams.toString()) return
+    if (mineOnly || searchParams.toString()) return
     try {
       if (sessionStorage.getItem('deskteam-default-ticket-view-applied') === '1') return
       sessionStorage.setItem('deskteam-default-ticket-view-applied', '1')
@@ -152,7 +154,7 @@ export default function TicketsContent({ user: currentUser }: TicketsContentProp
     ticketsPageLimit,
     setTicketsPageLimit,
     refetchTickets,
-  } = useTicketsData(currentUser.id, isCustomer, canDeleteTicket)
+  } = useTicketsData(currentUser.id, isCustomer, canDeleteTicket, mineOnly)
 
   const handleCloseTicket = async (id: number) => {
     try {

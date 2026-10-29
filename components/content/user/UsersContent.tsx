@@ -103,7 +103,7 @@ type ShiftOption = { id: string; title: string; start: string; end: string; cros
 export default function UsersContent({ user: currentUser }: UsersContentProps) {
   const router = useRouter()
   const isCustomer = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'customer'
-  const isAdmin = ((currentUser as { role?: string }).role ?? '').toLowerCase() === 'admin'
+  const isAdmin = ['admin', 'operations'].includes(((currentUser as { role?: string }).role ?? '').toLowerCase())
   const [collapsed, setCollapsed] = useState(false)
   const [users, setUsers] = useState<UserRecord[]>([])
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
@@ -834,7 +834,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                     style={{ width: 150 }}
                   >
                     <Option value="admin">Admin</Option>
-                    <Option value="manager">Manager</Option>
+                    <Option value="operations">Operations</Option>
+<Option value="manager">Team Leader / PIC</Option>
                     <Option value="staff">Staff</Option>
                   </Select>
                 )}
@@ -1178,7 +1179,8 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
                       >
                         <Select placeholder="Select Role">
                           <Option value="admin">Admin</Option>
-                          <Option value="manager">Manager</Option>
+                          <Option value="operations">Operations</Option>
+<Option value="manager">Team Leader / PIC</Option>
                           <Option value="staff">Staff</Option>
                           <Option value="customer">Customer</Option>
                         </Select>

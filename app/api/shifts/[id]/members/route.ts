@@ -2,13 +2,13 @@ import { and, eq, inArray, isNotNull, ne } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isAdmin } from '@/lib/auth-utils'
+import { isAdminOrOperations } from '@/lib/auth-utils'
 import { db, shifts, users } from '@/lib/db'
 
 async function guard() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!isAdmin((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!isAdminOrOperations((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   return null
 }
 

@@ -9,7 +9,7 @@ import { recurringTickets } from '@/lib/db/schema'
 export default async function EditRecurringTicketPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   const role = (session?.user as { role?: string })?.role?.toLowerCase()
-  if (!session?.user || !['admin', 'manager'].includes(role ?? '')) redirect('/settings/recurring-tickets')
+  if (!session?.user || !['admin', 'operations', 'manager'].includes(role ?? '')) redirect('/settings/recurring-tickets')
 
   const { id } = await params
   const [row] = await db.select().from(recurringTickets).where(eq(recurringTickets.id, id)).limit(1)

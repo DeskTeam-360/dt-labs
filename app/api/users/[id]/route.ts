@@ -342,7 +342,7 @@ export async function PATCH(
   const { id } = await params
   const body = await request.json()
   const role = (session.user as { role?: string }).role?.toLowerCase()
-  const isAdmin = role === 'admin'
+  const isAdmin = role === 'admin' || role === 'operations'
   const [targetUser] = await db.select().from(users).where(eq(users.id, id)).limit(1)
   if (!targetUser) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })

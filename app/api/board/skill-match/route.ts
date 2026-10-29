@@ -2,7 +2,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isAdmin } from '@/lib/auth-utils'
+import { canAccessTeamPool } from '@/lib/auth-utils'
 import { db, ticketAssignees, tickets, ticketSkills, userSkills } from '@/lib/db'
 import { ACTIVE_WORKLOAD_STATUSES } from '@/lib/skills'
 
@@ -14,7 +14,7 @@ import { ACTIVE_WORKLOAD_STATUSES } from '@/lib/skills'
 export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!isAdmin((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!canAccessTeamPool((session.user as { role?: string }).role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const url = new URL(request.url)
   const ticketIds = (url.searchParams.get('ticket_ids') ?? '').split(',').map((s) => parseInt(s, 10)).filter((n) => Number.isInteger(n))

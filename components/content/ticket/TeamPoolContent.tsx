@@ -272,7 +272,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
       .then((rows: { id: string; full_name?: string | null; email: string; position?: string | null; role?: string | null; status?: string | null; shift_id?: string | null }[]) =>
         setAgents(
           (Array.isArray(rows) ? rows : [])
-            .filter((u) => ['admin', 'manager', 'staff'].includes((u.role ?? '').toLowerCase()) && (u.status ?? 'active') === 'active')
+            .filter((u) => ['admin', 'operations', 'manager', 'staff'].includes((u.role ?? '').toLowerCase()) && (u.status ?? 'active') === 'active')
             .map((u) => ({ id: u.id, name: u.full_name || u.email, position: u.position ?? null, shift_id: u.shift_id ?? null }))
             .sort((a, b) => a.name.localeCompare(b.name))
         )

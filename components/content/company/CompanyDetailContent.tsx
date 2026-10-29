@@ -81,7 +81,7 @@ export default function CompanyDetailContent({
   currentUserRole,
 }: CompanyDetailContentProps) {
   const router = useRouter()
-  const canEdit = (() => { const r = (currentUserRole ?? '').toLowerCase(); return r === 'admin' || r === 'manager' })()
+  const canEdit = (() => { const r = (currentUserRole ?? '').toLowerCase(); return r === 'admin' || r === 'operations' || r === 'manager' })()
   const [collapsed, setCollapsed] = useState(false)
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)

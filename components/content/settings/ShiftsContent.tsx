@@ -47,7 +47,7 @@ export default function ShiftsContent({ user }: { user: { id: string; email?: st
       const list = res.ok ? ((await res.json()) as { id: string; full_name?: string | null; email: string; position?: string | null; role?: string | null; status?: string | null; shift_id?: string | null }[]) : []
       setPeople(
         (Array.isArray(list) ? list : [])
-          .filter((u) => ['admin', 'manager', 'staff'].includes((u.role ?? '').toLowerCase()) && (u.status ?? 'active') === 'active')
+          .filter((u) => ['admin', 'operations', 'manager', 'staff'].includes((u.role ?? '').toLowerCase()) && (u.status ?? 'active') === 'active')
           .map((u) => ({ id: u.id, name: u.full_name || u.email, position: u.position ?? null, shift_id: u.shift_id ?? null }))
           .sort((a, b) => a.name.localeCompare(b.name))
       )
