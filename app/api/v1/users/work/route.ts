@@ -2,12 +2,13 @@ import { and, asc, desc, eq, gte, lte, notInArray, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { getApiUser, isTeamRole } from '@/lib/api-auth'
-import { hours, isYmd, siteUrl, todayWib, toWibIso, wibDay, wibRange } from '@/lib/api-v1'
-import { daysBetween, loadCalendarEntries } from '@/lib/calendar-query'
+import { hours, resolveWindow, siteUrl, toWibIso, wibDay } from '@/lib/api-v1'
+import { loadCalendarEntries } from '@/lib/calendar-query'
 import { companies, db, shifts, ticketAssignees, tickets, ticketTimeTracker, users } from '@/lib/db'
 import { CLOSED_LIKE_STATUS_LIST } from '@/lib/ticket-status-workflow'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 import { getCapacityHoursByUser } from '@/lib/user-capacity'
+import { isUserInactive } from '@/lib/user-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,9 +16,10 @@ const MAX_DAYS = 92
 
 /**
  * GET /api/v1/users/work?email=person@company.com&from=YYYY-MM-DD&to=YYYY-MM-DD
- * What a team member worked on in a date range, with the hours they tracked: per day (first start, last stop),
+ * What an active team member worked on in a time range, with the hours they tracked: per day (first start, last stop),
  * per company and per ticket, plus their shift, capacity, calendar entries (leave, duty) and what is on their plate now.
- * `from` and `to` default to today (WIB); at most 92 days. include=sessions adds every single time entry.
+ * The range: from/to (WIB days, default today), or hours=24 (the last 24 hours), or since=<ISO datetime>[&until=<ISO datetime>];
+ * at most 92 days. include=sessions adds every single time entry.
  * Auth: browser session or an API key with the `users:read` scope.
  */
 export async function GET(request: Request) {
@@ -28,11 +30,11 @@ export async function GET(request: Request) {
   const q = new URL(request.url).searchParams
   const email = (q.get('email') ?? '').trim().toLowerCase()
   if (!email) return NextResponse.json({ error: 'email is required' }, { status: 400 })
-  const from = q.get('from') ?? todayWib()
-  const to = q.get('to') ?? from
-  if (!isYmd(from) || !isYmd(to)) return NextResponse.json({ error: 'from and to must be YYYY-MM-DD' }, { status: 400 })
-  if (to < from) return NextResponse.json({ error: 'to is before from' }, { status: 400 })
-  if (daysBetween(from, to) > MAX_DAYS) return NextResponse.json({ error: `The range can be at most ${MAX_DAYS} days` }, { status: 400 })
+  const win = resolveWindow(q, MAX_DAYS)
+  if ('error' in win) return NextResponse.json({ error: win.error }, { status: 400 })
+  const { start, end } = win
+  const from = wibDay(start)
+  const to = wibDay(end)
   const withSessions = (q.get('include') ?? '').split(',').includes('sessions')
 
   const [person] = await db
@@ -40,9 +42,10 @@ export async function GET(request: Request) {
     .from(users)
     .where(sql`lower(${users.email}) = ${email}`)
     .limit(1)
-  if (!person || !isTeamRole((person.role ?? '').toLowerCase())) return NextResponse.json({ error: 'No team member with that email' }, { status: 404 })
+  if (!person || !isTeamRole((person.role ?? '').toLowerCase()) || isUserInactive(person.status)) {
+    return NextResponse.json({ error: 'No active team member with that email' }, { status: 404 })
+  }
 
-  const { start, end } = wibRange(from, to)
   const now = new Date()
 
   const [sessionRows, shiftRow, capacity, calendar, plate] = await Promise.all([
@@ -149,6 +152,7 @@ export async function GET(request: Request) {
     user: { id: person.id, full_name: person.fullName, email: person.email, role: person.role, status: person.status },
     from,
     to,
+    window: win.label,
     shift: shiftRow[0] ? { title: shiftRow[0].title, start: String(shiftRow[0].start).slice(0, 5), end: String(shiftRow[0].end).slice(0, 5), timezone: 'WIB' } : null,
     summary: {
       tracked_seconds: totalSeconds,

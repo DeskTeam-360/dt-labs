@@ -32,8 +32,9 @@ GET /api/calendar/events?from=2026-11-01&to=2026-11-30
 | \`email\` | no | Only the entries of the person with this email (case-insensitive). |
 | \`include\` | no | \`tickets\` adds \`tickets_due\`: the tickets that fall due in the range (with \`email\`: only tickets assigned to that person). Needs a key that also has Tickets (read). |
 | \`done\` | no | \`0\` leaves finished tickets out of \`tickets_due\`. |
+| \`include=assigned_tickets\` | no | Next to every leave entry: \`assigned_tickets_total\` and \`assigned_tickets\`, the unfinished tickets that person still holds (up to 50, most urgent first). Use it to see what needs cover when someone is on leave. Needs Tickets (read) too. |
 
-Response: \`{ from, to, events: [{ id, type, title, start_date, end_date, user_name, user_email, repeat_yearly, notes }], holidays: [{ date, name }], tickets_due? }\`
+Response: \`{ from, to, events: [{ id, type, title, start_date, end_date, user_full_name, user_email, repeat_yearly, notes }], holidays: [{ date, name }], tickets_due? }\`
 
 Each item of \`tickets_due\`: \`{ id, title, status, done, priority, due_date, due_day, overdue, company, assignees, url }\` (\`due_day\` is the WIB calendar day).
 
@@ -52,7 +53,8 @@ GET /api/calendar/user-status?email=budi@company.com&from=2026-11-09&to=2026-11-
 Add \`include=tickets\` (key also needs Tickets (read)) to get each day's \`tickets_due\` (the person's unfinished tickets due that day) and, in \`summary\`, \`tickets_due\` and \`tickets_due_on_unavailable_days\`.
 
 - \`available\` is true when the day is not a weekend, not a holiday and the person is not on leave. Duty (piket) does not make someone unavailable: say "on duty".
-- No team member with that email: \`404\` \`{"error": "No team member with that email"}\`. Do not guess another email.
+- No active team member with that email: \`404\`. Do not guess another email.
+- \`include=assigned_tickets\` here adds \`assigned_tickets_total\` and \`assigned_tickets\`: everything the person holds, not only what is due in the range.
 
 ### Common questions
 
@@ -77,7 +79,7 @@ Every filter is optional and they can be combined: a ticket must match all of th
 | | \`updated_from\`, \`updated_to\` | Last updated in this range |
 | | \`due_from\`, \`due_to\` | Due in this range |
 | | \`overdue=1\` | Past its due date and not finished |
-| Company or customer | \`company_id\` | Company id (comma list) |
+| Company or customer | \`company_id\` | Company id (comma list); find ids with the Companies endpoint (\`/api/v1/companies?q=...\`) |
 | | \`company\` | Company name contains (comma list) |
 | | \`customer_email\` | The ticket's customer contact or creator has this email |
 | User | \`assignee_email\`, \`assignee_id\` | Assigned to this person (comma list) |
@@ -95,7 +97,7 @@ Every filter is optional and they can be combined: a ticket must match all of th
 | Order | \`sort\` = id, created_at, updated_at, due_date, priority; \`order\` = asc or desc (default desc) | |
 | Extra | \`include=description\` | Add the ticket description |
 
-Response: \`{ total, limit, offset, tickets: [{ id, title, status, priority, type, company, customer, created_by, assignees, tags, skills, created_at, updated_at, due_date, url }] }\`.
+Response: \`{ total, limit, offset, has_more, next_offset, tickets: [{ id, title, status, priority, type, company, customer, created_by, assignees, tags, skills, created_at, updated_at, due_date, url }] }\`. People (\`customer\`, \`created_by\`, \`assignees\`) are \`{ full_name, email }\`; assignees also have \`active\`.
 Times are written in WIB (\`+07:00\`). \`total\` is the number of matches across all pages: page through with \`offset\` when it is larger than \`limit\`.
 
 Examples:
@@ -115,7 +117,7 @@ const USERS_SKILL = `## Users (scope \`users:read\`)
 GET /api/v1/users/work?email=budi@company.com&from=2026-11-09&to=2026-11-13
 \`\`\`
 
-\`from\` and \`to\` default to today (WIB); at most 92 days. Add \`include=sessions\` to also get every single time entry.
+The range: \`from\` and \`to\` (WIB days, default today), **or** \`hours=24\` (the last 24 hours up to now, 1 to 720), **or** \`since=2026-11-10T08:00:00+07:00\` with optional \`until\`. At most 92 days. Add \`include=sessions\` to also get every single time entry. Only entries that started inside the range are counted.
 Time comes from the time tracker (the reported time, including adjustments); a running timer counts up to now.
 
 Response (main parts):
@@ -126,7 +128,15 @@ Response (main parts):
 - \`running_now\`: the timer running at this moment, if any.
 - \`calendar_entries\`: the person's leave, duty or birthday in the range.
 - \`assigned_open_tickets\`: unfinished tickets assigned to them now (up to 50).
-- No team member with that email: \`404\`. Do not guess another email.
+- No active team member with that email: \`404\`. Do not guess another email.
+
+### Everyone's work in one call
+
+\`\`\`
+GET /api/v1/work?hours=24
+\`\`\`
+
+Same range options as above (\`from\`/\`to\`, \`hours\`, \`since\`/\`until\`). Every active agent, most hours first, including people who tracked nothing: \`full_name, email, role, shift, tracked_hours, capacity_hours, utilization_pct, sessions, tickets_worked, days_with_work, leave_days, first_start, last_stop, running_now\` and their top tickets (\`limit_tickets\`, default 10; \`tickets=0\` for summaries only). Filters: \`email\`, \`role\`, \`min_hours\`; page with \`limit\`/\`offset\`. Use this for team reports instead of one call per person.
 
 ### Find people
 
@@ -134,7 +144,7 @@ Response (main parts):
 GET /api/v1/users?skill=WordPress&min_level=7
 \`\`\`
 
-Active team members only. Filters: \`email\` (comma list), \`q\` (name or email contains), \`role\`, \`skill\` (name, comma list) with \`min_level\` 1 to 10, \`limit\` (max 200). Each person comes with \`shift\` and \`skills\` (name and level, highest first).
+Active team members only. Filters: \`email\` (comma list), \`q\` (name or email contains), \`role\`, \`skill\` (name, comma list) with \`min_level\` 1 to 10, \`limit\` (max 200) and \`offset\`. Each person comes with \`shift\` and \`skills\` (name and level, highest first).
 
 Examples:
 - "How many hours did Budi work last week, and on what?": \`/api/v1/users/work?email=...&from=...&to=...\`, then use \`summary\` and \`tickets\`.
@@ -158,13 +168,25 @@ Every active agent with the tickets assigned to them that still need work: by de
 | \`role\` | Only these roles (\`admin\`, \`operations\`, \`manager\`, \`staff\`; comma list) |
 | \`tickets=0\` | Leave the ticket lists out and return counts only |
 | \`limit_per_agent\` | Most tickets listed per agent (default 50, max 200) |
-| \`include=unassigned\` | Also list tickets nobody is assigned to (the count is always given) |
+| \`include=unassigned\` | Also list tickets nobody is assigned to (\`unassigned_limit\`, \`unassigned_offset\`; the count and breakdown are always given) |
+| \`limit\`, \`offset\` | Page through the agents (default all) |
 
 Response: \`{ generated_at, statuses, thresholds, totals, agents, unassigned }\`.
 - \`totals\`: \`agents\`, \`tickets_assigned\` (each ticket once), \`unassigned\`, \`overdue\`.
-- Each agent: \`id, name, email, role, shift, on_leave_today, open_tickets\` (how many), \`load_level\`, \`by_status\`, \`overdue\`, \`due_today\`, and \`tickets\` (most urgent first: \`id, title, status, priority, due_date, overdue, company, url\`).
+- Each agent: \`id, full_name, email, role, shift, on_leave_today, open_tickets\` (how many), \`load_level\`, \`by_status\`, \`overdue\`, \`due_today\`, and \`tickets\` (most urgent first: \`id, title, status, priority, due_date, overdue, company, url\`; \`tickets_has_more\` says when more exist than \`limit_per_agent\`).
+- \`unassigned\`: \`count\`, \`by_company\`, \`by_skill\`, \`by_age\` (under 1 day, 1 to 3, 3 to 7, over 7 days) and, with \`include=unassigned\`, the \`tickets\` page.
 - \`load_level\` is \`normal\` (up to 5 active tickets), \`warning\` (6 to 9) or \`critical\` (10 or more); the limits are in \`thresholds\`.\n- A ticket with two assignees appears under both. Times are in WIB (\`+07:00\`).
 - You only see the tickets the key's owner can see (an admin sees all; others see the tickets of their teams, public teams and tickets without a team), so counts can be lower than the real load for someone who is not an admin.
+
+### Who could take over someone's tickets?
+
+\`\`\`
+GET /api/v1/team-load/suggest?from_email=budi@company.com
+\`\`\`
+
+For each unfinished ticket assigned to that person (most urgent first), the best people to take it, ranked on skill match, leave until the due date, shift and load. Or \`ticket_id=1234\` for one ticket. \`ticket_limit\` (default 20, max 50), \`candidates\` per ticket (default 3, max 10).
+Response: \`from_person\`, \`summary\` (how many tickets have an eligible candidate, and which have none) and \`suggestions\`: for each ticket, the \`ticket\`, its \`window\` (today until the due date) and \`candidates\` with \`eligible\`, \`match_pct\`, \`matched_skills\`, \`missing_skills\`, \`open_tickets\`, \`load_level\`, \`available_days\`, \`on_leave_days\`, \`available_on_due_date\`, \`shift\`, \`on_shift_now\`, and plain-language \`reasons\` and \`concerns\`.
+Eligible means: has at least half of the ticket's skills (or the ticket has none), is available at least one working day in the window and on the due date. This only suggests: nothing is assigned, and a person decides. Do not rank people on anything other than skills, availability, shift and load.
 
 Examples:
 - "Who has the most open work?": sort \`agents\` by \`open_tickets\`.
@@ -182,7 +204,7 @@ GET /api/v1/tickets/1234?comments=true
 
 One ticket in full: \`ticket\` (title, description as plain text, status, priority, type, company, team, customer, creator, assignees, tags, skills, dates, link) and \`time\` (hours tracked on it, in total and per person).
 
-Add \`comments=true\` to get the conversation: \`comments_total\`, \`comments_shown\` and \`comments\`, oldest first. Each comment has \`author\` (name, email, \`type\`: \`customer\`, \`agent\` or an automation), \`visibility\`, \`created_at\`, \`text\` (plain text), \`cc\`, \`attachments\` (name and link) and \`split_to_ticket_id\`.
+Add \`comments=true\` to get the conversation: \`comments_total\`, \`comments_shown\` and \`comments\`, oldest first. Each comment has \`author\` (\`full_name\`, \`email\`, \`type\`: \`customer\`, \`agent\` or an automation), \`visibility\`, \`created_at\`, \`text\` (plain text), \`cc\`, \`attachments\` (name and link) and \`split_to_ticket_id\`.
 
 | Parameter | Meaning |
 |---|---|
@@ -200,6 +222,34 @@ Examples:
 - "Summarise ticket 1234": \`/api/v1/tickets/1234?comments=true\`, then read \`comments\` in order.
 - "What did the customer last write?": \`?comments=true&comments_order=desc&comments_limit=5&comment_visibility=reply\`.
 - "What did the team discuss internally?": \`?comments=true&comment_visibility=note\`.
+`
+
+const COMPANIES_SKILL = `## Companies (scope \`companies:read\`)
+
+\`\`\`
+GET /api/v1/companies?q=acme
+\`\`\`
+
+Find a company and its \`id\`. Use that id as \`company_id\` on the tickets endpoint (\`/api/v1/tickets?company_id=...\`), which is the exact way to filter by company.
+
+| Parameter | Meaning |
+|---|---|
+| \`q\` | Name contains (case-insensitive) |
+| \`id\` | Specific company ids (comma list) |
+| \`customer\` | \`1\` customers only, \`0\` internal companies only |
+| \`include_inactive=1\` | Also companies that are switched off (left out by default) |
+| \`sort\` | \`name\` (default) or \`active_tickets\` (most first) |
+| \`limit\`, \`offset\` | Paging (default 100, max 500) |
+
+Response: \`{ total, limit, offset, has_more, next_offset, companies }\`. Each company: \`id, name, is_customer, is_active, plan_hours, domains, email, account_manager, pics, tickets, url\`.
+- \`plan_hours\` are the hours the customer has per day in their plan.
+- \`account_manager\` and \`pics\` (primary first, with \`role\`) are \`{ full_name, email }\`; only active people are listed.
+- \`tickets\`: \`active\` (open, received, working_team) and how many of those are \`overdue\`, counted over the tickets the key's owner may see.
+
+Examples:
+- "What is the id of Acme?": \`?q=acme\`; if several match, ask which one.
+- "Which customers have the most active tickets?": \`?customer=1&sort=active_tickets&limit=10\`.
+- "Tickets of Acme that are not finished": find its id here, then \`/api/v1/tickets?company_id=<id>&done=0\`.
 `
 
 export const API_SCOPES: ApiScope[] = [
@@ -225,7 +275,8 @@ export const API_SCOPES: ApiScope[] = [
     label: 'Users (read)',
     description: 'See what a person worked on in a date range with their hours, and find people by skill, role or email.',
     endpoints: [
-      { method: 'GET', path: '/api/v1/users/work', summary: 'Work and tracked hours of a person in a date range' },
+      { method: 'GET', path: '/api/v1/users/work', summary: 'Work and tracked hours of one person (date range, hours=24 or since)' },
+      { method: 'GET', path: '/api/v1/work', summary: 'Work and tracked hours of every active agent in one call (date range, hours=24 or since)' },
       { method: 'GET', path: '/api/v1/users', summary: 'Find active team members (with shift and skills)' },
     ],
     skill: USERS_SKILL,
@@ -234,7 +285,10 @@ export const API_SCOPES: ApiScope[] = [
     key: 'team-load:read',
     label: 'Team load (read)',
     description: 'All active agents with the tickets assigned to them in Open, Received and Working Team, to see who has room.',
-    endpoints: [{ method: 'GET', path: '/api/v1/team-load', summary: 'Every active agent with their assigned tickets and counts' }],
+    endpoints: [
+      { method: 'GET', path: '/api/v1/team-load', summary: 'Every active agent with their assigned tickets, counts and the unassigned breakdown' },
+      { method: 'GET', path: '/api/v1/team-load/suggest', summary: 'Who could take over the tickets of a person, ranked on skill, leave, shift and load' },
+    ],
     skill: TEAM_LOAD_SKILL,
   },
   {
@@ -243,6 +297,13 @@ export const API_SCOPES: ApiScope[] = [
     description: 'Open one ticket in full, with its conversation (customer replies and internal notes) and the time tracked on it.',
     endpoints: [{ method: 'GET', path: '/api/v1/tickets/{id}', summary: 'One ticket; add comments=true for the conversation' }],
     skill: TICKET_DETAIL_SKILL,
+  },
+  {
+    key: 'companies:read',
+    label: 'Companies (read)',
+    description: 'Find a company and its id (to filter tickets by company), with its plan hours, account manager, PICs and active tickets.',
+    endpoints: [{ method: 'GET', path: '/api/v1/companies', summary: 'Companies with their ids, plan, people and active ticket counts' }],
+    skill: COMPANIES_SKILL,
   },
 ]
 
@@ -275,6 +336,8 @@ Read-only HTTP and JSON. Responses use snake_case.
   \`\`\`
 
   The key was made on the API Keys page in Settings. It acts as the person who made it, only for the sections below, and it can expire or be revoked at any time. Keep it secret: never put it in a URL, never print it back to the user, never write it into files that are shared.
+- Every person in the API is written as \`full_name\` and \`email\` (calendar entries: \`user_full_name\`, \`user_email\`). Only active people are listed; an assignee of a ticket also has \`active\`.
+- Lists that can be long have \`limit\` and \`offset\`, and say \`has_more\` and \`next_offset\` (null on the last page): keep asking with \`offset=next_offset\` until \`has_more\` is false.
 - A key that is expired, revoked, switched off, or does not have access to the call returns \`401\`; tell the user and ask for a new key or different access. Do not retry.
 
 ${chosen.map((s) => s.skill).join('\n') || 'This key has no access yet.\n'}

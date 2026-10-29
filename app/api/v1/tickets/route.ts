@@ -2,9 +2,10 @@ import { and, asc, desc, eq, inArray, type SQL, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { getApiUser, isTeamRole } from '@/lib/api-auth'
-import { csv, isYmd, siteUrl, sqlList, ticketVisibility, toWibIso, wibRange } from '@/lib/api-v1'
+import { csv, isYmd, pageInfo, siteUrl, sqlList, ticketVisibility, toWibIso, wibRange } from '@/lib/api-v1'
 import { companies, db, ticketAssignees, tickets, ticketTypes, users } from '@/lib/db'
 import { CLOSED_LIKE_STATUS_LIST } from '@/lib/ticket-status-workflow'
+import { isUserInactive } from '@/lib/user-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -170,7 +171,7 @@ export async function GET(request: Request) {
   const [assigneeRows, tagRows, skillRows] = ticketIds.length
     ? await Promise.all([
         db
-          .select({ ticketId: ticketAssignees.ticketId, id: users.id, name: users.fullName, email: users.email })
+          .select({ ticketId: ticketAssignees.ticketId, id: users.id, fullName: users.fullName, email: users.email, status: users.status })
           .from(ticketAssignees)
           .innerJoin(users, eq(ticketAssignees.userId, users.id))
           .where(inArray(ticketAssignees.ticketId, ticketIds)),
@@ -179,8 +180,8 @@ export async function GET(request: Request) {
       ])
     : [[], [], []]
   const peopleIds = [...new Set(rows.flatMap((r) => [r.contactUserId, r.createdBy]).filter((v): v is string => !!v))]
-  const peopleRows = peopleIds.length ? await db.select({ id: users.id, name: users.fullName, email: users.email }).from(users).where(inArray(users.id, peopleIds)) : []
-  const person = new Map(peopleRows.map((p) => [p.id, { name: p.name, email: p.email }]))
+  const peopleRows = peopleIds.length ? await db.select({ id: users.id, fullName: users.fullName, email: users.email }).from(users).where(inArray(users.id, peopleIds)) : []
+  const person = new Map(peopleRows.map((p) => [p.id, { full_name: p.fullName, email: p.email }]))
 
   const asRows = <T,>(r: unknown): T[] => (Array.isArray(r) ? (r as T[]) : ((r as { rows?: T[] }).rows ?? []))
   const tagsBy = new Map<number, string[]>()
@@ -189,15 +190,16 @@ export async function GET(request: Request) {
   for (const s of asRows<{ ticket_id: number; name: string; is_primary: boolean }>(skillRows)) {
     skillsBy.set(s.ticket_id, [...(skillsBy.get(s.ticket_id) ?? []), { name: s.name, is_primary: s.is_primary }])
   }
-  const assigneesBy = new Map<number, { id: string; name: string | null; email: string }[]>()
-  for (const a of assigneeRows as { ticketId: number; id: string; name: string | null; email: string }[]) {
-    assigneesBy.set(a.ticketId, [...(assigneesBy.get(a.ticketId) ?? []), { id: a.id, name: a.name, email: a.email }])
+  const assigneesBy = new Map<number, { id: string; full_name: string | null; email: string; active: boolean }[]>()
+  for (const a of assigneeRows as { ticketId: number; id: string; fullName: string | null; email: string; status: string | null }[]) {
+    assigneesBy.set(a.ticketId, [...(assigneesBy.get(a.ticketId) ?? []), { id: a.id, full_name: a.fullName, email: a.email, active: !isUserInactive(a.status) }])
   }
 
   return NextResponse.json({
     total: totalRow[0]?.n ?? 0,
     limit,
     offset,
+    ...pageInfo(offset, rows.length, totalRow[0]?.n ?? 0),
     tickets: rows.map((r) => ({
       id: r.id,
       title: r.title,

@@ -78,3 +78,54 @@ export function htmlToText(html: string | null | undefined): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
+
+export type TimeWindow = {
+  start: Date
+  end: Date
+  /** What the caller asked for, echoed back in responses */
+  label: { from: string; to: string } | { since: string; until: string }
+}
+
+/**
+ * The time range of a request. Three ways, in this order:
+ * hours=24 (the last 24 hours up to now; 1 to 720), since=<ISO datetime> with optional until=<ISO datetime>,
+ * or from=YYYY-MM-DD with optional to=YYYY-MM-DD (WIB days, default today). `maxDays` limits the span.
+ */
+export function resolveWindow(q: URLSearchParams, maxDays: number): TimeWindow | { error: string } {
+  const now = new Date()
+  const hoursParam = q.get('hours')
+  const sinceParam = q.get('since')
+  if (hoursParam || sinceParam) {
+    let start: Date
+    let end = now
+    if (hoursParam) {
+      const h = Number(hoursParam)
+      if (!Number.isFinite(h) || h < 1 || h > 720) return { error: 'hours must be between 1 and 720' }
+      start = new Date(now.getTime() - h * 3600000)
+    } else {
+      start = new Date(sinceParam!)
+      if (Number.isNaN(start.getTime())) return { error: 'since must be an ISO date and time, e.g. 2026-11-10T08:00:00+07:00' }
+      const untilParam = q.get('until')
+      if (untilParam) {
+        end = new Date(untilParam)
+        if (Number.isNaN(end.getTime())) return { error: 'until must be an ISO date and time' }
+      }
+    }
+    if (end < start) return { error: 'until is before since' }
+    if ((end.getTime() - start.getTime()) / 86400000 > maxDays) return { error: `The range can be at most ${maxDays} days` }
+    return { start, end, label: { since: toWibIso(start)!, until: toWibIso(end)! } }
+  }
+  const from = q.get('from') ?? todayWib()
+  const to = q.get('to') ?? from
+  if (!isYmd(from) || !isYmd(to)) return { error: 'from and to must be YYYY-MM-DD' }
+  if (to < from) return { error: 'to is before from' }
+  if (Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1 > maxDays) return { error: `The range can be at most ${maxDays} days` }
+  const { start, end } = wibRange(from, to)
+  return { start, end, label: { from, to } }
+}
+
+/** Paging info for a list response: where the next page starts (null on the last page). */
+export function pageInfo(offset: number, shown: number, total: number): { has_more: boolean; next_offset: number | null } {
+  const next = offset + shown
+  return next < total ? { has_more: true, next_offset: next } : { has_more: false, next_offset: null }
+}

@@ -46,7 +46,7 @@ Response:
       "title": "Budi - leave",
       "start_date": "2026-11-10",
       "end_date": "2026-11-12",
-      "user_name": "Budi Santoso",
+      "user_full_name": "Budi Santoso",
       "user_email": "budi@company.com",
       "repeat_yearly": false,
       "notes": null
@@ -60,7 +60,7 @@ Notes:
 - Multi-day entries are one item with `start_date` and `end_date` (inclusive). Check overlap with `start_date <= day <= end_date`.
 - Yearly entries (birthdays, some holidays) are already placed in the year(s) of the range; `repeat_yearly` only says that they repeat.
 - `holidays` are the official non-working days. With `email`, or with a `type` that excludes `holiday`, the list is empty. Entries of type `holiday` are in `events`, so check both for a complete list.
-- `user_name` and `user_email` are `null` for entries that belong to nobody (for example a general holiday).
+- `user_full_name` and `user_email` are `null` for entries that belong to nobody (for example a general holiday).
 
 ## 2. Is this person available? (look up by email)
 
@@ -98,11 +98,11 @@ Response:
 ```
 
 - `available` is true when the day is not a weekend, not a holiday, and the person is not on leave. Duty (piket) does not make someone unavailable: say "on duty" instead.
-- A person who is not found, or is not a team member, returns `404` with `{"error": "No team member with that email"}`. Do not guess another email.
+- A person who is not found, or is not a team member, returns `404` with `{"error": "No active team member with that email"}`. Do not guess another email.
 
 ## How to answer common questions
 
-- "Who is on leave next week?" Call `/api/calendar/events` with `type=leave` and the week's dates; list `user_name` with the date range.
+- "Who is on leave next week?" Call `/api/calendar/events` with `type=leave` and the week's dates; list `user_full_name` with the date range.
 - "Can budi@company.com take a task on 12 Nov?" Call `/api/calendar/user-status` with `from=to=2026-11-12`; use `days[0].available`, and mention a holiday, leave, or duty entry as the reason.
 - "Who is on duty this weekend?" Call `/api/calendar/events` with `type=duty` for Saturday to Sunday.
 - "Any holidays in December?" Call `/api/calendar/events` for December and combine `holidays` with events of type `holiday`.
@@ -116,7 +116,7 @@ Response:
 | 400 | Missing or invalid parameter (the message says which), range too long, unknown `type` | Fix the request. |
 | 401 | Missing, expired, revoked or switched-off key, or a key without Calendar access | Tell the user; ask for a new key or different access. Do not retry. |
 | 403 | The key's owner is not allowed to use this | Tell the user. |
-| 404 | No team member with that email (`user-status`) | Tell the user the email was not found. |
+| 404 | No active team member with that email (`user-status`) | Tell the user the email was not found. |
 
 ## Rules
 

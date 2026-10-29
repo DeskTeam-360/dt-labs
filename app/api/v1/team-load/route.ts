@@ -2,7 +2,7 @@ import { and, eq, inArray, notInArray, type SQL, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { getApiUser, isTeamRole } from '@/lib/api-auth'
-import { csv, siteUrl, sqlList, ticketVisibility, toWibIso, wibDay } from '@/lib/api-v1'
+import { csv, pageInfo, siteUrl, sqlList, ticketVisibility, toWibIso, wibDay } from '@/lib/api-v1'
 import { eachDay, loadCalendarEntries } from '@/lib/calendar-query'
 import { companies, db, shifts, ticketAssignees, tickets, users } from '@/lib/db'
 import { ACTIVE_WORKLOAD_STATUSES } from '@/lib/skills'
@@ -19,7 +19,8 @@ const MAX_PER_AGENT = 200
 /**
  * GET /api/v1/team-load - every active agent with the tickets assigned to them that still need work
  * (default statuses: open, received, working_team). Agents with nothing assigned are listed too.
- * status (slugs, comma), email, role, tickets=0 (counts only), limit_per_agent, include=unassigned.
+ * status (slugs, comma), email, role, tickets=0 (counts only), limit_per_agent, limit and offset (page through the agents),
+ * include=unassigned (lists them; unassigned_limit, unassigned_offset). The unassigned count is always broken down by company, skill and age.
  * Auth: browser session or an API key with the `team-load:read` scope.
  */
 export async function GET(request: Request) {
@@ -35,6 +36,10 @@ export async function GET(request: Request) {
   const withTickets = q.get('tickets') !== '0'
   const perAgent = Math.min(MAX_PER_AGENT, Math.max(1, Number(q.get('limit_per_agent')) || DEFAULT_PER_AGENT))
   const includeUnassigned = csv(q.get('include')).includes('unassigned')
+  const agentLimit = Math.min(200, Math.max(1, Number(q.get('limit')) || 200))
+  const agentOffset = Math.max(0, Number(q.get('offset')) || 0)
+  const unassignedLimit = Math.min(MAX_PER_AGENT, Math.max(1, Number(q.get('unassigned_limit')) || DEFAULT_PER_AGENT))
+  const unassignedOffset = Math.max(0, Number(q.get('unassigned_offset')) || 0)
 
   const agentConditions: SQL[] = [inArray(users.role, roles.length ? roles.filter((r) => AGENT_ROLES.includes(r)) : AGENT_ROLES), notInArray(users.status, INACTIVE_USER_STATUSES)]
   if (emails.length) agentConditions.push(sql`lower(${users.email}) IN (${sqlList(emails)})`)
@@ -109,7 +114,7 @@ export async function GET(request: Request) {
       const sorted = sortTickets(list)
       return {
         id: a.id,
-        name: a.fullName || a.email,
+        full_name: a.fullName || a.email,
         email: a.email,
         role: a.role,
         shift: a.shiftTitle ? { title: a.shiftTitle, start: String(a.shiftStart).slice(0, 5), end: String(a.shiftEnd).slice(0, 5), timezone: 'WIB' } : null,
@@ -119,25 +124,52 @@ export async function GET(request: Request) {
         by_status: byStatus,
         overdue: list.filter((t) => t.overdue).length,
         due_today: list.filter((t) => t._due !== null && t._due >= todayStart && t._due <= todayEnd).length,
-        ...(withTickets ? { tickets: sorted.slice(0, perAgent).map(strip), tickets_shown: Math.min(sorted.length, perAgent) } : {}),
+        ...(withTickets ? { tickets: sorted.slice(0, perAgent).map(strip), tickets_shown: Math.min(sorted.length, perAgent), tickets_has_more: sorted.length > perAgent } : {}),
       }
     })
-    .sort((x, y) => y.open_tickets - x.open_tickets || x.name.localeCompare(y.name))
+    .sort((x, y) => y.open_tickets - x.open_tickets || x.full_name.localeCompare(y.full_name))
 
-  // Tickets in these statuses that nobody is assigned to.
+  // Tickets in these statuses that nobody is assigned to: always counted and broken down; listed on request.
   const unassignedWhere = and(...ticketConditions, sql`NOT EXISTS (SELECT 1 FROM ticket_assignees ta WHERE ta.ticket_id = ${tickets.id})`)
-  const [unassignedCount] = await db.select({ n: sql<number>`count(*)::int` }).from(tickets).where(unassignedWhere)
-  const unassignedRows = includeUnassigned
-    ? await db
-        .select({ id: tickets.id, title: tickets.title, status: tickets.status, priority: tickets.priority, dueDate: tickets.dueDate, companyName: companies.name })
-        .from(tickets)
-        .leftJoin(companies, eq(tickets.companyId, companies.id))
-        .where(unassignedWhere)
-        .orderBy(sql`${tickets.dueDate} ASC NULLS LAST`, tickets.id)
-        .limit(MAX_PER_AGENT)
+  const [unassignedAll, unassignedRows] = await Promise.all([
+    db
+      .select({ id: tickets.id, companyName: companies.name, createdAt: tickets.createdAt })
+      .from(tickets)
+      .leftJoin(companies, eq(tickets.companyId, companies.id))
+      .where(unassignedWhere),
+    includeUnassigned
+      ? db
+          .select({ id: tickets.id, title: tickets.title, status: tickets.status, priority: tickets.priority, dueDate: tickets.dueDate, companyName: companies.name })
+          .from(tickets)
+          .leftJoin(companies, eq(tickets.companyId, companies.id))
+          .where(unassignedWhere)
+          .orderBy(sql`${tickets.dueDate} ASC NULLS LAST`, tickets.id)
+          .limit(unassignedLimit)
+          .offset(unassignedOffset)
+      : Promise.resolve([]),
+  ])
+  const unassignedIds = unassignedAll.map((t) => t.id)
+  const skillRows = unassignedIds.length
+    ? await db.execute(sql`SELECT ts.ticket_id AS ticket_id, s.name AS name FROM ticket_skills ts JOIN skills s ON s.id = ts.skill_id WHERE ts.ticket_id IN (${sqlList(unassignedIds)})`)
     : []
+  const skillList = (Array.isArray(skillRows) ? skillRows : ((skillRows as { rows?: unknown[] }).rows ?? [])) as { ticket_id: number; name: string }[]
+  const byCompany = new Map<string, number>()
+  const bySkill = new Map<string, number>()
+  const age = { under_1_day: 0, one_to_3_days: 0, three_to_7_days: 0, over_7_days: 0 }
+  for (const t of unassignedAll) {
+    byCompany.set(t.companyName ?? '(no company)', (byCompany.get(t.companyName ?? '(no company)') ?? 0) + 1)
+    const days = (now - new Date(t.createdAt).getTime()) / 86400000
+    if (days < 1) age.under_1_day++
+    else if (days < 3) age.one_to_3_days++
+    else if (days < 7) age.three_to_7_days++
+    else age.over_7_days++
+  }
+  for (const s of skillList) bySkill.set(s.name, (bySkill.get(s.name) ?? 0) + 1)
+  const withoutSkill = unassignedIds.length - new Set(skillList.map((s) => s.ticket_id)).size
+  const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }))
 
   const distinct = new Set(rows.map((r) => r.id))
+  const pageAgents = agentsOut.slice(agentOffset, agentOffset + agentLimit)
   return NextResponse.json({
     generated_at: toWibIso(new Date()),
     statuses: statusList,
@@ -145,12 +177,26 @@ export async function GET(request: Request) {
     totals: {
       agents: agentsOut.length,
       tickets_assigned: distinct.size,
-      unassigned: unassignedCount?.n ?? 0,
+      unassigned: unassignedAll.length,
       overdue: agentsOut.reduce((n, a) => n + a.overdue, 0),
     },
-    agents: agentsOut,
-    unassigned: includeUnassigned
-      ? unassignedRows.map((r) => strip({ ...brief({ userId: '', ...r }) }))
-      : undefined,
+    limit: agentLimit,
+    offset: agentOffset,
+    ...pageInfo(agentOffset, pageAgents.length, agentsOut.length),
+    agents: pageAgents,
+    unassigned: {
+      count: unassignedAll.length,
+      by_company: top(byCompany),
+      by_skill: [...top(bySkill), ...(withoutSkill > 0 ? [{ name: '(no skill set)', count: withoutSkill }] : [])],
+      by_age: age,
+      ...(includeUnassigned
+        ? {
+            tickets: unassignedRows.map((r) => strip({ ...brief({ userId: '', ...r }) })),
+            limit: unassignedLimit,
+            offset: unassignedOffset,
+            ...pageInfo(unassignedOffset, unassignedRows.length, unassignedAll.length),
+          }
+        : {}),
+    },
   })
 }

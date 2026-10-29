@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, notInArray, or, type SQL,sql } from 'drizzle-orm
 import { NextResponse } from 'next/server'
 
 import { getApiUser, isTeamRole } from '@/lib/api-auth'
-import { csv, sqlList } from '@/lib/api-v1'
+import { csv, pageInfo, sqlList } from '@/lib/api-v1'
 import { db, shifts, skills,users, userSkills } from '@/lib/db'
 import { INACTIVE_USER_STATUSES } from '@/lib/user-status'
 
@@ -12,7 +12,7 @@ const MAX_LIMIT = 200
 
 /**
  * GET /api/v1/users - find team members (active people only).
- * email (exact, comma list), q (name or email contains), role, skill (name, comma list) with min_level (1-10), limit (max 200).
+ * email (exact, comma list), q (name or email contains), role, skill (name, comma list) with min_level (1-10), limit (max 200) and offset.
  * Each person comes with their shift and skills with levels.
  * Auth: browser session or an API key with the `users:read` scope.
  */
@@ -43,6 +43,8 @@ export async function GET(request: Request) {
   }
 
   const limit = Math.min(MAX_LIMIT, Math.max(1, Number(q.get('limit')) || 100))
+  const offset = Math.max(0, Number(q.get('offset')) || 0)
+  const [{ n: total }] = await db.select({ n: sql<number>`count(*)::int` }).from(users).where(and(...conditions))
   const rows = await db
     .select({
       id: users.id,
@@ -59,6 +61,7 @@ export async function GET(request: Request) {
     .where(and(...conditions))
     .orderBy(asc(users.fullName))
     .limit(limit)
+    .offset(offset)
 
   const ids = rows.map((r) => r.id)
   const skillRows = ids.length
@@ -72,7 +75,10 @@ export async function GET(request: Request) {
   for (const s of skillRows) skillsBy.set(s.userId, [...(skillsBy.get(s.userId) ?? []), { name: s.name, level: s.level }])
 
   return NextResponse.json({
-    total: rows.length,
+    total,
+    limit,
+    offset,
+    ...pageInfo(offset, rows.length, total),
     users: rows.map((r) => ({
       id: r.id,
       full_name: r.fullName,

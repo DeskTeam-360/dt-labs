@@ -5,7 +5,7 @@ import { getApiUser, isTeamRole } from '@/lib/api-auth'
 import { isAdminOrOperations } from '@/lib/auth-utils'
 import { CALENDAR_EVENT_TYPES, type CalendarEventType } from '@/lib/calendar-events'
 import { daysBetween, loadCalendarEntries } from '@/lib/calendar-query'
-import { loadDueTickets } from '@/lib/calendar-tickets'
+import { loadAssignedTickets, loadDueTickets } from '@/lib/calendar-tickets'
 import { calendarEvents, db } from '@/lib/db'
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/
@@ -82,14 +82,19 @@ export async function GET(request: Request) {
   const email = (q.get('email') ?? '').trim().toLowerCase()
 
   // include=tickets adds the tickets that are due in the range; that is ticket data, so the key needs the Tickets scope too.
-  const includeTickets = (q.get('include') ?? '').split(',').includes('tickets')
-  if (includeTickets && !(await getApiUser(request, 'tickets:read', { log: false }))) {
-    return NextResponse.json({ error: 'include=tickets needs a key that also has Tickets (read)' }, { status: 403 })
+  const include = (q.get('include') ?? '').split(',')
+  const includeTickets = include.includes('tickets')
+  const includeAssigned = include.includes('assigned_tickets')
+  if ((includeTickets || includeAssigned) && !(await getApiUser(request, 'tickets:read', { log: false }))) {
+    return NextResponse.json({ error: 'include=tickets and include=assigned_tickets need a key that also has Tickets (read)' }, { status: 403 })
   }
   const unfinishedOnly = q.get('done') === '0'
 
   const { events, holidays } = await loadCalendarEntries(from, to)
   const filtered = events.filter((e) => (types.length === 0 || types.includes(e.type)) && (!email || (e.user_email ?? '').toLowerCase() === email))
+  // The people on leave in this range and what each of them still has assigned.
+  const leavePeople = includeAssigned ? [...new Set(filtered.filter((e) => e.type === 'leave' && e.user_id).map((e) => e.user_id as string))] : []
+  const plates = await loadAssignedTickets(me, leavePeople)
   const includeHolidays = !email && (types.length === 0 || types.includes('holiday'))
 
   return NextResponse.json({
@@ -101,7 +106,8 @@ export async function GET(request: Request) {
       title: e.title,
       start_date: e.start_date,
       end_date: e.end_date,
-      user_name: e.user_name,
+      user_full_name: e.user_name,
+      ...(includeAssigned && e.type === 'leave' && e.user_id ? { assigned_tickets_total: plates.get(e.user_id)?.total ?? 0, assigned_tickets: plates.get(e.user_id)?.tickets.map(({ assignees, ...t }) => { void assignees; return t }) ?? [] } : {}),
       user_email: e.user_email ?? null,
       repeat_yearly: e.repeat_yearly,
       notes: e.notes,

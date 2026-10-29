@@ -16,6 +16,7 @@ import {
   users,
 } from '@/lib/db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
+import { isUserInactive } from '@/lib/user-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,7 +68,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
 
   const [assignees, tagRows, skillRows, sessions, people] = await Promise.all([
     db
-      .select({ id: users.id, name: users.fullName, email: users.email })
+      .select({ id: users.id, fullName: users.fullName, email: users.email, status: users.status })
       .from(ticketAssignees)
       .innerJoin(users, eq(ticketAssignees.userId, users.id))
       .where(eq(ticketAssignees.ticketId, id)),
@@ -84,12 +85,12 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
       .from(ticketTimeTracker)
       .where(eq(ticketTimeTracker.ticketId, id)),
     db
-      .select({ id: users.id, name: users.fullName, email: users.email })
+      .select({ id: users.id, fullName: users.fullName, email: users.email })
       .from(users)
       .where(inArray(users.id, [t.contactUserId, t.createdBy].filter((v): v is string => !!v))),
   ])
   const asRows = <T,>(r: unknown): T[] => (Array.isArray(r) ? (r as T[]) : ((r as { rows?: T[] }).rows ?? []))
-  const person = new Map(people.map((p) => [p.id, { name: p.name, email: p.email }]))
+  const person = new Map(people.map((p) => [p.id, { full_name: p.fullName, email: p.email }]))
 
   // Time tracked on this ticket, in total and per person (a running timer counts up to now).
   const now = Date.now()
@@ -103,7 +104,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
     bySeconds.set(s.userId, (bySeconds.get(s.userId) ?? 0) + sec)
   }
   const trackerPeople = bySeconds.size
-    ? await db.select({ id: users.id, name: users.fullName, email: users.email }).from(users).where(inArray(users.id, [...bySeconds.keys()]))
+    ? await db.select({ id: users.id, fullName: users.fullName, email: users.email }).from(users).where(inArray(users.id, [...bySeconds.keys()]))
     : []
 
   const includeHtml = q.get('html') === '1'
@@ -147,7 +148,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
     commentsTotal = countRow[0]?.n ?? 0
     comments = rows.map((r) => ({
       id: r.id,
-      author: { name: r.authorName ?? r.authorEmail ?? null, email: r.authorEmail ?? null, type: r.authorType },
+      author: { full_name: r.authorName ?? r.authorEmail ?? null, email: r.authorEmail ?? null, type: r.authorType },
       visibility: r.visibility,
       created_at: toWibIso(r.createdAt),
       edited_at: toWibIso(r.editedAt),
@@ -172,7 +173,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
       team: t.teamName ?? null,
       customer: t.contactUserId ? (person.get(t.contactUserId) ?? null) : null,
       created_by: t.createdBy ? (person.get(t.createdBy) ?? null) : null,
-      assignees: assignees.map((a) => ({ id: a.id, name: a.name, email: a.email })),
+      assignees: assignees.map((a) => ({ id: a.id, full_name: a.fullName, email: a.email, active: !isUserInactive(a.status) })),
       tags: asRows<{ name: string }>(tagRows).map((r) => r.name),
       skills: asRows<{ name: string; is_primary: boolean }>(skillRows).map((r) => ({ name: r.name, is_primary: r.is_primary })),
       created_at: toWibIso(t.createdAt),
@@ -184,7 +185,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
       tracked_seconds: totalSeconds,
       tracked_hours: hours(totalSeconds),
       by_person: trackerPeople
-        .map((p) => ({ name: p.name ?? p.email, email: p.email, tracked_hours: hours(bySeconds.get(p.id) ?? 0) }))
+        .map((p) => ({ full_name: p.fullName ?? p.email, email: p.email, tracked_hours: hours(bySeconds.get(p.id) ?? 0) }))
         .sort((a, b) => b.tracked_hours - a.tracked_hours),
     },
     ...(comments ? { comments_total: commentsTotal, comments_shown: comments.length, comments } : {}),

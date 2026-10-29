@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server'
 
 import { getApiUser, isTeamRole } from '@/lib/api-auth'
 import { daysBetween, eachDay, loadCalendarEntries } from '@/lib/calendar-query'
-import { loadDueTickets } from '@/lib/calendar-tickets'
+import { loadAssignedTickets, loadDueTickets } from '@/lib/calendar-tickets'
 import { db, users } from '@/lib/db'
+import { isUserInactive } from '@/lib/user-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,15 +41,21 @@ export async function GET(request: Request) {
     .from(users)
     .where(sql`lower(${users.email}) = ${email}`)
     .limit(1)
-  // Customers are not part of the team calendar.
-  if (!person || !isTeamRole((person.role ?? '').toLowerCase())) return NextResponse.json({ error: 'No team member with that email' }, { status: 404 })
+  // Customers and inactive people are not part of the team calendar.
+  if (!person || !isTeamRole((person.role ?? '').toLowerCase()) || isUserInactive(person.status)) {
+    return NextResponse.json({ error: 'No active team member with that email' }, { status: 404 })
+  }
 
   // include=tickets adds the person's unfinished tickets by due day; that is ticket data, so the key needs the Tickets scope too.
-  const includeTickets = (q.get('include') ?? '').split(',').includes('tickets')
-  if (includeTickets && !(await getApiUser(request, 'tickets:read', { log: false }))) {
-    return NextResponse.json({ error: 'include=tickets needs a key that also has Tickets (read)' }, { status: 403 })
+  const include = (q.get('include') ?? '').split(',')
+  const includeTickets = include.includes('tickets')
+  const includeAssigned = include.includes('assigned_tickets')
+  if ((includeTickets || includeAssigned) && !(await getApiUser(request, 'tickets:read', { log: false }))) {
+    return NextResponse.json({ error: 'include=tickets and include=assigned_tickets need a key that also has Tickets (read)' }, { status: 403 })
   }
   const dueTickets = includeTickets ? await loadDueTickets(me, from, to, { email: person.email, unfinishedOnly: true }) : []
+
+  const plate = includeAssigned ? ((await loadAssignedTickets(me, [person.id])).get(person.id) ?? { total: 0, tickets: [] }) : null
 
   const { events, holidays } = await loadCalendarEntries(from, to)
   const holidayOn = (d: string) => {
@@ -91,6 +98,7 @@ export async function GET(request: Request) {
       holiday_days: days.filter((d) => d.holiday).length,
       ...(includeTickets ? { tickets_due: dueTickets.length, tickets_due_on_unavailable_days: days.filter((d) => !d.available).reduce((n, d) => n + (d.tickets_due?.length ?? 0), 0) } : {}),
     },
+    ...(plate ? { assigned_tickets_total: plate.total, assigned_tickets: plate.tickets.map(({ assignees, ...t }) => { void assignees; return t }) } : {}),
     days,
   })
 }
