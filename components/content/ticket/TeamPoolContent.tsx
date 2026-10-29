@@ -12,6 +12,7 @@ import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { DEFAULT_ALL_STATUS_COLUMNS, type TicketRecord } from '@/components/ticket/list/types'
+import { loadLevel } from '@/lib/team-load-levels'
 
 dayjs.extend(relativeTime)
 
@@ -21,6 +22,8 @@ const { Title, Text } = Typography
 /** Only tickets still waiting for or in work are on the board. */
 const BOARD_STATUSES = 'open,received,working_team'
 const GREEN = '#52c41a'
+/** The statuses that count as work in progress for a person's load. */
+const ACTIVE_STATUSES = ['open', 'received', 'working_team']
 /** True for a moment after a drag ends, so releasing the card does not follow its link. */
 let justDragged = false
 /** "No assign" shows at most this many tickets; agent lanes always show everything they have. */
@@ -158,6 +161,9 @@ function TicketCard({ t, stat, hint, highlight }: { t: TicketRecord; stat?: Tick
 
 /** Top of a person's lane: who, duty/leave, shift, and where they are working right now. */
 function PersonHeader({ lane, agent, shift, status, count }: { lane: Lane; agent?: Agent; shift?: ShiftOption; status?: PersonStatus; count: number }) {
+  // Load is counted on active tickets (Open, Received, Working Team): orange from 6, red from 10.
+  const level = loadLevel(lane.tickets.filter((t) => ACTIVE_STATUSES.includes(t.status)).length)
+  const levelColor = level === 'critical' ? '#ff4d4f' : level === 'warning' ? '#fa8c16' : null
   const duty = status?.reason ? DUTY[status.reason] ?? { label: status.reason, color: 'default' } : null
   const active = status?.active ?? []
   const start = wibTime(status?.shift_start ?? null)
@@ -188,7 +194,7 @@ function PersonHeader({ lane, agent, shift, status, count }: { lane: Lane; agent
           borderRadius: 12,
           padding: '10px 12px',
           background: isActive ? '#f6ffed' : 'var(--kanban-column-bg, #fafafa)',
-          border: isActive ? `2px solid ${GREEN}` : '1px solid #e8e8e8',
+          border: levelColor ? `2px solid ${levelColor}` : isActive ? `2px solid ${GREEN}` : '1px solid #e8e8e8',
         }}
       >
         <Flex justify="space-between" align="center" gap={6}>
@@ -196,7 +202,11 @@ function PersonHeader({ lane, agent, shift, status, count }: { lane: Lane; agent
             <Text strong style={{ fontSize: 14 }}>{lane.title.split(' ')[0]}</Text>
             {lane.subtitle ? <Text type="secondary" style={{ fontSize: 11 }}> · {lane.subtitle}</Text> : null}
           </Text>
-          <Tag color={duty?.color ?? 'default'} style={{ margin: 0, flexShrink: 0 }}>
+          <Tag
+            color={level === 'critical' ? 'red' : level === 'warning' ? 'orange' : (duty?.color ?? 'default')}
+            style={{ margin: 0, flexShrink: 0 }}
+            title={level === 'normal' ? undefined : level === 'critical' ? '10 or more active tickets' : '6 or more active tickets'}
+          >
             {duty ? `${duty.label}: ${count}` : count}
           </Tag>
         </Flex>
