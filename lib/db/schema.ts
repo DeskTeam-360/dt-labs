@@ -1023,6 +1023,65 @@ export const calendarEvents = pgTable(
   (t) => [index('calendar_events_range_idx').on(t.startDate, t.endDate)]
 )
 
+/** The Google account a person connected to push calendar entries to their own Google Calendar. */
+export const googleCalendarConnections = pgTable('google_calendar_connections', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  googleEmail: varchar('google_email', { length: 255 }),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  expiresAt: ts('expires_at'),
+  calendarId: varchar('calendar_id', { length: 255 }).notNull().default('primary'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
+/** Which Google event an entry became in whose calendar, so edits and deletes can follow. */
+export const calendarGoogleLinks = pgTable(
+  'calendar_google_links',
+  {
+    eventId: uuid('event_id').notNull().references(() => calendarEvents.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    googleEventId: text('google_event_id').notNull(),
+    syncedAt: ts('synced_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.userId] })]
+)
+
+/** API keys people make for scripts and AI assistants; only the hash is stored. `scopes` is what the key may use. */
+export const apiKeys = pgTable(
+  'api_keys',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 120 }).notNull(),
+    keyPrefix: varchar('key_prefix', { length: 16 }).notNull(),
+    keyHash: varchar('key_hash', { length: 64 }).notNull().unique(),
+    scopes: jsonb('scopes').$type<string[]>().notNull().default([]),
+    expiresAt: ts('expires_at'),
+    isActive: boolean('is_active').notNull().default(true),
+    lastUsedAt: ts('last_used_at'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('api_keys_user_idx').on(t.userId)]
+)
+
+/** Every call made with an API key, including refused ones (with the reason). */
+export const apiKeyUsage = pgTable(
+  'api_key_usage',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    keyId: uuid('key_id').notNull().references(() => apiKeys.id, { onDelete: 'cascade' }),
+    method: varchar('method', { length: 8 }).notNull(),
+    path: varchar('path', { length: 200 }).notNull(),
+    allowed: boolean('allowed').notNull().default(true),
+    deniedReason: varchar('denied_reason', { length: 40 }),
+    ip: varchar('ip', { length: 64 }),
+    userAgent: varchar('user_agent', { length: 200 }),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('api_key_usage_key_idx').on(t.keyId, t.createdAt), index('api_key_usage_created_idx').on(t.createdAt)]
+)
+
 /** "My Filters" on the tickets page: a name and the filter query string, one of them can be the default view. */
 export const ticketSavedFilters = pgTable(
   'ticket_saved_filters',
