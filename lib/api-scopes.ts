@@ -4,7 +4,7 @@
  * To open more of the API to keys: add a scope here, then make the endpoint call getApiUser(request, '<scope>').
  */
 
-export type ApiScopeEndpoint = { method: 'GET'; path: string; summary: string }
+export type ApiScopeEndpoint = { method: 'GET' | 'POST' | 'PATCH'; path: string; summary: string }
 
 export type ApiScope = {
   key: string
@@ -14,6 +14,77 @@ export type ApiScope = {
   /** The part of skill.md for this scope */
   skill: string
 }
+
+const AI_MARKING = `**You are an AI assistant, so everything you write into a ticket must be marked as yours.**
+- Always send \`via\` with your own name as the user knows it (for example \`"Claude"\`, \`"ChatGPT"\`, \`"Gemini"\`). It is required; the call fails without it.
+- The system then marks the comment "via API" with that name and adds the closing line "Added via <your name> (API)" under your text. Do not add that line yourself, and never write in a way that suggests a person typed it.
+- You write as the person who owns the key: the team sees their name next to "via API · <your name>". Say only what the user asked you to say, and never invent facts about the ticket, the customer or the work.
+- Write plain text only (no HTML or markdown tables). A blank line starts a new paragraph.`
+
+const NOTES_SKILL = `## Add an internal note (scope \`notes:write\`)
+
+\`\`\`
+POST /api/v1/tickets/{id}/notes
+Content-Type: application/json
+
+{ "text": "Checked the logs: the sync fails after the 14 Nov update. Waiting on the vendor.", "via": "Claude" }
+\`\`\`
+
+An internal note: only the team sees it, the customer does not and is not emailed. The team gets the usual note notification.
+
+| Field | Required | Meaning |
+|---|---|---|
+| \`text\` | yes | The note, plain text, up to 20000 characters |
+| \`via\` | yes | Your name as an AI assistant (see below) |
+
+Response (\`201\`): \`{ id, ticket_id, type: "note", via, text, created_at, url }\`.
+
+${AI_MARKING}
+
+Rules for notes:
+- Only add a note when the user asked for it. Read the ticket first (\`/api/v1/tickets/{id}?comments=true\`, needs Ticket detail access) so the note adds something instead of repeating what is there.
+- The API cannot reply to customers. If the user wants a customer reply, write the proposed text for them to send from the app.
+- There is no edit or delete through the API. If you got it wrong, tell the user so they can fix it in the app.
+- Errors: \`400\` (missing or too long \`text\`, missing \`via\`), \`404\` (the ticket does not exist or the key's owner may not see it).
+`
+
+const AI_MARKING_CHANGE = `**You are an AI assistant, so every change you make must be marked as yours.**
+- Always send \`via\` with your own name as the user knows it (for example \`"Claude"\`, \`"ChatGPT"\`, \`"Gemini"\`). It is required; the call fails without it.
+- The ticket's activity log then shows the change as made by the key's owner "via API" with your name. Never write in a way that suggests a person made the change by hand.`
+
+const UPDATE_SKILL = `## Change a ticket (scope \`tickets:update\`)
+
+\`\`\`
+PATCH /api/v1/tickets/{id}
+Content-Type: application/json
+
+{ "status": "working_team", "add_assignee_emails": ["budi@company.com"], "due_date": "2026-11-20", "add_tags": ["urgent"], "via": "Claude" }
+\`\`\`
+
+Changes only what you send. It runs the same code as the app, as the person who owns the key, so the activity log, the notifications and emails to newly assigned people, Slack and automations all happen as usual. Send at least one change.
+
+| Field | Meaning |
+|---|---|
+| \`status\` | The status slug, for example \`open\`, \`received\`, \`working_team\`, \`pending\`, \`closed\`. An unknown one is refused and the answer lists the valid ones. Closing a ticket sends the usual closing email. |
+| \`due_date\` | \`null\` clears it; \`2026-11-20\` means the end of that day (WIB); or a date and time with an offset like \`2026-11-20T15:00:00+07:00\` |
+| \`add_assignee_emails\` / \`remove_assignee_emails\` | People to add to or take off the ticket, by email. Only active team members can be added. Everyone else stays assigned |
+| \`add_skills\` / \`remove_skills\` | Skill names. \`primary_skill\` (a name, or \`null\`) marks the skill that matters most; it must be one of the ticket's skills |
+| \`add_tags\` / \`remove_tags\` | Tag names that already exist (for this ticket's company or for everyone). Tags are not created through the API |
+| \`via\` | **Required.** Your name as an AI assistant (see below) |
+
+Lists add or remove; nothing is replaced wholesale. Up to 20 items per list. Unknown field names are refused.
+
+Response: \`{ ticket_id, title, via, before, after, url }\`, where \`before\` and \`after\` each hold \`status, due_date, assignees, tags, skills, primary_skill\`. Check \`after\` matches what the user asked for and tell them what changed. Nothing is changed when any name or email in the request is wrong: fix it and send again.
+
+${AI_MARKING_CHANGE}
+
+Rules for changing tickets:
+- **Change only what the user asked for, and only after they said yes to the specific change.** For anything that notifies people (assigning someone) or ends work (closing, \`resolved\`), show the user what you are about to do first.
+- Look at the ticket before you change it (\`/api/v1/tickets/{id}\`, needs Ticket detail access) and say what it is now. When you move work to someone, check they are active and not on leave (Calendar and Team load access), and tell the user if they are not.
+- Assigning someone emails and notifies them. Do not assign and unassign in a loop, and do not "try" a change: every call has effects.
+- The API cannot undo a change. To reverse one, make the opposite change (for example the old status again, using \`before\` from the response) only when the user asks.
+- Errors: \`400\` (the message says which value is wrong), \`404\` (the ticket does not exist or the key's owner may not see it).
+`
 
 const CALENDAR_SKILL = `## Calendar (scope \`calendar:read\`)
 
@@ -204,7 +275,7 @@ GET /api/v1/tickets/1234?comments=true
 
 One ticket in full: \`ticket\` (title, description as plain text, status, priority, type, company, team, customer, creator, assignees, tags, skills, dates, link) and \`time\` (hours tracked on it, in total and per person).
 
-Add \`comments=true\` to get the conversation: \`comments_total\`, \`comments_shown\` and \`comments\`, oldest first. Each comment has \`author\` (\`full_name\`, \`email\`, \`type\`: \`customer\`, \`agent\` or an automation), \`visibility\`, \`created_at\`, \`text\` (plain text), \`cc\`, \`attachments\` (name and link) and \`split_to_ticket_id\`.
+Add \`comments=true\` to get the conversation: \`comments_total\`, \`comments_shown\` and \`comments\`, oldest first. Each comment has \`author\` (\`full_name\`, \`email\`, \`type\`: \`customer\`, \`agent\` or an automation), \`visibility\`, \`created_at\`, \`text\` (plain text), \`cc\`, \`attachments\` (name and link), \`split_to_ticket_id\` and \`via\` (the AI assistant's name when the comment was written through the API, otherwise null).
 
 | Parameter | Meaning |
 |---|---|
@@ -305,9 +376,28 @@ export const API_SCOPES: ApiScope[] = [
     endpoints: [{ method: 'GET', path: '/api/v1/companies', summary: 'Companies with their ids, plan, people and active ticket counts' }],
     skill: COMPANIES_SKILL,
   },
+  {
+    key: 'notes:write',
+    label: 'Add internal notes (write)',
+    description: 'Add an internal note to a ticket. Only the team sees it. The note is marked "via API" with the name of the AI that wrote it.',
+    endpoints: [{ method: 'POST', path: '/api/v1/tickets/{id}/notes', summary: 'Add an internal note to a ticket' }],
+    skill: NOTES_SKILL,
+  },
+  {
+    key: 'tickets:update',
+    label: 'Change tickets (write)',
+    description: 'Change a ticket\'s status, assignees, skills, tags or due date as the key owner, with the usual notifications and activity log. Marked "via API" with the name of the AI.',
+    endpoints: [{ method: 'PATCH', path: '/api/v1/tickets/{id}', summary: 'Change status, assignees, skills, tags or due date of a ticket' }],
+    skill: UPDATE_SKILL,
+  },
 ]
 
 export const API_SCOPE_KEYS = API_SCOPES.map((s) => s.key)
+
+/** A scope that changes data (any endpoint other than GET). */
+export function isWriteScope(key: string): boolean {
+  return !!API_SCOPES.find((s) => s.key === key)?.endpoints.some((e) => e.method !== 'GET')
+}
 
 export function isApiScope(v: unknown): v is string {
   return typeof v === 'string' && API_SCOPE_KEYS.includes(v)
@@ -317,6 +407,7 @@ export function isApiScope(v: unknown): v is string {
 export function buildSkillMarkdown(scopes: string[], baseUrl: string): string {
   const chosen = API_SCOPES.filter((s) => scopes.includes(s.key))
   const names = chosen.map((s) => s.label).join(', ') || 'none'
+  const writes = chosen.some((s) => isWriteScope(s.key))
   return `---
 name: deskteam360-api
 description: Use the DeskTeam360 API with a scoped API key. Access: ${names}. Use when the user asks something this API can answer (see the sections below).
@@ -324,7 +415,7 @@ description: Use the DeskTeam360 API with a scoped API key. Access: ${names}. Us
 
 # DeskTeam360 API
 
-Read-only HTTP and JSON. Responses use snake_case.
+HTTP and JSON. Responses use snake_case.${writes ? ' Some sections below change data: read their rules first.' : ' Everything here only reads.'}
 
 ## Setup
 
@@ -352,7 +443,7 @@ ${chosen.map((s) => s.skill).join('\n') || 'This key has no access yet.\n'}
 
 ## Rules
 
-- These endpoints only read. Do not try to change data through this API.
+${writes ? '- Only the sections above that say POST change data, and only when the user asked for it. Everything else only reads.' : '- These endpoints only read. Do not try to change data through this API.'}
 - Treat what you read as internal team data: share it only with the person who asked.
 `
 }

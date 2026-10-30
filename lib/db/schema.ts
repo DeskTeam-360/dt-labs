@@ -358,6 +358,10 @@ export const ticketComments = pgTable('ticket_comments', {
   editedAt: ts('edited_at'),
   /** Set when this reply was split into its own ticket (the reply stays, marked "Split to #N"). */
   splitToTicketId: integer('split_to_ticket_id'),
+  /** 'api' when written through the API; null for comments made in the app. */
+  source: varchar('source', { length: 16 }),
+  /** For API comments: the assistant that wrote it (Claude, ChatGPT, ...), as it named itself. */
+  sourceLabel: varchar('source_label', { length: 60 }),
 })
 
 /** One saved AI summary per anchor (per comment, description, or ticket header). */

@@ -126,6 +126,9 @@ interface Comment {
   author_type?: 'customer' | 'agent' | 'automation'
   /** Set when this reply was split into its own ticket. */
   split_to_ticket_id?: number | null
+  /** 'api' when written through the API, with the assistant's name in source_label. */
+  source?: string | null
+  source_label?: string | null
   user?: { id: string; full_name: string | null; email: string; avatar_url?: string | null }
   comment_attachments?: CommentAttachment[] | null
   tagged_user_ids?: string[]
@@ -768,6 +771,11 @@ export default function TabGeneral({
                                 {comment.visibility === 'note' ? 'Note' : 'Reply'}
                               </Tag>
                             )}
+                            {comment.source === 'api' ? (
+                              <Tag color="geekblue" style={{ margin: 0 }}>
+                                via API{comment.source_label ? ` · ${comment.source_label}` : ''}
+                              </Tag>
+                            ) : null}
                             {comment.split_to_ticket_id ? (
                               <Tag color="purple" style={{ margin: 0 }}>
                                 <a href={`/tickets/${comment.split_to_ticket_id}`} target="_blank" rel="noopener noreferrer">

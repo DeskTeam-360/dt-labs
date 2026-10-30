@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { getApiUser, isTeamRole } from '@/lib/api-auth'
+import { updateTicketViaApi } from '@/lib/api-ticket-update'
 import { csv, hours, htmlToText, siteUrl, ticketVisibility, toWibIso } from '@/lib/api-v1'
 import {
   commentAttachments,
@@ -126,6 +127,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
           createdAt: ticketComments.createdAt,
           editedAt: ticketComments.editedAt,
           splitTo: ticketComments.splitToTicketId,
+          sourceLabel: ticketComments.sourceLabel,
           ccEmails: ticketComments.ccEmails,
           authorName: users.fullName,
           authorEmail: users.email,
@@ -157,6 +159,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
       cc: r.ccEmails ?? [],
       attachments: filesBy.get(r.id) ?? [],
       split_to_ticket_id: r.splitTo ?? null,
+      via: r.sourceLabel ?? null,
     }))
   }
 
@@ -190,4 +193,9 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
     },
     ...(comments ? { comments_total: commentsTotal, comments_shown: comments.length, comments } : {}),
   })
+}
+
+/** PATCH /api/v1/tickets/{id} - change status, assignees, skills, tags or due date. See lib/api-ticket-update.ts. Scope: `tickets:update`. */
+export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> }) {
+  return updateTicketViaApi(request, (await ctx.params).id)
 }

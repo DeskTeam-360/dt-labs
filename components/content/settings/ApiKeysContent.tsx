@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
-import { API_SCOPES, buildSkillMarkdown } from '@/lib/api-scopes'
+import { API_SCOPES, buildSkillMarkdown, isWriteScope } from '@/lib/api-scopes'
 import { downloadTextFile } from '@/lib/crawl-groups'
 
 dayjs.extend(relativeTime)
@@ -158,7 +158,7 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
                 <div>
                   <Title level={2} style={{ margin: '8px 0 0' }}>API Keys</Title>
                   <Text type="secondary">
-                    Make a key with only the access you choose, to give to a script or an AI assistant. A key acts as you, can only read what you allowed, and stops at its expiry date.
+                    Make a key with only the access you choose, to give to a script or an AI assistant. A key acts as you, can only do what you allowed (reading, or writing where you tick it), and stops at its expiry date.
                   </Text>
                 </div>
                 <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
@@ -191,7 +191,7 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
                   dataIndex: 'scopes',
                   render: (v: string[]) => (
                     <Flex gap={4} wrap>
-                      {v.map((s) => <Tag key={s} style={{ margin: 0 }}>{scopeLabel(s)}</Tag>)}
+                      {v.map((s) => <Tag key={s} color={isWriteScope(s) ? 'orange' : undefined} style={{ margin: 0 }}>{scopeLabel(s)}</Tag>)}
                     </Flex>
                   ),
                 },
@@ -311,6 +311,7 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
               {API_SCOPES.map((s) => (
                 <Checkbox key={s.key} value={s.key}>
                   <Text strong>{s.label}</Text>
+                  {isWriteScope(s.key) ? <Tag color="orange" style={{ marginLeft: 8 }}>Changes data</Tag> : null}
                   <div><Text type="secondary" style={{ fontSize: 12 }}>{s.description}</Text></div>
                   {s.endpoints.map((e) => (
                     <div key={e.path}><Text code style={{ fontSize: 11 }}>{e.method} {e.path}</Text></div>
