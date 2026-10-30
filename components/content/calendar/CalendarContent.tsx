@@ -1,6 +1,6 @@
 'use client'
 
-import { DeleteOutlined, EditOutlined, GoogleOutlined, PlusOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, GoogleOutlined, LeftOutlined, PlusOutlined, RightOutlined } from '@ant-design/icons'
 import { Alert, Badge, Button, Calendar, Card, Checkbox, DatePicker, Flex, Form, Input, Layout, message, Modal, Popconfirm, Segmented, Select, Space, Switch, Tag, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -38,6 +38,7 @@ export default function CalendarContent({ user }: { user: { id: string; email?: 
   const [scope, setScope] = useState<'mine' | 'all'>('mine')
   const [month, setMonth] = useState<Dayjs>(dayjs())
   const [selected, setSelected] = useState<Dayjs>(dayjs())
+  const [mode, setMode] = useState<'month' | 'year'>('month')
   const [tickets, setTickets] = useState<CalTicket[]>([])
   const [holidays, setHolidays] = useState<CalHoliday[]>([])
   const [events, setEvents] = useState<CalendarEventOut[]>([])
@@ -54,9 +55,9 @@ export default function CalendarContent({ user }: { user: { id: string; email?: 
   const [form] = Form.useForm<FormValues>()
   const formType = Form.useWatch('type', form)
 
-  // The month grid also shows days of the neighbouring months, so load a little around it.
-  const from = month.startOf('month').subtract(7, 'day').format('YYYY-MM-DD')
-  const to = month.endOf('month').add(7, 'day').format('YYYY-MM-DD')
+  // A whole year is loaded at once (a little beyond it for the grid's neighbouring days), so going to the next or previous month is instant.
+  const from = month.startOf('year').subtract(7, 'day').format('YYYY-MM-DD')
+  const to = month.endOf('year').add(7, 'day').format('YYYY-MM-DD')
 
   useEffect(() => {
     let cancelled = false
@@ -149,6 +150,11 @@ export default function CalendarContent({ user }: { user: { id: string; email?: 
   const dayTickets = showTickets ? (ticketsByDay.get(key) ?? []) : []
   const dayEvents = eventsByDay.get(key) ?? []
   const dayHoliday = showHolidays ? holidayByDay.get(key) : undefined
+
+  const goTo = (d: Dayjs) => {
+    setSelected(d)
+    setMonth(d)
+  }
 
   const openForm = (row: CalendarEventOut | 'new') => {
     setEditing(row)
@@ -343,12 +349,64 @@ export default function CalendarContent({ user }: { user: { id: string; email?: 
             <Card size="small">
               <Calendar
                 value={selected}
+                mode={mode}
                 onSelect={(d, info) => {
-                  setSelected(d)
-                  if (info.source === 'date' && !d.isSame(month, 'month')) setMonth(d)
+                  goTo(d)
+                  if (info.source === 'month') setMode('month')
                 }}
-                onPanelChange={(d) => setMonth(d)}
+                headerRender={() => (
+                  <Flex justify="flex-end" align="center" gap={8} wrap style={{ paddingBottom: 12 }}>
+                    <Button icon={<LeftOutlined />} aria-label="Previous" onClick={() => goTo(selected.subtract(1, mode))} />
+                    <Button icon={<RightOutlined />} aria-label="Next" onClick={() => goTo(selected.add(1, mode))} />
+                    <Button onClick={() => goTo(dayjs())}>Today</Button>
+                    <Select
+                      value={selected.year()}
+                      onChange={(y) => goTo(selected.year(y))}
+                      options={Array.from({ length: 21 }, (_, i) => dayjs().year() - 10 + i).map((y) => ({ value: y, label: y }))}
+                      style={{ width: 90 }}
+                    />
+                    {mode === 'month' ? (
+                      <Select
+                        value={selected.month()}
+                        onChange={(m) => goTo(selected.month(m))}
+                        options={Array.from({ length: 12 }, (_, i) => ({ value: i, label: dayjs().month(i).format('MMM') }))}
+                        style={{ width: 90 }}
+                      />
+                    ) : null}
+                    <Segmented
+                      value={mode}
+                      onChange={(v) => setMode(v as 'month' | 'year')}
+                      options={[
+                        { value: 'month', label: 'Month' },
+                        { value: 'year', label: 'Year' },
+                      ]}
+                    />
+                  </Flex>
+                )}
                 cellRender={(d, info) => {
+                  if (info.type === 'month') {
+                    const first = d.startOf('month').format('YYYY-MM-DD')
+                    const last = d.endOf('month').format('YYYY-MM-DD')
+                    const mEvents = events.filter((e) => show.includes(e.type) && e.end_date >= first && e.start_date <= last)
+                    const mTickets = showTickets ? [...ticketsByDay.entries()].filter(([k]) => k >= first && k <= last).flatMap(([, list]) => list) : []
+                    const mHolidays = showHolidays ? holidays.filter((h) => h.date >= first && h.date <= last) : []
+                    const fmt = (a: string, b: string) => (a === b ? dayjs(a).format('D') : `${dayjs(a).format('D')}-${dayjs(b).format('D')}`)
+                    const rows: Array<{ key: string; node: React.ReactNode }> = [
+                      ...mHolidays.map((h) => ({ key: `h${h.date}`, node: <Badge color="red" text={`${dayjs(h.date).format('D')} ${h.name}`} /> })),
+                      ...mEvents.map((e) => ({
+                        key: `e${e.id}${e.start_date}`,
+                        node: <Badge color={CALENDAR_TYPE_META[e.type].color === 'default' ? 'gray' : CALENDAR_TYPE_META[e.type].color} text={`${fmt(e.start_date < first ? first : e.start_date, e.end_date > last ? last : e.end_date)} ${e.title}`} />,
+                      })),
+                      ...mTickets.map((t) => ({ key: `t${t.id}`, node: <Badge status={isDone(t.status) ? 'default' : 'processing'} text={`#${t.id} ${t.title}`} /> })),
+                    ]
+                    return (
+                      <div style={{ maxHeight: 160, overflowY: 'auto' }}>
+                        {rows.map((r) => (
+                          <div key={r.key} style={{ fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.node}</div>
+                        ))}
+                      </div>
+                    )
+                  }
                   if (info.type !== 'date') return info.originNode
                   const k = d.format('YYYY-MM-DD')
                   const ev = eventsByDay.get(k) ?? []
