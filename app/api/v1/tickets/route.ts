@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, type SQL, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { getApiUser, isTeamRole } from '@/lib/api-auth'
+import { createTicketViaApi } from '@/lib/api-ticket-create'
 import { csv, isYmd, pageInfo, siteUrl, sqlList, ticketVisibility, toWibIso, wibRange } from '@/lib/api-v1'
 import { companies, db, ticketAssignees, tickets, ticketTypes, users } from '@/lib/db'
 import { CLOSED_LIKE_STATUS_LIST } from '@/lib/ticket-status-workflow'
@@ -219,4 +220,9 @@ export async function GET(request: Request) {
       url: `${siteUrl()}/tickets/${r.id}`,
     })),
   })
+}
+
+/** POST /api/v1/tickets - create a ticket as the key's owner. See lib/api-ticket-create.ts. Scope: `tickets:create`. */
+export async function POST(request: Request) {
+  return createTicketViaApi(request)
 }

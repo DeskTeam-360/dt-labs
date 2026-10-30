@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, gte, lte, notInArray, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, lte, notInArray, type SQL, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { getApiUser, isTeamRole } from '@/lib/api-auth'
-import { hours, resolveWindow, siteUrl, toWibIso, wibDay } from '@/lib/api-v1'
+import { hours, pageInfo, resolveWindow, siteUrl, ticketVisibility, toWibIso, wibDay } from '@/lib/api-v1'
 import { loadCalendarEntries } from '@/lib/calendar-query'
 import { companies, db, shifts, ticketAssignees, tickets, ticketTimeTracker, users } from '@/lib/db'
 import { CLOSED_LIKE_STATUS_LIST } from '@/lib/ticket-status-workflow'
@@ -13,6 +13,8 @@ import { isUserInactive } from '@/lib/user-status'
 export const dynamic = 'force-dynamic'
 
 const MAX_DAYS = 92
+const PLATE_DEFAULT = 100
+const PLATE_MAX = 500
 
 /**
  * GET /api/v1/users/work?email=person@company.com&from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -20,8 +22,58 @@ const MAX_DAYS = 92
  * per company and per ticket, plus their shift, capacity, calendar entries (leave, duty) and what is on their plate now.
  * The range: from/to (WIB days, default today), or hours=24 (the last 24 hours), or since=<ISO datetime>[&until=<ISO datetime>];
  * at most 92 days. include=sessions adds every single time entry.
+ * assigned_open_tickets: everything unfinished that is assigned to them (what the caller may see), most urgent first, with assigned_summary
+ * (totals, overdue, by status) and paging through assigned_limit (default 100, max 500) and assigned_offset.
  * Auth: browser session or an API key with the `users:read` scope.
  */
+/** What a person holds: unfinished support tickets assigned to them, limited to what the caller may see. */
+async function loadPlate(personId: string, me: { id: string; role: string }, limit: number, offset: number) {
+  const visible = await ticketVisibility(me)
+  const conditions: SQL[] = [eq(ticketAssignees.userId, personId), eq(tickets.ticketType, 'support'), notInArray(tickets.status, CLOSED_LIKE_STATUS_LIST)]
+  if (visible) conditions.push(visible)
+  const where = and(...conditions)
+  const [rows, byStatus] = await Promise.all([
+    db
+      .select({
+        id: tickets.id,
+        title: tickets.title,
+        status: tickets.status,
+        priority: tickets.priority,
+        dueDate: tickets.dueDate,
+        createdAt: tickets.createdAt,
+        updatedAt: tickets.updatedAt,
+        companyName: companies.name,
+      })
+      .from(ticketAssignees)
+      .innerJoin(tickets, eq(ticketAssignees.ticketId, tickets.id))
+      .leftJoin(companies, eq(tickets.companyId, companies.id))
+      .where(where)
+      // Overdue and soonest due first, then the ones with a queue priority, then the most recently touched.
+      .orderBy(sql`${tickets.dueDate} ASC NULLS LAST`, sql`${tickets.priority} ASC NULLS LAST`, sql`${tickets.updatedAt} DESC`)
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({
+        status: tickets.status,
+        n: sql<number>`count(*)::int`,
+        overdue: sql<number>`count(*) FILTER (WHERE ${tickets.dueDate} IS NOT NULL AND ${tickets.dueDate} < now())::int`,
+        noDue: sql<number>`count(*) FILTER (WHERE ${tickets.dueDate} IS NULL)::int`,
+      })
+      .from(ticketAssignees)
+      .innerJoin(tickets, eq(ticketAssignees.ticketId, tickets.id))
+      .where(where)
+      .groupBy(tickets.status),
+  ])
+  const total = byStatus.reduce((a, r) => a + r.n, 0)
+  return {
+    rows,
+    total,
+    overdue: byStatus.reduce((a, r) => a + r.overdue, 0),
+    noDue: byStatus.reduce((a, r) => a + r.noDue, 0),
+    byStatus: Object.fromEntries(byStatus.sort((a, b) => b.n - a.n).map((r) => [r.status, r.n])),
+  }
+}
+
 export async function GET(request: Request) {
   const me = await getApiUser(request, 'users:read')
   if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -36,6 +88,8 @@ export async function GET(request: Request) {
   const from = wibDay(start)
   const to = wibDay(end)
   const withSessions = (q.get('include') ?? '').split(',').includes('sessions')
+  const plateLimit = Math.min(PLATE_MAX, Math.max(1, Number(q.get('assigned_limit')) || PLATE_DEFAULT))
+  const plateOffset = Math.max(0, Number(q.get('assigned_offset')) || 0)
 
   const [person] = await db
     .select({ id: users.id, fullName: users.fullName, email: users.email, role: users.role, status: users.status, shiftId: users.shiftId })
@@ -78,14 +132,7 @@ export async function GET(request: Request) {
     person.shiftId ? db.select({ title: shifts.title, start: shifts.startTime, end: shifts.endTime }).from(shifts).where(eq(shifts.id, person.shiftId)).limit(1) : Promise.resolve([]),
     getCapacityHoursByUser([person.id], from, to),
     loadCalendarEntries(from, to),
-    db
-      .select({ id: tickets.id, title: tickets.title, status: tickets.status, dueDate: tickets.dueDate, companyName: companies.name })
-      .from(ticketAssignees)
-      .innerJoin(tickets, eq(ticketAssignees.ticketId, tickets.id))
-      .leftJoin(companies, eq(tickets.companyId, companies.id))
-      .where(and(eq(ticketAssignees.userId, person.id), eq(tickets.ticketType, 'support'), notInArray(tickets.status, CLOSED_LIKE_STATUS_LIST)))
-      .orderBy(desc(tickets.updatedAt))
-      .limit(50),
+    loadPlate(person.id, me, plateLimit, plateOffset),
   ])
 
   type Agg = { seconds: number; sessions: number; first: Date | null; last: Date | null }
@@ -196,14 +243,20 @@ export async function GET(request: Request) {
       })),
     ...(withSessions ? { sessions: sessionsOut } : {}),
     calendar_entries: mine.map((e) => ({ type: e.type, title: e.title, start_date: e.start_date, end_date: e.end_date })),
-    assigned_open_tickets: plate.map((t) => ({
+    assigned_summary: { total: plate.total, overdue: plate.overdue, without_due_date: plate.noDue, by_status: plate.byStatus },
+    assigned_open_tickets: plate.rows.map((t) => ({
       id: t.id,
       title: t.title,
       status: t.status,
+      priority: t.priority,
       company: t.companyName ?? null,
       due_date: toWibIso(t.dueDate),
+      overdue: !!t.dueDate && new Date(t.dueDate) < now,
+      created_at: toWibIso(t.createdAt),
+      updated_at: toWibIso(t.updatedAt),
       url: `${siteUrl()}/tickets/${t.id}`,
     })),
+    assigned_page: { limit: plateLimit, offset: plateOffset, ...pageInfo(plateOffset, plate.rows.length, plate.total) },
   })
 }
 

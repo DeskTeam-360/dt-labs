@@ -86,6 +86,49 @@ Rules for changing tickets:
 - Errors: \`400\` (the message says which value is wrong), \`404\` (the ticket does not exist or the key's owner may not see it).
 `
 
+const AI_MARKING_CREATE = `**You are an AI assistant, so everything you create must be marked as yours.**
+- Always send \`via\` with your own name as the user knows it (for example \`"Claude"\`, \`"ChatGPT"\`, \`"Gemini"\`). It is required; the call fails without it.
+- The description then ends with "Created via <your name> (API)", and the ticket's history shows it was created through the API by that assistant. Do not add that line yourself, and never write as if a person typed it.`
+
+const CREATE_SKILL = `## Create a ticket (scope \`tickets:create\`)
+
+\`\`\`
+POST /api/v1/tickets
+Content-Type: application/json
+
+{ "title": "Renew the SSL certificate for acme.com", "description": "Expires on 20 Nov.\\n\\nNeeds a new certificate and a check afterwards.", "company_id": "<id from /api/v1/companies>", "contact_email": "pat@acme.com", "type": "support", "due_date": "2026-11-18", "assignee_emails": ["budi@company.com"], "tags": ["ssl"], "via": "Claude" }
+\`\`\`
+
+Creates a support ticket as the person who owns the key, with the same code as the app: the company's priority queue, default skills, automations, the notification to assignees, Slack and the confirmation email to the requester. A created ticket cannot be removed through the API.
+
+| Field | Required | Meaning |
+|---|---|---|
+| \`title\` | yes | Up to 250 characters |
+| \`description\` | no | Plain text, up to 20000 characters. A blank line starts a new paragraph |
+| \`company_id\` | no | From the Companies endpoint |
+| \`contact_email\` | no | The customer the ticket is for (a user's email). Their company is used when \`company_id\` is left out |
+| \`type\` or \`type_id\` | no | Ticket type slug or id (see the catalog) |
+| \`status\` | no | A status slug from the catalog. Default \`open\` |
+| \`priority\` | no | Its place in the company's queue: 1 is first, leave out for the end |
+| \`due_date\` | no | \`2026-11-18\` (end of that day, WIB) or a date and time with an offset |
+| \`team_id\` | no | A team id from the catalog |
+| \`assignee_emails\` | no | Active team members. They are notified |
+| \`tags\` | no | Names of tags that already exist |
+| \`skills\`, \`primary_skill\` | no | Skill names. Left out: the defaults of the company and ticket type apply |
+| \`via\` | yes | Your name as an AI assistant (see below) |
+
+Response (\`201\`): \`{ id, title, via, status, company_id, url }\`. Nothing is created when any value is wrong: the message says which, fix it and send again.
+
+${AI_MARKING_CREATE}
+
+Rules for creating tickets:
+- **Create a ticket only when the user asked for it, and show them the title, company, customer and assignees first.** Creating one emails the requester and notifies people.
+- Look for an existing ticket first (\`/api/v1/tickets?search=...&company_id=...&done=0\`, needs Tickets access) and tell the user if there is one, instead of making a duplicate.
+- Never invent a company, customer or assignee: find them with the Companies endpoint and the Users endpoint, and ask when it is not clear.
+- One call creates one ticket. Do not retry after a timeout without searching for the title first.
+- Errors: \`400\` (the message says which value is wrong).
+`
+
 const CALENDAR_SKILL = `## Calendar (scope \`calendar:read\`)
 
 All dates are calendar dates in \`YYYY-MM-DD\` (WIB, UTC+7).
@@ -178,6 +221,14 @@ Examples:
 - Overdue and most urgent first: \`?overdue=1&sort=priority&order=asc\`
 
 You only see the tickets the key's owner can see (an admin sees all; others see the tickets of their teams, public teams and unassigned-team tickets).
+
+### The names the API accepts
+
+\`\`\`
+GET /api/v1/catalog
+\`\`\`
+
+Statuses (\`slug\`, \`title\`, \`active\`, \`closed_like\`), ticket types (\`id\`, \`slug\`, \`title\`), teams (\`id\`, \`name\`), tags (\`name\`, and the company when it belongs to one) and skills (\`name\`). \`include=statuses,tags\` returns only some. Look here before you filter or change a ticket, instead of guessing a status slug, a tag or a skill name. Companies are found with the Companies endpoint.
 `
 
 const USERS_SKILL = `## Users (scope \`users:read\`)
@@ -198,7 +249,8 @@ Response (main parts):
 - \`by_company\`: hours per company. \`tickets\`: each ticket worked on with hours, sessions, first start, last stop and job types.
 - \`running_now\`: the timer running at this moment, if any.
 - \`calendar_entries\`: the person's leave, duty or birthday in the range.
-- \`assigned_open_tickets\`: unfinished tickets assigned to them now (up to 50).
+- \`assigned_open_tickets\`: everything unfinished that is assigned to them now, as far as the key's owner may see it, most urgent first (soonest due date, then queue priority, then most recently touched). Each: \`id, title, status, priority, company, due_date, overdue, created_at, updated_at, url\`. Page with \`assigned_limit\` (default 100, max 500) and \`assigned_offset\`; \`assigned_page\` says \`has_more\` and \`next_offset\`.
+- \`assigned_summary\`: \`total\`, \`overdue\`, \`without_due_date\` and \`by_status\` for the whole list, not only the page. Use it for "how much does this person hold?" and read the list for "what exactly?".
 - No active team member with that email: \`404\`. Do not guess another email.
 
 ### Everyone's work in one call
@@ -293,6 +345,15 @@ Examples:
 - "Summarise ticket 1234": \`/api/v1/tickets/1234?comments=true\`, then read \`comments\` in order.
 - "What did the customer last write?": \`?comments=true&comments_order=desc&comments_limit=5&comment_visibility=reply\`.
 - "What did the team discuss internally?": \`?comments=true&comment_visibility=note\`.
+
+### History of a ticket
+
+\`\`\`
+GET /api/v1/tickets/{id}/activity
+\`\`\`
+
+Who changed what and when, newest first (\`order=asc\` for oldest first), \`limit\` (default 50, max 200) and \`offset\`. Response: \`{ ticket_id, total, limit, offset, has_more, next_offset, entries }\`. Each entry: \`at\`, \`action\`, \`summary\` (for example "Status changed"), \`actor\` (\`full_name\`, \`email\`, \`role\`, or \`automation\`), \`changes\` (a list of \`{ field, from, to }\` with names instead of ids and dates in WIB), \`comment_preview\` for comments, and \`via_api\` / \`via\` when the change was made through the API by an AI assistant.
+- Use it for "why is this ticket with Budi?", "when did the status change?" and "what did the assistant change?". It is the record of changes, not of conversation: read the comments for what was said.
 `
 
 const COMPANIES_SKILL = `## Companies (scope \`companies:read\`)
@@ -338,7 +399,10 @@ export const API_SCOPES: ApiScope[] = [
     key: 'tickets:read',
     label: 'Tickets (read)',
     description: 'List tickets with filters that can be combined: date, company or customer, person, skill, type, status, tag, overdue and more.',
-    endpoints: [{ method: 'GET', path: '/api/v1/tickets', summary: 'Tickets matching the filters (paged)' }],
+    endpoints: [
+      { method: 'GET', path: '/api/v1/tickets', summary: 'Tickets matching the filters (paged)' },
+      { method: 'GET', path: '/api/v1/catalog', summary: 'Statuses, ticket types, teams, tags and skills: the names the API accepts' },
+    ],
     skill: TICKETS_SKILL,
   },
   {
@@ -366,7 +430,10 @@ export const API_SCOPES: ApiScope[] = [
     key: 'ticket-detail:read',
     label: 'Ticket detail and comments (read)',
     description: 'Open one ticket in full, with its conversation (customer replies and internal notes) and the time tracked on it.',
-    endpoints: [{ method: 'GET', path: '/api/v1/tickets/{id}', summary: 'One ticket; add comments=true for the conversation' }],
+    endpoints: [
+      { method: 'GET', path: '/api/v1/tickets/{id}', summary: 'One ticket; add comments=true for the conversation' },
+      { method: 'GET', path: '/api/v1/tickets/{id}/activity', summary: 'The history of a ticket: who changed what and when' },
+    ],
     skill: TICKET_DETAIL_SKILL,
   },
   {
@@ -389,6 +456,13 @@ export const API_SCOPES: ApiScope[] = [
     description: 'Change a ticket\'s status, assignees, skills, tags or due date as the key owner, with the usual notifications and activity log. Marked "via API" with the name of the AI.',
     endpoints: [{ method: 'PATCH', path: '/api/v1/tickets/{id}', summary: 'Change status, assignees, skills, tags or due date of a ticket' }],
     skill: UPDATE_SKILL,
+  },
+  {
+    key: 'tickets:create',
+    label: 'Create tickets (write)',
+    description: 'Create a support ticket as the key owner, with the usual queue, notifications and emails. Marked "via API" with the name of the AI.',
+    endpoints: [{ method: 'POST', path: '/api/v1/tickets', summary: 'Create a ticket' }],
+    skill: CREATE_SKILL,
   },
 ]
 
