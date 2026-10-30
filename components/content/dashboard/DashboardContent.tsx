@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { UserTimeSummary } from '@/app/api/users/time-summary/route'
 import DashboardAnnouncementsSection from '@/components/dashboard/DashboardAnnouncementsSection'
 import DashboardHourlyActivityCard from '@/components/dashboard/DashboardHourlyActivityCard'
+import DashboardTeamClocks from '@/components/dashboard/DashboardTeamClocks'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import StopTimerNoteModal from '@/components/ticket/StopTimerNoteModal'
@@ -38,7 +39,7 @@ const { Content } = Layout
 const { Title, Text } = Typography
 
 /** How many rows Recent Activities fetches (API max 100). */
-const RECENT_TRACKERS_LIMIT = 15
+const RECENT_TRACKERS_LIMIT = 5
 
 interface DashboardContentProps {
   user: { id: string; email?: string | null; name?: string | null }
@@ -514,7 +515,8 @@ export default function DashboardContent({ user }: DashboardContentProps) {
           </Col>
           <Col xs={24} lg={8}>
             
-            <Card title="Account Information" style={{ height: '100%' }}>
+            <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+            <Card title="Account Information" >
               <Space orientation="vertical" style={{ width: '100%' }}>
                 <div>
                   <Text type="secondary">Email:</Text>
@@ -535,6 +537,8 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                 </div>
               </Space>
             </Card>
+              <DashboardTeamClocks myTimezone={timeSummary?.data.timezone} />
+            </Space>
           </Col>
         </Row>
         </Content>
