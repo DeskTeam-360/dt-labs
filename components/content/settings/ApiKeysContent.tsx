@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeftOutlined, BarChartOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined, PlusOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, BarChartOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Checkbox, Drawer, Flex, Form, Input, Layout, message, Modal, Popconfirm, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -60,6 +60,44 @@ const copy = (text: string, ok: string) => {
   void navigator.clipboard.writeText(text).then(() => message.success(ok))
 }
 
+/** The access checkboxes, with the warning once a "Changes data" access is ticked. Used when making a key and when changing one. */
+function ScopeFields() {
+  return (
+    <>
+      <Form.Item name="scopes" label="What can this key do?" rules={[{ required: true, type: 'array', min: 1, message: 'Choose at least one access' }]}>
+        <Checkbox.Group style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {API_SCOPES.map((s) => (
+            <Checkbox key={s.key} value={s.key}>
+              <Text strong>{s.label}</Text>
+              {isWriteScope(s.key) ? <Tag color="orange" style={{ marginLeft: 8 }}>Changes data</Tag> : null}
+              <div><Text type="secondary" style={{ fontSize: 12 }}>{s.description}</Text></div>
+              {s.endpoints.map((e) => (
+                <div key={e.path}><Text code style={{ fontSize: 11 }}>{e.method} {e.path}</Text></div>
+              ))}
+            </Checkbox>
+          ))}
+        </Checkbox.Group>
+      </Form.Item>
+      <Form.Item noStyle shouldUpdate={(a, b) => a.scopes !== b.scopes}>
+        {({ getFieldValue }) => {
+          const writes = ((getFieldValue('scopes') as string[] | undefined) ?? []).filter(isWriteScope)
+          if (!writes.length) return null
+          const labels = writes.map((k) => API_SCOPES.find((s) => s.key === k)?.label ?? k)
+          return (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 24 }}
+              message="Do you authorize this key to change data?"
+              description={`Anyone holding this key can make changes as you (${labels.join(', ')}), including emails and notifications sent to customers and your team. Only give it to an assistant you trust, and keep it secret. You can turn it off at any time.`}
+            />
+          )
+        }}
+      </Form.Item>
+    </>
+  )
+}
+
 /** Team Leaders, Operations and Admins make API keys with only the access they choose, for scripts and AI assistants. */
 export default function ApiKeysContent({ user }: { user: { id: string; email?: string | null; name?: string | null; role?: string | null } }) {
   const [collapsed, setCollapsed] = useState(false)
@@ -71,6 +109,9 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
   const [usage, setUsage] = useState<Usage | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
   const [form] = Form.useForm<FormValues>()
+  const [editForm] = Form.useForm<{ scopes: string[] }>()
+  const [editing, setEditing] = useState<KeyRow | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
   const isAdminUser = (user.role ?? '').toLowerCase() === 'admin'
 
   const load = useCallback(async () => {
@@ -118,6 +159,29 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
     const res = await fetch(`/api/api-keys/${id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (!res.ok) message.error('Failed to update the key')
     void load()
+  }
+
+  const openEdit = (r: KeyRow) => {
+    setEditing(r)
+    editForm.setFieldsValue({ scopes: r.scopes })
+  }
+
+  const saveEdit = async () => {
+    if (!editing) return
+    const v = await editForm.validateFields()
+    setEditSaving(true)
+    try {
+      const res = await fetch(`/api/api-keys/${editing.id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scopes: v.scopes }) })
+      const j = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) throw new Error(j.error || 'Failed to update the key')
+      message.success('Access updated. The key itself is unchanged; download skill.md again so the assistant knows the new access.')
+      setEditing(null)
+      void load()
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setEditSaving(false)
+    }
   }
 
   const remove = async (id: string) => {
@@ -214,9 +278,12 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
                 },
                 {
                   title: '',
-                  width: 170,
+                  width: 210,
                   render: (_: unknown, r) => (
                     <Space size={4}>
+                      <Tooltip title="Change what this key can do">
+                        <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
+                      </Tooltip>
                       <Tooltip title="Usage: who called what, and when">
                         <Button size="small" icon={<BarChartOutlined />} onClick={() => void openUsage(r.id)} />
                       </Tooltip>
@@ -306,23 +373,16 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
           <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Give the key a name' }]} extra="So you remember what it is for, e.g. Claude assistant.">
             <Input maxLength={120} />
           </Form.Item>
-          <Form.Item name="scopes" label="What can this key do?" rules={[{ required: true, type: 'array', min: 1, message: 'Choose at least one access' }]}>
-            <Checkbox.Group style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {API_SCOPES.map((s) => (
-                <Checkbox key={s.key} value={s.key}>
-                  <Text strong>{s.label}</Text>
-                  {isWriteScope(s.key) ? <Tag color="orange" style={{ marginLeft: 8 }}>Changes data</Tag> : null}
-                  <div><Text type="secondary" style={{ fontSize: 12 }}>{s.description}</Text></div>
-                  {s.endpoints.map((e) => (
-                    <div key={e.path}><Text code style={{ fontSize: 11 }}>{e.method} {e.path}</Text></div>
-                  ))}
-                </Checkbox>
-              ))}
-            </Checkbox.Group>
-          </Form.Item>
+          <ScopeFields />
           <Form.Item name="expires_in_days" label="Expires after" rules={[{ required: true }]}>
             <Select options={EXPIRY_OPTIONS} />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal title={editing ? `Access of "${editing.name}"` : ''} open={editing !== null} onCancel={() => setEditing(null)} onOk={() => void saveEdit()} confirmLoading={editSaving} okText="Save access" destroyOnHidden forceRender>
+        <Form form={editForm} layout="vertical">
+          <ScopeFields />
         </Form>
       </Modal>
 

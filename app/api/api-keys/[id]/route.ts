@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { isApiScope } from '@/lib/api-scopes'
 import { canManageApiKeys, isAdmin } from '@/lib/auth-utils'
 import { apiKeys, db } from '@/lib/db'
 
@@ -19,17 +20,22 @@ async function ownedKey(id: string) {
   return { id: row.id }
 }
 
-/** PATCH /api/api-keys/[id] { is_active?, name? } - turn a key off or on, or rename it. */
+/** PATCH /api/api-keys/[id] { is_active?, name?, scopes? } - turn a key off or on, rename it, or change what it may do (the key itself stays the same). */
 export async function PATCH(request: Request, ctx: Ctx) {
   const k = await ownedKey((await ctx.params).id)
   if (k.error) return k.error
-  const body = (await request.json().catch(() => ({}))) as { is_active?: unknown; name?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { is_active?: unknown; name?: unknown; scopes?: unknown }
   const set: Partial<typeof apiKeys.$inferInsert> = {}
   if (body.is_active !== undefined) set.isActive = Boolean(body.is_active)
   if (body.name !== undefined) {
     const n = String(body.name).trim().slice(0, 120)
     if (!n) return NextResponse.json({ error: 'Give the key a name' }, { status: 400 })
     set.name = n
+  }
+  if (body.scopes !== undefined) {
+    const scopes = [...new Set((Array.isArray(body.scopes) ? body.scopes : []).filter(isApiScope))]
+    if (scopes.length === 0) return NextResponse.json({ error: 'Choose at least one access' }, { status: 400 })
+    set.scopes = scopes
   }
   if (Object.keys(set).length === 0) return NextResponse.json({ ok: true })
   await db.update(apiKeys).set(set).where(eq(apiKeys.id, k.id))
