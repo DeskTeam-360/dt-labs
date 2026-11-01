@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-import { getApiUser, isTeamRole } from '@/lib/api-auth'
+import { apiUnauthorized, getApiUser, isTeamRole } from '@/lib/api-auth'
 import { siteUrl, ticketVisibility } from '@/lib/api-v1'
 import { runTicketCommentAutomation } from '@/lib/automation-engine'
 import { db, ticketComments, tickets } from '@/lib/db'
@@ -29,7 +29,7 @@ function textToHtml(text: string): string {
  */
 export async function addApiNote(request: Request, rawId: string) {
   const me = await getApiUser(request, 'notes:write')
-  if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!me) return apiUnauthorized(request)
   if (!isTeamRole(me.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const ticketId = Number(rawId.replace(/^#/, ''))
@@ -55,7 +55,7 @@ export async function addApiNote(request: Request, rawId: string) {
     .limit(1)
   if (!t) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
 
-  const html = `${textToHtml(text)}<p><em>Added via ${escapeHtml(via)} (API)</em></p>`
+  const html = textToHtml(text)
   const [row] = await db
     .insert(ticketComments)
     .values({ ticketId, userId: me.id, comment: html, visibility: 'note', authorType: 'agent', source: 'api', sourceLabel: via })

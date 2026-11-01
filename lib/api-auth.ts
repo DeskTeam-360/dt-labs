@@ -1,11 +1,35 @@
-import { eq } from 'drizzle-orm'
+import { and, asc, eq, gt, sql } from 'drizzle-orm'
+import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { API_KEY_PREFIX, hashApiKey } from '@/lib/api-keys'
+import { toWibIso } from '@/lib/api-v1'
 import { canManageApiKeys } from '@/lib/auth-utils'
 import { apiKeys, apiKeyUsage, db, users } from '@/lib/db'
 
 export type ApiUser = { id: string; role: string }
+
+const HOUR_MS = 3600000
+/** Requests whose key was refused for making too many calls, with what the answer should say. */
+const RESET_FREES = 10
+const rateLimited = new WeakMap<Request, { limit: number; used: number; resetAt: Date; retryAfter: number; free: number }>()
+
+/** The answer for a call that got no user: 429 when the key is over its hourly limit, otherwise 401. */
+export function apiUnauthorized(request: Request) {
+  const hit = rateLimited.get(request)
+  if (!hit) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  return NextResponse.json(
+    {
+      error: `Rate limit reached: this key may make ${hit.limit} calls per hour and has made ${hit.used} in the last hour. At ${toWibIso(hit.resetAt)} (in about ${Math.max(1, Math.ceil(hit.retryAfter / 60))} minute(s)) ${hit.free} calls will be free again.`,
+      limit_per_hour: hit.limit,
+      used_last_hour: hit.used,
+      reset_at: toWibIso(hit.resetAt),
+      retry_after_seconds: hit.retryAfter,
+      calls_free_at_reset: hit.free,
+    },
+    { status: 429, headers: { 'Retry-After': String(hit.retryAfter) } }
+  )
+}
 
 /** Writes one line of the key's usage log. It never slows down or breaks the call it belongs to. */
 function logUsage(keyId: string, request: Request, deniedReason: string | null): void {
@@ -42,7 +66,7 @@ export async function getApiUser(request: Request, scope?: string, opts: { log?:
   if (bearer) {
     if (!bearer.startsWith(API_KEY_PREFIX)) return null
     const [row] = await db
-      .select({ id: apiKeys.id, userId: apiKeys.userId, scopes: apiKeys.scopes, expiresAt: apiKeys.expiresAt, isActive: apiKeys.isActive })
+      .select({ id: apiKeys.id, userId: apiKeys.userId, scopes: apiKeys.scopes, rateLimitPerHour: apiKeys.rateLimitPerHour, expiresAt: apiKeys.expiresAt, isActive: apiKeys.isActive })
       .from(apiKeys)
       .where(eq(apiKeys.keyHash, hashApiKey(bearer)))
       .limit(1)
@@ -57,7 +81,21 @@ export async function getApiUser(request: Request, scope?: string, opts: { log?:
     const [u] = await db.select({ id: users.id, role: users.role, status: users.status }).from(users).where(eq(users.id, row.userId)).limit(1)
     // A key stops working when its owner is switched off or is no longer someone who may keep keys.
     if (!u || (u.status && u.status !== 'active') || !canManageApiKeys(u.role ?? '')) return deny('owner_not_allowed')
-    if (log) logUsage(row.id, request, null)
+    // Calls of the last hour that went through; refused ones do not count against the key.
+    if (log) {
+      const since = and(eq(apiKeyUsage.keyId, row.id), eq(apiKeyUsage.allowed, true), gt(apiKeyUsage.createdAt, new Date(Date.now() - HOUR_MS)))
+      const [used] = await db.select({ n: sql<number>`count(*)::int` }).from(apiKeyUsage).where(since)
+      const n = used?.n ?? 0
+      if (n >= row.rateLimitPerHour) {
+        // The window slides, so calls free up one by one, oldest first. Report when at least RESET_FREES calls are free again.
+        const frees = Math.min(n, n - row.rateLimitPerHour + RESET_FREES)
+        const [edge] = await db.select({ at: apiKeyUsage.createdAt }).from(apiKeyUsage).where(since).orderBy(asc(apiKeyUsage.createdAt)).offset(frees - 1).limit(1)
+        const resetAt = new Date((edge?.at ? new Date(edge.at).getTime() : Date.now()) + HOUR_MS)
+        rateLimited.set(request, { limit: row.rateLimitPerHour, used: n, resetAt, retryAfter: Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000)), free: Math.min(row.rateLimitPerHour, row.rateLimitPerHour - n + frees) })
+        return deny('rate_limited')
+      }
+      logUsage(row.id, request, null)
+    }
     await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, row.id))
     return { id: u.id, role: (u.role ?? '').toLowerCase() }
   }

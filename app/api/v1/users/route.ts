@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, notInArray, or, type SQL,sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-import { getApiUser, isTeamRole } from '@/lib/api-auth'
+import { apiUnauthorized, getApiUser, isTeamRole } from '@/lib/api-auth'
 import { csv, pageInfo, sqlList } from '@/lib/api-v1'
 import { db, shifts, skills,users, userSkills } from '@/lib/db'
 import { INACTIVE_USER_STATUSES } from '@/lib/user-status'
@@ -18,7 +18,7 @@ const MAX_LIMIT = 200
  */
 export async function GET(request: Request) {
   const me = await getApiUser(request, 'users:read')
-  if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!me) return apiUnauthorized(request)
   if (!isTeamRole(me.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const q = new URL(request.url).searchParams

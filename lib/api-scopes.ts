@@ -17,7 +17,7 @@ export type ApiScope = {
 
 const AI_MARKING = `**You are an AI assistant, so everything you write into a ticket must be marked as yours.**
 - Always send \`via\` with your own name as the user knows it (for example \`"Claude"\`, \`"ChatGPT"\`, \`"Gemini"\`). It is required; the call fails without it.
-- The system then marks the comment "via API" with that name and adds the closing line "Added via <your name> (API)" under your text. Do not add that line yourself, and never write in a way that suggests a person typed it.
+- The system marks the note with a "via API · <your name>" tag, so you do not need to sign it. Do not add a line like "Added via ..." yourself, and never write in a way that suggests a person typed it.
 - You write as the person who owns the key: the team sees their name next to "via API · <your name>". Say only what the user asked you to say, and never invent facts about the ticket, the customer or the work.
 - Write plain text only (no HTML or markdown tables). A blank line starts a new paragraph.`
 
@@ -503,9 +503,24 @@ HTTP and JSON. Responses use snake_case.${writes ? ' Some sections below change 
   The key was made on the API Keys page in Settings. It acts as the person who made it, only for the sections below, and it can expire or be revoked at any time. Keep it secret: never put it in a URL, never print it back to the user, never write it into files that are shared.
 - Every person in the API is written as \`full_name\` and \`email\` (calendar entries: \`user_full_name\`, \`user_email\`). Only active people are listed; an assignee of a ticket also has \`active\`.
 - Lists that can be long have \`limit\` and \`offset\`, and say \`has_more\` and \`next_offset\` (null on the last page): keep asking with \`offset=next_offset\` until \`has_more\` is false.
-- A key that is expired, revoked, switched off, or does not have access to the call returns \`401\`; tell the user and ask for a new key or different access. Do not retry.
+- A key that is expired, revoked, switched off, or does not have access to the call returns \`401\`; tell the user and ask for a new key or different access. Do not retry. A \`429\` is different, see "Call limit" below.
 
 ${chosen.map((s) => s.skill).join('\n') || 'This key has no access yet.\n'}
+## Call limit
+
+Every key may make a limited number of calls per hour (100 unless its owner changed it). The count is the last 60 minutes, so calls free up one by one as they get older. Plan for it: ask for bigger pages (\`limit\`) and use \`include\` or the combined endpoints instead of many small calls.
+
+When the limit is reached the answer is \`429\`. **This is not an error and not a broken key.** The body says exactly where the key stands:
+
+\`\`\`
+{ "error": "...", "limit_per_hour": 100, "used_last_hour": 100, "reset_at": "2026-11-02T15:20:00+07:00", "retry_after_seconds": 840, "calls_free_at_reset": 10 }
+\`\`\`
+
+\`reset_at\` is when at least 10 calls are free again (the \`Retry-After\` header has the same wait in seconds). What to do:
+- Tell the user plainly: the limit (\`limit_per_hour\`), how many calls were used, and the \`reset_at\` time.
+- Do not retry before \`reset_at\`, and do not try to work around it.
+- Offer to continue after that time, or to answer with what you already have.
+
 ## Errors
 
 | Status | Meaning |
@@ -513,6 +528,7 @@ ${chosen.map((s) => s.skill).join('\n') || 'This key has no access yet.\n'}
 | 400 | Missing or invalid parameter (the message says which) |
 | 401 | Missing, expired, revoked or switched-off key, or a key without access to this call |
 | 403 | The key's owner is not allowed to use this |
+| 429 | The key reached its call limit for the hour. Not a fault: see "Call limit" |
 | 404 | The thing asked for was not found |
 
 ## Rules

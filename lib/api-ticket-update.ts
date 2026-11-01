@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-import { getApiUser, isTeamRole } from '@/lib/api-auth'
+import { apiUnauthorized, getApiUser, isTeamRole } from '@/lib/api-auth'
 import { siteUrl, ticketVisibility, toWibIso } from '@/lib/api-v1'
 import { db, skills, tags, ticketAssignees, tickets, ticketSkills, ticketStatuses, ticketTags, users } from '@/lib/db'
 import { bumpTicketDataVersion } from '@/lib/firebase/ticket-sync-server'
@@ -59,7 +59,7 @@ async function snapshot(ticketId: number) {
  */
 export async function updateTicketViaApi(request: Request, rawId: string) {
   const me = await getApiUser(request, 'tickets:update')
-  if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!me) return apiUnauthorized(request)
   if (!isTeamRole(me.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const ticketId = Number(rawId.replace(/^#/, ''))

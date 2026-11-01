@@ -1,7 +1,7 @@
 import { asc, eq, inArray, or } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-import { getApiUser, isTeamRole } from '@/lib/api-auth'
+import { apiUnauthorized, getApiUser, isTeamRole } from '@/lib/api-auth'
 import { isAdmin } from '@/lib/auth-utils'
 import { companies, db, skills, tags, teamMembers, teams, ticketStatuses, ticketTypes } from '@/lib/db'
 import { isClosedLikeTicketStatus } from '@/lib/ticket-status-workflow'
@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: Request) {
   const me = await getApiUser(request, 'tickets:read')
-  if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!me) return apiUnauthorized(request)
   if (!isTeamRole(me.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const wanted = (new URL(request.url).searchParams.get('include') ?? '').split(',').map((s) => s.trim()).filter(Boolean)

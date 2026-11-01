@@ -44,6 +44,7 @@ export async function GET() {
       scopes: r.k.scopes,
       expires_at: r.k.expiresAt ? new Date(r.k.expiresAt).toISOString() : null,
       is_active: r.k.isActive,
+      rate_limit_per_hour: r.k.rateLimitPerHour,
       last_used_at: r.k.lastUsedAt ? new Date(r.k.lastUsedAt).toISOString() : null,
       created_at: r.k.createdAt ? new Date(r.k.createdAt).toISOString() : null,
       owner: r.ownerName || r.ownerEmail || null,

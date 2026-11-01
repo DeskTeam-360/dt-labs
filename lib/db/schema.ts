@@ -1063,6 +1063,7 @@ export const apiKeys = pgTable(
     scopes: jsonb('scopes').$type<string[]>().notNull().default([]),
     expiresAt: ts('expires_at'),
     isActive: boolean('is_active').notNull().default(true),
+    rateLimitPerHour: integer('rate_limit_per_hour').notNull().default(100),
     lastUsedAt: ts('last_used_at'),
     createdAt: ts('created_at').notNull().defaultNow(),
   },

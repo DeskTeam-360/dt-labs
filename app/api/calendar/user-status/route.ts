@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-import { getApiUser, isTeamRole } from '@/lib/api-auth'
+import { apiUnauthorized, getApiUser, isTeamRole } from '@/lib/api-auth'
 import { daysBetween, eachDay, loadCalendarEntries } from '@/lib/calendar-query'
 import { loadAssignedTickets, loadDueTickets } from '@/lib/calendar-tickets'
 import { db, users } from '@/lib/db'
@@ -24,7 +24,7 @@ const todayWib = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0,
  */
 export async function GET(request: Request) {
   const me = await getApiUser(request, 'calendar:read')
-  if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!me) return apiUnauthorized(request)
   if (!isTeamRole(me.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const q = new URL(request.url).searchParams

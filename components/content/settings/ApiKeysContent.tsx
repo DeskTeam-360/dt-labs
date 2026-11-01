@@ -1,7 +1,7 @@
 'use client'
 
 import { ArrowLeftOutlined, BarChartOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Checkbox, Drawer, Flex, Form, Input, Layout, message, Modal, Popconfirm, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography } from 'antd'
+import { Alert, Button, Card, Checkbox, Drawer, Flex, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useState } from 'react'
@@ -24,6 +24,7 @@ type KeyRow = {
   scopes: string[]
   expires_at: string | null
   is_active: boolean
+  rate_limit_per_hour: number
   last_used_at: string | null
   created_at: string | null
   owner: string | null
@@ -109,7 +110,7 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
   const [usage, setUsage] = useState<Usage | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
   const [form] = Form.useForm<FormValues>()
-  const [editForm] = Form.useForm<{ scopes: string[] }>()
+  const [editForm] = Form.useForm<{ scopes: string[]; rate_limit_per_hour: number }>()
   const [editing, setEditing] = useState<KeyRow | null>(null)
   const [editSaving, setEditSaving] = useState(false)
   const isAdminUser = (user.role ?? '').toLowerCase() === 'admin'
@@ -163,7 +164,7 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
 
   const openEdit = (r: KeyRow) => {
     setEditing(r)
-    editForm.setFieldsValue({ scopes: r.scopes })
+    editForm.setFieldsValue({ scopes: r.scopes, rate_limit_per_hour: r.rate_limit_per_hour })
   }
 
   const saveEdit = async () => {
@@ -171,7 +172,7 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
     const v = await editForm.validateFields()
     setEditSaving(true)
     try {
-      const res = await fetch(`/api/api-keys/${editing.id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scopes: v.scopes }) })
+      const res = await fetch(`/api/api-keys/${editing.id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scopes: v.scopes, rate_limit_per_hour: v.rate_limit_per_hour }) })
       const j = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) throw new Error(j.error || 'Failed to update the key')
       message.success('Access updated. The key itself is unchanged; download skill.md again so the assistant knows the new access.')
@@ -382,6 +383,9 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
 
       <Modal title={editing ? `Access of "${editing.name}"` : ''} open={editing !== null} onCancel={() => setEditing(null)} onOk={() => void saveEdit()} confirmLoading={editSaving} okText="Save access" destroyOnHidden forceRender>
         <Form form={editForm} layout="vertical">
+          <Form.Item name="rate_limit_per_hour" label="Calls per hour" rules={[{ required: true, type: 'number', min: 10, max: 10000, message: 'A whole number from 10 to 10000' }]} extra="Over this, the API answers 429 until older calls fall out of the hour. New keys start at 100.">
+            <InputNumber min={10} max={10000} precision={0} style={{ width: 160 }} />
+          </Form.Item>
           <ScopeFields />
         </Form>
       </Modal>

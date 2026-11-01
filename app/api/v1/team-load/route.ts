@@ -1,7 +1,7 @@
 import { and, eq, inArray, notInArray, type SQL, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-import { getApiUser, isTeamRole } from '@/lib/api-auth'
+import { apiUnauthorized, getApiUser, isTeamRole } from '@/lib/api-auth'
 import { csv, pageInfo, siteUrl, sqlList, ticketVisibility, toWibIso, wibDay } from '@/lib/api-v1'
 import { eachDay, loadCalendarEntries } from '@/lib/calendar-query'
 import { companies, db, shifts, ticketAssignees, tickets, users } from '@/lib/db'
@@ -25,7 +25,7 @@ const MAX_PER_AGENT = 200
  */
 export async function GET(request: Request) {
   const me = await getApiUser(request, 'team-load:read')
-  if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!me) return apiUnauthorized(request)
   if (!isTeamRole(me.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const q = new URL(request.url).searchParams

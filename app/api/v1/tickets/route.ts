@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, type SQL, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-import { getApiUser, isTeamRole } from '@/lib/api-auth'
+import { apiUnauthorized, getApiUser, isTeamRole } from '@/lib/api-auth'
 import { createTicketViaApi } from '@/lib/api-ticket-create'
 import { csv, isYmd, pageInfo, siteUrl, sqlList, ticketVisibility, toWibIso, wibRange } from '@/lib/api-v1'
 import { companies, db, ticketAssignees, tickets, ticketTypes, users } from '@/lib/db'
@@ -33,7 +33,7 @@ const lowerList = (v: string | null) => csv(v).map((s) => s.toLowerCase())
  */
 export async function GET(request: Request) {
   const me = await getApiUser(request, 'tickets:read')
-  if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!me) return apiUnauthorized(request)
   if (!isTeamRole(me.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const q = new URL(request.url).searchParams

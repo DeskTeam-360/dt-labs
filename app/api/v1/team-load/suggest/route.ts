@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { getApiUser, isTeamRole } from '@/lib/api-auth'
+import { apiUnauthorized, getApiUser, isTeamRole } from '@/lib/api-auth'
 import { ticketVisibility } from '@/lib/api-v1'
 import { suggestCandidates } from '@/lib/team-suggest'
 
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: Request) {
   const me = await getApiUser(request, 'team-load:read')
-  if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!me) return apiUnauthorized(request)
   if (!isTeamRole(me.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const q = new URL(request.url).searchParams

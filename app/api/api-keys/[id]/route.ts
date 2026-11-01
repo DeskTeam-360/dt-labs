@@ -20,11 +20,11 @@ async function ownedKey(id: string) {
   return { id: row.id }
 }
 
-/** PATCH /api/api-keys/[id] { is_active?, name?, scopes? } - turn a key off or on, rename it, or change what it may do (the key itself stays the same). */
+/** PATCH /api/api-keys/[id] { is_active?, name?, scopes?, rate_limit_per_hour? } - turn a key off or on, rename it, change what it may do or how many calls it may make per hour (the key itself stays the same). */
 export async function PATCH(request: Request, ctx: Ctx) {
   const k = await ownedKey((await ctx.params).id)
   if (k.error) return k.error
-  const body = (await request.json().catch(() => ({}))) as { is_active?: unknown; name?: unknown; scopes?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { is_active?: unknown; name?: unknown; scopes?: unknown; rate_limit_per_hour?: unknown }
   const set: Partial<typeof apiKeys.$inferInsert> = {}
   if (body.is_active !== undefined) set.isActive = Boolean(body.is_active)
   if (body.name !== undefined) {
@@ -36,6 +36,11 @@ export async function PATCH(request: Request, ctx: Ctx) {
     const scopes = [...new Set((Array.isArray(body.scopes) ? body.scopes : []).filter(isApiScope))]
     if (scopes.length === 0) return NextResponse.json({ error: 'Choose at least one access' }, { status: 400 })
     set.scopes = scopes
+  }
+  if (body.rate_limit_per_hour !== undefined) {
+    const n = Number(body.rate_limit_per_hour)
+    if (!Number.isInteger(n) || n < 10 || n > 10000) return NextResponse.json({ error: 'The limit must be a whole number from 10 to 10000 calls per hour' }, { status: 400 })
+    set.rateLimitPerHour = n
   }
   if (Object.keys(set).length === 0) return NextResponse.json({ ok: true })
   await db.update(apiKeys).set(set).where(eq(apiKeys.id, k.id))

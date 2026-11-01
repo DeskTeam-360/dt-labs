@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
-import { getApiUser, isTeamRole } from '@/lib/api-auth'
+import { apiUnauthorized, getApiUser, isTeamRole } from '@/lib/api-auth'
 import { pageInfo, ticketVisibility, toWibIso } from '@/lib/api-v1'
 import { db, ticketActivityLog, tickets, users } from '@/lib/db'
 import { formatTicketActivityAction } from '@/lib/ticket-activity-labels'
@@ -55,7 +55,7 @@ function readable(key: string, value: unknown, labels: Labels): unknown {
  */
 export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const me = await getApiUser(request, 'ticket-detail:read')
-  if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!me) return apiUnauthorized(request)
   if (!isTeamRole(me.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const id = Number((await ctx.params).id.replace(/^#/, ''))
