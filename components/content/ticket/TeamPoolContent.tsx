@@ -257,6 +257,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
   const [companies, setCompanies] = useState<CompanyOption[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
   const [shifts, setShifts] = useState<ShiftOption[]>([])
+  const [teamGroups, setTeamGroups] = useState<{ id: string; name: string; user_ids: string[] }[]>([])
   const [everyone, setEveryone] = useState<Record<string, PersonStatus>>({})
   const [companyIds, setCompanyIds] = useState<string[]>([])
   const [agentIds, setAgentIds] = useState<string[]>([])
@@ -277,6 +278,10 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
       .then((r) => (r.ok ? r.json() : { companies: [] }))
       .then((j: { companies?: CompanyOption[] }) => setCompanies(j.companies ?? []))
       .catch(() => setCompanies([]))
+    fetch('/api/board/team-members', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { teams: [] }))
+      .then((j: { teams?: { id: string; name: string; user_ids: string[] }[] }) => setTeamGroups(j.teams ?? []))
+      .catch(() => setTeamGroups([]))
     fetch('/api/shifts', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
       .then((rows: ShiftOption[]) => setShifts(Array.isArray(rows) ? rows : []))
@@ -315,11 +320,17 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
       }
       return [...m.entries()].sort(([x], [y]) => x.localeCompare(y)).map(([label, ids]) => ({ label, ids }))
     }
+    // A team lists only the agents shown in the pool (active staff); a team with none of them is left out.
+    const agentIdSet = new Set(agents.map((a) => a.id))
+    const teamList = teamGroups
+      .map((t) => ({ label: t.name, ids: t.user_ids.filter((id) => agentIdSet.has(id)) }))
+      .filter((t) => t.ids.length > 0)
     return {
       positions: build((a) => a.position?.trim() || null),
       shifts: build((a) => shifts.find((x) => x.id === a.shift_id)?.title ?? null),
+      teams: teamList,
     }
-  }, [agents, shifts])
+  }, [agents, shifts, teamGroups])
 
   /** Adds the whole group to the selection, or removes it again when every member is already selected. */
   const toggleGroup = (ids: string[]) =>
@@ -633,7 +644,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
               <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>Reload</Button>
             </Flex>
 
-            {quickGroups.positions.length + quickGroups.shifts.length > 0 ? (
+            {quickGroups.positions.length + quickGroups.shifts.length + quickGroups.teams.length > 0 ? (
               <Flex gap={6} wrap align="center">
                 <Text type="secondary" style={{ fontSize: 12 }}>Quick select:</Text>
                 {quickGroups.positions.map((g) => (
@@ -645,6 +656,12 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                 {quickGroups.shifts.map((g) => (
                   <Tag.CheckableTag key={`s-${g.label}`} checked={g.ids.every((id) => agentIds.includes(id))} onChange={() => toggleGroup(g.ids)}>
                     Shift {g.label} ({g.ids.length})
+                  </Tag.CheckableTag>
+                ))}
+                {quickGroups.teams.length > 0 && quickGroups.positions.length + quickGroups.shifts.length > 0 ? <Text type="secondary">|</Text> : null}
+                {quickGroups.teams.map((g) => (
+                  <Tag.CheckableTag key={`t-${g.label}`} checked={g.ids.every((id) => agentIds.includes(id))} onChange={() => toggleGroup(g.ids)}>
+                    Team {g.label} ({g.ids.length})
                   </Tag.CheckableTag>
                 ))}
                 {agentIds.length > 0 ? (
