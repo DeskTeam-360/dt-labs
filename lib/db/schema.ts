@@ -1191,3 +1191,37 @@ export const userCompanyChanges = pgTable(
   },
   (t) => [index('user_company_changes_user_idx').on(t.userId, t.createdAt)]
 )
+
+/** OAuth clients registered by MCP apps such as ChatGPT (dynamic client registration). Public clients: no secret, PKCE instead. */
+export const oauthClients = pgTable('oauth_clients', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 120 }).notNull(),
+  redirectUris: jsonb('redirect_uris').$type<string[]>().notNull().default([]),
+  createdAt: ts('created_at').notNull().defaultNow(),
+})
+
+/** A single-use authorization code, kept for minutes. Only its hash is stored. */
+export const oauthCodes = pgTable('oauth_codes', {
+  codeHash: varchar('code_hash', { length: 64 }).primaryKey(),
+  clientId: uuid('client_id').notNull().references(() => oauthClients.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  scopes: jsonb('scopes').$type<string[]>().notNull().default([]),
+  redirectUri: text('redirect_uri').notNull(),
+  codeChallenge: varchar('code_challenge', { length: 128 }).notNull(),
+  expiresAt: ts('expires_at').notNull(),
+})
+
+/** One connection of an app to a person: owns the api_keys row used as the access token, and the refresh token's hash. */
+export const oauthGrants = pgTable(
+  'oauth_grants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    clientId: uuid('client_id').notNull().references(() => oauthClients.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    keyId: uuid('key_id').notNull().unique().references(() => apiKeys.id, { onDelete: 'cascade' }),
+    refreshHash: varchar('refresh_hash', { length: 64 }).notNull(),
+    refreshExpiresAt: ts('refresh_expires_at').notNull(),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('oauth_grants_refresh_idx').on(t.refreshHash)]
+)

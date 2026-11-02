@@ -31,7 +31,9 @@ export async function middleware(req: NextRequest) {
   }
 
   if (req.nextUrl.pathname === '/login' && isLoggedIn) {
-    return NextResponse.redirect(new URL('/dashboard', req.url))
+    const next = req.nextUrl.searchParams.get('next')
+    const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
+    return NextResponse.redirect(new URL(safeNext ?? '/dashboard', req.url))
   }
 
   if (isLoggedIn && mustChangePassword && req.nextUrl.pathname !== '/change-password' && req.nextUrl.pathname !== '/forgot-password') {

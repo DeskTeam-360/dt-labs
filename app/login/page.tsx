@@ -65,7 +65,10 @@ export default function LoginPage() {
       if (result?.ok) {
         message.success('Login successful!')
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-        window.location.href = isMobile ? '/m/tickets' : '/dashboard'
+        // `next` is where the person was going (for example approving an app); only paths on this site are followed.
+        const next = new URLSearchParams(window.location.search).get('next')
+        const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
+        window.location.href = safeNext ?? (isMobile ? '/m/tickets' : '/dashboard')
         return
       }
     } catch {

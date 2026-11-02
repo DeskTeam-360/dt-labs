@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { apiKeyScopes } from '@/lib/api-auth'
 import { buildToolRequest, MCP_INSTRUCTIONS, MCP_TOOLS, toolInputSchema } from '@/lib/mcp-tools'
+import { siteOrigin } from '@/lib/oauth'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,7 +91,11 @@ async function handle(request: Request, msg: RpcRequest, scopes: string[]) {
 export async function POST(request: Request) {
   const scopes = await apiKeyScopes(request)
   if (!scopes) {
-    return NextResponse.json(fail(null, -32001, 'Unauthorized: send an API key as "Authorization: Bearer dtk_..." (Settings, API Keys)'), { status: 401 })
+    // The header points an app such as ChatGPT to the sign-in (OAuth) of this server; apps with an API key just send it.
+    return NextResponse.json(fail(null, -32001, 'Unauthorized: send an API key as "Authorization: Bearer dtk_..." (Settings, API Keys), or sign in through OAuth'), {
+      status: 401,
+      headers: { 'WWW-Authenticate': `Bearer resource_metadata="${siteOrigin(request)}/.well-known/oauth-protected-resource"` },
+    })
   }
   let payload: unknown
   try {
