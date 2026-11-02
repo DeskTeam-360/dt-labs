@@ -101,12 +101,25 @@ export function captureWebsite(rawUrl: string, opts: CaptureOptions = {}): Promi
       await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
       await page.waitForTimeout(Math.min(15, Math.max(0, opts.waitSeconds ?? 1)) * 1000)
 
-      let fullPage = !!opts.fullPage
-      if (fullPage) {
-        const height = await page.evaluate(() => document.documentElement.scrollHeight)
-        if (height > MAX_FULL_PAGE_HEIGHT) fullPage = false
+      let png: Buffer
+      if (opts.fullPage) {
+        // Scroll down once so images that load as you scroll are there, then back to the top.
+        await page.evaluate(async (cap: number) => {
+          const step = Math.max(300, window.innerHeight)
+          for (let y = 0; y < Math.min(document.documentElement.scrollHeight, cap); y += step) {
+            window.scrollTo(0, y)
+            await new Promise((r) => setTimeout(r, 120))
+          }
+          window.scrollTo(0, 0)
+        }, MAX_FULL_PAGE_HEIGHT)
+        await page.waitForTimeout(300)
+        const height = await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0))
+        const width = page.viewportSize()?.width ?? 1366
+        // A very tall page is cut at the limit instead of falling back to the top screen only.
+        png = await page.screenshot({ type: 'png', fullPage: true, clip: { x: 0, y: 0, width, height: Math.max(1, Math.min(height, MAX_FULL_PAGE_HEIGHT)) } })
+      } else {
+        png = await page.screenshot({ type: 'png' })
       }
-      const png = await page.screenshot({ type: 'png', fullPage })
       return { png, finalUrl: page.url(), title: (await page.title().catch(() => '')) || first.hostname }
     } finally {
       await browser.close().catch(() => undefined)

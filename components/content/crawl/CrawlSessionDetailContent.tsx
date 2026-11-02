@@ -9,6 +9,7 @@ import { useEffect,useState } from 'react'
 import { getCrawlPages } from '@/app/actions/crawl'
 import DateDisplay from '@/components/common/DateDisplay'
 import CrawlGenerateModal from '@/components/content/crawl/CrawlGenerateModal'
+import CrawlSessionScreenshots from '@/components/content/crawl/CrawlSessionScreenshots'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { compareCrawls,type CompareRow } from '@/lib/crawl-compare'
@@ -1805,6 +1806,11 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
           )}
         </div>
       ),
+    },
+    {
+      key: 'screenshots',
+      label: 'Screenshots',
+      children: <CrawlSessionScreenshots sessionId={crawlSession.id} pages={crawlPages} />,
     },
     {
       key: 'share-preview',
