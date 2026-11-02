@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { canAccessTeamPool } from '@/lib/auth-utils'
-import { companies, db, tickets, ticketTimeTracker } from '@/lib/db'
+import { companies, companyPics, db, tickets, ticketTimeTracker, users } from '@/lib/db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 
 const WIB_MS = 7 * 60 * 60 * 1000
@@ -50,6 +50,16 @@ export async function GET() {
       )
     )
 
+  // Who is in charge of each company (primary first), shown when hovering a ticket.
+  const picRows = await db
+    .select({ companyId: companyPics.companyId, userId: companyPics.userId, role: companyPics.role, name: users.fullName, email: users.email })
+    .from(companyPics)
+    .innerJoin(users, eq(companyPics.userId, users.id))
+    .where(inArray(companyPics.companyId, ids))
+  const picsByCompany = new Map<string, { user_id: string; name: string; role: string }[]>()
+  for (const p of picRows) picsByCompany.set(p.companyId, [...(picsByCompany.get(p.companyId) ?? []), { user_id: p.userId, name: p.name || p.email, role: p.role }])
+  for (const list of picsByCompany.values()) list.sort((a, b) => (a.role === b.role ? 0 : a.role === 'primary' ? -1 : 1) || a.name.localeCompare(b.name))
+
   const spent = new Map<string, number>()
   const active = new Set<string>()
   for (const s of sessions) {
@@ -73,6 +83,7 @@ export async function GET() {
         plan_hours: c.activeTime ?? 0,
         spent_hours: Math.round(((spent.get(c.id) ?? 0) / 3600) * 10) / 10,
         has_active_timer: active.has(c.id),
+        pics: picsByCompany.get(c.id) ?? [],
       }))
       .sort((a, b) => (a.display_order ?? 1e9) - (b.display_order ?? 1e9) || a.name.localeCompare(b.name)),
   })

@@ -5,7 +5,7 @@ import { DndContext, type DragEndEvent, DragOverlay, type DragStartEvent, Pointe
 import { Alert, Badge, Button, Empty, Flex, Input, Layout, message, Modal, Popover, Select, Space, Spin, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 import type { TicketTrackerStat } from '@/app/api/tickets/ticket-time-stats/route'
 import { SpaNavLink } from '@/components/common/SpaNavLink'
@@ -29,7 +29,9 @@ let justDragged = false
 /** "No assign" shows at most this many tickets; agent lanes always show everything they have. */
 const NO_ASSIGN_LIMIT = 50
 
-type CompanyOption = { id: string; name: string; is_customer?: boolean; plan_hours: number; spent_hours: number; has_active_timer: boolean }
+type CompanyOption = { id: string; name: string; is_customer?: boolean; plan_hours: number; spent_hours: number; has_active_timer: boolean; pics?: { user_id: string; name: string; role: string }[] }
+/** The people in charge of each company (by company id), so a ticket's hover can name them. */
+const PicsContext = createContext<Record<string, { user_id: string; name: string; role: string }[]>>({})
 type Agent = { id: string; name: string; position: string | null; shift_id: string | null }
 type ShiftOption = { id: string; title: string; start: string; end: string; crosses_midnight: boolean }
 type Lane = { key: string; title: string; subtitle?: string; tickets: TicketRecord[]; total?: number }
@@ -96,11 +98,13 @@ function StatusChip({ status }: { status: string }) {
 function TicketCard({ t, stat, hint, highlight }: { t: TicketRecord; stat?: TicketTrackerStat; hint?: React.ReactNode; highlight?: boolean }) {
   const active = stat?.active_trackers ?? []
   const isActive = active.length > 0
+  const pics = useContext(PicsContext)[t.company?.id ?? ''] ?? []
 
   const detail = (
     <Flex vertical gap={6} style={{ width: 320 }}>
       <Text strong>#{t.id} {t.title}</Text>
       <Text type="secondary">{[t.company?.name, t.type?.title, t.team_name].filter(Boolean).join(' · ') || 'No company'}</Text>
+      {t.company?.id ? <Text>PIC: {pics.length ? pics.map((p) => (p.role === 'primary' ? `${p.name} (primary)` : p.name)).join(', ') : 'none set'}</Text> : null}
       <Text>Assigned to: {(t.assignees ?? []).map((a) => a.user_name).filter(Boolean).join(', ') || 'nobody'}</Text>
       <Text>Last update: {dayjs(t.updated_at).fromNow()} <Text type="secondary">({dayjs(t.updated_at).format('MMM DD, HH:mm')})</Text></Text>
       <Text>Created: {dayjs(t.created_at).format('MMM DD, YYYY HH:mm')}</Text>
@@ -521,7 +525,18 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
     return <Tag color={pct === 100 ? 'green' : pct >= 50 ? 'gold' : 'default'} style={{ margin: 0 }}>Skill match {pct}%</Tag>
   }
 
+  const picsMap = useMemo(() => Object.fromEntries(companies.map((c) => [c.id, c.pics ?? []])), [companies])
+  /** The companies where the signed-in person is a PIC. */
+  const myPicCompanyIds = useMemo(() => companies.filter((c) => (c.pics ?? []).some((p) => p.user_id === currentUser.id)).map((c) => c.id), [companies, currentUser.id])
+  const myPicSelected = myPicCompanyIds.length > 0 && companyIds.length === myPicCompanyIds.length && myPicCompanyIds.every((id) => companyIds.includes(id))
+  const toggleMyPicCompanies = () => {
+    if (myPicSelected) return setCompanyIds([])
+    if (myPicCompanyIds.length === 0) return void message.info('You are not the PIC of any company yet')
+    setCompanyIds(myPicCompanyIds)
+  }
+
   return (
+    <PicsContext.Provider value={picsMap}>
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={{ ...currentUser, role: currentUser.role ?? undefined }} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={currentUser}>
@@ -563,6 +578,9 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                   }}
                 />
               </div>
+              <Button type={myPicSelected ? 'primary' : 'default'} disabled={!!activeSearch} onClick={toggleMyPicCompanies}>
+                My companies (PIC)
+              </Button>
               <div style={{ minWidth: 280, flex: 1 }}>
                 <Select
                   mode="multiple"
@@ -701,5 +719,6 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
         </Content>
       </AdminMainColumn>
     </Layout>
+    </PicsContext.Provider>
   )
 }
