@@ -665,7 +665,7 @@ export default function CompanyDetailContent({
                     <Row gutter={16}>
                       <Col xs={24} sm={12}>
                         <Form.Item name="active_time" label="Active time" initialValue={0}>
-                          <InputNumber min={0} precision={0} addonAfter="H" style={{ width: '100%' }} />
+                          <InputNumber min={0} max={99999} step={0.1} precision={2} addonAfter="H" style={{ width: "100%" }} />
                         </Form.Item>
                       </Col>
                       {/* <Col xs={24} sm={12}>

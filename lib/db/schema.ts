@@ -69,7 +69,7 @@ export const companies = pgTable('companies', {
   color: varchar('color', { length: 20 }).default('#000000'),
   activeTeamId: uuid('active_team_id'),
   activeManagerId: uuid('active_manager_id'),
-  activeTime: integer('active_time').notNull().default(0),
+  activeTime: numeric('active_time', { precision: 7, scale: 2, mode: 'number' }).notNull().default(0),
   /** Manual position of the customer in Round Robin and reports (1 = first). Null = after all numbered ones. */
   displayOrder: integer('display_order'),
   isCustomer: boolean('is_customer').notNull().default(false),
@@ -89,7 +89,7 @@ export const companyDailyActiveAssignments = pgTable(
     snapshotDate: date('snapshot_date').notNull(),
     activeTeamId: uuid('active_team_id'),
     activeManagerId: uuid('active_manager_id'),
-    activeTime: integer('active_time').notNull().default(0),
+    activeTime: numeric('active_time', { precision: 7, scale: 2, mode: 'number' }).notNull().default(0),
     createdAt: ts('created_at').notNull().defaultNow(),
   },
   (t) => [

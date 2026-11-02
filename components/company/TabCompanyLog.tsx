@@ -356,7 +356,7 @@ export default function TabCompanyLog({ companyId, forceCanManage, layout = 'def
               />
             </Form.Item>
             <Form.Item name="active_time" label="active_time">
-              <InputNumber min={0} precision={0} style={{ width: '100%' }} addonAfter="H" />
+              <InputNumber min={0} max={99999} step={0.1} precision={2} style={{ width: "100%" }} addonAfter="H" />
             </Form.Item>
           </Form>
         </Modal>

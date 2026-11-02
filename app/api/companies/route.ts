@@ -22,7 +22,7 @@ function parseDisplayOrder(v: unknown): number | null {
 
 function parseActiveTime(v: unknown): number {
   if (typeof v !== 'number' || !Number.isFinite(v)) return 0
-  return Math.max(0, Math.floor(v))
+  return Math.min(99999, Math.max(0, Math.round(v * 100) / 100))
 }
 
 /** GET /api/companies - List companies */

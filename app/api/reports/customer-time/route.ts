@@ -255,7 +255,7 @@ export async function GET(request: Request) {
       .select({
         companyId: companyDailyActiveAssignments.companyId,
         days: sql<number>`count(*)::int`,
-        hours: sql<number>`coalesce(sum(${companyDailyActiveAssignments.activeTime}), 0)::int`,
+        hours: sql<number>`coalesce(sum(${companyDailyActiveAssignments.activeTime}), 0)::float8`,
       })
       .from(companyDailyActiveAssignments)
       .where(and(...logConds))
