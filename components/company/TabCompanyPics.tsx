@@ -11,7 +11,7 @@ type Candidate = { id: string; full_name: string | null; email: string }
 
 /**
  * People in charge (PIC) of this company: any number, one of them primary and the rest secondary.
- * They are picked from the company's customer users.
+ * They are picked from the active team (agents), not from the company's customer users.
  */
 export default function TabCompanyPics({ companyId, canEdit }: { companyId: string; canEdit: boolean }) {
   const [pics, setPics] = useState<Pic[]>([])
@@ -24,12 +24,17 @@ export default function TabCompanyPics({ companyId, canEdit }: { companyId: stri
     setLoading(true)
     Promise.all([
       fetch(`/api/companies/${companyId}/pics`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : { pics: [] })),
-      fetch(`/api/companies/${companyId}/users`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : { users: [] })),
+      fetch('/api/users', { credentials: 'include' }).then((r) => (r.ok ? r.json() : [])),
     ])
       .then(([p, u]) => {
         if (cancelled) return
         setPics((p as { pics?: Pic[] }).pics ?? [])
-        setCandidates((u as { users?: Candidate[] }).users ?? [])
+        setCandidates(
+          (Array.isArray(u) ? (u as { id: string; full_name?: string | null; email: string; role?: string | null; status?: string | null }[]) : [])
+            .filter((x) => ['admin', 'operations', 'manager', 'staff'].includes((x.role ?? '').toLowerCase()) && (x.status ?? 'active') === 'active')
+            .map((x) => ({ id: x.id, full_name: x.full_name ?? null, email: x.email }))
+            .sort((a, b) => (a.full_name || a.email).localeCompare(b.full_name || b.email))
+        )
       })
       .catch(() => {
         if (!cancelled) {
@@ -81,7 +86,7 @@ export default function TabCompanyPics({ companyId, canEdit }: { companyId: stri
 
   return (
     <Flex vertical gap={16} style={{ maxWidth: 760 }}>
-      <Text type="secondary">The people in charge on the customer side. One primary PIC and any number of secondary PICs.</Text>
+      <Text type="secondary">The agents in charge of this company. One primary PIC and any number of secondary PICs.</Text>
       {canEdit ? (
         <Select
           showSearch
