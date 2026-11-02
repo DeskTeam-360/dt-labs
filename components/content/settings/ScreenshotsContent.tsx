@@ -1,7 +1,7 @@
 'use client'
 
 import { CalendarOutlined,CopyOutlined, DeleteOutlined, EditOutlined, PictureOutlined } from '@ant-design/icons'
-import { Button, Card, Col, DatePicker, Empty,Image, Layout, message, Modal, Row, Select, Space, Tag, Typography } from 'antd'
+import { Button, Card, Checkbox, Col, DatePicker, Empty,Image, Input, Layout, message, Modal, Row, Select, Space, Tag, Typography } from 'antd'
 import dayjs, { Dayjs } from 'dayjs'
 import { useEffect,useState } from 'react'
 
@@ -57,6 +57,32 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
   const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null)
   const [modalVisible, setModalVisible] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [captureUrl, setCaptureUrl] = useState('')
+  const [captureDevice, setCaptureDevice] = useState<'desktop' | 'mobile'>('desktop')
+  const [captureFull, setCaptureFull] = useState(false)
+  const [capturing, setCapturing] = useState(false)
+
+  /** Takes a picture of a web address on the server; it joins the gallery. */
+  const captureWebsite = async () => {
+    if (!captureUrl.trim()) return void message.warning('Enter the web address to capture')
+    setCapturing(true)
+    try {
+      const res = await fetch('/api/screenshots/capture', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: captureUrl.trim(), device: captureDevice, full_page: captureFull, ticket_id: selectedTicket }),
+      })
+      const j = (await res.json()) as Screenshot & { error?: string }
+      if (!res.ok) throw new Error(j.error || 'The capture failed')
+      setScreenshots((prev) => [j, ...prev])
+      message.success('Captured')
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setCapturing(false)
+    }
+  }
 
   // Filter screenshots
   useEffect(() => {
@@ -147,6 +173,22 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
               <PictureOutlined /> Screenshots Gallery
             </Title>
             <Text type="secondary">View and manage your screenshots</Text>
+
+            <Card size="small" title="Capture a website" style={{ marginTop: 24 }}>
+              <Space wrap style={{ width: '100%' }}>
+                <Input
+                  style={{ width: 360 }}
+                  placeholder="https://example.com/page"
+                  value={captureUrl}
+                  onChange={(e) => setCaptureUrl(e.target.value)}
+                  onPressEnter={() => void captureWebsite()}
+                />
+                <Select value={captureDevice} onChange={setCaptureDevice} style={{ width: 120 }} options={[{ value: 'desktop', label: 'Desktop' }, { value: 'mobile', label: 'Mobile' }]} />
+                <Checkbox checked={captureFull} onChange={(e) => setCaptureFull(e.target.checked)}>Whole page</Checkbox>
+                <Button type="primary" loading={capturing} onClick={() => void captureWebsite()}>Capture</Button>
+              </Space>
+              <div><Text type="secondary" style={{ fontSize: 12 }}>Public web addresses only. It can take up to half a minute{selectedTicket ? `; the picture is linked to ticket #${selectedTicket}` : ''}.</Text></div>
+            </Card>
 
             {/* Filters */}
             <div style={{ marginTop: 24, marginBottom: 24 }}>
