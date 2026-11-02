@@ -326,6 +326,7 @@ export async function startCrawlProcess(
       // Extract links (simplified)
       const linkMatches = html.matchAll(/<a[^>]*href=["']([^"']+)["'][^>]*>/gi)
       const links: string[] = []
+      const externalLinks: Array<{ url: string; text: string; tag: string }> = []
       for (const match of linkMatches) {
         // The part after # only points inside the page, so the page address ends before it.
         let linkUrl = match[1].replace(/#.*$/, '')
@@ -348,6 +349,15 @@ export async function startCrawlProcess(
           const linkDomain = new URL(linkUrl).hostname
           // Normalize link URL for duplicate checking
           const normalizedLinkUrl = normalizeUrl(linkUrl)
+          if (linkDomain !== currentDomain && linkDomain.replace(/^www\./, '') !== currentDomain.replace(/^www\./, '')) {
+            // A link to another site, kept for a person to review (the first sign of an inserted backlink).
+            if (externalLinks.length < 200 && /^https?:$/.test(new URL(linkUrl).protocol) && !externalLinks.some((l) => l.url === linkUrl)) {
+              const rel = (match[0].match(/\brel=["']([^"']*)["']/i)?.[1] ?? '').toLowerCase().split(/\s+/).filter((r) => ['nofollow', 'sponsored', 'ugc'].includes(r))
+              const after = html.slice((match.index ?? 0) + match[0].length, (match.index ?? 0) + match[0].length + 400)
+              const text = after.split(/<\/a>/i)[0].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 120)
+              externalLinks.push({ url: linkUrl, text, tag: rel.length ? `external:${rel.join(',')}` : 'external' })
+            }
+          }
           if (linkDomain === currentDomain) {
             // Every internal link is kept (once per page) so a broken page can be traced to the pages that link to it.
             if (!links.includes(linkUrl)) links.push(linkUrl)
@@ -482,6 +492,7 @@ export async function startCrawlProcess(
           headingHierarchy: headingHierarchy,
           metaTags: metaTags,
           links: links,
+          externalLinks: externalLinks.length ? externalLinks : null,
           errorMessage: isRedirect ? redirectInfo : null,
           crawledAt: new Date(),
         })

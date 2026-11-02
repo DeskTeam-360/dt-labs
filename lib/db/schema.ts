@@ -592,6 +592,7 @@ export const crawlPages = pgTable('crawl_pages', {
   headingHierarchy: jsonb('heading_hierarchy'),
   metaTags: jsonb('meta_tags'),
   links: jsonb('links'),
+  externalLinks: jsonb('external_links').$type<Array<{ url: string; text: string; tag: string }>>(),
   crawledAt: ts('crawled_at'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),

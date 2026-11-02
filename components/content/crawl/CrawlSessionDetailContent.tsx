@@ -37,6 +37,7 @@ interface CrawlPageRecord {
   heading_hierarchy: any
   meta_tags: any
   links: string[] | null
+  external_links: Array<{ url: string; text: string; tag: string }> | null
   error_message: string | null
   crawled_at: string | null
   created_at: string
@@ -1489,6 +1490,22 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   <div>
                     {renderSocialPreviews(record)}
                   </div>
+                  {record.external_links && record.external_links.length > 0 && (
+                    <div>
+                      <Text strong>External links ({record.external_links.length}), to review:</Text>
+                      <div style={{ marginTop: 8, maxHeight: 200, overflowY: 'auto' }}>
+                        {record.external_links.map((l, idx) => (
+                          <div key={idx}>
+                            <Tag color={l.tag === 'external' ? 'orange' : 'gold'}>{l.tag}</Tag>
+                            <a href={l.url} target="_blank" rel="noopener noreferrer nofollow">
+                              {l.url}
+                            </a>
+                            {l.text ? <Text type="secondary"> - &quot;{l.text}&quot;</Text> : <Text type="secondary"> - (no text)</Text>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {record.links && record.links.length > 0 && (
                     <div>
                       <Text strong>Links ({record.links.length}):</Text>
@@ -1506,7 +1523,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                 </Space>
               </div>
             ),
-            rowExpandable: (record) => !!(record.description || record.heading_hierarchy || record.meta_tags || record.links?.length),
+            rowExpandable: (record) => !!(record.description || record.heading_hierarchy || record.meta_tags || record.links?.length || record.external_links?.length),
           }}
         />
         </div>
