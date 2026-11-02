@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 
+import { alertNewExternalLinks } from '@/lib/crawl-external-alerts'
 import { db } from '@/lib/db'
 import { companyWebsites, crawlPages, crawlSessions } from '@/lib/db/schema'
 
@@ -618,5 +619,13 @@ export async function startCrawlProcess(
   }
   
   console.log(`[Crawl] Session ${sessionId} completed successfully`)
+
+  // A failed alert never turns a finished crawl into a failed one.
+  try {
+    const alert = await alertNewExternalLinks(sessionId)
+    if (alert.newLinks > 0) console.log(`[Crawl] ${alert.newLinks} new external link(s), ${alert.sent} PIC(s) emailed`)
+  } catch (alertError) {
+    console.error('[Crawl] Could not check for new external links:', alertError)
+  }
 }
 
