@@ -104,6 +104,22 @@ export async function getApiUser(request: Request, scope?: string, opts: { log?:
   return { id: session.user.id, role: ((session.user as { role?: string }).role ?? '').toLowerCase() }
 }
 
+/**
+ * The access of the API key in the request, or null when there is no usable key (missing, wrong, switched off or expired).
+ * Only reads; it does not log or count the call. The MCP server uses it to offer a key just the tools it may use.
+ */
+export async function apiKeyScopes(request: Request): Promise<string[] | null> {
+  const bearer = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim()
+  if (!bearer || !bearer.startsWith(API_KEY_PREFIX)) return null
+  const [row] = await db
+    .select({ scopes: apiKeys.scopes, expiresAt: apiKeys.expiresAt, isActive: apiKeys.isActive })
+    .from(apiKeys)
+    .where(eq(apiKeys.keyHash, hashApiKey(bearer)))
+    .limit(1)
+  if (!row || !row.isActive || (row.expiresAt && new Date(row.expiresAt) < new Date())) return null
+  return row.scopes ?? []
+}
+
 /** Team members only (not customers). */
 export function isTeamRole(role: string): boolean {
   return !!role && role !== 'customer'

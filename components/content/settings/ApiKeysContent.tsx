@@ -417,6 +417,26 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
                 <Button icon={<CopyOutlined />} onClick={() => copy(skillFor(created.scopes), 'skill.md copied')}>Copy skill.md</Button>
               </Space>
             </div>
+            <div>
+              <Text strong>Or connect it as an MCP server</Text>
+              <Paragraph type="secondary" style={{ margin: '4px 0 8px' }}>
+                The assistant then gets ready-made tools instead of reading skill.md. It only gets the tools this key has access to.
+              </Paragraph>
+              <Flex vertical gap={8}>
+                {[
+                  { label: 'Claude Code', text: `claude mcp add --transport http deskteam360 ${window.location.origin}/api/mcp --header "Authorization: Bearer ${created.key}"` },
+                  {
+                    label: 'Claude Desktop',
+                    text: JSON.stringify({ mcpServers: { deskteam360: { command: 'npx', args: ['-y', 'mcp-remote', `${window.location.origin}/api/mcp`, '--header', `Authorization: Bearer ${created.key}`] } } }, null, 2),
+                  },
+                ].map((c) => (
+                  <Flex key={c.label} justify="space-between" align="center" gap={8}>
+                    <Text>{c.label}</Text>
+                    <Button icon={<CopyOutlined />} size="small" onClick={() => copy(c.text, `${c.label} setup copied`)}>Copy setup</Button>
+                  </Flex>
+                ))}
+              </Flex>
+            </div>
           </Space>
         ) : null}
       </Modal>
