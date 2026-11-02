@@ -85,6 +85,76 @@ async function fetchTicketsPage(params: Record<string, string>): Promise<{ items
   return { items, total: Array.isArray(data) ? items.length : Number(data.total ?? items.length) }
 }
 
+type SuggestCandidate = {
+  id: string
+  full_name: string
+  eligible: boolean
+  match_pct: number | null
+  open_tickets: number
+  load_level: string
+  on_shift_now: boolean | null
+  reasons: string[]
+  concerns: string[]
+}
+
+/** On a ticket nobody holds: who could take it, ranked on skill, leave until the due date, shift and load. It only suggests; dragging the card assigns. */
+function SuggestButton({ ticketId }: { ticketId: number }) {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [rows, setRows] = useState<SuggestCandidate[] | null>(null)
+  const [error, setError] = useState('')
+
+  const toggle = (next: boolean) => {
+    setOpen(next)
+    if (!next || rows || loading) return
+    setLoading(true)
+    setError('')
+    fetch(`/api/v1/team-load/suggest?ticket_id=${ticketId}&candidates=5`, { credentials: 'include' })
+      .then(async (r) => {
+        const j = (await r.json()) as { suggestions?: { candidates?: SuggestCandidate[] }[]; error?: string }
+        if (!r.ok) throw new Error(j.error || 'Could not load suggestions')
+        setRows(j.suggestions?.[0]?.candidates ?? [])
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }
+
+  const content = (
+    <Flex vertical gap={8} style={{ width: 300 }}>
+      {loading ? <Spin size="small" /> : null}
+      {error ? <Text type="danger">{error}</Text> : null}
+      {rows && rows.length === 0 ? <Text type="secondary">Nobody to suggest.</Text> : null}
+      {(rows ?? []).map((c) => (
+        <div key={c.id}>
+          <Flex gap={6} align="center" wrap>
+            <Text strong>{c.full_name}</Text>
+            <Tag color={c.eligible ? 'green' : 'default'} style={{ margin: 0 }}>{c.eligible ? 'Can take it' : 'Not ideal'}</Tag>
+            {c.match_pct != null ? <Tag style={{ margin: 0 }}>Skill {c.match_pct}%</Tag> : null}
+            <Tag color={c.load_level === 'critical' ? 'red' : c.load_level === 'warning' ? 'orange' : 'default'} style={{ margin: 0 }}>{c.open_tickets} active</Tag>
+          </Flex>
+          {c.concerns.slice(0, 2).map((x) => <div key={x}><Text type="secondary" style={{ fontSize: 12 }}>{x}</Text></div>)}
+        </div>
+      ))}
+      <Text type="secondary" style={{ fontSize: 11 }}>Only a suggestion: drag the card to a person to assign it.</Text>
+    </Flex>
+  )
+
+  return (
+    <Popover content={content} title="Who could take this?" trigger="click" open={open} onOpenChange={toggle} placement="right">
+      <Button
+        size="small"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+        }}
+      >
+        Suggest
+      </Button>
+    </Popover>
+  )
+}
+
 function StatusChip({ status }: { status: string }) {
   const col = DEFAULT_ALL_STATUS_COLUMNS.find((c) => c.id === status)
   return (
@@ -712,7 +782,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                               <TicketCard
                                 t={t}
                                 stat={stats.get(t.id)}
-                                hint={isPool ? bestFit(t) : fitFor(t, lane.key)}
+                                hint={isPool ? <Flex gap={6} align="center" wrap>{bestFit(t)}<SuggestButton ticketId={t.id} /></Flex> : fitFor(t, lane.key)}
                                 highlight={t.id === highlightId}
                               />
                             </DraggableTicket>
