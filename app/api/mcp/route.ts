@@ -13,7 +13,7 @@ import { GET as ticketsGet, POST as ticketsPost } from '@/app/api/v1/tickets/rou
 import { GET as usersGet } from '@/app/api/v1/users/route'
 import { GET as userWorkGet } from '@/app/api/v1/users/work/route'
 import { GET as teamWorkGet } from '@/app/api/v1/work/route'
-import { apiKeyScopes } from '@/lib/api-auth'
+import { apiKeyInfo, logMcpUsage } from '@/lib/api-auth'
 import { buildToolRequest, MCP_INSTRUCTIONS, MCP_TOOLS, toolInputSchema } from '@/lib/mcp-tools'
 import { siteOrigin } from '@/lib/oauth'
 
@@ -121,7 +121,8 @@ async function handle(request: Request, msg: RpcRequest, scopes: string[]) {
  * the key only gets the tools of the access it has. Every tool is a call to the normal API made with that same key.
  */
 export async function POST(request: Request) {
-  const scopes = await apiKeyScopes(request)
+  const info = await apiKeyInfo(request)
+  const scopes = info?.scopes ?? null
   if (!scopes) {
     // The header points an app such as ChatGPT to the sign-in (OAuth) of this server; apps with an API key just send it.
     return NextResponse.json(fail(null, -32001, 'Unauthorized: send an API key as "Authorization: Bearer dtk_..." (Settings, API Keys), or sign in through OAuth'), {
@@ -148,6 +149,8 @@ export async function POST(request: Request) {
       const client = String((msg.params?.clientInfo as { name?: unknown } | undefined)?.name ?? 'MCP')
       headers['Mcp-Session-Id'] = sessionFor(client)
     }
+    // Connecting and listing the tools are noted in the key's usage log; tool calls are logged by the API route they run.
+    if (info && (msg.method === 'initialize' || msg.method === 'tools/list')) logMcpUsage(info.id, request, msg.method)
     // Notifications and responses have no id and get no answer.
     if (msg.id === undefined || msg.id === null) continue
     out.push(await handle(request, msg, scopes))

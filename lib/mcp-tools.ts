@@ -277,6 +277,10 @@ export const MCP_INSTRUCTIONS = [
   'Tools that say CHANGES DATA change real tickets and can email customers or notify people: show the user what will change and wait for a clear yes first.',
   'Notes are internal. Never present an internal note as something the customer was told.',
   'If a call answers with a rate limit (429), tell the user the limit and the reset_at time, and do not retry before then.',
+  'Lists that can be long say has_more and next_offset: keep asking with offset=next_offset until has_more is false before you total or compare anything.',
+  'Load: load_level is normal up to 5 active tickets (open, received, working_team), warning from 6 and critical from 10. A ticket with two assignees counts for both.',
+  'Hours come from the time tracker only. Before you say someone worked little, check leave, holidays and shift (capacity_hours, calendar entries, get_person_availability): low utilization during leave is not slacking. Do not rank or judge people on one number.',
+  'Overdue means past the due date and not finished. Finished statuses are listed by get_catalog (closed_like).',
 ].join('\n')
 
 export function toolInputSchema(t: McpTool) {

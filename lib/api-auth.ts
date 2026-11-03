@@ -32,12 +32,14 @@ export function apiUnauthorized(request: Request) {
 }
 
 /** Writes one line of the key's usage log. It never slows down or breaks the call it belongs to. */
-function logUsage(keyId: string, request: Request, deniedReason: string | null): void {
-  let path = ''
-  try {
-    path = new URL(request.url).pathname
-  } catch {
-    // keep empty
+function logUsage(keyId: string, request: Request, deniedReason: string | null, pathOverride?: string): void {
+  let path = pathOverride ?? ''
+  if (!pathOverride) {
+    try {
+      path = new URL(request.url).pathname
+    } catch {
+      // keep empty
+    }
   }
   const ip = (request.headers.get('x-forwarded-for')?.split(',')[0] ?? request.headers.get('x-real-ip') ?? '').trim()
   void db
@@ -108,16 +110,27 @@ export async function getApiUser(request: Request, scope?: string, opts: { log?:
  * The access of the API key in the request, or null when there is no usable key (missing, wrong, switched off or expired).
  * Only reads; it does not log or count the call. The MCP server uses it to offer a key just the tools it may use.
  */
-export async function apiKeyScopes(request: Request): Promise<string[] | null> {
+export async function apiKeyInfo(request: Request): Promise<{ id: string; scopes: string[] } | null> {
   const bearer = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim()
   if (!bearer || !bearer.startsWith(API_KEY_PREFIX)) return null
   const [row] = await db
-    .select({ scopes: apiKeys.scopes, expiresAt: apiKeys.expiresAt, isActive: apiKeys.isActive })
+    .select({ id: apiKeys.id, scopes: apiKeys.scopes, expiresAt: apiKeys.expiresAt, isActive: apiKeys.isActive })
     .from(apiKeys)
     .where(eq(apiKeys.keyHash, hashApiKey(bearer)))
     .limit(1)
   if (!row || !row.isActive || (row.expiresAt && new Date(row.expiresAt) < new Date())) return null
-  return row.scopes ?? []
+  return { id: row.id, scopes: row.scopes ?? [] }
+}
+
+/** The access of the key in the request, or null when there is no usable key. */
+export async function apiKeyScopes(request: Request): Promise<string[] | null> {
+  return (await apiKeyInfo(request))?.scopes ?? null
+}
+
+/** Notes a call of the MCP protocol itself (connecting, listing the tools) in the key's usage log, so a connection that is alive shows as used. */
+export function logMcpUsage(keyId: string, request: Request, label: string): void {
+  logUsage(keyId, request, null, `/api/mcp (${label})`.slice(0, 200))
+  void db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, keyId)).catch(() => undefined)
 }
 
 /** Team members only (not customers). */
