@@ -2,14 +2,11 @@ import { desc, eq, gte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { generateApiKey } from '@/lib/api-keys'
-import { isApiScope } from '@/lib/api-scopes'
 import { canManageApiKeys, isAdmin } from '@/lib/auth-utils'
-import { apiKeys, apiKeyUsage, db, users } from '@/lib/db'
+import { apiKeys, apiKeyUsage, db, oauthGrants, users } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-const MAX_KEYS_PER_USER = 20
 
 async function gate() {
   const session = await auth()
@@ -35,9 +32,11 @@ export async function GET() {
     .where(gte(apiKeyUsage.createdAt, new Date(Date.now() - 86400000)))
     .groupBy(apiKeyUsage.keyId)
   const calls24h = new Map(recent.map((r) => [r.keyId, r.n]))
+  const viaOauth = new Set((await db.select({ keyId: oauthGrants.keyId }).from(oauthGrants)).map((g) => g.keyId))
   return NextResponse.json({
     keys: rows.map((r) => ({
       calls_24h: calls24h.get(r.k.id) ?? 0,
+      connection: viaOauth.has(r.k.id) ? 'oauth' : 'manual',
       id: r.k.id,
       name: r.k.name,
       key_prefix: r.k.keyPrefix,
@@ -53,24 +52,7 @@ export async function GET() {
   })
 }
 
-/** POST /api/api-keys { name, scopes, expires_in_days } -> { key } shown once. */
-export async function POST(request: Request) {
-  const g = await gate()
-  if (g.error) return g.error
-  const body = (await request.json().catch(() => ({}))) as { name?: unknown; scopes?: unknown; expires_in_days?: unknown }
-  const name = String(body.name ?? '').trim().slice(0, 120)
-  if (!name) return NextResponse.json({ error: 'Give the key a name' }, { status: 400 })
-  const scopes = [...new Set((Array.isArray(body.scopes) ? body.scopes : []).filter(isApiScope))]
-  if (scopes.length === 0) return NextResponse.json({ error: 'Choose at least one access' }, { status: 400 })
-  const days = Number(body.expires_in_days)
-  const expiresAt = Number.isFinite(days) && days > 0 ? new Date(Date.now() + Math.min(365, Math.round(days)) * 86400000) : null
-  // A key never lives forever: no expiry is not offered, the longest is a year.
-  if (!expiresAt) return NextResponse.json({ error: 'Choose when the key expires (1 to 365 days)' }, { status: 400 })
-
-  const mine = await db.select({ id: apiKeys.id }).from(apiKeys).where(eq(apiKeys.userId, g.userId))
-  if (mine.length >= MAX_KEYS_PER_USER) return NextResponse.json({ error: `You can have up to ${MAX_KEYS_PER_USER} keys; delete one you no longer use` }, { status: 400 })
-
-  const { key, prefix, hash } = generateApiKey()
-  const [row] = await db.insert(apiKeys).values({ userId: g.userId, name, keyPrefix: prefix, keyHash: hash, scopes, expiresAt }).returning({ id: apiKeys.id })
-  return NextResponse.json({ id: row.id, key, expires_at: expiresAt.toISOString() }, { status: 201 })
+/** POST /api/api-keys - keys are no longer made by hand: an assistant connects through MCP and OAuth (see /api/oauth/token). */
+export async function POST() {
+  return NextResponse.json({ error: 'API keys are no longer made by hand. Connect the assistant through MCP: add the server address in its connectors and approve the access.' }, { status: 410 })
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import { ArrowLeftOutlined, BarChartOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Checkbox, Drawer, Flex, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography } from 'antd'
+import { ArrowLeftOutlined, BarChartOutlined, CopyOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Checkbox, Drawer, Flex, Form, InputNumber, Layout, message, Modal, Popconfirm, Space, Statistic, Switch, Table, Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useState } from 'react'
@@ -9,13 +9,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
-import { API_SCOPES, buildSkillMarkdown, isWriteScope } from '@/lib/api-scopes'
-import { downloadTextFile } from '@/lib/crawl-groups'
+import { API_SCOPES, isWriteScope } from '@/lib/api-scopes'
 
 dayjs.extend(relativeTime)
 
 const { Content } = Layout
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 
 type KeyRow = {
   id: string
@@ -25,6 +24,7 @@ type KeyRow = {
   expires_at: string | null
   is_active: boolean
   rate_limit_per_hour: number
+  connection: 'oauth' | 'manual'
   last_used_at: string | null
   created_at: string | null
   owner: string | null
@@ -48,14 +48,6 @@ const REASON_TEXT: Record<string, string> = {
   owner_not_allowed: 'Owner no longer allowed',
 }
 
-type FormValues = { name: string; scopes: string[]; expires_in_days: number }
-
-const EXPIRY_OPTIONS = [
-  { value: 30, label: '30 days' },
-  { value: 90, label: '90 days' },
-  { value: 180, label: '180 days' },
-  { value: 365, label: '1 year' },
-]
 
 const copy = (text: string, ok: string) => {
   void navigator.clipboard.writeText(text).then(() => message.success(ok))
@@ -104,16 +96,13 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
   const [collapsed, setCollapsed] = useState(false)
   const [rows, setRows] = useState<KeyRow[]>([])
   const [loading, setLoading] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [created, setCreated] = useState<{ key: string; scopes: string[]; name: string } | null>(null)
   const [usage, setUsage] = useState<Usage | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
-  const [form] = Form.useForm<FormValues>()
   const [editForm] = Form.useForm<{ scopes: string[]; rate_limit_per_hour: number }>()
   const [editing, setEditing] = useState<KeyRow | null>(null)
   const [editSaving, setEditSaving] = useState(false)
   const isAdminUser = (user.role ?? '').toLowerCase() === 'admin'
+  const mcpUrl = typeof window === 'undefined' ? '/api/mcp' : `${window.location.origin}/api/mcp`
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -132,29 +121,6 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
   useEffect(() => {
     void load()
   }, [load])
-
-  const create = async () => {
-    const v = await form.validateFields()
-    setSaving(true)
-    try {
-      const res = await fetch('/api/api-keys', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(v),
-      })
-      const j = (await res.json()) as { key?: string; error?: string }
-      if (!res.ok || !j.key) throw new Error(j.error || 'Failed to create the key')
-      setCreating(false)
-      setCreated({ key: j.key, scopes: v.scopes, name: v.name })
-      form.resetFields()
-      void load()
-    } catch (e) {
-      message.error((e as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const patch = async (id: string, body: Record<string, unknown>) => {
     const res = await fetch(`/api/api-keys/${id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -175,7 +141,7 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
       const res = await fetch(`/api/api-keys/${editing.id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scopes: v.scopes, rate_limit_per_hour: v.rate_limit_per_hour }) })
       const j = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) throw new Error(j.error || 'Failed to update the key')
-      message.success('Access updated. The key itself is unchanged; download skill.md again so the assistant knows the new access.')
+      message.success('Access updated. It applies to the next call the assistant makes.')
       setEditing(null)
       void load()
     } catch (e) {
@@ -206,31 +172,38 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
     }
   }
 
-  const skillFor = (scopes: string[]) => buildSkillMarkdown(scopes, window.location.origin)
   const scopeLabel = (k: string) => API_SCOPES.find((s) => s.key === k)?.label ?? k
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={{ ...user, role: user.role ?? undefined }} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={user}>
-        <Content className="settings-page" style={{ padding: 24, margin: '0 auto', width: '100%', maxWidth: 1100 }}>
+        <Content className="settings-page" style={{ padding: 24, width: '100%' }}>
           <Space orientation="vertical" size="large" style={{ width: '100%' }}>
             <div>
               <SpaNavLink href="/settings">
                 <Button type="link" icon={<ArrowLeftOutlined />} style={{ paddingLeft: 0 }}>Back to Settings</Button>
               </SpaNavLink>
-              <Flex justify="space-between" align="center" wrap gap={12}>
-                <div>
-                  <Title level={2} style={{ margin: '8px 0 0' }}>API Keys</Title>
-                  <Text type="secondary">
-                    Make a key with only the access you choose, to give to a script or an AI assistant. A key acts as you, can only do what you allowed (reading, or writing where you tick it), and stops at its expiry date.
-                  </Text>
-                </div>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
-                  New API key
-                </Button>
-              </Flex>
+              <Title level={2} style={{ margin: '8px 0 0' }}>AI connections</Title>
+              <Text type="secondary">
+                AI assistants connect to DeskTeam360 through MCP and sign in with their own approval page. There are no keys to copy: you choose the access when you approve, it acts as you, and you can change or switch it off here at any time.
+              </Text>
             </div>
+
+            <Card size="small" title="Connect an assistant">
+              <Flex vertical gap={10}>
+                <Flex align="center" gap={8} wrap>
+                  <Text>Server address:</Text>
+                  <Text code>{mcpUrl}</Text>
+                  <Button size="small" icon={<CopyOutlined />} onClick={() => copy(mcpUrl, 'Address copied')}>Copy</Button>
+                </Flex>
+                <Text type="secondary">
+                  <b>Claude Desktop or claude.ai:</b> Settings, Connectors, add a custom connector with this address. <b>ChatGPT:</b> turn on Developer Mode, then add a connector with this address.{' '}
+                  <b>Claude Code:</b> run <Text code>claude mcp add --transport http deskteam360 {mcpUrl}</Text>, then sign in from <Text code>/mcp</Text>.
+                </Text>
+                <Text type="secondary">An approval page opens where you sign in and choose the access. Anything that changes data has to be ticked on purpose. Only admins, operations and managers can approve.</Text>
+              </Flex>
+            </Card>
 
             <Table<KeyRow>
               rowKey="id"
@@ -238,14 +211,14 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
               loading={loading}
               dataSource={rows}
               pagination={false}
-              locale={{ emptyText: 'No API keys yet' }}
+              locale={{ emptyText: 'Nothing connected yet' }}
               scroll={{ x: 'max-content' }}
               columns={[
                 {
                   title: 'Name',
                   render: (_: unknown, r) => (
                     <div>
-                      <Text strong>{r.name}</Text>
+                      <Text strong>{r.name}</Text>{r.connection === 'manual' ? <Tooltip title="Made by hand before connections moved to OAuth. Delete it once nothing uses it."><Tag color="gold" style={{ marginLeft: 8 }}>Old key</Tag></Tooltip> : null}
                       <div><Text type="secondary" style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.key_prefix}…</Text></div>
                     </div>
                   ),
@@ -287,12 +260,6 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
                       </Tooltip>
                       <Tooltip title="Usage: who called what, and when">
                         <Button size="small" icon={<BarChartOutlined />} onClick={() => void openUsage(r.id)} />
-                      </Tooltip>
-                      <Tooltip title="Download skill.md for this key's access">
-                        <Button size="small" icon={<DownloadOutlined />} onClick={() => downloadTextFile('skill.md', skillFor(r.scopes), 'text/markdown')} />
-                      </Tooltip>
-                      <Tooltip title="Copy skill.md">
-                        <Button size="small" icon={<CopyOutlined />} onClick={() => copy(skillFor(r.scopes), 'skill.md copied')} />
                       </Tooltip>
                       <Popconfirm title="Delete this key?" description="Anything using it stops working right away." okText="Delete" onConfirm={() => void remove(r.id)}>
                         <Button size="small" danger icon={<DeleteOutlined />} />
@@ -369,18 +336,6 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
         ) : null}
       </Drawer>
 
-      <Modal title="New API key" open={creating} onCancel={() => setCreating(false)} onOk={() => void create()} confirmLoading={saving} okText="Create key" destroyOnHidden forceRender>
-        <Form form={form} layout="vertical" initialValues={{ scopes: [], expires_in_days: 90 }}>
-          <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Give the key a name' }]} extra="So you remember what it is for, e.g. Claude assistant.">
-            <Input maxLength={120} />
-          </Form.Item>
-          <ScopeFields />
-          <Form.Item name="expires_in_days" label="Expires after" rules={[{ required: true }]}>
-            <Select options={EXPIRY_OPTIONS} />
-          </Form.Item>
-        </Form>
-      </Modal>
-
       <Modal title={editing ? `Access of "${editing.name}"` : ''} open={editing !== null} onCancel={() => setEditing(null)} onOk={() => void saveEdit()} confirmLoading={editSaving} okText="Save access" destroyOnHidden forceRender>
         <Form form={editForm} layout="vertical">
           <Form.Item name="rate_limit_per_hour" label="Calls per hour" rules={[{ required: true, type: 'number', min: 10, max: 10000, message: 'A whole number from 10 to 10000' }]} extra="Over this, the API answers 429 until older calls fall out of the hour. New keys start at 100.">
@@ -388,57 +343,6 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
           </Form.Item>
           <ScopeFields />
         </Form>
-      </Modal>
-
-      <Modal
-        title={created ? `Key "${created.name}" is ready` : ''}
-        open={created !== null}
-        onCancel={() => setCreated(null)}
-        footer={<Button type="primary" onClick={() => setCreated(null)}>Done</Button>}
-        width={640}
-        destroyOnHidden
-      >
-        {created ? (
-          <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-            <Alert type="warning" showIcon title="Copy the key now. It is shown only this once; if you lose it, make a new key." />
-            <Card size="small">
-              <Flex justify="space-between" align="center" gap={8}>
-                <Text code style={{ wordBreak: 'break-all' }}>{created.key}</Text>
-                <Button icon={<CopyOutlined />} onClick={() => copy(created.key, 'Key copied')}>Copy</Button>
-              </Flex>
-            </Card>
-            <div>
-              <Text strong>Give it to an AI assistant</Text>
-              <Paragraph type="secondary" style={{ margin: '4px 0 8px' }}>
-                The skill.md explains the endpoints this key can use. Give the assistant the skill file and the key (never put the key inside skill.md).
-              </Paragraph>
-              <Space>
-                <Button icon={<DownloadOutlined />} onClick={() => downloadTextFile('skill.md', skillFor(created.scopes), 'text/markdown')}>Download skill.md</Button>
-                <Button icon={<CopyOutlined />} onClick={() => copy(skillFor(created.scopes), 'skill.md copied')}>Copy skill.md</Button>
-              </Space>
-            </div>
-            <div>
-              <Text strong>Or connect it as an MCP server</Text>
-              <Paragraph type="secondary" style={{ margin: '4px 0 8px' }}>
-                The assistant then gets ready-made tools instead of reading skill.md. It only gets the tools this key has access to.
-              </Paragraph>
-              <Flex vertical gap={8}>
-                {[
-                  { label: 'Claude Code', text: `claude mcp add --transport http deskteam360 ${window.location.origin}/api/mcp --header "Authorization: Bearer ${created.key}"` },
-                  {
-                    label: 'Claude Desktop',
-                    text: JSON.stringify({ mcpServers: { deskteam360: { command: 'npx', args: ['-y', 'mcp-remote', `${window.location.origin}/api/mcp`, '--header', `Authorization: Bearer ${created.key}`] } } }, null, 2),
-                  },
-                ].map((c) => (
-                  <Flex key={c.label} justify="space-between" align="center" gap={8}>
-                    <Text>{c.label}</Text>
-                    <Button icon={<CopyOutlined />} size="small" onClick={() => copy(c.text, `${c.label} setup copied`)}>Copy setup</Button>
-                  </Flex>
-                ))}
-              </Flex>
-            </div>
-          </Space>
-        ) : null}
       </Modal>
     </Layout>
   )
