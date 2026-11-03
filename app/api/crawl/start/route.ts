@@ -28,6 +28,8 @@ export async function POST(request: Request) {
       is_primary,
       max_depth = 3,
       max_pages = 100,
+      screenshot_homepage = false,
+      screenshot_random_count = 0,
       company_website_id, // Optional: if provided, use existing website instead of creating new one
     } = body
 
@@ -93,6 +95,9 @@ export async function POST(request: Request) {
         status: 'pending',
         maxDepth: max_depth,
         maxPages: max_pages,
+        startedBy: session.user.id,
+        screenshotHomepage: screenshot_homepage === true,
+        screenshotRandomCount: Math.min(10, Math.max(0, Math.round(Number(screenshot_random_count)) || 0)),
         startedAt: new Date(),
       })
       .returning()

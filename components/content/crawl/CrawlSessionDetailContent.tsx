@@ -9,6 +9,7 @@ import { useEffect,useState } from 'react'
 import { getCrawlPages } from '@/app/actions/crawl'
 import DateDisplay from '@/components/common/DateDisplay'
 import CrawlGenerateModal from '@/components/content/crawl/CrawlGenerateModal'
+import CrawlSessionScreenshotLinks from '@/components/content/crawl/CrawlSessionScreenshotLinks'
 import CrawlSessionScreenshots from '@/components/content/crawl/CrawlSessionScreenshots'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
@@ -1371,6 +1372,9 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   <DateDisplay date={crawlSession.completed_at} format="detailed" />
                 </Space>
               ) : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Screenshots">
+              <CrawlSessionScreenshotLinks sessionId={crawlSession.id} pages={crawlPages} />
             </Descriptions.Item>
             {crawlSession.error_message && (
               <Descriptions.Item label="Error Message" span={2}>

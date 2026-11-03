@@ -572,6 +572,10 @@ export const crawlSessions = pgTable('crawl_sessions', {
   errorMessage: text('error_message'),
   maxDepth: integer('max_depth').default(3),
   maxPages: integer('max_pages').default(100),
+  /** Who started it (the pictures taken after the crawl are saved under their name). */
+  startedBy: uuid('started_by'),
+  screenshotHomepage: boolean('screenshot_homepage').notNull().default(false),
+  screenshotRandomCount: integer('screenshot_random_count').notNull().default(0),
   startedAt: ts('started_at'),
   completedAt: ts('completed_at'),
   createdAt: ts('created_at').notNull().defaultNow(),

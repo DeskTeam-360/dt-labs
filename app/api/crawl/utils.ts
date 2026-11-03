@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 
+import { captureAfterCrawl } from '@/lib/crawl-auto-screenshots'
 import { alertNewExternalLinks } from '@/lib/crawl-external-alerts'
 import { db } from '@/lib/db'
 import { companyWebsites, crawlPages, crawlSessions } from '@/lib/db/schema'
@@ -627,5 +628,8 @@ export async function startCrawlProcess(
   } catch (alertError) {
     console.error('[Crawl] Could not check for new external links:', alertError)
   }
+
+  // Pictures the person asked for when starting the crawl run on their own, after the crawl is already finished.
+  void captureAfterCrawl(sessionId).catch((shotError) => console.error('[Crawl] Could not take the screenshots after the crawl:', shotError))
 }
 

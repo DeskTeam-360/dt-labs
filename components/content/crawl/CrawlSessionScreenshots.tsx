@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, Card, Divider, Empty, Flex, Image, InputNumber, message, Select, Space, Typography } from 'antd'
+import { Button, Card, Divider, Empty, Flex, Image, InputNumber, message, Popconfirm, Select, Space, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -89,6 +89,14 @@ export default function CrawlSessionScreenshots({ sessionId, pages }: { sessionI
     void run(shuffled.slice(0, n).map((p) => p.url))
   }
 
+  /** Removes a bad picture (the row and its file) so the page can be taken again. */
+  const removeShot = async (id: string) => {
+    const res = await fetch(`/api/screenshots/capture?id=${id}`, { method: 'DELETE', credentials: 'include' })
+    if (!res.ok) return void message.error(((await res.json().catch(() => ({}))) as { error?: string }).error || 'Could not delete the picture')
+    setShots((prev) => prev.filter((x) => x.id !== id))
+    message.success('Picture deleted')
+  }
+
   const groups = useMemo(() => {
     const m = new Map<string, Shot[]>()
     for (const s of shots) m.set(s.page_url, [...(m.get(s.page_url) ?? []), s])
@@ -138,7 +146,14 @@ export default function CrawlSessionScreenshots({ sessionId, pages }: { sessionI
                   <div key={d} style={{ width: d === 'mobile' ? 260 : 520 }}>
                     <Flex justify="space-between" align="center" gap={8}>
                       <Text strong style={{ textTransform: 'capitalize' }}>{d}</Text>
-                      {s ? <a href={s.file_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>Open full size</a> : null}
+                      {s ? (
+                        <Space size={12}>
+                          <a href={s.file_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>Open full size</a>
+                          <Popconfirm title="Delete this picture?" description="Use it when a capture came out wrong, then take the page again." okText="Delete" okButtonProps={{ danger: true }} onConfirm={() => void removeShot(s.id)}>
+                            <a style={{ fontSize: 12, color: '#ff4d4f' }}>Delete</a>
+                          </Popconfirm>
+                        </Space>
+                      ) : null}
                     </Flex>
                     {s ? (
                       <div style={{ marginTop: 6, maxHeight: '75vh', overflow: 'auto', border: '1px solid var(--ant-color-border-secondary, #f0f0f0)' }}>

@@ -20,6 +20,8 @@ interface StartCrawlParams {
   company_website_id?: string
   max_depth?: number
   max_pages?: number
+  screenshot_homepage?: boolean
+  screenshot_random_count?: number
 }
 
 function toSnakeSession(s: typeof crawlSessions.$inferSelect) {
@@ -85,6 +87,8 @@ export async function startCrawl(params: StartCrawlParams) {
       company_website_id,
       max_depth = 3,
       max_pages = 100,
+      screenshot_homepage = false,
+      screenshot_random_count = 0,
     } = params
 
     let websiteId = company_website_id
@@ -151,6 +155,8 @@ export async function startCrawl(params: StartCrawlParams) {
         company_website_id: websiteId,
         max_depth,
         max_pages,
+        screenshot_homepage,
+        screenshot_random_count,
       }),
     })
 

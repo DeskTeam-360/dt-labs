@@ -1,7 +1,7 @@
 'use client'
 
 import { CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EyeOutlined, GlobalOutlined,PlayCircleOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Card, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Progress, Select, Space, Spin,Table, Tag, Typography } from 'antd'
+import { Button, Card, Checkbox, Form, Input, InputNumber, Layout, message, Modal, Popconfirm, Progress, Select, Space, Spin,Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useRouter } from 'next/navigation'
 import { useEffect,useState } from 'react'
@@ -135,6 +135,8 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
     form.setFieldsValue({
       max_depth: 3,
       max_pages: 100,
+      screenshot_homepage: false,
+      screenshot_random_count: 0,
     })
     setModalVisible(true)
   }
@@ -150,6 +152,8 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
         company_website_id: values.company_website_id,
         max_depth: values.max_depth || 3,
         max_pages: values.max_pages || 100,
+        screenshot_homepage: values.screenshot_homepage === true,
+        screenshot_random_count: values.screenshot_random_count || 0,
       })
 
       if (result.error) {
@@ -438,6 +442,24 @@ export default function CrawlSessionsContent({ user: currentUser }: CrawlSession
                 tooltip="Maximum number of pages to crawl"
               >
                 <InputNumber min={1} max={1000} style={{ width: '100%' }} />
+              </Form.Item>
+
+              <Form.Item
+                label="Screenshots when the crawl finishes"
+                tooltip="Whole page, desktop and mobile, saved under your name once the crawl is done. They show in the Screenshots tab and in the Overview of the crawl."
+              >
+                <Space orientation="vertical" size={8}>
+                  <Form.Item name="screenshot_homepage" valuePropName="checked" noStyle>
+                    <Checkbox>Homepage</Checkbox>
+                  </Form.Item>
+                  <Space>
+                    <Text>Random inner pages:</Text>
+                    <Form.Item name="screenshot_random_count" noStyle>
+                      <InputNumber min={0} max={10} precision={0} />
+                    </Form.Item>
+                    <Text type="secondary" style={{ fontSize: 12 }}>0 = none, the homepage is never picked here</Text>
+                  </Space>
+                </Space>
               </Form.Item>
 
               <Form.Item>
