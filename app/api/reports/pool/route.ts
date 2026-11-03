@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { canAccessPoolReport } from '@/lib/auth-utils'
-import { companies, db, ticketAssignees, tickets, ticketTimeTracker, users } from '@/lib/db'
+import { companies, companyPics, db, ticketAssignees, tickets, ticketTimeTracker, users } from '@/lib/db'
 import { getLastActivity } from '@/lib/ticket-last-activity'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
 
@@ -152,6 +152,18 @@ export async function GET(request: Request) {
 
   const lastActivity = await getLastActivity(ticketRows.map((t) => ({ id: t.id, createdAt: t.createdAt })))
 
+  // The people in charge of each company (primary first), for the PIC column.
+  const picRows = companyRows.length
+    ? await db
+        .select({ companyId: companyPics.companyId, role: companyPics.role, fullName: users.fullName, email: users.email })
+        .from(companyPics)
+        .innerJoin(users, eq(companyPics.userId, users.id))
+        .where(inArray(companyPics.companyId, companyRows.map((c) => c.id)))
+    : []
+  const picsByCompany = new Map<string, { name: string; primary: boolean }[]>()
+  for (const p of picRows) picsByCompany.set(p.companyId, [...(picsByCompany.get(p.companyId) ?? []), { name: p.fullName || p.email, primary: p.role === 'primary' }])
+  for (const list of picsByCompany.values()) list.sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name))
+
   const out = companyRows.map((c) => {
     const plan = c.activeTime ?? 0
     const dailySeconds = dailyByCompany.get(c.id) ?? 0
@@ -188,6 +200,7 @@ export async function GET(request: Request) {
       display_order: c.displayOrder ?? null,
       plan_hours: plan,
       active_users: activeUsers,
+      pics: picsByCompany.get(c.id) ?? [],
       daily_seconds: dailySeconds,
       daily_pct: pct(dailySeconds, plan),
       weekly_seconds: weeklySeconds,

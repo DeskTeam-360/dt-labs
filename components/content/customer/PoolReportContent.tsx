@@ -33,6 +33,7 @@ type PoolCompany = {
   name: string
   plan_hours: number
   active_users: string[]
+  pics: { name: string; primary: boolean }[]
   daily_seconds: number
   daily_pct: number | null
   weekly_seconds: number
@@ -190,6 +191,23 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
           <Flex gap={4} wrap>
             {c.active_users.map((n) => (
               <Tag key={n} color="green" style={{ margin: 0 }}>{n.split(' ')[0]}</Tag>
+            ))}
+          </Flex>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
+    {
+      title: 'PIC',
+      key: 'pics',
+      width: 190,
+      render: (_: unknown, c) =>
+        c.pics.length ? (
+          <Flex gap={4} wrap>
+            {c.pics.map((p) => (
+              <Tooltip key={p.name} title={p.primary ? 'Primary PIC' : 'Secondary PIC'}>
+                <Tag color={p.primary ? 'blue' : undefined} style={{ margin: 0 }}>{p.name.split(' ')[0]}</Tag>
+              </Tooltip>
             ))}
           </Flex>
         ) : (

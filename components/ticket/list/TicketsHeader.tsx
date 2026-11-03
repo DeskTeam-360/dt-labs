@@ -97,7 +97,7 @@ export default function TicketsHeader({
       )}
       <Flex vertical gap={12} style={{ padding: 24 }}>
         <Typography.Title level={2} style={{ margin: 0 }}>
-          {junkTitle ?? 'My Tickets'}
+          {junkTitle ?? 'All Tickets'}
         </Typography.Title>
 
         {!inJunkFolder && (
