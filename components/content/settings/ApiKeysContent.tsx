@@ -92,7 +92,7 @@ function ScopeFields() {
 }
 
 /** Team Leaders, Operations and Admins make API keys with only the access they choose, for scripts and AI assistants. */
-export default function ApiKeysContent({ user }: { user: { id: string; email?: string | null; name?: string | null; role?: string | null } }) {
+export default function ApiKeysContent({ user, embedded = false }: { user: { id: string; email?: string | null; name?: string | null; role?: string | null }; embedded?: boolean }) {
   const [collapsed, setCollapsed] = useState(false)
   const [rows, setRows] = useState<KeyRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -174,17 +174,15 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
 
   const scopeLabel = (k: string) => API_SCOPES.find((s) => s.key === k)?.label ?? k
 
-  return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <AdminSidebar user={{ ...user, role: user.role ?? undefined }} collapsed={collapsed} onCollapse={setCollapsed} />
-      <AdminMainColumn collapsed={collapsed} user={user}>
-        <Content className="settings-page" style={{ padding: 24, width: '100%' }}>
-          <Space orientation="vertical" size="large" style={{ width: '100%' }}>
+  const inner = (
+    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
             <div>
-              <SpaNavLink href="/settings">
-                <Button type="link" icon={<ArrowLeftOutlined />} style={{ paddingLeft: 0 }}>Back to Settings</Button>
-              </SpaNavLink>
-              <Title level={2} style={{ margin: '8px 0 0' }}>AI connections</Title>
+              {embedded ? null : (
+                <SpaNavLink href="/settings">
+                  <Button type="link" icon={<ArrowLeftOutlined />} style={{ paddingLeft: 0 }}>Back to Settings</Button>
+                </SpaNavLink>
+              )}
+              {embedded ? null : <Title level={2} style={{ margin: '8px 0 0' }}>AI connections</Title>}
               <Text type="secondary">
                 AI assistants connect to DeskTeam360 through MCP and sign in with their own approval page. There are no keys to copy: you choose the access when you approve, it acts as you, and you can change or switch it off here at any time.
               </Text>
@@ -197,11 +195,14 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
                   <Text code>{mcpUrl}</Text>
                   <Button size="small" icon={<CopyOutlined />} onClick={() => copy(mcpUrl, 'Address copied')}>Copy</Button>
                 </Flex>
-                <Text type="secondary">
-                  <b>Claude Desktop or claude.ai:</b> Settings, Connectors, add a custom connector with this address. <b>ChatGPT:</b> turn on Developer Mode, then add a connector with this address.{' '}
-                  <b>Claude Code:</b> run <Text code>claude mcp add --transport http deskteam360 {mcpUrl}</Text>, then sign in from <Text code>/mcp</Text>.
-                </Text>
-                <Text type="secondary">An approval page opens where you sign in and choose the access. Anything that changes data has to be ticked on purpose. Only admins, operations and managers can approve.</Text>
+                <Flex vertical gap={4}>
+                  <Text type="secondary"><b>Claude Desktop or claude.ai:</b> Settings, Connectors, add a custom connector with this address.</Text>
+                  <Text type="secondary"><b>ChatGPT:</b> turn on Developer Mode, then add a connector with this address.</Text>
+                  <Text type="secondary">
+                    <b>Claude Code:</b> run <Text code>claude mcp add --transport http deskteam360 {mcpUrl}</Text>, then sign in from <Text code>/mcp</Text>.
+                  </Text>
+                </Flex>
+                <Text type="secondary">An approval page opens where you sign in and choose the access. Anything that changes data has to be ticked on purpose. Any team member can approve; agents and managers can have one connection.</Text>
               </Flex>
             </Card>
 
@@ -270,9 +271,11 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
               ]}
             />
           </Space>
-        </Content>
-      </AdminMainColumn>
+  )
 
+
+  const overlays = (
+    <>
       <Drawer
         title={usage ? `Usage of "${usage.key.name}"` : 'Usage'}
         open={usageLoading || usage !== null}
@@ -344,6 +347,19 @@ export default function ApiKeysContent({ user }: { user: { id: string; email?: s
           <ScopeFields />
         </Form>
       </Modal>
+    </>
+  )
+
+  if (embedded) return <>{inner}{overlays}</>
+  return (
+    <Layout style={{ minHeight: '100vh' }}>
+      <AdminSidebar user={{ ...user, role: user.role ?? undefined }} collapsed={collapsed} onCollapse={setCollapsed} />
+      <AdminMainColumn collapsed={collapsed} user={user}>
+        <Content className="settings-page" style={{ padding: 24, width: '100%' }}>
+          {inner}
+        </Content>
+      </AdminMainColumn>
+      {overlays}
     </Layout>
   )
 }

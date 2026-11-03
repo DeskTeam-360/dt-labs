@@ -25,9 +25,15 @@ export function isAdminOrOperations(role: string | undefined): boolean {
   return r === 'admin' || r === 'operations'
 }
 
-/** API keys with chosen access: Admin, Operations and Team Leader. */
+/** Connecting an AI assistant (MCP / OAuth): every team member; not customers. */
 export function canManageApiKeys(role: string | undefined): boolean {
-  return isAdminOrManager(role)
+  return isInternalUser(role)
+}
+
+/** How many AI connections a person may have: Agents (staff) and Managers one, everyone else as many as they need (null). */
+export function aiConnectionLimit(role: string | undefined): number | null {
+  const r = (role ?? '').toLowerCase()
+  return r === 'staff' || r === 'manager' ? 1 : null
 }
 
 /** Anyone on the team (Admin, Operations, Team Leader, Staff); not customers. */

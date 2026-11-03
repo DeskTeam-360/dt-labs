@@ -1,8 +1,8 @@
 import { and, eq, gt, lt } from 'drizzle-orm'
 
 import { generateApiKey } from '@/lib/api-keys'
-import { apiKeys, db, oauthClients, oauthCodes, oauthGrants } from '@/lib/db'
-import { ACCESS_TOKEN_SECONDS, CORS_HEADERS, oauthError, randomToken, REFRESH_TOKEN_DAYS, sha256Base64Url, sha256Hex } from '@/lib/oauth'
+import { apiKeys, db, oauthClients, oauthCodes, oauthGrants, users } from '@/lib/db'
+import { ACCESS_TOKEN_SECONDS, connectionLimitMessage, CORS_HEADERS, oauthError, randomToken, REFRESH_TOKEN_DAYS, sha256Base64Url, sha256Hex } from '@/lib/oauth'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +34,9 @@ export async function POST(request: Request) {
     const [row] = await db.delete(oauthCodes).where(and(eq(oauthCodes.codeHash, sha256Hex(code)), gt(oauthCodes.expiresAt, new Date()))).returning()
     if (!row || row.clientId !== client.id || row.redirectUri !== (form.get('redirect_uri') ?? '')) return oauthError('invalid_grant', 'The code is wrong, used or expired')
     if (!verifier || sha256Base64Url(verifier) !== row.codeChallenge) return oauthError('invalid_grant', 'PKCE check failed')
+    const [owner] = await db.select({ role: users.role }).from(users).where(eq(users.id, row.userId)).limit(1)
+    const limited = await connectionLimitMessage(row.userId, owner?.role ?? undefined)
+    if (limited) return oauthError('access_denied', limited, 403)
 
     const { key, prefix, hash } = generateApiKey()
     const refresh = randomToken('dtr_', 32)

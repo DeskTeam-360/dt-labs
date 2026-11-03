@@ -6,10 +6,11 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useEffect,useState } from 'react'
 
+import ApiKeysContent from '@/components/content/settings/ApiKeysContent'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import MyTeamReportCard from '@/components/profile/MyTeamReportCard'
-import { canViewCustomerReports } from '@/lib/auth-utils'
+import { canManageApiKeys, canViewCustomerReports, isAdmin } from '@/lib/auth-utils'
 import { TIMEZONE_OPTIONS } from '@/lib/timezones'
 import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
 import { uploadAvatar } from '@/utils/storage'
@@ -57,6 +58,7 @@ interface ApiToken {
 export default function ProfileContent({ user, userData }: ProfileContentProps) {
   const router = useRouter()
   const { update: updateSession, data: clientSession } = useSession()
+  const myRole = ((clientSession?.user as { role?: string } | undefined)?.role ?? '').toLowerCase()
   const [collapsed, setCollapsed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -567,6 +569,12 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
               )}
             </div>
           </Card>
+          {myRole && canManageApiKeys(myRole) && !isAdmin(myRole) ? (
+            <Card style={{ marginTop: 24 }}>
+              <Title level={3}>AI connections</Title>
+              <ApiKeysContent user={{ id: user.id, email: user.email, name: user.name, role: myRole }} embedded />
+            </Card>
+          ) : null}
         </Content>
       </AdminMainColumn>
     </Layout>

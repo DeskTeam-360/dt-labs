@@ -5,7 +5,7 @@ import { auth } from '@/auth'
 import { isApiScope } from '@/lib/api-scopes'
 import { canManageApiKeys } from '@/lib/auth-utils'
 import { db, oauthClients, oauthCodes } from '@/lib/db'
-import { CODE_MINUTES, randomToken, sha256Hex } from '@/lib/oauth'
+import { CODE_MINUTES, connectionLimitMessage, randomToken, sha256Hex } from '@/lib/oauth'
 
 /**
  * POST /api/oauth/authorize { client_id, redirect_uri, code_challenge, state?, scopes[], approve }
@@ -27,6 +27,9 @@ export async function POST(request: Request) {
     target.searchParams.set('error', 'access_denied')
     return NextResponse.json({ redirect: target.toString() })
   }
+
+  const limited = await connectionLimitMessage(session.user.id, (session.user as { role?: string }).role)
+  if (limited) return NextResponse.json({ error: limited }, { status: 409 })
 
   const challenge = String(b.code_challenge ?? '')
   if (!/^[A-Za-z0-9_-]{43,128}$/.test(challenge)) return NextResponse.json({ error: 'The app did not send a valid PKCE challenge' }, { status: 400 })

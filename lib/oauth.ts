@@ -1,6 +1,9 @@
 import { createHash, randomBytes } from 'crypto'
+import { eq, sql } from 'drizzle-orm'
 
 import { API_SCOPES } from '@/lib/api-scopes'
+import { aiConnectionLimit } from '@/lib/auth-utils'
+import { apiKeys, db } from '@/lib/db'
 
 export const ACCESS_TOKEN_SECONDS = 3600
 export const REFRESH_TOKEN_DAYS = 90
@@ -43,3 +46,12 @@ export const oauthError = (error: string, description: string, status = 400) =>
     status,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS_HEADERS },
   })
+
+/** The message when a person is at the number of AI connections their role allows, or null when they may add one. */
+export async function connectionLimitMessage(userId: string, role: string | undefined): Promise<string | null> {
+  const limit = aiConnectionLimit(role)
+  if (limit === null) return null
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(apiKeys).where(eq(apiKeys.userId, userId))
+  if ((row?.n ?? 0) < limit) return null
+  return `Your role can have ${limit} AI connection${limit === 1 ? '' : 's'} and you already have ${row.n}. Remove the old one first (Profile, AI connections), then connect again.`
+}

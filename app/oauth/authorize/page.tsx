@@ -5,6 +5,7 @@ import { auth } from '@/auth'
 import OAuthConsent from '@/components/content/settings/OAuthConsent'
 import { canManageApiKeys } from '@/lib/auth-utils'
 import { db, oauthClients } from '@/lib/db'
+import { connectionLimitMessage } from '@/lib/oauth'
 
 type Search = Record<string, string | string[] | undefined>
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? ''
@@ -34,7 +35,10 @@ export default async function OAuthAuthorizePage({ searchParams }: { searchParam
     redirect(`/login?next=${encodeURIComponent(here)}`)
   }
   const role = ((session.user as { role?: string }).role ?? '').toLowerCase()
-  if (!canManageApiKeys(role)) return <Message title="Not allowed" text="Only admins, operations and managers can connect an app to DeskTeam360." />
+  if (!canManageApiKeys(role)) return <Message title="Not allowed" text="Only team members can connect an app to DeskTeam360." />
+
+  const limited = await connectionLimitMessage(session.user.id, role)
+  if (limited) return <Message title="You already have a connection" text={limited} />
 
   return <OAuthConsent clientName={client.name} clientId={client.id} redirectUri={redirectUri} codeChallenge={one(q.code_challenge)} state={one(q.state)} userName={session.user.name ?? session.user.email ?? ''} />
 }

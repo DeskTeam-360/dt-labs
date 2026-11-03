@@ -49,7 +49,6 @@ import {
   canAccessTeams,
   canAccessTicketAttributes,
   canAccessUsers,
-  canManageApiKeys,
   canManageDashboardAnnouncements,
   canManageGlobalAnnouncement,
   canManageTeamAvailability,
@@ -262,11 +261,11 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
-                {canManageApiKeys(role) && (
+                {isAdmin(role) && (
                   <Col xs={24} sm={12} md={8}>
                     <HubTile
-                      title="API Keys"
-                      description="Keys with chosen access for scripts and AI assistants"
+                      title="AI Connections"
+                      description="Every AI assistant connected to DeskTeam360, with its access and usage"
                       href="/settings/api-keys"
                       icon={<ApiOutlined />}
                     />
