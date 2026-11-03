@@ -7,6 +7,59 @@ const MAX_CONCURRENT = 2
 const MAX_WAITING = 8
 const MAX_FULL_PAGE_HEIGHT = 15000
 
+const IMAGE_WAIT_MS = 15000
+/** Shows what scroll-reveal scripts keep hidden until you scroll, and ends animations at once. */
+const REVEAL_CSS = `
+*, *::before, *::after { animation-duration: 0.001s !important; animation-delay: 0s !important; transition-duration: 0.001s !important; transition-delay: 0s !important; scroll-behavior: auto !important; }
+[data-aos], .aos-init, .aos-animate, .wow, .elementor-invisible, .reveal { opacity: 1 !important; transform: none !important; visibility: visible !important; }
+`
+
+/** Runs in the page: turns lazy images into normal ones (data-src and friends become src). */
+function makeImagesEager() {
+  const copy = (el: Element, from: string, to: string) => {
+    const v = el.getAttribute(from)
+    if (v) el.setAttribute(to, v)
+  }
+  document.querySelectorAll('img').forEach((img) => {
+    img.loading = 'eager'
+    const src = img.getAttribute('src') ?? ''
+    if (!src || src.startsWith('data:')) {
+      for (const a of ['data-src', 'data-lazy-src', 'data-original', 'data-lazy']) {
+        if (img.getAttribute(a)) {
+          copy(img, a, 'src')
+          break
+        }
+      }
+    }
+    for (const a of ['data-srcset', 'data-lazy-srcset']) if (img.getAttribute(a)) copy(img, a, 'srcset')
+  })
+  document.querySelectorAll('source').forEach((s) => {
+    copy(s, 'data-srcset', 'srcset')
+    copy(s, 'data-src', 'src')
+  })
+}
+
+/** Runs in the page: scrolls down in small steps so sections that load on scroll get their turn. */
+async function scrollThrough(cap: number) {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+  const step = Math.max(200, Math.round(window.innerHeight * 0.6))
+  for (let y = 0; y < Math.min(document.documentElement.scrollHeight, cap); y += step) {
+    window.scrollTo(0, y)
+    await sleep(250)
+  }
+  window.scrollTo(0, Math.min(document.documentElement.scrollHeight, cap))
+  await sleep(500)
+}
+
+/** Runs in the page: waits until every image has loaded or failed; returns how many did not load. */
+async function waitForImages(maxMs: number): Promise<number> {
+  const deadline = Date.now() + maxMs
+  const real = () => Array.from(document.images).filter((i) => (i.currentSrc || i.src) && !(i.currentSrc || i.src).startsWith('data:'))
+  while (Date.now() < deadline && real().some((i) => !i.complete)) await new Promise((r) => setTimeout(r, 300))
+  await Promise.all(real().map((i) => (i.complete && i.naturalWidth > 0 ? i.decode().catch(() => undefined) : undefined)))
+  return real().filter((i) => !i.complete || (i.naturalWidth === 0 && !/\.svg(\?|$)/i.test(i.currentSrc || i.src))).length
+}
+
 export type CaptureOptions = { device?: 'desktop' | 'mobile'; fullPage?: boolean; waitSeconds?: number }
 export class CaptureError extends Error {
   constructor(message: string, public status = 400) {
@@ -63,7 +116,7 @@ async function slot<T>(work: () => Promise<T>): Promise<T> {
 }
 
 /** A PNG of the page at `rawUrl`, taken by a headless Chromium on this server. */
-export function captureWebsite(rawUrl: string, opts: CaptureOptions = {}): Promise<{ png: Buffer; finalUrl: string; title: string }> {
+export function captureWebsite(rawUrl: string, opts: CaptureOptions = {}): Promise<{ png: Buffer; finalUrl: string; title: string; unloadedImages: number }> {
   return slot(async () => {
     const first = await assertPublicUrl(rawUrl)
     const mobile = opts.device === 'mobile'
@@ -78,6 +131,7 @@ export function captureWebsite(rawUrl: string, opts: CaptureOptions = {}): Promi
         deviceScaleFactor: 1,
         acceptDownloads: false,
         serviceWorkers: 'block',
+        reducedMotion: 'reduce',
       })
       // Redirects and the page's own requests are held to the same rule, so a public page cannot lead the browser into the internal network.
       const okHosts = new Set<string>([first.hostname])
@@ -101,18 +155,20 @@ export function captureWebsite(rawUrl: string, opts: CaptureOptions = {}): Promi
       await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
       await page.waitForTimeout(Math.min(15, Math.max(0, opts.waitSeconds ?? 1)) * 1000)
 
+      // Make sure everything is there before the picture: scroll-reveal sections are shown, lazy images are fetched,
+      // and every image has finished loading (or has failed, which is counted and reported).
+      await page.addStyleTag({ content: REVEAL_CSS }).catch(() => undefined)
+      await page.evaluate(makeImagesEager).catch(() => undefined)
+      if (opts.fullPage) {
+        await page.evaluate(scrollThrough, MAX_FULL_PAGE_HEIGHT).catch(() => undefined)
+        await page.evaluate(makeImagesEager).catch(() => undefined)
+      }
+      const unloadedImages = await page.evaluate(waitForImages, IMAGE_WAIT_MS).catch(() => 0)
+      await page.evaluate(() => window.scrollTo(0, 0)).catch(() => undefined)
+      await page.waitForTimeout(500)
+
       let png: Buffer
       if (opts.fullPage) {
-        // Scroll down once so images that load as you scroll are there, then back to the top.
-        await page.evaluate(async (cap: number) => {
-          const step = Math.max(300, window.innerHeight)
-          for (let y = 0; y < Math.min(document.documentElement.scrollHeight, cap); y += step) {
-            window.scrollTo(0, y)
-            await new Promise((r) => setTimeout(r, 120))
-          }
-          window.scrollTo(0, 0)
-        }, MAX_FULL_PAGE_HEIGHT)
-        await page.waitForTimeout(300)
         const height = await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0))
         const width = page.viewportSize()?.width ?? 1366
         // A very tall page is cut at the limit instead of falling back to the top screen only.
@@ -120,7 +176,7 @@ export function captureWebsite(rawUrl: string, opts: CaptureOptions = {}): Promi
       } else {
         png = await page.screenshot({ type: 'png' })
       }
-      return { png, finalUrl: page.url(), title: (await page.title().catch(() => '')) || first.hostname }
+      return { png, finalUrl: page.url(), title: (await page.title().catch(() => '')) || first.hostname, unloadedImages }
     } finally {
       await browser.close().catch(() => undefined)
     }

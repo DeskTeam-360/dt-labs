@@ -73,10 +73,11 @@ export default function ScreenshotsContent({ user, screenshots: initialScreensho
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: captureUrl.trim(), device: captureDevice, full_page: captureFull, ticket_id: selectedTicket }),
       })
-      const j = (await res.json()) as Screenshot & { error?: string }
+      const j = (await res.json()) as Screenshot & { error?: string; unloaded_images?: number }
       if (!res.ok) throw new Error(j.error || 'The capture failed')
       setScreenshots((prev) => [j, ...prev])
-      message.success('Captured')
+      if (j.unloaded_images) message.warning(`Captured, but ${j.unloaded_images} image${j.unloaded_images === 1 ? '' : 's'} on the page did not load. Capture again if the picture looks incomplete.`)
+      else message.success('Captured')
     } catch (e) {
       message.error((e as Error).message)
     } finally {

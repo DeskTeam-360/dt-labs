@@ -45,6 +45,7 @@ export default function CrawlSessionScreenshots({ sessionId, pages }: { sessionI
     const total = urls.length * DEVICES.length
     setProgress({ done: 0, total })
     let failed = 0
+    const incomplete: string[] = []
     let done = 0
     for (const url of urls) {
       for (const device of DEVICES) {
@@ -55,7 +56,10 @@ export default function CrawlSessionScreenshots({ sessionId, pages }: { sessionI
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url, device, full_page: true, crawl_session_id: sessionId }),
           })
-          if (!res.ok) {
+          if (res.ok) {
+            const ok = (await res.json().catch(() => ({}))) as { unloaded_images?: number }
+            if (ok.unloaded_images) incomplete.push(`${url} (${device}): ${ok.unloaded_images}`)
+          } else {
             failed++
             const j = (await res.json().catch(() => ({}))) as { error?: string }
             if (res.status === 503) {
@@ -74,7 +78,8 @@ export default function CrawlSessionScreenshots({ sessionId, pages }: { sessionI
     }
     setProgress(null)
     if (failed) message.warning(`${total - failed} of ${total} captured; ${failed} failed`)
-    else message.success(`${total} pictures captured`)
+    else if (incomplete.length === 0) message.success(`${total} pictures captured`)
+    if (incomplete.length) message.warning(`Some images did not load in ${incomplete.length} picture${incomplete.length === 1 ? '' : 's'}: ${incomplete.slice(0, 3).join('; ')}. Capture those pages again if they look incomplete.`, 8)
   }
 
   const captureRandom = () => {

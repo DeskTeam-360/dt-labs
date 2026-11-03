@@ -79,6 +79,7 @@ export async function POST(request: Request) {
         created_at: row.createdAt?.toISOString() ?? new Date().toISOString(),
         updated_at: row.updatedAt?.toISOString() ?? new Date().toISOString(),
         tickets: null,
+        unloaded_images: shot.unloadedImages,
       },
       { status: 201 }
     )
