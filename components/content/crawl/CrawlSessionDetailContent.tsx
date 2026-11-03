@@ -1410,18 +1410,6 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   })),
                 ]}
               />
-              <Button
-                icon={<CopyOutlined />}
-                onClick={() => {
-                  const link = `${window.location.origin}/crawl-sessions/${crawlSession.id}`
-                  navigator.clipboard.writeText(link).then(
-                    () => message.success('Link copied'),
-                    () => message.error('Could not copy the link')
-                  )
-                }}
-              >
-                Copy link
-              </Button>
             </Space>
             <Space>
               <Text strong>Group:</Text>
@@ -1879,6 +1867,18 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   Refresh
                 </Button>
               )}
+              <Button
+                icon={<CopyOutlined />}
+                onClick={() => {
+                  const link = `${window.location.origin}/crawl-sessions/${crawlSession.id}`
+                  navigator.clipboard.writeText(link).then(
+                    () => message.success('Link copied'),
+                    () => message.error('Could not copy the link')
+                  )
+                }}
+              >
+                Copy link
+              </Button>
             </Space>
 
             <div style={{ marginBottom: 32 }}>
