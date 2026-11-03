@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, GlobalOutlined,ReloadOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, CopyOutlined, GlobalOutlined,ReloadOutlined } from '@ant-design/icons'
 import { Button, Card, Descriptions, Empty, Flex, Layout, message, Progress, Select,Space, Table, Tabs, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useRouter } from 'next/navigation'
@@ -1410,6 +1410,18 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
                   })),
                 ]}
               />
+              <Button
+                icon={<CopyOutlined />}
+                onClick={() => {
+                  const link = `${window.location.origin}/crawl-sessions/${crawlSession.id}`
+                  navigator.clipboard.writeText(link).then(
+                    () => message.success('Link copied'),
+                    () => message.error('Could not copy the link')
+                  )
+                }}
+              >
+                Copy link
+              </Button>
             </Space>
             <Space>
               <Text strong>Group:</Text>
