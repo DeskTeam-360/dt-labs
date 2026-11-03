@@ -3,11 +3,13 @@
 import { DeleteOutlined, EditOutlined,EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Card, Descriptions, message, Modal, Popconfirm, Radio, Select, Space, Switch, Tag, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useCallback, useEffect, useState } from 'react'
 
 import DateDisplay from '@/components/common/DateDisplay'
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import { confirmUserCompanyMove } from '@/components/company/confirm-user-company-move'
+import ViewAsButton, { canViewAs } from '@/components/user/ViewAsButton'
 
 const { Text } = Typography
 
@@ -45,6 +47,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 
 export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: TabUsersProps) {
   const router = useRouter()
+  const viewerRole = (useSession().data?.user as { role?: string } | undefined)?.role
   const companyId = companyData.id
   const companyName = companyData.name ?? 'this company'
   const companyUsers = (companyData.company_users || []) as CompanyUserRow[]
@@ -209,6 +212,7 @@ export default function TabUsers({ companyData, viewerIsGlobalAdmin = false }: T
                       />
                     </Space>
                   ) : null}
+                  {canViewAs(viewerRole, cu.users?.role) ? <ViewAsButton userId={cu.user_id} userName={cu.users?.full_name || cu.users?.email} /> : null}
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     Added: <DateDisplay date={cu.created_at} />
                   </Text>

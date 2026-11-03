@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo,useRef, useState } from 'react'
 
 import UserSkillsField from '@/components/skills/UserSkillsField'
 import UserCompanyHistory from '@/components/user/UserCompanyHistory'
+import ViewAsButton, { canViewAs } from '@/components/user/ViewAsButton'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import { TIMEZONE_OPTIONS } from '@/lib/timezones'
 import {
@@ -677,6 +678,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                       <Tag color={getStatusColor(userData.status)} style={{ fontSize: 14, padding: '4px 12px' }}>
                         {userData.status?.toUpperCase()}
                       </Tag>
+                      {canViewAs((currentUser as { role?: string }).role, userData.role) ? <ViewAsButton userId={userData.id} userName={userData.full_name} /> : null}
                     </>
                   )}
                 </Space>

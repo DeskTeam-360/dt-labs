@@ -61,6 +61,7 @@ import { shouldOpenHrefInNewTab,SpaNavLink } from '@/components/common/SpaNavLin
 import { confirmUserCompanyMove } from '@/components/company/confirm-user-company-move'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import ViewAsButton, { canViewAs } from '@/components/user/ViewAsButton'
 import { isUserInactive } from '@/lib/user-status'
 
 const { Content } = Layout
@@ -714,6 +715,7 @@ export default function UsersContent({ user: currentUser }: UsersContentProps) {
               onClick={() => router.push(`/settings/users/${record.id}?edit=1`)}
             />
           </Tooltip>
+          {canViewAs((currentUser as { role?: string }).role, record.role) ? <ViewAsButton userId={record.id} userName={record.full_name} iconOnly /> : null}
           {isAdmin && record.role === 'customer' && (
             <Tooltip title="Send reset password email">
               <Button

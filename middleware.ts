@@ -20,6 +20,17 @@ export async function middleware(req: NextRequest) {
     secureCookie: authSecureCookieFromRequest(req),
   })
 
+  // "View as" a client is read only: while an admin or manager is looking as a client, nothing may be changed.
+  // (Signing in and out and the session itself, under /api/auth, stay open so they can leave.)
+  const path = req.nextUrl.pathname
+  if (path.startsWith('/api/')) {
+    const viewingAs = !!(token as { impersonatorId?: string } | null)?.impersonatorId
+    if (viewingAs && !path.startsWith('/api/auth/') && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      return NextResponse.json({ error: 'You are viewing as another user (read only). Exit that view to make changes.' }, { status: 403 })
+    }
+    return NextResponse.next()
+  }
+
   const accessRevoked = token?.error === 'AccessRevoked'
   const isLoggedIn = !!token && !accessRevoked && !!(token as { id?: string }).id
   const mustChangePassword = !!token?.mustChangePassword
@@ -43,7 +54,7 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next()
 }
 
-/** Only pages that need auth redirects — reduces middleware invocations on Vercel. */
+/** Pages that need auth redirects, and the API (only to keep "view as" read only). */
 export const config = {
-  matcher: ['/login', '/dashboard/:path*', '/tickets/:path*', '/settings/:path*', '/change-password'],
+  matcher: ['/login', '/dashboard/:path*', '/tickets/:path*', '/settings/:path*', '/change-password', '/api/:path*'],
 }

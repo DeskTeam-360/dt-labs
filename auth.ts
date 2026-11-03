@@ -21,7 +21,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session: updateData }) {
       if (token.error === 'AccessRevoked') {
         return token
       }
@@ -45,6 +45,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       const now = Date.now()
+
+      // "View as" a client (admin and manager, read only). The browser only asks (session update); every rule is checked here on the server.
+      const viewAs = trigger === 'update' && updateData && typeof updateData === 'object' ? (updateData as { impersonate?: unknown; exitImpersonation?: unknown }) : null
+      const realViewer = typeof token.impersonatorId === 'string' ? token.impersonatorId : null
+      if (realViewer) {
+        const expired = typeof token.impersonationExpiresAt === 'number' && now > token.impersonationExpiresAt
+        if (viewAs?.exitImpersonation === true || expired) {
+          const { endViewAs } = await import('@/lib/impersonation')
+          return endViewAs(token, expired ? 'expired' : 'ended')
+        }
+      }
+      if (viewAs && typeof viewAs.impersonate === 'string') {
+        const { startViewAs } = await import('@/lib/impersonation')
+        return (await startViewAs(token, viewAs.impersonate)) ?? token
+      }
       const mergeProfileFromDb = (
         refresh: { active: boolean; fullName: string | null; avatarUrl: string | null; mustChangePassword: boolean }
       ) => {
@@ -136,6 +151,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       if (typeof token.picture === 'string') {
         session.user.image = token.picture
+      }
+      if (typeof token.impersonatorId === 'string') {
+        session.impersonation = {
+          by_id: token.impersonatorId,
+          by_name: token.impersonatorName ?? 'an admin',
+          expires_at: token.impersonationExpiresAt ?? 0,
+        }
       }
       return session
     },

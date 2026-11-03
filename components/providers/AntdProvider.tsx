@@ -5,6 +5,7 @@ import type { Session } from 'next-auth'
 import { SessionProvider } from 'next-auth/react'
 
 import FirebaseSessionBridge from '@/components/providers/FirebaseSessionBridge'
+import ImpersonationBanner from '@/components/providers/ImpersonationBanner'
 import NotificationPollProvider from '@/components/providers/NotificationPollProvider'
 import QueryProvider from '@/components/providers/QueryProvider'
 import SessionAccessGuard from '@/components/providers/SessionAccessGuard'
@@ -74,6 +75,7 @@ export default function AntdProvider({
           <QueryProvider>
             <NotificationPollProvider>
               <SessionAccessGuard />
+              <ImpersonationBanner />
               <FirebaseSessionBridge />
               {children}
             </NotificationPollProvider>
