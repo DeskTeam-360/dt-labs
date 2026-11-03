@@ -136,9 +136,12 @@ export default function CrawlSessionScreenshots({ sessionId, pages }: { sessionI
                 const s = list.find((x) => x.device === d)
                 return (
                   <div key={d} style={{ width: d === 'mobile' ? 260 : 520 }}>
-                    <Text strong style={{ textTransform: 'capitalize' }}>{d}</Text>
+                    <Flex justify="space-between" align="center" gap={8}>
+                      <Text strong style={{ textTransform: 'capitalize' }}>{d}</Text>
+                      {s ? <a href={s.file_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>Open full size</a> : null}
+                    </Flex>
                     {s ? (
-                      <div style={{ marginTop: 6, maxHeight: 460, overflow: 'auto', border: '1px solid var(--ant-color-border-secondary, #f0f0f0)' }}>
+                      <div style={{ marginTop: 6, maxHeight: '75vh', overflow: 'auto', border: '1px solid var(--ant-color-border-secondary, #f0f0f0)' }}>
                         <Image src={s.file_url} alt={`${d} ${url}`} style={{ width: '100%' }} />
                       </div>
                     ) : (
