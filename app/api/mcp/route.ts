@@ -1,5 +1,18 @@
 import { NextResponse } from 'next/server'
 
+import { GET as calendarEventsGet } from '@/app/api/calendar/events/route'
+import { GET as calendarStatusGet } from '@/app/api/calendar/user-status/route'
+import { GET as catalogGet } from '@/app/api/v1/catalog/route'
+import { GET as companiesGet } from '@/app/api/v1/companies/route'
+import { GET as teamLoadGet } from '@/app/api/v1/team-load/route'
+import { GET as suggestGet } from '@/app/api/v1/team-load/suggest/route'
+import { GET as activityGet } from '@/app/api/v1/tickets/[id]/activity/route'
+import { POST as notePost } from '@/app/api/v1/tickets/[id]/notes/route'
+import { GET as ticketGet, PATCH as ticketPatch } from '@/app/api/v1/tickets/[id]/route'
+import { GET as ticketsGet, POST as ticketsPost } from '@/app/api/v1/tickets/route'
+import { GET as usersGet } from '@/app/api/v1/users/route'
+import { GET as userWorkGet } from '@/app/api/v1/users/work/route'
+import { GET as teamWorkGet } from '@/app/api/v1/work/route'
 import { apiKeyScopes } from '@/lib/api-auth'
 import { buildToolRequest, MCP_INSTRUCTIONS, MCP_TOOLS, toolInputSchema } from '@/lib/mcp-tools'
 import { siteOrigin } from '@/lib/oauth'
@@ -27,30 +40,49 @@ function clientFromSession(request: Request): string {
   }
 }
 
+type Handler = (request: Request, ctx: { params: Promise<{ id: string }> }) => Response | Promise<Response>
+/** Each tool runs the handler of its API route directly (no network hop), so access, hourly limit and usage log apply as for any other call. */
+const HANDLERS: Record<string, Handler> = {
+  list_tickets: ticketsGet,
+  get_catalog: catalogGet,
+  get_ticket: ticketGet,
+  get_ticket_history: activityGet,
+  list_users: usersGet,
+  get_person_work: userWorkGet,
+  get_team_work: teamWorkGet,
+  get_team_load: teamLoadGet,
+  suggest_takeover: suggestGet,
+  list_companies: companiesGet,
+  get_calendar: calendarEventsGet,
+  get_person_availability: calendarStatusGet,
+  add_note: notePost,
+  update_ticket: ticketPatch,
+  create_ticket: ticketsPost,
+}
+
 async function callTool(request: Request, params: Record<string, unknown> | undefined) {
   const tool = MCP_TOOLS.find((t) => t.name === params?.name)
-  if (!tool) return { content: [{ type: 'text', text: `Unknown tool "${String(params?.name)}"` }], isError: true }
-  const built = buildToolRequest(tool, (params?.arguments as Record<string, unknown>) ?? {}, clientFromSession(request))
+  const handler = tool ? HANDLERS[tool.name] : undefined
+  if (!tool || !handler) return { content: [{ type: 'text', text: `Unknown tool "${String(params?.name)}"` }], isError: true }
+  const args = (params?.arguments as Record<string, unknown>) ?? {}
+  const built = buildToolRequest(tool, args, clientFromSession(request))
   if ('error' in built) return { content: [{ type: 'text', text: built.error }], isError: true }
 
-  // The call goes through the normal API with the same key, so access, hourly limit and usage log apply as for any other call.
-  const url = new URL(request.url)
-  const target = `${url.origin}${built.path}${built.query ? `?${built.query}` : ''}`
+  // The address only carries the path and query; the same key header goes along so the route signs the caller in as usual.
+  const headers = new Headers({ authorization: request.headers.get('authorization') ?? '', 'user-agent': `DeskTeam360-MCP (${clientFromSession(request)})` })
+  for (const h of ['x-forwarded-for', 'x-real-ip']) {
+    const v = request.headers.get(h)
+    if (v) headers.set(h, v)
+  }
+  if (built.body) headers.set('content-type', 'application/json')
+  const inner = new Request(`${new URL(request.url).origin}${built.path}${built.query ? `?${built.query}` : ''}`, { method: tool.method, headers, body: built.body })
   try {
-    const res = await fetch(target, {
-      method: tool.method,
-      headers: {
-        authorization: request.headers.get('authorization') ?? '',
-        'user-agent': `DeskTeam360-MCP (${clientFromSession(request)})`,
-        ...(built.body ? { 'content-type': 'application/json' } : {}),
-      },
-      body: built.body,
-      cache: 'no-store',
-    })
+    const res = await handler(inner, { params: Promise.resolve({ id: String(args.id ?? '') }) })
     let text = await res.text()
     if (text.length > MAX_RESULT_CHARS) text = `${text.slice(0, MAX_RESULT_CHARS)}\n...(cut: ask for a smaller range or use limit/offset)`
     return { content: [{ type: 'text', text }], isError: !res.ok }
   } catch (e) {
+    console.error('[mcp] tool failed:', tool.name, e)
     return { content: [{ type: 'text', text: `The call failed: ${(e as Error).message}` }], isError: true }
   }
 }
