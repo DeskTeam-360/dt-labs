@@ -2,13 +2,13 @@ import { and, eq, gt, lt } from 'drizzle-orm'
 
 import { generateApiKey } from '@/lib/api-keys'
 import { apiKeys, db, oauthClients, oauthCodes, oauthGrants, users } from '@/lib/db'
-import { ACCESS_TOKEN_SECONDS, connectionLimitMessage, CORS_HEADERS, oauthError, randomToken, REFRESH_TOKEN_DAYS, sha256Base64Url, sha256Hex } from '@/lib/oauth'
+import { ACCESS_TOKEN_SECONDS, connectionLimitMessage, CORS_HEADERS, oauthError, randomToken, sha256Base64Url, sha256Hex } from '@/lib/oauth'
 
 export const dynamic = 'force-dynamic'
 
-const tokenResponse = (accessToken: string, refreshToken: string, scopes: string[]) =>
+const tokenResponse = (accessToken: string, refreshToken: string, scopes: string[], expiresIn: number = ACCESS_TOKEN_SECONDS) =>
   Response.json(
-    { access_token: accessToken, token_type: 'Bearer', expires_in: ACCESS_TOKEN_SECONDS, refresh_token: refreshToken, scope: scopes.join(' ') },
+    { access_token: accessToken, token_type: 'Bearer', expires_in: expiresIn, refresh_token: refreshToken, scope: scopes.join(' ') },
     { headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache', ...CORS_HEADERS } }
   )
 
@@ -25,7 +25,6 @@ export async function POST(request: Request) {
   if (!client) return oauthError('invalid_client', 'Unknown client_id', 401)
 
   const accessExpires = () => new Date(Date.now() + ACCESS_TOKEN_SECONDS * 1000)
-  const refreshExpires = () => new Date(Date.now() + REFRESH_TOKEN_DAYS * 86400000)
 
   if (grant === 'authorization_code') {
     const code = form.get('code') ?? ''
@@ -40,11 +39,13 @@ export async function POST(request: Request) {
 
     const { key, prefix, hash } = generateApiKey()
     const refresh = randomToken('dtr_', 32)
+    // The connection lasts CONNECTION_DAYS from now; renewing the token never moves this date, only the owner's Extend does.
+    const expiry = accessExpires()
     const [keyRow] = await db
       .insert(apiKeys)
-      .values({ userId: row.userId, name: `${client.name} (OAuth)`, keyPrefix: prefix, keyHash: hash, scopes: row.scopes, expiresAt: accessExpires() })
+      .values({ userId: row.userId, name: `${client.name} (OAuth)`, keyPrefix: prefix, keyHash: hash, scopes: row.scopes, expiresAt: expiry })
       .returning({ id: apiKeys.id })
-    await db.insert(oauthGrants).values({ clientId: client.id, userId: row.userId, keyId: keyRow.id, refreshHash: sha256Hex(refresh), refreshExpiresAt: refreshExpires() })
+    await db.insert(oauthGrants).values({ clientId: client.id, userId: row.userId, keyId: keyRow.id, refreshHash: sha256Hex(refresh), refreshExpiresAt: expiry })
     return tokenResponse(key, refresh, row.scopes)
   }
 
@@ -61,9 +62,11 @@ export async function POST(request: Request) {
 
     const { key, prefix, hash } = generateApiKey()
     const refresh = randomToken('dtr_', 32)
-    await db.update(apiKeys).set({ keyHash: hash, keyPrefix: prefix, expiresAt: accessExpires() }).where(eq(apiKeys.id, g.keyId))
-    await db.update(oauthGrants).set({ refreshHash: sha256Hex(refresh), refreshExpiresAt: refreshExpires() }).where(eq(oauthGrants.id, g.id))
-    return tokenResponse(key, refresh, keyRow.scopes ?? [])
+    // A new token for the same connection: it ends when the connection does (never later than CONNECTION_DAYS from now, for older connections).
+    const expiry = new Date(Math.min(g.refreshExpiresAt.getTime(), accessExpires().getTime()))
+    await db.update(apiKeys).set({ keyHash: hash, keyPrefix: prefix, expiresAt: expiry }).where(eq(apiKeys.id, g.keyId))
+    await db.update(oauthGrants).set({ refreshHash: sha256Hex(refresh) }).where(eq(oauthGrants.id, g.id))
+    return tokenResponse(key, refresh, keyRow.scopes ?? [], Math.max(60, Math.floor((expiry.getTime() - Date.now()) / 1000)))
   }
 
   // Old unused codes are cleaned up now and then.

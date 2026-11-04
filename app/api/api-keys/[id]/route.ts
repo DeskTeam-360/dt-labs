@@ -4,7 +4,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { isApiScope } from '@/lib/api-scopes'
 import { canManageApiKeys, isAdmin } from '@/lib/auth-utils'
-import { apiKeys, db } from '@/lib/db'
+import { apiKeys, db, oauthGrants } from '@/lib/db'
+import { CONNECTION_DAYS } from '@/lib/oauth'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -20,11 +21,11 @@ async function ownedKey(id: string) {
   return { id: row.id }
 }
 
-/** PATCH /api/api-keys/[id] { is_active?, name?, scopes?, rate_limit_per_hour? } - turn a key off or on, rename it, change what it may do or how many calls it may make per hour (the key itself stays the same). */
+/** PATCH /api/api-keys/[id] { is_active?, name?, scopes?, rate_limit_per_hour?, extend? } - turn a connection off or on, rename it, change what it may do or how many calls it may make per hour, or extend it (extend: true makes it last 30 days from now). The key itself stays the same. */
 export async function PATCH(request: Request, ctx: Ctx) {
   const k = await ownedKey((await ctx.params).id)
   if (k.error) return k.error
-  const body = (await request.json().catch(() => ({}))) as { is_active?: unknown; name?: unknown; scopes?: unknown; rate_limit_per_hour?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { is_active?: unknown; name?: unknown; scopes?: unknown; rate_limit_per_hour?: unknown; extend?: unknown }
   const set: Partial<typeof apiKeys.$inferInsert> = {}
   if (body.is_active !== undefined) set.isActive = Boolean(body.is_active)
   if (body.name !== undefined) {
@@ -42,9 +43,17 @@ export async function PATCH(request: Request, ctx: Ctx) {
     if (!Number.isInteger(n) || n < 10 || n > 10000) return NextResponse.json({ error: 'The limit must be a whole number from 10 to 10000 calls per hour' }, { status: 400 })
     set.rateLimitPerHour = n
   }
+  let extendedTo: Date | null = null
+  if (body.extend === true) {
+    // Lasts CONNECTION_DAYS from today, whatever was left. An expired connection comes back to life with the same token.
+    extendedTo = new Date(Date.now() + CONNECTION_DAYS * 86400000)
+    set.expiresAt = extendedTo
+  }
   if (Object.keys(set).length === 0) return NextResponse.json({ ok: true })
   await db.update(apiKeys).set(set).where(eq(apiKeys.id, k.id))
-  return NextResponse.json({ ok: true })
+  // An app that connected through OAuth renews its token against the connection's own end date, so that moves too.
+  if (extendedTo) await db.update(oauthGrants).set({ refreshExpiresAt: extendedTo }).where(eq(oauthGrants.keyId, k.id))
+  return NextResponse.json({ ok: true, ...(extendedTo ? { expires_at: extendedTo.toISOString() } : {}) })
 }
 
 /** DELETE /api/api-keys/[id] - removes the key for good; anything using it stops working. */

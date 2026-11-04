@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeftOutlined, BarChartOutlined, CopyOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, BarChartOutlined, CopyOutlined, DeleteOutlined, EditOutlined, FieldTimeOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Checkbox, Drawer, Flex, Form, InputNumber, Layout, message, Modal, Popconfirm, Space, Statistic, Switch, Table, Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -151,6 +151,13 @@ export default function ApiKeysContent({ user, embedded = false }: { user: { id:
     }
   }
 
+  const extend = async (id: string) => {
+    const res = await fetch(`/api/api-keys/${id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ extend: true }) })
+    if (!res.ok) message.error('Could not extend the connection')
+    else message.success('Extended: it now lasts 30 days from today')
+    void load()
+  }
+
   const remove = async (id: string) => {
     const res = await fetch(`/api/api-keys/${id}`, { method: 'DELETE', credentials: 'include' })
     if (!res.ok) message.error('Failed to delete the key')
@@ -239,8 +246,13 @@ export default function ApiKeysContent({ user, embedded = false }: { user: { id:
                   dataIndex: 'expires_at',
                   render: (v: string | null) => {
                     if (!v) return '-'
-                    const past = dayjs(v).isBefore(dayjs())
-                    return past ? <Tag color="red" style={{ margin: 0 }}>Expired {dayjs(v).format('MMM D, YYYY')}</Tag> : dayjs(v).format('MMM D, YYYY')
+                    const left = dayjs(v).diff(dayjs(), 'day', true)
+                    if (left <= 0) return <Tag color="red" style={{ margin: 0 }}>Expired {dayjs(v).format('MMM D, YYYY')}</Tag>
+                    return (
+                      <Tooltip title={dayjs(v).format('MMM D, YYYY HH:mm')}>
+                        <Tag color={left <= 7 ? 'orange' : undefined} style={{ margin: 0 }}>{left < 1 ? 'Ends today' : `${Math.ceil(left)} days left`}</Tag>
+                      </Tooltip>
+                    )
                   },
                 },
                 { title: 'Last used', dataIndex: 'last_used_at', render: (v: string | null) => (v ? <Tooltip title={dayjs(v).format('MMM D, YYYY HH:mm')}>{dayjs(v).fromNow()}</Tooltip> : 'Never') },
@@ -253,9 +265,14 @@ export default function ApiKeysContent({ user, embedded = false }: { user: { id:
                 },
                 {
                   title: '',
-                  width: 210,
+                  width: 250,
                   render: (_: unknown, r) => (
                     <Space size={4}>
+                      <Popconfirm title="Extend this connection?" description="It will last 30 days from today. The assistant keeps working without connecting again." okText="Extend 30 days" onConfirm={() => void extend(r.id)}>
+                        <Tooltip title="Extend 30 days from today">
+                          <Button size="small" icon={<FieldTimeOutlined />} />
+                        </Tooltip>
+                      </Popconfirm>
                       <Tooltip title="Change what this key can do">
                         <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
                       </Tooltip>

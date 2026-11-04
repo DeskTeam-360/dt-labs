@@ -39,7 +39,7 @@ export default function OAuthConsent({ clientName, clientId, redirectUri, codeCh
       <Card>
         <Title level={3} style={{ marginTop: 0 }}>Connect {clientName} to DeskTeam360</Title>
         <Paragraph type="secondary">
-          {clientName} is asking to act as you ({userName}). It only gets the access you tick below. You can change or switch it off any time in Settings, API Keys.
+          {clientName} is asking to act as you ({userName}). It only gets the access you tick below. The connection lasts 30 days; you can extend it, change the access or switch it off any time in your Profile (AI connections).
         </Paragraph>
         <Checkbox.Group value={scopes} onChange={(v) => setScopes(v as string[])} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {API_SCOPES.map((s) => (

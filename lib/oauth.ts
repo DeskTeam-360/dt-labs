@@ -5,8 +5,9 @@ import { API_SCOPES } from '@/lib/api-scopes'
 import { aiConnectionLimit } from '@/lib/auth-utils'
 import { apiKeys, db } from '@/lib/db'
 
-export const ACCESS_TOKEN_SECONDS = 3600
-export const REFRESH_TOKEN_DAYS = 90
+/** A connection lasts this long unless its owner extends it (Profile or Settings, AI connections). */
+export const CONNECTION_DAYS = 30
+export const ACCESS_TOKEN_SECONDS = CONNECTION_DAYS * 86400
 export const CODE_MINUTES = 5
 
 export const sha256Hex = (s: string) => createHash('sha256').update(s).digest('hex')
