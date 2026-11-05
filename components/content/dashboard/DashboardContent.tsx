@@ -38,8 +38,12 @@ import StaffDashboardCharts from '@/components/dashboard/DashboardStaffChartsLaz
 const { Content } = Layout
 const { Title, Text } = Typography
 
-/** How many rows Recent Activities fetches (API max 100). */
-const RECENT_TRACKERS_LIMIT = 5
+/** Recent Activities lists the trackers started in this many hours (the card keeps its size and scrolls). */
+const RECENT_TRACKERS_HOURS = 12
+/** Most rows fetched for that window (API max 100). */
+const RECENT_TRACKERS_LIMIT = 100
+/** Recent Activities, Time tracked and Team clocks all have this height. */
+const DASHBOARD_CARD_HEIGHT = 460
 
 interface DashboardContentProps {
   user: { id: string; email?: string | null; name?: string | null }
@@ -203,7 +207,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
     try {
       const [lastData, , , activeData] = await Promise.all([
         apiFetch<Array<{ id: string; ticket_id: number; start_time: string; stop_time: string | null; duration_seconds: number | null; ticket?: { id: number; title: string } }>>(
-          `/api/users/time-tracker?user_id=${user.id}&filter=all&limit=${RECENT_TRACKERS_LIMIT}`
+          `/api/users/time-tracker?user_id=${user.id}&filter=custom&start=${encodeURIComponent(new Date(Date.now() - RECENT_TRACKERS_HOURS * 3600000).toISOString())}&end=${encodeURIComponent(new Date(Date.now() + 60000).toISOString())}&limit=${RECENT_TRACKERS_LIMIT}`
         ),
         fetchAllSessionsForStats(),
         fetchTimeSummary(),
@@ -436,12 +440,13 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                   <ClockCircleOutlined />
                   <span>Recent Activities</span>
                   <Text type="secondary" style={{ fontSize: 12, fontWeight: 'normal' }}>
-                    (Last {RECENT_TRACKERS_LIMIT} trackers
+                    (Last {RECENT_TRACKERS_HOURS} hours
                     {lastTrackers.length > 0 ? ` · ${lastTrackers.length} shown` : ''})
                   </Text>
                 </Space>
               }
-              style={{ height: '100%' }}
+              style={{ height: DASHBOARD_CARD_HEIGHT, display: 'flex', flexDirection: 'column' }}
+              styles={{ body: { flex: 1, minHeight: 0, overflowY: 'auto' } }}
               loading={loadingTrackers}
             >
               {lastTrackers.length > 0 ? (
@@ -508,37 +513,15 @@ export default function DashboardContent({ user }: DashboardContentProps) {
                   <span>Time tracked - Last 7 days (hours)</span>
                 </Space>
               }
-              style={{ marginBottom: 16 }}
+              style={{ height: DASHBOARD_CARD_HEIGHT, display: 'flex', flexDirection: 'column' }}
+              styles={{ body: { flex: 1, minHeight: 0, overflowY: 'auto' } }}
             >
               <StaffDashboardCharts chartData={chartData} />
             </Card>
           </Col>
           <Col xs={24} lg={8}>
             
-            <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-            <Card title="Account Information" >
-              <Space orientation="vertical" style={{ width: '100%' }}>
-                <div>
-                  <Text type="secondary">Email:</Text>
-                  <br />
-                  <Text strong>{user.email}</Text>
-                </div>
-                <div>
-                  <Text type="secondary">User ID:</Text>
-                  <br />
-                  <Text code style={{ fontSize: 12 }}>
-                    {user.id}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">Name:</Text>
-                  <br />
-                  <Text>{user.name || user.email || '—'}</Text>
-                </div>
-              </Space>
-            </Card>
-              <DashboardTeamClocks myTimezone={timeSummary?.data.timezone} />
-            </Space>
+            <DashboardTeamClocks myTimezone={timeSummary?.data.timezone} height={DASHBOARD_CARD_HEIGHT} />
           </Col>
         </Row>
         </Content>

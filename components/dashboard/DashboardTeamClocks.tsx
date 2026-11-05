@@ -17,7 +17,7 @@ const splitLabel = (label: string) => {
 }
 
 /** Live clocks for the places the team works from (the time zones of the profile page), and the server's own time. */
-export default function DashboardTeamClocks({ myTimezone }: { myTimezone?: string }) {
+export default function DashboardTeamClocks({ myTimezone, height }: { myTimezone?: string; height?: number }) {
   const [now, setNow] = useState(() => Date.now())
   const [server, setServer] = useState<ServerClock | null>(null)
 
@@ -49,6 +49,8 @@ export default function DashboardTeamClocks({ myTimezone }: { myTimezone?: strin
 
   return (
     <Card
+      style={height ? { height, display: 'flex', flexDirection: 'column' } : undefined}
+      styles={height ? { body: { flex: 1, minHeight: 0, overflowY: 'auto' } } : undefined}
       title={
         <Flex gap={8} align="center">
           <GlobalOutlined />
