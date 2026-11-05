@@ -1,7 +1,7 @@
 'use client'
 
 import { App, Button, Input, Modal, Radio, Table, Tag, Typography } from 'antd'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 
@@ -45,12 +45,26 @@ export default function ImportFdTicketsModal({
   onImported?: () => void
 }) {
   const { message } = App.useApp()
-  const [source, setSource] = useState<'freshdesk' | 'archive'>('freshdesk')
+  const [source, setSource] = useState<'freshdesk' | 'archive'>('archive')
+  const [available, setAvailable] = useState<{ archive: boolean; freshdesk: boolean } | null>(null)
   const [input, setInput] = useState('')
   const [importing, setImporting] = useState(false)
   const [results, setResults] = useState<ImportResult[] | null>(null)
   const ids = parseTicketIds(input)
   const tooMany = ids.length > MAX_IDS
+
+  // The FD Archive is the first choice; it is only offered when its address and key are set, else Freshdesk is used.
+  useEffect(() => {
+    if (!open) return
+    fetch('/api/freshdesk/sources', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: { archive: boolean; freshdesk: boolean } | null) => {
+        if (!s) return
+        setAvailable(s)
+        setSource(s.archive ? 'archive' : 'freshdesk')
+      })
+      .catch(() => undefined)
+  }, [open])
 
   const runImport = async () => {
     if (ids.length === 0 || tooMany) return
@@ -101,8 +115,8 @@ export default function ImportFdTicketsModal({
       ]}
     >
       <Radio.Group value={source} onChange={(e) => setSource(e.target.value)} disabled={importing} style={{ marginBottom: 12 }}>
-        <Radio value="freshdesk">Freshdesk</Radio>
-        <Radio value="archive">FD Archive</Radio>
+        <Radio value="archive" disabled={available?.archive === false}>FD Archive (recommended)</Radio>
+        <Radio value="freshdesk" disabled={available?.freshdesk === false}>Freshdesk</Radio>
       </Radio.Group>
       <Paragraph type="secondary" style={{ marginBottom: 12 }}>
         Choose where to read from, then enter Freshdesk ticket IDs. Each ticket is imported with its comments and attachments and keeps its Freshdesk
