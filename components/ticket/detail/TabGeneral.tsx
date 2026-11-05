@@ -1023,7 +1023,7 @@ export default function TabGeneral({
               </Flex>
             </div>
           )}
-          <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
+          <div style={{ padding: 16, overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.3) transparent' }}>
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
 
             {/* Status / Project status */}
@@ -1317,7 +1317,7 @@ export default function TabGeneral({
             />
           </div>
           {!companyCollapsed && (
-            <div style={{ padding: 16, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ padding: 16, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16, scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.3) transparent' }}>
               {!ticketData?.company_id ? (
                 <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>No company linked</Text>
               ) : !companyDetail ? (
