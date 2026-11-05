@@ -141,7 +141,7 @@ export default function ApiKeysContent({ user, embedded = false }: { user: { id:
       const res = await fetch(`/api/api-keys/${editing.id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scopes: v.scopes, rate_limit_per_hour: v.rate_limit_per_hour }) })
       const j = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) throw new Error(j.error || 'Failed to update the key')
-      message.success('Access updated. It applies to the next call the assistant makes.')
+      message.success('Access updated. Assistants read their list of tools when a chat starts, so open a new chat to see tools you just added.', 8)
       setEditing(null)
       void load()
     } catch (e) {
