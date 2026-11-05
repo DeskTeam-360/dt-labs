@@ -15,6 +15,8 @@ export type ActiveTrackerEntry = {
 export type CompanyTimeStat = {
   company_id: string
   today_seconds: number
+  /** Time logged since Monday (same day boundary as today_seconds), today included. */
+  week_seconds: number
   active_time_hours: number
   active_manager_name: string | null
   has_active_tracker: boolean
@@ -45,12 +47,24 @@ export async function GET(request: Request) {
   const todayStart = new Date()
   todayStart.setUTCHours(0, 0, 0, 0)
 
-  // Total time logged today per company — join ticket_time_tracker → tickets on company_id
+  // The week starts on Monday at the same boundary as the day (UTC midnight), so today is always part of it.
+  const weekStart = new Date(todayStart)
+  weekStart.setUTCDate(weekStart.getUTCDate() - ((weekStart.getUTCDay() + 6) % 7))
+
+  // Time logged this week and today per company — join ticket_time_tracker → tickets on company_id
   const timeRows = await db
     .select({
       companyId: tickets.companyId,
-      totalSeconds: sql<number>`coalesce(sum(
+      weekSeconds: sql<number>`coalesce(sum(
         case
+          when ${ticketTimeTracker.durationAdjustment} is not null then ${ticketTimeTracker.durationAdjustment}
+          when ${ticketTimeTracker.durationSeconds} is not null then ${ticketTimeTracker.durationSeconds}
+          else 0
+        end
+      ), 0)`.mapWith(Number),
+      todaySeconds: sql<number>`coalesce(sum(
+        case
+          when ${ticketTimeTracker.startTime} < ${todayStart.toISOString()}::timestamptz then 0
           when ${ticketTimeTracker.durationAdjustment} is not null then ${ticketTimeTracker.durationAdjustment}
           when ${ticketTimeTracker.durationSeconds} is not null then ${ticketTimeTracker.durationSeconds}
           else 0
@@ -63,7 +77,7 @@ export async function GET(request: Request) {
       and(
         isNotNull(tickets.companyId),
         inArray(tickets.companyId, companyIds),
-        gte(ticketTimeTracker.startTime, todayStart),
+        gte(ticketTimeTracker.startTime, weekStart),
         isNotNull(ticketTimeTracker.stopTime),
       )
     )
@@ -134,9 +148,9 @@ export async function GET(request: Request) {
     }
   }
 
-  const timeMap = new Map<string, number>()
+  const timeMap = new Map<string, { today: number; week: number }>()
   for (const r of timeRows) {
-    if (r.companyId) timeMap.set(r.companyId, r.totalSeconds)
+    if (r.companyId) timeMap.set(r.companyId, { today: r.todaySeconds, week: r.weekSeconds })
   }
 
   const result: CompanyTimeStat[] = companyRows.map((c) => {
@@ -146,7 +160,8 @@ export async function GET(request: Request) {
     const first = actives[0] ?? null
     return {
       company_id: c.id,
-      today_seconds: timeMap.get(c.id) ?? 0,
+      today_seconds: timeMap.get(c.id)?.today ?? 0,
+      week_seconds: timeMap.get(c.id)?.week ?? 0,
       active_time_hours: c.activeTime ?? 0,
       active_manager_name: c.activeManagerId ? (managerMap.get(c.activeManagerId) ?? null) : null,
       has_active_tracker: actives.length > 0,

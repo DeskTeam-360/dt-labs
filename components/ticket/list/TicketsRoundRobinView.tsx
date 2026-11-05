@@ -129,8 +129,9 @@ export default function TicketsRoundRobinView({
             </Typography.Text>
             {stat && (
               <div style={{ fontSize: 11, color: 'var(--ant-color-text-secondary, #8c8c8c)', marginTop: 2 }}>
-                Total Spend Time : {fmtSeconds(stat.today_seconds)}
-                {'  '}AM: {amName ?? 'NA'}
+                <div>Spend in a day: {fmtSeconds(stat.today_seconds)}</div>
+                <div>Spend in a week: {fmtSeconds(stat.week_seconds)}</div>
+                <div>AM: {amName ?? 'NA'}</div>
               </div>
             )}
           </div>
