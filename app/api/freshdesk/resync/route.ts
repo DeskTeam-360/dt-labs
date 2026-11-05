@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { appSettings, companies, companyUsers, db, ticketComments, tickets, users } from '@/lib/db'
+import { FRESHDESK_LIVE_IMPORT_ENABLED, FRESHDESK_LIVE_IMPORT_OFF_MESSAGE } from '@/lib/fd-import-flags'
 import { FD_STATUS_MAP, FD_TYPE_MAP } from '@/lib/freshdesk-maps'
 
 function sessionRole(s: { user?: { role?: string } } | null) {
@@ -58,6 +59,7 @@ type FDTicket = { id: number; subject: string; description?: string | null; desc
 type FDConversation = { id: number; body: string; body_text: string | null; incoming: boolean; private: boolean; from_email: string | null; created_at: string }
 type FDAgent = { id: number; contact: { name: string; email: string } }
 export async function POST(req: NextRequest) {
+  if (!FRESHDESK_LIVE_IMPORT_ENABLED) return NextResponse.json({ error: FRESHDESK_LIVE_IMPORT_OFF_MESSAGE }, { status: 410 })
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const role = sessionRole(session).toLowerCase()

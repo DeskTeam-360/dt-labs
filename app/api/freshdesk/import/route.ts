@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { appSettings, companies, companyUsers, db, ticketComments, tickets, users } from '@/lib/db'
+import { FRESHDESK_LIVE_IMPORT_ENABLED, FRESHDESK_LIVE_IMPORT_OFF_MESSAGE } from '@/lib/fd-import-flags'
 import { FD_STATUS_MAP, FD_TYPE_MAP } from '@/lib/freshdesk-maps'
 import { logUserCompanyChange } from '@/lib/user-company'
 
@@ -92,6 +93,7 @@ async function resetTicketSequence() {
 }
 
 export async function POST(req: NextRequest) {
+  if (!FRESHDESK_LIVE_IMPORT_ENABLED) return NextResponse.json({ error: FRESHDESK_LIVE_IMPORT_OFF_MESSAGE }, { status: 410 })
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (sessionRole(session).toLowerCase() !== 'admin')

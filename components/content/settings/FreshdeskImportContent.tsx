@@ -6,6 +6,7 @@ import { useRef, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { FRESHDESK_LIVE_IMPORT_ENABLED, FRESHDESK_LIVE_IMPORT_OFF_MESSAGE } from '@/lib/fd-import-flags'
 
 const { Content } = Layout
 const { Title, Text, Paragraph } = Typography
@@ -232,6 +233,9 @@ export default function FreshdeskImportContent({
             </Card>
 
             {/* ── Import Card ──────────────────────────────── */}
+            {!FRESHDESK_LIVE_IMPORT_ENABLED ? (
+              <Alert type="info" showIcon style={{ marginBottom: 24 }} title="Run Import is switched off" description={FRESHDESK_LIVE_IMPORT_OFF_MESSAGE} />
+            ) : (
             <Card title="Run Import">
               <Paragraph type="secondary">
                 Select what to import. Make sure settings are saved before running.
@@ -315,6 +319,7 @@ export default function FreshdeskImportContent({
                 </>
               )}
             </Card>
+            )}
             {/* ── Attachment Import Card ───────────────────── */}
             <Card title="Import Attachments dari Freshdesk" style={{ marginTop: 24 }}>
               <Paragraph type="secondary">

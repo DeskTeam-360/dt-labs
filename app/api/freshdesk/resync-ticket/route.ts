@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { isAdmin, isAdminOrManager } from '@/lib/auth-utils'
 import { appSettings, db, ticketComments, tickets, users } from '@/lib/db'
+import { FRESHDESK_LIVE_IMPORT_ENABLED, FRESHDESK_LIVE_IMPORT_OFF_MESSAGE } from '@/lib/fd-import-flags'
 import { type FdAttachment, importFdTicketAttachments } from '@/lib/freshdesk-attachments'
 import { FD_STATUS_MAP, FD_TYPE_MAP } from '@/lib/freshdesk-maps'
 
@@ -64,6 +65,7 @@ type FDTicket = {
 type FDAgent = { id: number; contact: { name: string; email: string } }
 
 export async function POST(req: NextRequest) {
+  if (!FRESHDESK_LIVE_IMPORT_ENABLED) return NextResponse.json({ error: FRESHDESK_LIVE_IMPORT_OFF_MESSAGE }, { status: 410 })
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

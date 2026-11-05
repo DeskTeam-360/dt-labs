@@ -30,6 +30,7 @@ import TabCompanySkills from '@/components/company/TabCompanySkills'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import CustomerNavbar from '@/components/layout/CustomerNavbar'
+import { FRESHDESK_LIVE_IMPORT_ENABLED } from '@/lib/fd-import-flags'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -566,7 +567,7 @@ export default function CompanyDetailContent({
                 {companyData.name}
               </Title>
               <Space>
-                {companyData.freshdesk_id && (
+                {FRESHDESK_LIVE_IMPORT_ENABLED && companyData.freshdesk_id && (
                   <Button
                     icon={<SyncOutlined spin={resyncing} />}
                     loading={resyncing}

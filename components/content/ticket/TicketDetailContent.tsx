@@ -71,6 +71,7 @@ import type { SidebarAttributesDraft } from '@/components/ticket/detail/TabGener
 import TabGeneralCustomer from '@/components/ticket/detail/TabGeneralCustomer'
 import TicketPresenceBar from '@/components/ticket/TicketPresenceBar'
 import { canDeleteTickets, isAdmin, isAdminOrManager } from '@/lib/auth-utils'
+import { FRESHDESK_LIVE_IMPORT_ENABLED } from '@/lib/fd-import-flags'
 import { useTicketDetailLiveSync } from '@/lib/firebase/useTicketDetailLiveSync'
 import { linkifyRichHtml } from '@/lib/linkify-rich-html'
 
@@ -1804,7 +1805,7 @@ export default function TicketDetailContent({
                                                     Mark as support
                                                 </Button>
                                             )}
-                                            {displayTicket?.source === 'freshdesk' && (currentUser as { role?: string }).role?.toLowerCase() !== 'customer' && (
+                                            {FRESHDESK_LIVE_IMPORT_ENABLED && displayTicket?.source === 'freshdesk' && (currentUser as { role?: string }).role?.toLowerCase() !== 'customer' && (
                                                 <Button
                                                     icon={<ReloadOutlined />}
                                                     loading={resyncLoading}
