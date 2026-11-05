@@ -1,37 +1,11 @@
 import { and, eq, sql } from 'drizzle-orm'
 
 import { appSettings, companies, companyUsers, db, ticketComments, tickets, users } from '@/lib/db'
-import { type FdAttachment, type FdAttachmentImportResult, importFdTicketAttachments } from '@/lib/freshdesk-attachments'
+import type { FdConversation, TicketSource } from '@/lib/fd-ticket-source'
+import { type FdAttachmentImportResult, importFdTicketAttachments } from '@/lib/freshdesk-attachments'
 import { FD_STATUS_MAP, FD_TYPE_MAP } from '@/lib/freshdesk-maps'
 import { logUserCompanyChange } from '@/lib/user-company'
 
-type FdTicket = {
-  id: number
-  subject: string
-  description: string | null
-  description_text: string | null
-  status: number
-  type: string | null
-  requester_id: number
-  company_id: number | null
-  created_at: string
-  updated_at: string
-  attachments?: FdAttachment[]
-}
-
-type FdConversation = {
-  id: number
-  body: string
-  body_text: string | null
-  incoming: boolean
-  private: boolean
-  from_email: string | null
-  created_at: string
-  attachments?: FdAttachment[]
-}
-
-type FdCompany = { id: number; name: string; domains?: string[] }
-type FdContact = { id: number; name: string; email: string | null; phone?: string | null; mobile?: string | null }
 type FdAgent = { id: number; contact: { name: string; email: string } }
 
 export type FdTicketImportStatus = 'imported' | 'already_imported' | 'not_found' | 'id_conflict' | 'error'
@@ -101,7 +75,7 @@ export async function loadFdAgentNames(fd: FdClient): Promise<Record<string, str
   return names
 }
 
-async function resolveCompany(fd: FdClient, fdCompanyId: number | null): Promise<{ id: string; name: string } | null> {
+async function resolveCompany(source: TicketSource, fdCompanyId: number | null): Promise<{ id: string; name: string } | null> {
   if (!fdCompanyId) return null
   const [byFdId] = await db
     .select({ id: companies.id, name: companies.name })
@@ -110,7 +84,7 @@ async function resolveCompany(fd: FdClient, fdCompanyId: number | null): Promise
     .limit(1)
   if (byFdId) return byFdId
 
-  const { data: fc } = await fd.get<FdCompany>(`/api/v2/companies/${fdCompanyId}`)
+  const fc = await source.getCompany(fdCompanyId)
   const name = fc?.name?.trim()
   if (!name) return null
 
@@ -131,9 +105,9 @@ async function resolveCompany(fd: FdClient, fdCompanyId: number | null): Promise
   return created ?? null
 }
 
-async function resolveRequester(fd: FdClient, requesterId: number, companyId: string | null): Promise<string | null> {
+async function resolveRequester(source: TicketSource, requesterId: number, companyId: string | null): Promise<string | null> {
   if (!requesterId) return null
-  const { data: contact } = await fd.get<FdContact>(`/api/v2/contacts/${requesterId}`)
+  const contact = await source.getContact(requesterId)
   const email = contact?.email?.trim().toLowerCase()
   if (!email) return null
 
@@ -235,12 +209,11 @@ async function resolveCommentAuthor(params: {
  * and an ID used by a native ticket is reported as a conflict.
  */
 export async function importFdTicketById(params: {
-  fd: FdClient
+  source: TicketSource
   ticketId: number
   adminUserId: string
-  agentNames: Record<string, string>
 }): Promise<FdTicketImportResult> {
-  const { fd, ticketId, adminUserId, agentNames } = params
+  const { source, ticketId, adminUserId } = params
 
   const [existing] = await db
     .select({ id: tickets.id, source: tickets.source, title: tickets.title })
@@ -253,12 +226,12 @@ export async function importFdTicketById(params: {
       : { ticketId, status: 'id_conflict', title: existing.title, message: 'This ID is already used by a ticket created in DeskTeam360, so it was not overwritten.' }
   }
 
-  const { status: httpStatus, data: ft } = await fd.get<FdTicket>(`/api/v2/tickets/${ticketId}`)
-  if (httpStatus === 404) return { ticketId, status: 'not_found', message: 'Ticket not found in Freshdesk.' }
-  if (!ft) return { ticketId, status: 'error', message: `Freshdesk returned HTTP ${httpStatus}.` }
+  const { status: httpStatus, data: ft } = await source.getTicket(ticketId)
+  if (httpStatus === 404) return { ticketId, status: 'not_found', message: source.kind === 'archive' ? 'Ticket not found in the FD Archive.' : 'Ticket not found in Freshdesk.' }
+  if (!ft) return { ticketId, status: 'error', message: `${source.kind === 'archive' ? 'The FD Archive' : 'Freshdesk'} returned HTTP ${httpStatus}.` }
 
-  const company = await resolveCompany(fd, ft.company_id)
-  const contactUserId = await resolveRequester(fd, ft.requester_id, company?.id ?? null)
+  const company = await resolveCompany(source, ft.company_id)
+  const contactUserId = await resolveRequester(source, ft.requester_id, company?.id ?? null)
   const createdBy = contactUserId ?? adminUserId
 
   // Keep the Freshdesk ID. Dates as ISO strings: postgres.js can't serialize Date inside sql``.
@@ -291,7 +264,7 @@ export async function importFdTicketById(params: {
     )
   `)
 
-  const conversations = await fd.getAll<FdConversation>(`/api/v2/tickets/${ticketId}/conversations`)
+  const conversations: FdConversation[] = await source.getConversations(ticketId)
   const comments = { imported: 0, skipped: 0, errors: 0 }
   const authorCache: Record<string, string> = {}
 
@@ -308,7 +281,7 @@ export async function importFdTicketById(params: {
         companyId: company?.id ?? null,
         contactUserId,
         fallbackUserId: adminUserId,
-        agentNames,
+        agentNames: source.agentNames,
         cache: authorCache,
       })
       const inserted = await db
@@ -336,7 +309,7 @@ export async function importFdTicketById(params: {
     ticketId,
     ticketFiles: ft.attachments ?? [],
     conversations,
-    authHeader: fd.authHeader,
+    authHeader: source.attachmentAuthHeader,
   })
 
   return {

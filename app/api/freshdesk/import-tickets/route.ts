@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { archiveSource, freshdeskSource, loadArchiveSettings, type TicketSource } from '@/lib/fd-ticket-source'
 import {
   createFdClient,
   type FdTicketImportResult,
@@ -11,7 +12,22 @@ import {
 
 const MAX_IDS = 50
 
-/** POST /api/freshdesk/import-tickets — import specific Freshdesk tickets by ID. Any staff user (not customers). */
+/** The place tickets are read from: Freshdesk itself, or the FD Archive. Null (with a message) when that one is not set up in Settings. */
+async function buildSource(kind: 'freshdesk' | 'archive'): Promise<{ source: TicketSource } | { error: string }> {
+  if (kind === 'archive') {
+    const archive = await loadArchiveSettings()
+    if (!archive) return { error: 'The FD Archive address and API key are not set. Fill them in under Settings, Freshdesk Import.' }
+    return { source: await archiveSource(archive.baseUrl, archive.apiKey) }
+  }
+  const fd = await createFdClient()
+  if (!fd) return { error: 'Freshdesk domain and API key are not configured' }
+  return { source: freshdeskSource(fd, await loadFdAgentNames(fd)) }
+}
+
+/**
+ * POST /api/freshdesk/import-tickets { ticket_ids, source?: 'freshdesk' | 'archive' } — import specific tickets by their Freshdesk ID,
+ * from Freshdesk (default) or from the FD Archive. Any staff user (not customers).
+ */
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -30,14 +46,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Import at most ${MAX_IDS} ticket IDs at a time` }, { status: 400 })
   }
 
-  const fd = await createFdClient()
-  if (!fd) return NextResponse.json({ error: 'Freshdesk domain and API key are not configured' }, { status: 400 })
+  const built = await buildSource(body.source === 'archive' ? 'archive' : 'freshdesk')
+  if ('error' in built) return NextResponse.json({ error: built.error }, { status: 400 })
 
-  const agentNames = await loadFdAgentNames(fd)
   const results: FdTicketImportResult[] = []
   for (const ticketId of ids) {
     try {
-      results.push(await importFdTicketById({ fd, ticketId, adminUserId: session.user.id, agentNames }))
+      results.push(await importFdTicketById({ source: built.source, ticketId, adminUserId: session.user.id }))
     } catch (e) {
       console.error('[FD import-tickets] ticket', ticketId, e)
       results.push({ ticketId, status: 'error', message: e instanceof Error ? e.message : String(e) })
@@ -52,5 +67,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, results })
+  return NextResponse.json({ ok: true, source: built.source.kind, results })
 }

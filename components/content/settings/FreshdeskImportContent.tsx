@@ -14,6 +14,8 @@ interface FreshdeskImportContentProps {
   user: { id: string; email?: string | null; name?: string | null; role?: string }
   initialDomain?: string
   initialApiKey?: string
+  initialArchiveUrl?: string
+  initialArchiveKey?: string
 }
 
 type ImportResult = {
@@ -27,9 +29,13 @@ export default function FreshdeskImportContent({
   user,
   initialDomain = '',
   initialApiKey = '',
+  initialArchiveUrl = '',
+  initialArchiveKey = '',
 }: FreshdeskImportContentProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [settingsForm] = Form.useForm()
+  const [archiveForm] = Form.useForm()
+  const [savingArchive, setSavingArchive] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importContacts, setImportContacts] = useState(true)
@@ -69,6 +75,24 @@ export default function FreshdeskImportContent({
       message.error((e as Error).message || 'Failed to save settings')
     } finally {
       setSavingSettings(false)
+    }
+  }
+
+  const handleSaveArchive = async (values: { fd_archive_url: string; fd_archive_api_key: string }) => {
+    setSavingArchive(true)
+    try {
+      const res = await fetch('/api/freshdesk/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ fd_archive_url: values.fd_archive_url.trim(), fd_archive_api_key: values.fd_archive_api_key.trim() }),
+      })
+      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error || 'Failed to save settings')
+      message.success('FD Archive settings saved')
+    } catch (e: unknown) {
+      message.error((e as Error).message || 'Failed to save settings')
+    } finally {
+      setSavingArchive(false)
     }
   }
 
@@ -188,6 +212,21 @@ export default function FreshdeskImportContent({
                 </Form.Item>
                 <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={savingSettings}>
                   Save Settings
+                </Button>
+              </Form>
+            </Card>
+
+            {/* ── FD Archive Card ─────────────────────────── */}
+            <Card title="FD Archive (import tickets from the archive instead of Freshdesk)" style={{ marginBottom: 24 }}>
+              <Form form={archiveForm} layout="vertical" initialValues={{ fd_archive_url: initialArchiveUrl, fd_archive_api_key: initialArchiveKey }} onFinish={handleSaveArchive}>
+                <Form.Item name="fd_archive_url" label="FD Archive address" rules={[{ required: true, message: 'Address is required' }]} extra="The fd-archive app, e.g. https://archive.example.com">
+                  <Input placeholder="https://archive.example.com" />
+                </Form.Item>
+                <Form.Item name="fd_archive_api_key" label="Archive API key" rules={[{ required: true, message: 'API key is required' }]} extra="The ARCHIVE_API_KEY set in the fd-archive app">
+                  <Input.Password placeholder="Archive API key" />
+                </Form.Item>
+                <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={savingArchive}>
+                  Save Archive Settings
                 </Button>
               </Form>
             </Card>

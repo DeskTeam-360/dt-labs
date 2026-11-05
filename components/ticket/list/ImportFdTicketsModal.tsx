@@ -1,6 +1,6 @@
 'use client'
 
-import { App, Button, Input, Modal, Table, Tag, Typography } from 'antd'
+import { App, Button, Input, Modal, Radio, Table, Tag, Typography } from 'antd'
 import { useState } from 'react'
 
 import { SpaNavLink } from '@/components/common/SpaNavLink'
@@ -22,7 +22,7 @@ type ImportResult = {
 const STATUS_TAG: Record<ImportResult['status'], { color: string; label: string }> = {
   imported: { color: 'green', label: 'Imported' },
   already_imported: { color: 'default', label: 'Already imported' },
-  not_found: { color: 'orange', label: 'Not found in FD' },
+  not_found: { color: 'orange', label: 'Not found' },
   id_conflict: { color: 'red', label: 'ID in use' },
   error: { color: 'red', label: 'Error' },
 }
@@ -45,6 +45,7 @@ export default function ImportFdTicketsModal({
   onImported?: () => void
 }) {
   const { message } = App.useApp()
+  const [source, setSource] = useState<'freshdesk' | 'archive'>('freshdesk')
   const [input, setInput] = useState('')
   const [importing, setImporting] = useState(false)
   const [results, setResults] = useState<ImportResult[] | null>(null)
@@ -60,7 +61,7 @@ export default function ImportFdTicketsModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ ticket_ids: ids }),
+        body: JSON.stringify({ ticket_ids: ids, source }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Import failed')
@@ -86,7 +87,7 @@ export default function ImportFdTicketsModal({
   return (
     <Modal
       open={open}
-      title="Import tickets from Freshdesk"
+      title="Import tickets from Freshdesk or the FD Archive"
       onCancel={close}
       width={760}
       destroyOnHidden
@@ -99,8 +100,12 @@ export default function ImportFdTicketsModal({
         </Button>,
       ]}
     >
+      <Radio.Group value={source} onChange={(e) => setSource(e.target.value)} disabled={importing} style={{ marginBottom: 12 }}>
+        <Radio value="freshdesk">Freshdesk</Radio>
+        <Radio value="archive">FD Archive</Radio>
+      </Radio.Group>
       <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        Enter Freshdesk ticket IDs. Each ticket is imported with its comments and attachments and keeps its Freshdesk
+        Choose where to read from, then enter Freshdesk ticket IDs. Each ticket is imported with its comments and attachments and keeps its Freshdesk
         ID; its company and requester are matched or created. Tickets that already exist are skipped, never overwritten.
       </Paragraph>
       <Input.TextArea

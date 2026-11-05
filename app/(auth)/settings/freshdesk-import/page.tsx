@@ -21,6 +21,8 @@ export default async function FreshdeskImportPage() {
       user={session.user}
       initialDomain={map['freshdesk_domain'] ?? ''}
       initialApiKey={map['freshdesk_api_key'] ?? ''}
+      initialArchiveUrl={map['fd_archive_url'] ?? ''}
+      initialArchiveKey={map['fd_archive_api_key'] ?? ''}
     />
   )
 }
