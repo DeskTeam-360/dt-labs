@@ -25,6 +25,8 @@ interface TicketsHeaderProps {
   ticketsPageLimit?: TicketsPageLimit
   onTicketsPageLimitChange?: (v: TicketsPageLimit) => void
   onRefresh?: () => void
+  /** My Tickets page: the title says so. Everyone else sees All Tickets (customers keep My Tickets). */
+  mineOnly?: boolean
 }
 
 const SEARCH_FIELD_OPTIONS = [
@@ -48,6 +50,7 @@ export default function TicketsHeader({
   ticketsPageLimit = 50,
   onTicketsPageLimitChange,
   onRefresh,
+  mineOnly = false,
 }: TicketsHeaderProps) {
   const { token } = theme.useToken()
   const searchPending = loading && !!filterSearch.trim()
@@ -97,7 +100,7 @@ export default function TicketsHeader({
       )}
       <Flex vertical gap={12} style={{ padding: 24 }}>
         <Typography.Title level={2} style={{ margin: 0 }}>
-          {junkTitle ?? 'All Tickets'}
+          {junkTitle ?? (mineOnly || isCustomer ? 'My Tickets' : 'All Tickets')}
         </Typography.Title>
 
         {!inJunkFolder && (

@@ -205,6 +205,7 @@ export default function TicketsContent({ user: currentUser, mineOnly = false }: 
             ticketsPageLimit={ticketsPageLimit}
             onTicketsPageLimitChange={setTicketsPageLimit}
             onRefresh={refetchTickets}
+            mineOnly={mineOnly}
           />
 
           {!isCustomer && filterTicketType === 'spam' && (
