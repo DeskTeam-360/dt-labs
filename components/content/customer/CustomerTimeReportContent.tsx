@@ -1708,13 +1708,8 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                       value: report.summary.completed_ticket_count,
                       accent: 'var(--customer-report-accent-4, #FFB400)',
                     },
-                    {
-                      label: 'Urgent',
-                      value: report.summary.urgent_ticket_count,
-                      accent: 'var(--customer-report-accent-5, #FF4C51)',
-                    },
                   ].map((m) => (
-                    <Col xs={12} sm={8} md={4} key={m.label}>
+                    <Col xs={12} sm={8} md={{ flex: '0 0 20%' }} key={m.label}>
                       <div className="customer-time-report-metric">
                         <div className="customer-time-report-metric-bar" style={{ background: m.accent }} />
                         <Text type="secondary" className="customer-time-report-metric-label">
