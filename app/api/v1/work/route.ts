@@ -2,7 +2,7 @@ import { and, eq, gte, inArray, lte, notInArray, type SQL, sql } from 'drizzle-o
 import { NextResponse } from 'next/server'
 
 import { apiUnauthorized, getApiUser, isTeamRole } from '@/lib/api-auth'
-import { csv, hours, pageInfo, resolveWindow, siteUrl, sqlList, toWibIso, wibDay } from '@/lib/api-v1'
+import { csv, HIDDEN_COMPANY_NAME, HIDDEN_TICKET_TITLE, hiddenTicketIds, hours, pageInfo, resolveWindow, siteUrl, sqlList, toWibIso, wibDay } from '@/lib/api-v1'
 import { loadCalendarEntries } from '@/lib/calendar-query'
 import { companies, db, shifts, tickets, ticketTimeTracker, users } from '@/lib/db'
 import { reportedDurationSeconds } from '@/lib/time-tracker-reported'
@@ -79,8 +79,11 @@ export async function GET(request: Request) {
 
   const now = Date.now()
   type Agg = { seconds: number; sessions: number; first: Date | null; last: Date | null; running: { ticket_id: number; since: string | null } | null; tickets: Map<number, { title: string; status: string; company: string | null; seconds: number; sessions: number }>; days: Set<string> }
+  // Time on a ticket the caller may not see still counts, but without its title, company, number or link.
+  const hidden = await hiddenTicketIds(me, [...new Set(sessions.map((s) => s.ticketId))])
+  const visibleSessions = sessions.map((s) => (hidden.has(s.ticketId) ? { ...s, ticketId: 0, title: HIDDEN_TICKET_TITLE, status: '', companyName: HIDDEN_COMPANY_NAME } : s))
   const agg = new Map<string, Agg>()
-  for (const s of sessions) {
+  for (const s of visibleSessions) {
     const a = agg.get(s.userId) ?? { seconds: 0, sessions: 0, first: null, last: null, running: null, tickets: new Map(), days: new Set<string>() }
     const startAt = new Date(s.startTime)
     const stopAt = s.stopTime ? new Date(s.stopTime) : null
@@ -130,17 +133,17 @@ export async function GET(request: Request) {
         leave_days: leaveDays.get(a.id) ?? 0,
         first_start: toWibIso(g?.first),
         last_stop: toWibIso(g?.last),
-        running_now: g?.running ?? null,
+        running_now: g?.running ? { ticket_id: g.running.ticket_id > 0 ? g.running.ticket_id : null, since: g.running.since } : null,
         ...(withTickets
           ? {
               tickets: list.slice(0, perAgent).map(([id, t]) => ({
-                id,
+                id: id > 0 ? id : null,
                 title: t.title,
                 status: t.status,
                 company: t.company,
                 tracked_hours: hours(t.seconds),
                 sessions: t.sessions,
-                url: `${siteUrl()}/tickets/${id}`,
+                url: id > 0 ? `${siteUrl()}/tickets/${id}` : null,
               })),
               tickets_has_more: list.length > perAgent,
             }

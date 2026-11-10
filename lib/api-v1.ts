@@ -1,4 +1,4 @@
-import { eq, type SQL, sql } from 'drizzle-orm'
+import { and, eq, inArray, type SQL, sql } from 'drizzle-orm'
 
 import { isAdmin } from '@/lib/auth-utils'
 import { db, teamMembers, tickets } from '@/lib/db'
@@ -128,4 +128,17 @@ export function resolveWindow(q: URLSearchParams, maxDays: number): TimeWindow |
 export function pageInfo(offset: number, shown: number, total: number): { has_more: boolean; next_offset: number | null } {
   const next = offset + shown
   return next < total ? { has_more: true, next_offset: next } : { has_more: false, next_offset: null }
+}
+
+/** What a ticket shows as when the caller may not see it (its hours still count, its details do not). */
+export const HIDDEN_TICKET_TITLE = '(ticket you cannot see)'
+export const HIDDEN_COMPANY_NAME = '(not visible)'
+
+/** Of these ticket ids, the ones the caller may NOT see (everything is visible to an admin). */
+export async function hiddenTicketIds(me: { id: string; role: string }, ids: number[]): Promise<Set<number>> {
+  const visible = await ticketVisibility(me)
+  if (!visible || ids.length === 0) return new Set()
+  const rows = await db.select({ id: tickets.id }).from(tickets).where(and(inArray(tickets.id, ids), visible))
+  const ok = new Set(rows.map((r) => r.id))
+  return new Set(ids.filter((id) => !ok.has(id)))
 }

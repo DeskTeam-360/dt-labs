@@ -2,7 +2,7 @@ import { and, asc, eq, gte, lte, notInArray, type SQL, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { apiUnauthorized, getApiUser, isTeamRole } from '@/lib/api-auth'
-import { hours, pageInfo, resolveWindow, siteUrl, ticketVisibility, toWibIso, wibDay } from '@/lib/api-v1'
+import { HIDDEN_COMPANY_NAME, HIDDEN_TICKET_TITLE, hiddenTicketIds, hours, pageInfo, resolveWindow, siteUrl, ticketVisibility, toWibIso, wibDay } from '@/lib/api-v1'
 import { loadCalendarEntries } from '@/lib/calendar-query'
 import { companies, db, shifts, ticketAssignees, tickets, ticketTimeTracker, users } from '@/lib/db'
 import { CLOSED_LIKE_STATUS_LIST } from '@/lib/ticket-status-workflow'
@@ -135,6 +135,10 @@ export async function GET(request: Request) {
     loadPlate(person.id, me, plateLimit, plateOffset),
   ])
 
+  // Time on a ticket the caller may not see still counts, but without its title, company, number or link.
+  const hidden = await hiddenTicketIds(me, [...new Set(sessionRows.map((s) => s.ticketId))])
+  const rows = sessionRows.map((s) => (hidden.has(s.ticketId) ? { ...s, ticketId: 0, title: HIDDEN_TICKET_TITLE, status: '', companyId: 'hidden', companyName: HIDDEN_COMPANY_NAME, note: null } : s))
+
   type Agg = { seconds: number; sessions: number; first: Date | null; last: Date | null }
   const byDay = new Map<string, Agg & { tickets: Set<number> }>()
   const byTicket = new Map<number, Agg & { title: string; status: string; company: string | null; jobTypes: Set<string> }>()
@@ -143,7 +147,7 @@ export async function GET(request: Request) {
   let running: { ticket_id: number; title: string; since: string | null } | null = null
   const sessionsOut: Array<Record<string, unknown>> = []
 
-  for (const s of sessionRows) {
+  for (const s of rows) {
     const startAt = new Date(s.startTime)
     const stopAt = s.stopTime ? new Date(s.stopTime) : null
     // A running timer counts up to now.
@@ -179,7 +183,7 @@ export async function GET(request: Request) {
     if (withSessions) {
       sessionsOut.push({
         id: s.id,
-        ticket_id: s.ticketId,
+        ticket_id: s.ticketId > 0 ? s.ticketId : null,
         ticket_title: s.title,
         job_type: s.jobType,
         start: toWibIso(startAt),
@@ -211,7 +215,7 @@ export async function GET(request: Request) {
       sessions: sessionRows.length,
       days_with_work: byDay.size,
     },
-    running_now: running,
+    running_now: running && running.ticket_id > 0 ? running : running ? { ticket_id: null, title: HIDDEN_TICKET_TITLE, since: running.since } : null,
     by_day: [...byDay.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, d]) => ({
@@ -221,7 +225,7 @@ export async function GET(request: Request) {
         sessions: d.sessions,
         first_start: toWibIso(d.first),
         last_stop: toWibIso(d.last),
-        ticket_ids: [...d.tickets],
+        ticket_ids: [...d.tickets].filter((n) => n > 0),
       })),
     by_company: [...byCompany.values()]
       .sort((a, b) => b.seconds - a.seconds)
@@ -229,7 +233,7 @@ export async function GET(request: Request) {
     tickets: [...byTicket.entries()]
       .sort(([, a], [, b]) => b.seconds - a.seconds)
       .map(([id, t]) => ({
-        id,
+        id: id > 0 ? id : null,
         title: t.title,
         status: t.status,
         company: t.company,
@@ -239,7 +243,7 @@ export async function GET(request: Request) {
         first_start: toWibIso(t.first),
         last_stop: toWibIso(t.last),
         job_types: [...t.jobTypes],
-        url: `${siteUrl()}/tickets/${id}`,
+        url: id > 0 ? `${siteUrl()}/tickets/${id}` : null,
       })),
     ...(withSessions ? { sessions: sessionsOut } : {}),
     calendar_entries: mine.map((e) => ({ type: e.type, title: e.title, start_date: e.start_date, end_date: e.end_date })),
