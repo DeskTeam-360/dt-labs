@@ -1,6 +1,7 @@
 import { and, eq, gt, lt } from 'drizzle-orm'
 
 import { generateApiKey } from '@/lib/api-keys'
+import { callsPerHourForRole, effectiveScopes } from '@/lib/api-scopes'
 import { apiKeys, db, oauthClients, oauthCodes, oauthGrants, users } from '@/lib/db'
 import { ACCESS_TOKEN_SECONDS, connectionLimitMessage, CORS_HEADERS, oauthError, randomToken, sha256Base64Url, sha256Hex } from '@/lib/oauth'
 
@@ -43,10 +44,10 @@ export async function POST(request: Request) {
     const expiry = accessExpires()
     const [keyRow] = await db
       .insert(apiKeys)
-      .values({ userId: row.userId, name: `${client.name} (OAuth)`, keyPrefix: prefix, keyHash: hash, scopes: row.scopes, expiresAt: expiry })
+      .values({ userId: row.userId, name: `${client.name} (OAuth)`, keyPrefix: prefix, keyHash: hash, scopes: effectiveScopes(row.scopes, owner?.role), rateLimitPerHour: callsPerHourForRole(owner?.role), expiresAt: expiry })
       .returning({ id: apiKeys.id })
     await db.insert(oauthGrants).values({ clientId: client.id, userId: row.userId, keyId: keyRow.id, refreshHash: sha256Hex(refresh), refreshExpiresAt: expiry })
-    return tokenResponse(key, refresh, row.scopes)
+    return tokenResponse(key, refresh, effectiveScopes(row.scopes, owner?.role))
   }
 
   if (grant === 'refresh_token') {

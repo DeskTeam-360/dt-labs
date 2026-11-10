@@ -24,6 +24,9 @@ type KeyRow = {
   expires_at: string | null
   is_active: boolean
   rate_limit_per_hour: number
+  max_calls_per_hour: number
+  owner_role: string
+  allowed_scopes: string[]
   connection: 'oauth' | 'manual'
   last_used_at: string | null
   created_at: string | null
@@ -54,12 +57,12 @@ const copy = (text: string, ok: string) => {
 }
 
 /** The access checkboxes, with the warning once a "Changes data" access is ticked. Used when making a key and when changing one. */
-function ScopeFields() {
+function ScopeFields({ allowed }: { allowed: string[] }) {
   return (
     <>
       <Form.Item name="scopes" label="What can this key do?" rules={[{ required: true, type: 'array', min: 1, message: 'Choose at least one access' }]}>
         <Checkbox.Group style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {API_SCOPES.map((s) => (
+          {API_SCOPES.filter((s) => allowed.includes(s.key)).map((s) => (
             <Checkbox key={s.key} value={s.key}>
               <Text strong>{s.label}</Text>
               {isWriteScope(s.key) ? <Tag color="orange" style={{ marginLeft: 8 }}>Changes data</Tag> : null}
@@ -130,7 +133,8 @@ export default function ApiKeysContent({ user, embedded = false }: { user: { id:
 
   const openEdit = (r: KeyRow) => {
     setEditing(r)
-    editForm.setFieldsValue({ scopes: r.scopes, rate_limit_per_hour: r.rate_limit_per_hour })
+    // Only what the owner's role allows is offered; anything older that goes beyond it is not carried into the form.
+    editForm.setFieldsValue({ scopes: r.scopes.filter((s) => r.allowed_scopes.includes(s)), rate_limit_per_hour: Math.min(r.rate_limit_per_hour, r.max_calls_per_hour) })
   }
 
   const saveEdit = async () => {
@@ -217,7 +221,7 @@ export default function ApiKeysContent({ user, embedded = false }: { user: { id:
               rowKey="id"
               size="middle"
               loading={loading}
-              dataSource={rows}
+              dataSource={embedded ? rows.filter((r) => r.mine) : rows}
               pagination={false}
               locale={{ emptyText: 'Nothing connected yet' }}
               scroll={{ x: 'max-content' }}
@@ -231,13 +235,13 @@ export default function ApiKeysContent({ user, embedded = false }: { user: { id:
                     </div>
                   ),
                 },
-                ...(isAdminUser ? [{ title: 'Owner', dataIndex: 'owner', render: (v: string | null, r: KeyRow) => (r.mine ? 'You' : (v ?? '-')) }] : []),
+                ...(isAdminUser && !embedded ? [{ title: 'Owner', dataIndex: 'owner', render: (v: string | null, r: KeyRow) => (r.mine ? 'You' : (v ?? '-')) }] : []),
                 {
                   title: 'Access',
                   dataIndex: 'scopes',
-                  render: (v: string[]) => (
+                  render: (v: string[], r: KeyRow) => (
                     <Flex gap={4} wrap>
-                      {v.map((s) => <Tag key={s} color={isWriteScope(s) ? 'orange' : undefined} style={{ margin: 0 }}>{scopeLabel(s)}</Tag>)}
+                      {v.filter((s) => r.allowed_scopes.includes(s)).map((s) => <Tag key={s} color={isWriteScope(s) ? 'orange' : undefined} style={{ margin: 0 }}>{scopeLabel(s)}</Tag>)}
                     </Flex>
                   ),
                 },
@@ -358,10 +362,10 @@ export default function ApiKeysContent({ user, embedded = false }: { user: { id:
 
       <Modal title={editing ? `Access of "${editing.name}"` : ''} open={editing !== null} onCancel={() => setEditing(null)} onOk={() => void saveEdit()} confirmLoading={editSaving} okText="Save access" destroyOnHidden forceRender>
         <Form form={editForm} layout="vertical">
-          <Form.Item name="rate_limit_per_hour" label="Calls per hour" rules={[{ required: true, type: 'number', min: 10, max: 10000, message: 'A whole number from 10 to 10000' }]} extra="Over this, the API answers 429 until older calls fall out of the hour. New keys start at 100.">
-            <InputNumber min={10} max={10000} precision={0} style={{ width: 160 }} />
+          <Form.Item name="rate_limit_per_hour" label="Calls per hour" rules={[{ required: true, type: 'number', min: 10, max: 10000, message: 'A whole number from 10 to 10000' }]} extra={`Over this, the API answers 429 until older calls fall out of the hour. This role may use up to ${editing?.max_calls_per_hour ?? 0} (agents 50, managers and operations 100, admins 200).`}>
+            <InputNumber min={10} max={editing?.max_calls_per_hour ?? 10000} precision={0} style={{ width: 160 }} />
           </Form.Item>
-          <ScopeFields />
+          <ScopeFields allowed={editing?.allowed_scopes ?? []} />
         </Form>
       </Modal>
     </>

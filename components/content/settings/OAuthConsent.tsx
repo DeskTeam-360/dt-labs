@@ -7,12 +7,13 @@ import { API_SCOPES, isWriteScope } from '@/lib/api-scopes'
 
 const { Title, Text, Paragraph } = Typography
 
-type Props = { clientName: string; clientId: string; redirectUri: string; codeChallenge: string; state: string; userName: string }
+type Props = { clientName: string; clientId: string; redirectUri: string; codeChallenge: string; state: string; userName: string; allowedScopes: string[] }
 
 /** The page where a signed-in person approves what an app such as ChatGPT may do, and picks the access it gets. */
-export default function OAuthConsent({ clientName, clientId, redirectUri, codeChallenge, state, userName }: Props) {
+export default function OAuthConsent({ clientName, clientId, redirectUri, codeChallenge, state, userName, allowedScopes }: Props) {
+  const offered = API_SCOPES.filter((s) => allowedScopes.includes(s.key))
   // Only the reading accesses start ticked; changing data has to be chosen on purpose.
-  const [scopes, setScopes] = useState<string[]>(API_SCOPES.filter((s) => !isWriteScope(s.key)).map((s) => s.key))
+  const [scopes, setScopes] = useState<string[]>(offered.filter((s) => !isWriteScope(s.key)).map((s) => s.key))
   const [busy, setBusy] = useState(false)
   const writes = scopes.filter(isWriteScope)
 
@@ -42,7 +43,7 @@ export default function OAuthConsent({ clientName, clientId, redirectUri, codeCh
           {clientName} is asking to act as you ({userName}). It only gets the access you tick below. The connection lasts 30 days; you can extend it, change the access or switch it off any time in your Profile (AI connections).
         </Paragraph>
         <Checkbox.Group value={scopes} onChange={(v) => setScopes(v as string[])} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {API_SCOPES.map((s) => (
+          {offered.map((s) => (
             <Checkbox key={s.key} value={s.key}>
               <Text strong>{s.label}</Text>
               {isWriteScope(s.key) ? <Tag color="orange" style={{ marginLeft: 8 }}>Changes data</Tag> : null}

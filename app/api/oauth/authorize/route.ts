@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { isApiScope } from '@/lib/api-scopes'
+import { allowedScopesForRole, API_SCOPES, isApiScope } from '@/lib/api-scopes'
 import { canManageApiKeys } from '@/lib/auth-utils'
 import { db, oauthClients, oauthCodes } from '@/lib/db'
 import { CODE_MINUTES, connectionLimitMessage, randomToken, sha256Hex } from '@/lib/oauth'
@@ -35,6 +35,12 @@ export async function POST(request: Request) {
   if (!/^[A-Za-z0-9_-]{43,128}$/.test(challenge)) return NextResponse.json({ error: 'The app did not send a valid PKCE challenge' }, { status: 400 })
   const scopes = [...new Set((Array.isArray(b.scopes) ? b.scopes : []).filter(isApiScope))]
   if (scopes.length === 0) return NextResponse.json({ error: 'Choose at least one access' }, { status: 400 })
+  // What an AI may be given depends on the person's role (agents: no workload, hours or ticket changes).
+  const allowed = allowedScopesForRole((session.user as { role?: string }).role)
+  const beyond = scopes.filter((s) => !allowed.includes(s))
+  if (beyond.length > 0) {
+    return NextResponse.json({ error: `Your role cannot give these accesses: ${beyond.map((k) => API_SCOPES.find((s) => s.key === k)?.label ?? k).join(', ')}` }, { status: 403 })
+  }
 
   const code = randomToken('dtc_', 24)
   await db.insert(oauthCodes).values({

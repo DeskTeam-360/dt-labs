@@ -477,6 +477,31 @@ export function isApiScope(v: unknown): v is string {
   return typeof v === 'string' && API_SCOPE_KEYS.includes(v)
 }
 
+/**
+ * What each role may give to an AI assistant. Agents (staff) read tickets, companies and the calendar and may add internal notes;
+ * they cannot see colleagues' workload or hours, and cannot change or create tickets (those send emails to customers).
+ * Managers, operations and admins may have every access. An unknown role gets the agent's list.
+ */
+const STAFF_SCOPES = ['tickets:read', 'ticket-detail:read', 'companies:read', 'calendar:read', 'notes:write']
+export function allowedScopesForRole(role: string | null | undefined): string[] {
+  const r = (role ?? '').toLowerCase()
+  return ['admin', 'operations', 'manager'].includes(r) ? API_SCOPE_KEYS : STAFF_SCOPES
+}
+
+/** Calls per hour a connection may make: agents 50, managers and operations 100, admins 200 (unknown roles 50). */
+export function callsPerHourForRole(role: string | null | undefined): number {
+  const r = (role ?? '').toLowerCase()
+  if (r === 'admin') return 200
+  if (r === 'manager' || r === 'operations') return 100
+  return 50
+}
+
+/** The access a connection really has: what it was given, cut down to what its owner's role allows. */
+export function effectiveScopes(scopes: string[], role: string | null | undefined): string[] {
+  const allowed = allowedScopesForRole(role)
+  return scopes.filter((s) => allowed.includes(s))
+}
+
 /** The skill.md to hand to an AI assistant together with a key that has these scopes. */
 export function buildSkillMarkdown(scopes: string[], baseUrl: string): string {
   const chosen = API_SCOPES.filter((s) => scopes.includes(s.key))

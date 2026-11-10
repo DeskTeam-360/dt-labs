@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
 import OAuthConsent from '@/components/content/settings/OAuthConsent'
+import { allowedScopesForRole } from '@/lib/api-scopes'
 import { canManageApiKeys } from '@/lib/auth-utils'
 import { db, oauthClients } from '@/lib/db'
 import { connectionLimitMessage } from '@/lib/oauth'
@@ -40,5 +41,5 @@ export default async function OAuthAuthorizePage({ searchParams }: { searchParam
   const limited = await connectionLimitMessage(session.user.id, role)
   if (limited) return <Message title="You already have a connection" text={limited} />
 
-  return <OAuthConsent clientName={client.name} clientId={client.id} redirectUri={redirectUri} codeChallenge={one(q.code_challenge)} state={one(q.state)} userName={session.user.name ?? session.user.email ?? ''} />
+  return <OAuthConsent clientName={client.name} clientId={client.id} redirectUri={redirectUri} codeChallenge={one(q.code_challenge)} state={one(q.state)} userName={session.user.name ?? session.user.email ?? ''} allowedScopes={allowedScopesForRole(role)} />
 }

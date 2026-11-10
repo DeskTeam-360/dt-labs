@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { API_KEY_PREFIX, hashApiKey } from '@/lib/api-keys'
+import { callsPerHourForRole, effectiveScopes } from '@/lib/api-scopes'
 import { toWibIso } from '@/lib/api-v1'
 import { canManageApiKeys } from '@/lib/auth-utils'
 import { apiKeys, apiKeyUsage, db, users } from '@/lib/db'
@@ -83,17 +84,20 @@ export async function getApiUser(request: Request, scope?: string, opts: { log?:
     const [u] = await db.select({ id: users.id, role: users.role, status: users.status }).from(users).where(eq(users.id, row.userId)).limit(1)
     // A key stops working when its owner is switched off or is no longer someone who may keep keys.
     if (!u || (u.status && u.status !== 'active') || !canManageApiKeys(u.role ?? '')) return deny('owner_not_allowed')
+    // What the owner's role allows cuts the key's access down (an agent's key never reaches workload or change-ticket tools).
+    if (scope && !effectiveScopes(row.scopes ?? [], u.role).includes(scope)) return deny('missing_scope')
+    const callLimit = Math.min(row.rateLimitPerHour, callsPerHourForRole(u.role))
     // Calls of the last hour that went through; refused ones do not count against the key.
     if (log) {
       const since = and(eq(apiKeyUsage.keyId, row.id), eq(apiKeyUsage.allowed, true), gt(apiKeyUsage.createdAt, new Date(Date.now() - HOUR_MS)))
       const [used] = await db.select({ n: sql<number>`count(*)::int` }).from(apiKeyUsage).where(since)
       const n = used?.n ?? 0
-      if (n >= row.rateLimitPerHour) {
+      if (n >= callLimit) {
         // The window slides, so calls free up one by one, oldest first. Report when at least RESET_FREES calls are free again.
-        const frees = Math.min(n, n - row.rateLimitPerHour + RESET_FREES)
+        const frees = Math.min(n, n - callLimit + RESET_FREES)
         const [edge] = await db.select({ at: apiKeyUsage.createdAt }).from(apiKeyUsage).where(since).orderBy(asc(apiKeyUsage.createdAt)).offset(frees - 1).limit(1)
         const resetAt = new Date((edge?.at ? new Date(edge.at).getTime() : Date.now()) + HOUR_MS)
-        rateLimited.set(request, { limit: row.rateLimitPerHour, used: n, resetAt, retryAfter: Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000)), free: Math.min(row.rateLimitPerHour, row.rateLimitPerHour - n + frees) })
+        rateLimited.set(request, { limit: callLimit, used: n, resetAt, retryAfter: Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000)), free: Math.min(callLimit, callLimit - n + frees) })
         return deny('rate_limited')
       }
       logUsage(row.id, request, null)
@@ -114,12 +118,14 @@ export async function apiKeyInfo(request: Request): Promise<{ id: string; scopes
   const bearer = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim()
   if (!bearer || !bearer.startsWith(API_KEY_PREFIX)) return null
   const [row] = await db
-    .select({ id: apiKeys.id, scopes: apiKeys.scopes, expiresAt: apiKeys.expiresAt, isActive: apiKeys.isActive })
+    .select({ id: apiKeys.id, scopes: apiKeys.scopes, expiresAt: apiKeys.expiresAt, isActive: apiKeys.isActive, ownerRole: users.role })
     .from(apiKeys)
+    .innerJoin(users, eq(apiKeys.userId, users.id))
     .where(eq(apiKeys.keyHash, hashApiKey(bearer)))
     .limit(1)
   if (!row || !row.isActive || (row.expiresAt && new Date(row.expiresAt) < new Date())) return null
-  return { id: row.id, scopes: row.scopes ?? [] }
+  // The tools offered are the key's access cut down to what its owner's role allows.
+  return { id: row.id, scopes: effectiveScopes(row.scopes ?? [], row.ownerRole) }
 }
 
 /** The access of the key in the request, or null when there is no usable key. */

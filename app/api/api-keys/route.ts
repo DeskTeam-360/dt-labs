@@ -2,6 +2,7 @@ import { desc, eq, gte, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { allowedScopesForRole, callsPerHourForRole } from '@/lib/api-scopes'
 import { canManageApiKeys, isAdmin } from '@/lib/auth-utils'
 import { apiKeys, apiKeyUsage, db, oauthGrants, users } from '@/lib/db'
 
@@ -21,7 +22,7 @@ export async function GET() {
   const g = await gate()
   if (g.error) return g.error
   const rows = await db
-    .select({ k: apiKeys, ownerName: users.fullName, ownerEmail: users.email })
+    .select({ k: apiKeys, ownerName: users.fullName, ownerEmail: users.email, ownerRole: users.role })
     .from(apiKeys)
     .leftJoin(users, eq(apiKeys.userId, users.id))
     .where(isAdmin(g.role) ? undefined : eq(apiKeys.userId, g.userId))
@@ -43,7 +44,10 @@ export async function GET() {
       scopes: r.k.scopes,
       expires_at: r.k.expiresAt ? new Date(r.k.expiresAt).toISOString() : null,
       is_active: r.k.isActive,
-      rate_limit_per_hour: r.k.rateLimitPerHour,
+      rate_limit_per_hour: Math.min(r.k.rateLimitPerHour, callsPerHourForRole(r.ownerRole)),
+      max_calls_per_hour: callsPerHourForRole(r.ownerRole),
+      owner_role: r.ownerRole,
+      allowed_scopes: allowedScopesForRole(r.ownerRole),
       last_used_at: r.k.lastUsedAt ? new Date(r.k.lastUsedAt).toISOString() : null,
       created_at: r.k.createdAt ? new Date(r.k.createdAt).toISOString() : null,
       owner: r.ownerName || r.ownerEmail || null,
