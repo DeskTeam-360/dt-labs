@@ -1,7 +1,7 @@
 'use client'
 
 import { CopyOutlined, DeleteOutlined, KeyOutlined, MailOutlined, PhoneOutlined, PlusOutlined,UploadOutlined, UserOutlined } from '@ant-design/icons'
-import { Avatar, Button, Card, Col, Divider, Form, Input, Layout, message, Popconfirm,Row, Select, Space, Tag, Typography, Upload } from 'antd'
+import { Avatar, Button, Card, Col, Descriptions, Divider, Form, Input, Layout, message, Popconfirm,Row, Select, Space, Tag, Typography, Upload } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useEffect,useState } from 'react'
@@ -10,7 +10,7 @@ import ApiKeysContent from '@/components/content/settings/ApiKeysContent'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import MyTeamReportCard from '@/components/profile/MyTeamReportCard'
-import { canManageApiKeys, canViewCustomerReports, isAdmin } from '@/lib/auth-utils'
+import { canManageApiKeys, canViewCustomerReports } from '@/lib/auth-utils'
 import { TIMEZONE_OPTIONS } from '@/lib/timezones'
 import { USER_DEPARTMENTS, USER_POSITIONS } from '@/lib/user-work-dropdowns'
 import { uploadAvatar } from '@/utils/storage'
@@ -42,6 +42,20 @@ interface ProfileContentProps {
     timezone?: string
     locale?: string
     default_job_type?: string | null
+    account?: {
+      id: string
+      role: string
+      status: string
+      is_email_verified: boolean
+      company_name: string | null
+      shift: { title: string; start: string; end: string } | null
+      joined_at: string | null
+      left_at: string | null
+      created_at: string | null
+      updated_at: string | null
+      last_login_at: string | null
+      last_active_at: string | null
+    }
   }
 }
 
@@ -458,6 +472,60 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
 
           {canViewCustomerReports((clientSession?.user as { role?: string } | undefined)?.role) ? <MyTeamReportCard /> : null}
 
+          {userData?.account ? (
+            <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+              <Col xs={24} lg={12}>
+                <Card title="Account Status" size="small">
+                  <Descriptions column={1} bordered>
+                    <Descriptions.Item label="Role">
+                      <Tag style={{ margin: 0, textTransform: 'uppercase' }}>{userData.account.role}</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Status">
+                      <Tag color={userData.account.status === 'active' ? 'green' : 'default'} style={{ margin: 0, textTransform: 'uppercase' }}>{userData.account.status}</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Email Verified">{userData.account.is_email_verified ? 'Yes' : 'No'}</Descriptions.Item>
+                    <Descriptions.Item label="Company">{userData.account.company_name ?? '—'}</Descriptions.Item>
+                    <Descriptions.Item label="Shift">
+                      {userData.account.shift ? (
+                        <Space>
+                          <Tag color="geekblue" style={{ margin: 0 }}>{userData.account.shift.title}</Tag>
+                          <Text type="secondary">{userData.account.shift.start} - {userData.account.shift.end} WIB</Text>
+                        </Space>
+                      ) : (
+                        <Text type="secondary">No shift</Text>
+                      )}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="First working day">{userData.account.joined_at ?? '—'}</Descriptions.Item>
+                    <Descriptions.Item label="Last working day">{userData.account.left_at ?? '—'}</Descriptions.Item>
+                    <Descriptions.Item label="User ID">
+                      <Text code style={{ fontSize: 12 }}>{userData.account.id}</Text>
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Card>
+              </Col>
+              <Col xs={24} lg={12}>
+                <Card title="Activity" size="small">
+                  <Descriptions column={1} bordered>
+                    {(
+                      [
+                        ['Created At', userData.account.created_at],
+                        ['Last Updated', userData.account.updated_at],
+                        ['Last Login', userData.account.last_login_at],
+                        ['Last Active', userData.account.last_active_at],
+                      ] as const
+                    ).map(([label, value]) => (
+                      <Descriptions.Item key={label} label={label}>
+                        {value
+                          ? new Date(value).toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                          : 'N/A'}
+                      </Descriptions.Item>
+                    ))}
+                  </Descriptions>
+                </Card>
+              </Col>
+            </Row>
+          ) : null}
+
           <Card style={{ marginTop: 24 }}>
             <Title level={3}>
               <KeyOutlined /> API Tokens for Chrome Extension
@@ -569,7 +637,7 @@ export default function ProfileContent({ user, userData }: ProfileContentProps) 
               )}
             </div>
           </Card>
-          {myRole && canManageApiKeys(myRole) && !isAdmin(myRole) ? (
+          {myRole && canManageApiKeys(myRole) ? (
             <Card style={{ marginTop: 24 }}>
               <Title level={3}>AI connections</Title>
               <ApiKeysContent user={{ id: user.id, email: user.email, name: user.name, role: myRole }} embedded />
