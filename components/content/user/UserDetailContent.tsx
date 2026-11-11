@@ -8,11 +8,13 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useCallback, useEffect, useMemo,useRef, useState } from 'react'
 
+import MyTeamReportCard from '@/components/profile/MyTeamReportCard'
 import ProfileIntegrations from '@/components/profile/ProfileIntegrations'
 import UserSkillsField from '@/components/skills/UserSkillsField'
 import UserCompanyHistory from '@/components/user/UserCompanyHistory'
 import ViewAsButton, { canViewAs } from '@/components/user/ViewAsButton'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
+import { canViewCustomerReports } from '@/lib/auth-utils'
 import { TIMEZONE_OPTIONS } from '@/lib/timezones'
 import {
   getUserDepartmentAccentColor,
@@ -1277,6 +1279,12 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         />
                       )}
 
+                      {isOwnProfile && canViewCustomerReports((currentUser as { role?: string }).role) ? (
+                        <div style={{ marginBottom: 24 }}>
+                          <MyTeamReportCard />
+                        </div>
+                      ) : null}
+
                       {/* Filter Section */}
                       <Card style={{ marginBottom: 24 }}>
                         <Flex justify="space-between" align="center">
@@ -1316,7 +1324,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         </Flex>
                       </Card>
                       <Row gutter={[24, 24]}>
-                        <Col xs={24} sm={12}>
+                        <Col xs={24}>
                         <Card title="Most reported tickets" size="small" loading={timeTrackerLoading}>
                         <Row gutter={[24, 16]}>
                           
@@ -1466,9 +1474,10 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         />
                       </Drawer>
                         </Col>
-                        <Col xs={24} sm={12}> 
-                        <Card>
+                        <Col xs={24}>
+                        <Card title="Time entries" size="small">
                         <Table
+                        scroll={{ x: 'max-content' }}
                         columns={[
                           {
                             title: 'Ticket',

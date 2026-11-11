@@ -6,8 +6,7 @@ import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
 
 import ApiKeysContent from '@/components/content/settings/ApiKeysContent'
-import MyTeamReportCard from '@/components/profile/MyTeamReportCard'
-import { canManageApiKeys, canViewCustomerReports } from '@/lib/auth-utils'
+import { canManageApiKeys } from '@/lib/auth-utils'
 
 const { Title, Text } = Typography
 
@@ -21,7 +20,7 @@ interface ApiToken {
   created_at: string
 }
 
-/** The parts only the signed-in person sees on their own profile: team report, AI connections and the Chrome Extension tokens. */
+/** The parts only the signed-in person sees on their own profile: AI connections and the Chrome Extension tokens. */
 export default function ProfileIntegrations({ user }: { user: { id: string; email?: string | null; name?: string | null } }) {
   const { data: clientSession } = useSession()
   const myRole = ((clientSession?.user as { role?: string } | undefined)?.role ?? '').toLowerCase()
@@ -94,7 +93,6 @@ export default function ProfileIntegrations({ user }: { user: { id: string; emai
 
   return (
     <>
-      {canViewCustomerReports(myRole) ? <MyTeamReportCard /> : null}
             <Card style={{ marginTop: 24 }}>
               <Title level={3}>
                 <KeyOutlined /> API Tokens for Chrome Extension
