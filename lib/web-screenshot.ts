@@ -79,7 +79,7 @@ function isPrivateIp(ip: string): boolean {
 }
 
 /** Only http(s) addresses whose name resolves to public IPs only. Throws CaptureError otherwise. */
-async function assertPublicUrl(raw: string): Promise<URL> {
+export async function assertPublicUrl(raw: string): Promise<URL> {
   let u: URL
   try {
     u = new URL(raw)

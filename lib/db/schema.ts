@@ -1229,3 +1229,57 @@ export const oauthGrants = pgTable(
   },
   (t) => [index('oauth_grants_refresh_idx').on(t.refreshHash)]
 )
+
+// ============ WordPress monitoring (wp-plugin) ============
+export const wpSites = pgTable('wp_sites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  /** Normalised site URL (lowercase, no trailing slash); the plugin sends it in X-DT360-Site. */
+  siteUrl: text('site_url').notNull().unique(),
+  name: varchar('name', { length: 255 }),
+  companyId: uuid('company_id').references(() => companies.id, { onDelete: 'set null' }),
+  /** Shared secret for the HMAC signature; shown once when the site is registered. */
+  secretKey: text('secret_key').notNull(),
+  wpVersion: varchar('wp_version', { length: 50 }),
+  phpVersion: varchar('php_version', { length: 50 }),
+  lastReport: jsonb('last_report'),
+  lastSeenAt: ts('last_seen_at'),
+  /** This server's own check of the site (not the plugin's report), so a site that is down shows even though it cannot report. */
+  uptimeOk: boolean('uptime_ok'),
+  uptimeStatus: integer('uptime_status'),
+  uptimeMs: integer('uptime_ms'),
+  uptimeCheckedAt: ts('uptime_checked_at'),
+  uptimeFailCount: integer('uptime_fail_count').notNull().default(0),
+  uptimeDownSince: ts('uptime_down_since'),
+  /** No notifications until then (planned maintenance). */
+  snoozedUntil: ts('snoozed_until'),
+  /** Signature of the last accepted report, so the same signed request cannot be replayed. */
+  lastSignature: varchar('last_signature', { length: 64 }),
+  createdAt: ts('created_at').notNull().defaultNow(),
+})
+
+export const wpSiteReports = pgTable(
+  'wp_site_reports',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    siteId: uuid('site_id').notNull().references(() => wpSites.id, { onDelete: 'cascade' }),
+    payload: jsonb('payload').notNull(),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('wp_site_reports_site_created_idx').on(t.siteId, t.createdAt)],
+)
+
+/** One alarm of one kind on one site: opened when the condition appears, cleared when it is gone, never repeated while open. */
+export const wpSiteAlarms = pgTable(
+  'wp_site_alarms',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    siteId: uuid('site_id').notNull().references(() => wpSites.id, { onDelete: 'cascade' }),
+    code: varchar('code', { length: 40 }).notNull(),
+    level: varchar('level', { length: 10 }).notNull(),
+    message: text('message').notNull(),
+    openedAt: ts('opened_at').notNull().defaultNow(),
+    clearedAt: ts('cleared_at'),
+    notifiedAt: ts('notified_at'),
+  },
+  (t) => [index('wp_site_alarms_site_idx').on(t.siteId, t.openedAt)]
+)
