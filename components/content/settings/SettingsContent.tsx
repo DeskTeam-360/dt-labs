@@ -10,6 +10,7 @@ import {
   CheckSquareOutlined,
   ClockCircleOutlined,
   CloudDownloadOutlined,
+  CloudServerOutlined,
   FileTextOutlined,
   GlobalOutlined,
   InfoCircleOutlined,
@@ -268,6 +269,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                       description="Every AI assistant connected to DeskTeam360, with its access and usage"
                       href="/settings/api-keys"
                       icon={<ApiOutlined />}
+                    />
+                  </Col>
+                )}
+                {['admin', 'operations', 'manager'].includes((role ?? '').toLowerCase()) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="WordPress Monitoring"
+                      description="How the monitored WordPress sites are doing: updates, SSL, backups, security and uptime"
+                      href="/wp-monitor"
+                      icon={<CloudServerOutlined />}
                     />
                   </Col>
                 )}

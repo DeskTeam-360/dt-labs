@@ -509,6 +509,7 @@ export default function CompanyDetailContent({
           websites={websites}
           loadingWebsites={loadingWebsites}
           getLastCrawlSession={getLastCrawlSession}
+          onChanged={fetchWebsites}
           onAddWebsite={handleWebsiteCreate}
           onEditWebsite={handleWebsiteEdit}
           onDeleteWebsite={handleWebsiteDelete}

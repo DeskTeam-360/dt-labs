@@ -1,9 +1,11 @@
-import { desc,eq } from 'drizzle-orm'
+import { desc, eq, isNull, or } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { companyWebsites } from '@/lib/db'
+import { companyWebsites, wpSites } from '@/lib/db'
+import { evaluateWpSite } from '@/lib/wp-health'
+import { siteMatchKey } from '@/lib/wp-monitor'
 
 /** GET /api/company-websites?company_id=... */
 export async function GET(request: Request) {
@@ -32,6 +34,14 @@ export async function GET(request: Request) {
     return db2 - da
   })
 
+
+  // A website that is also a monitored WordPress site (matched on its address) comes with how that site is doing. Staff only: no customer sees it.
+  const role = ((session.user as { role?: string }).role ?? '').toLowerCase()
+  const wpByKey = new Map<string, typeof wpSites.$inferSelect>()
+  if (companyId && role !== 'customer') {
+    const wpRows = await db.select().from(wpSites).where(or(eq(wpSites.companyId, companyId), isNull(wpSites.companyId)))
+    for (const w of wpRows) wpByKey.set(siteMatchKey(w.siteUrl), w)
+  }
   const data = rows.map((r) => ({
     id: r.id,
     company_id: r.companyId,
@@ -41,6 +51,12 @@ export async function GET(request: Request) {
     is_primary: r.isPrimary ?? false,
     created_at: r.createdAt ? new Date(r.createdAt).toISOString() : '',
     updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
+    wp_site: (() => {
+      const w = wpByKey.get(siteMatchKey(r.url))
+      if (!w) return null
+      const h = evaluateWpSite(w.lastSeenAt, w.lastReport as Record<string, unknown> | null)
+      return { id: w.id, site_url: w.siteUrl, registered_to_company: w.companyId === companyId, health: h.level, problems: h.problems, facts: h.facts }
+    })(),
   }))
 
   return NextResponse.json({ data })
