@@ -74,6 +74,7 @@ export default async function SettingsUserDetailPage({
     bio: u.bio,
     timezone: u.timezone,
     locale: u.locale,
+    default_job_type: u.defaultJobType ?? null,
     joined_at: u.joinedAt ?? null,
     left_at: u.leftAt ?? null,
     is_email_verified: u.isEmailVerified,

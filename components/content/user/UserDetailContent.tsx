@@ -1,12 +1,14 @@
 'use client'
 
-import { ArrowLeftOutlined, BankOutlined, CalendarOutlined, ClockCircleOutlined, CloseOutlined, EditOutlined, GlobalOutlined, HistoryOutlined, IdcardOutlined, LockOutlined, MailOutlined, NumberOutlined,PhoneOutlined, SaveOutlined, ToolOutlined, TranslationOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons'
+import { ApiOutlined, ArrowLeftOutlined, BankOutlined, CalendarOutlined, ClockCircleOutlined, CloseOutlined, EditOutlined, GlobalOutlined, HistoryOutlined, IdcardOutlined, LockOutlined, MailOutlined, NumberOutlined,PhoneOutlined, SaveOutlined, ToolOutlined, TranslationOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons'
 import { Avatar, Button, Card, Col, DatePicker, Descriptions, Divider, Drawer, Flex,Form, Input, Layout, message, Modal, Radio, Row, Select, Space, Statistic, Switch, Table, Tabs, Tag, Typography, Upload } from 'antd'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useCallback, useEffect, useMemo,useRef, useState } from 'react'
 
+import ProfileIntegrations from '@/components/profile/ProfileIntegrations'
 import UserSkillsField from '@/components/skills/UserSkillsField'
 import UserCompanyHistory from '@/components/user/UserCompanyHistory'
 import ViewAsButton, { canViewAs } from '@/components/user/ViewAsButton'
@@ -68,8 +70,11 @@ export default function UserDetailContent({ user: currentUser, userData: initial
   const openedEditFromQueryRef = useRef(false)
   const [collapsed, setCollapsed] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  // The job type preselected when the person starts a timer (own profile only).
+  const [jobTypeOptions, setJobTypeOptions] = useState<{ slug: string; title: string }[]>([])
   const [userData, setUserData] = useState(initialUserData)
   const extraCompanies: { id: string; name: string }[] = userData.extra_companies ?? []
+  const { update: updateSession } = useSession()
   const isOwnProfile = String(currentUser.id) === String(userData?.id)
   const [shiftOptions, setShiftOptions] = useState<{ id: string; title: string; start: string; end: string; crosses_midnight: boolean }[]>([])
   useEffect(() => {
@@ -342,6 +347,14 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     }
     return colorMap[status] || 'default'
   }
+  useEffect(() => {
+    if (!isOwnProfile) return
+    fetch('/api/job-types', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => setJobTypeOptions(Array.isArray(rows) ? rows : []))
+      .catch(() => setJobTypeOptions([]))
+  }, [isOwnProfile])
+
 
   const handleEdit = () => {
     setIsEditing(true)
@@ -358,6 +371,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       bio: userData.bio || '',
       timezone: userData.timezone || 'UTC',
       locale: userData.locale || 'en',
+      default_job_type: (userData as { default_job_type?: string | null }).default_job_type || undefined,
       joined_at: userData.joined_at ? dayjs(userData.joined_at) : null,
       left_at: userData.left_at ? dayjs(userData.left_at) : null,
       shift_id: userData.shift_id || undefined,
@@ -388,6 +402,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       bio: userData.bio || '',
       timezone: userData.timezone || 'UTC',
       locale: userData.locale || 'en',
+      default_job_type: (userData as { default_job_type?: string | null }).default_job_type || undefined,
       joined_at: userData.joined_at ? dayjs(userData.joined_at) : null,
       left_at: userData.left_at ? dayjs(userData.left_at) : null,
       is_email_verified: userData.is_email_verified || false,
@@ -455,6 +470,15 @@ export default function UserDetailContent({ user: currentUser, userData: initial
         updateData.company_id = values.company_id || null
       }
 
+      // The default job type of the timer lives in the person's own profile settings.
+      if (isOwnProfile) {
+        await apiFetch('/api/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ default_job_type: values.default_job_type || null }),
+        })
+      }
+
       await apiFetch(`/api/users/${userData.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -464,6 +488,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
       setIsEditing(false)
       setActiveTabKey('general')
       message.success(isOwnProfile ? 'Profile updated successfully' : 'User updated successfully')
+      // The header shows the signed-in person's name and picture, so it is refreshed after they change their own.
+      if (isOwnProfile) await updateSession({})
       router.refresh()
     } catch (error: any) {
       message.error(error.message || 'Failed to update user')
@@ -859,6 +885,11 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                         <Form.Item name="timezone" label="Timezone">
                           <Select options={TIMEZONE_OPTIONS} prefix={<GlobalOutlined />} placeholder="Select Timezone" showSearch />
                         </Form.Item>
+                        {isOwnProfile && !isCustomer && (
+                          <Form.Item name="default_job_type" label="Default job type (Time Tracker)" extra="Preselected when you start a timer on a ticket.">
+                            <Select allowClear placeholder="Other" options={jobTypeOptions.map((o) => ({ value: o.slug, label: o.title }))} />
+                          </Form.Item>
+                        )}
                         {isAdmin && (
                           <>
                             <Form.Item name="shift_id" label="Shift" extra="Times are WIB. Manage the list in Settings, Shifts.">
@@ -929,6 +960,11 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             <Text>{userData.timezone || 'UTC'}</Text>
                           </Space>
                         </Descriptions.Item>
+                        {isOwnProfile && !isCustomer && (
+                          <Descriptions.Item label="Default job type">
+                            {jobTypeOptions.find((o) => o.slug === (userData as { default_job_type?: string | null }).default_job_type)?.title ?? 'Other'}
+                          </Descriptions.Item>
+                        )}
                         {!isCustomer && (
                           <Descriptions.Item label="Shift">
                             {(() => {
@@ -1588,6 +1624,20 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             />
                           </Card>
                         ),
+                      },
+                    ]
+                  : []),
+                ...(isOwnProfile && !isCustomer
+                  ? [
+                      {
+                        key: 'integrations',
+                        label: (
+                          <span>
+                            <ApiOutlined />
+                            Integrations
+                          </span>
+                        ),
+                        children: <ProfileIntegrations user={{ id: String(userData.id), email: userData.email, name: userData.full_name }} />,
                       },
                     ]
                   : []),
