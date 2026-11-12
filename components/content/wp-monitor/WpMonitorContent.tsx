@@ -43,12 +43,12 @@ const SNOOZE_OPTIONS = [
 
 type SessionUser = { id: string; email?: string | null; name?: string | null; role?: string | null }
 
-function Trend({ title, data, dataKey }: { title: string; data: { at: string; v: number | null }[]; dataKey?: string }) {
+function Trend({ title, data, dataKey, note }: { title: string; data: { at: string; v: number | null }[]; dataKey?: string; note?: string }) {
   const rows = data.filter((d) => d.v !== null).map((d) => ({ day: dayjs(d.at).format('MMM D'), [dataKey ?? 'v']: d.v }))
   return (
     <Card size="small" title={title}>
       {rows.length < 2 ? (
-        <Text type="secondary">Not enough reports yet.</Text>
+        <Text type="secondary">{data.length > 0 && !data.some((d) => d.v !== null) ? (note ?? 'This site does not report this.') : 'Not enough reports yet.'}</Text>
       ) : (
         <ResponsiveContainer width="100%" height={140}>
           <LineChart data={rows}>
@@ -72,6 +72,7 @@ export default function WpMonitorContent({ user }: { user: SessionUser }) {
   const [open, setOpen] = useState<Site | null>(null)
   const [points, setPoints] = useState<WpPoint[]>([])
   const [rotated, setRotated] = useState<{ label: string; key: string } | null>(null)
+  const [checking, setChecking] = useState(false)
   const isAdminUser = (user.role ?? '').toLowerCase() === 'admin'
 
   const load = useCallback(async () => {
@@ -115,6 +116,23 @@ export default function WpMonitorContent({ user }: { user: SessionUser }) {
     const j = (await res.json().catch(() => ({}))) as { secret_key?: string; error?: string }
     if (!res.ok || !j.secret_key) return void message.error(j.error || 'Could not make a new key')
     setRotated({ label: site.name || site.site_url, key: j.secret_key })
+  }
+
+  /** Looks at the site now: opens it, asks the plugin for a fresh report, updates the alarms. */
+  const checkNow = async (site: Site) => {
+    setChecking(true)
+    try {
+      const res = await fetch(`/api/wp-monitor/sites/${site.id}/check`, { method: 'POST', credentials: 'include' })
+      const j = (await res.json().catch(() => ({}))) as { uptime_ok?: boolean; report?: string; report_note?: string | null; error?: string }
+      if (!res.ok) throw new Error(j.error || 'The check failed')
+      const note = j.report === 'fresh' ? 'fresh report received' : `kept the last report (${j.report_note ?? 'no answer'})`
+      message[j.uptime_ok ? 'success' : 'warning'](`${j.uptime_ok ? 'The site answers' : 'The site does not answer'}; ${note}`, 6)
+      void load()
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setChecking(false)
+    }
   }
 
   const remove = async (site: Site) => {
@@ -220,6 +238,7 @@ export default function WpMonitorContent({ user }: { user: SessionUser }) {
               <Tag color={HEALTH_COLOR[open.health]} style={{ margin: 0 }}>{HEALTH_LABEL[open.health]}</Tag>
               <a href={open.site_url} target="_blank" rel="noopener noreferrer">{open.site_url}</a>
               <a href={`${open.site_url}/wp-admin/update-core.php`} target="_blank" rel="noopener noreferrer">Open updates in wp-admin</a>
+              <Button size="small" loading={checking} onClick={() => void checkNow(open)}>Check now</Button>
             </Flex>
 
             {isSnoozed(open) ? <Alert type="info" showIcon title={`Alarms are quiet until ${dayjs(open.snoozed_until).format('MMM D, HH:mm')}`} action={<Button size="small" onClick={() => void snooze(open, 0)}>Turn alarms on</Button>} /> : (
@@ -233,7 +252,7 @@ export default function WpMonitorContent({ user }: { user: SessionUser }) {
 
             <Row gutter={[12, 12]}>
               <Col xs={24} md={12}><Trend title="Plugin updates pending" data={points.map((p) => ({ at: p.at, v: p.plugin_updates }))} /></Col>
-              <Col xs={24} md={12}><Trend title="Failed logins (24h)" data={points.map((p) => ({ at: p.at, v: p.failed_logins }))} /></Col>
+              <Col xs={24} md={12}><Trend title="Failed logins (24h)" note="Not reported: failed logins need Wordfence on the site." data={points.map((p) => ({ at: p.at, v: p.failed_logins }))} /></Col>
               <Col xs={24} md={12}><Trend title="SSL days left" data={points.map((p) => ({ at: p.at, v: p.ssl_days_left }))} /></Col>
               <Col xs={24} md={12}><Trend title="Spam comments (total)" data={points.map((p) => ({ at: p.at, v: p.spam }))} /></Col>
             </Row>

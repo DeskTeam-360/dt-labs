@@ -4,6 +4,7 @@ import { captureAfterCrawl } from '@/lib/crawl-auto-screenshots'
 import { alertNewExternalLinks } from '@/lib/crawl-external-alerts'
 import { db } from '@/lib/db'
 import { companyWebsites, crawlPages, crawlSessions } from '@/lib/db/schema'
+import { checkWpAfterCrawl } from '@/lib/wp-check'
 
 // Normalize URL to avoid duplicate crawling (normalize trailing slash)
 // The #fragment is never part of the page: /who-we-help/#practices and /who-we-help/#small are the same page.
@@ -627,6 +628,14 @@ export async function startCrawlProcess(
     if (alert.newLinks > 0) console.log(`[Crawl] ${alert.newLinks} new external link(s), ${alert.sent} PIC(s) emailed`)
   } catch (alertError) {
     console.error('[Crawl] Could not check for new external links:', alertError)
+  }
+
+  // A crawled website that is a monitored WordPress site is looked at now: its address is opened, the plugin is asked for a fresh report and the alarms are updated.
+  try {
+    const wp = await checkWpAfterCrawl(sessionId)
+    if (wp) console.log(`[Crawl] WordPress check of ${wp.site}: up=${wp.uptime_ok}, report ${wp.report}${wp.report_note ? ` (${wp.report_note})` : ''}`)
+  } catch (wpError) {
+    console.error('[Crawl] Could not check the WordPress site:', wpError)
   }
 
   // Pictures the person asked for when starting the crawl run on their own, after the crawl is already finished.

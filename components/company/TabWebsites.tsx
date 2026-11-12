@@ -40,6 +40,23 @@ export default function TabWebsites({
   const [registeringId, setRegisteringId] = useState<string | null>(null)
   const [setup, setSetup] = useState<{ label: string; key: string } | null>(null)
 
+  /** Looks at a monitored site now: opens it, asks the plugin for a fresh report, updates the alarms. */
+  const checkNow = async (record: any) => {
+    setRegisteringId(record.id)
+    try {
+      const res = await fetch(`/api/wp-monitor/sites/${record.wp_site.id}/check`, { method: 'POST', credentials: 'include' })
+      const j = (await res.json().catch(() => ({}))) as { uptime_ok?: boolean; report?: string; report_note?: string | null; error?: string }
+      if (!res.ok) throw new Error(j.error || 'The check failed')
+      const note = j.report === 'fresh' ? 'fresh report received' : `kept the last report (${j.report_note ?? 'no answer'})`
+      message[j.uptime_ok ? 'success' : 'warning'](`${j.uptime_ok ? 'The site answers' : 'The site does not answer'}; ${note}`, 6)
+      onChanged?.()
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setRegisteringId(null)
+    }
+  }
+
   /** Registers the website for monitoring and shows its key once, with what to put in the site's wp-config.php. */
   const registerForMonitoring = async (record: any) => {
     setRegisteringId(record.id)
@@ -118,6 +135,11 @@ export default function TabWebsites({
         const lastCrawlSession = getLastCrawlSession(record.id)
         return (
           <Space>
+            {record.wp_site ? (
+              <Button type="link" loading={registeringId === record.id} onClick={() => void checkNow(record)}>
+                Check now
+              </Button>
+            ) : null}
             {isAdminUser && !record.wp_site ? (
               <Tooltip title="Watch this site with the DeskTeam360 Monitor plugin">
                 <Button type="link" loading={registeringId === record.id} onClick={() => void registerForMonitoring(record)}>

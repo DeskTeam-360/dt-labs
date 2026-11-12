@@ -11,8 +11,10 @@ import DateDisplay from '@/components/common/DateDisplay'
 import CrawlGenerateModal from '@/components/content/crawl/CrawlGenerateModal'
 import CrawlSessionScreenshotLinks from '@/components/content/crawl/CrawlSessionScreenshotLinks'
 import CrawlSessionScreenshots from '@/components/content/crawl/CrawlSessionScreenshots'
+import CrawlSessionWordPress from '@/components/content/crawl/CrawlSessionWordPress'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import type { WpSiteSummary } from '@/components/wp-monitor/WpSiteDetails'
 import { compareCrawls,type CompareRow } from '@/lib/crawl-compare'
 import { buildGroups, type CrawlPageLite, groupKeyOf } from '@/lib/crawl-groups'
 import { analyzeSeo, findBrokenLinks, SEO_ISSUE_LABELS, type SeoPage, summarizeByGroup } from '@/lib/crawl-seo'
@@ -114,6 +116,24 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       live = false
     }
   }, [crawlSession.id, crawlSession.company_website_id])
+
+  // the WordPress monitor's view of this website (staff only: the list comes back without it for customers)
+  const [wpSite, setWpSite] = useState<WpSiteSummary | null>(null)
+  const [wpTick, setWpTick] = useState(0)
+  const wpCompanyId = crawlSession.company_websites?.company_id
+  useEffect(() => {
+    if (!wpCompanyId) return
+    let live = true
+    fetch(`/api/company-websites?company_id=${wpCompanyId}`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((j: { data?: Array<{ id: string; wp_site: WpSiteSummary | null }> }) => {
+        if (live) setWpSite(j.data?.find((w) => w.id === crawlSession.company_website_id)?.wp_site ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [wpCompanyId, crawlSession.company_website_id, wpTick])
 
   const pickBaseline = async (id: string | null) => {
     setBaselineId(id)
@@ -1816,6 +1836,15 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       label: 'Screenshots',
       children: <CrawlSessionScreenshots sessionId={crawlSession.id} pages={crawlPages} />,
     },
+    ...(wpSite
+      ? [
+          {
+            key: 'wordpress',
+            label: 'WordPress',
+            children: <CrawlSessionWordPress wp={wpSite} onChanged={() => setWpTick((n) => n + 1)} />,
+          },
+        ]
+      : []),
     {
       key: 'share-preview',
       label: 'Share Preview',

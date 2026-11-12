@@ -1,16 +1,16 @@
 import { createHmac, timingSafeEqual } from 'crypto'
-import { and,eq, lt } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 
-import { db, wpSiteReports, wpSites } from '@/lib/db'
+import { db, wpSites } from '@/lib/db'
 import { syncSiteAlarms } from '@/lib/wp-alarms'
+import { storeWpReport } from '@/lib/wp-ingest'
 import { normaliseSiteUrl } from '@/lib/wp-monitor'
 
 export const dynamic = 'force-dynamic'
 
 const MAX_BODY_BYTES = 1_000_000
 const MAX_SKEW_SECONDS = 300
-const KEEP_REPORT_DAYS = 90
 const MIN_SECONDS_BETWEEN_REPORTS = 20
 
 function safeEqualHex(a: string, b: string) {
@@ -55,31 +55,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Too many reports; wait a moment' }, { status: 429 })
   }
 
-  // Administrator email addresses are not needed to spot a new administrator (the id and login are enough), so they are not kept.
-  const users = payload.users as { administrators?: Record<string, unknown>[] } | undefined
-  if (users && Array.isArray(users.administrators)) {
-    users.administrators = users.administrators.map(({ email: _email, ...rest }) => rest)
-  }
-
-  const str = (v: unknown) => (typeof v === 'string' ? v.slice(0, 50) : null)
-  const [updated] = await db
-    .update(wpSites)
-    .set({
-      wpVersion: str(payload.wp_version),
-      phpVersion: str(payload.php_version),
-      lastReport: payload,
-      lastSeenAt: new Date(),
-      lastSignature: sig.slice(0, 64),
-    })
-    .where(eq(wpSites.id, site.id))
-    .returning()
-  await db.insert(wpSiteReports).values({ siteId: site.id, payload })
-  await db
-    .delete(wpSiteReports)
-    .where(and(eq(wpSiteReports.siteId, site.id), lt(wpSiteReports.createdAt, new Date(Date.now() - KEEP_REPORT_DAYS * 86400000))))
+  const updated = await storeWpReport(site, payload, sig)
 
   // Alarms follow the new report at once; a failure here never makes the plugin's report fail.
-  if (updated) await syncSiteAlarms(updated).catch((e) => console.error('[wp-monitor] alarms:', e))
+  await syncSiteAlarms(updated).catch((e) => console.error('[wp-monitor] alarms:', e))
 
   return NextResponse.json({ ok: true })
 }

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DeskTeam360 Monitor
  * Description: Sends WordPress/PHP version, comments, Gravity Forms entry log and Wordfence log to an external endpoint, signed with a secret key (HMAC).
- * Version: 0.1.0
+ * Version: 0.2.1
  * Requires PHP: 7.4
  * Author: DeskTeam360
  *
@@ -29,6 +29,7 @@ final class DT360_Monitor {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_post_dt360_send_now', array( __CLASS__, 'send_now' ) );
 		add_action( 'admin_post_dt360_save', array( __CLASS__, 'save' ) );
+		add_action( 'rest_api_init', array( __CLASS__, 'register_rest' ) );
 	}
 
 	public static function activate() {
@@ -120,8 +121,8 @@ final class DT360_Monitor {
 			);
 		}
 		$out   = array( 'administrators' => $admins, 'failed_logins_24h' => null );
-		$table = $wpdb->prefix . 'wfLogins';
-		if ( self::table_exists( $table ) ) {
+		$table = self::find_table( $wpdb->prefix . 'wfLogins' );
+		if ( $table ) {
 			$since                      = time() - DAY_IN_SECONDS;
 			$out['failed_logins_24h']   = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `$table` WHERE fail = 1 AND ctime >= %d", $since ) );
 			$out['failed_login_users']  = array_map( function ( $r ) {
@@ -245,9 +246,11 @@ final class DT360_Monitor {
 		return $out;
 	}
 
-	private static function table_exists( $table ) {
+	/** The real name of a table, found without regard to upper or lower case (some servers store table names in lower case), or null. */
+	private static function find_table( $table ) {
 		global $wpdb;
-		return $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table;
+		$found = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+		return $found && 0 === strcasecmp( $found, $table ) ? $found : null;
 	}
 
 	private static function wordfence() {
@@ -257,8 +260,8 @@ final class DT360_Monitor {
 		}
 		$out = array( 'active' => true, 'version' => WORDFENCE_VERSION );
 
-		$issues = $wpdb->prefix . 'wfIssues';
-		if ( self::table_exists( $issues ) ) {
+		$issues = self::find_table( $wpdb->prefix . 'wfIssues' );
+		if ( $issues ) {
 			$out['open_issues'] = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `$issues` WHERE status = %s", 'new' ) );
 			$rows               = $wpdb->get_results( $wpdb->prepare( "SELECT type, severity, shortMsg, time FROM `$issues` WHERE status = %s ORDER BY severity ASC, time DESC LIMIT 20", 'new' ), ARRAY_A );
 			$out['issues']      = array_map( function ( $r ) {
@@ -269,14 +272,14 @@ final class DT360_Monitor {
 			}, (array) $rows );
 		}
 
-		$blocked = $wpdb->prefix . 'wfBlockedIPLog';
-		if ( self::table_exists( $blocked ) ) {
+		$blocked = self::find_table( $wpdb->prefix . 'wfBlockedIPLog' );
+		if ( $blocked ) {
 			$day                 = (int) floor( time() / 86400 ) - 1;
 			$out['blocked_24h']  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(SUM(blockCount),0) FROM `$blocked` WHERE unixday >= %d", $day ) );
 		}
 
-		$status = $wpdb->prefix . 'wfStatus';
-		if ( self::table_exists( $status ) ) {
+		$status = self::find_table( $wpdb->prefix . 'wfStatus' );
+		if ( $status ) {
 			$rows       = $wpdb->get_results( "SELECT ctime, level, type, msg FROM `$status` WHERE level <= 2 ORDER BY ctime DESC LIMIT 30", ARRAY_A );
 			$out['log'] = array_map( function ( $r ) {
 				return array(
@@ -286,6 +289,31 @@ final class DT360_Monitor {
 			}, (array) $rows );
 		}
 		return $out;
+	}
+
+	/* ---------- On request (DeskTeam360 asks for the report, e.g. when it crawls the site) ---------- */
+
+	public static function register_rest() {
+		register_rest_route( 'dt360-monitor/v1', '/report', array(
+			'methods'             => 'GET',
+			'callback'            => array( __CLASS__, 'rest_report' ),
+			'permission_callback' => array( __CLASS__, 'rest_allowed' ),
+		) );
+	}
+
+	/** The request must carry X-DT360-Timestamp (within 5 minutes) and X-DT360-Signature = HMAC-SHA256(key, timestamp + ".report"). */
+	public static function rest_allowed( $request ) {
+		$key = self::key();
+		$ts  = (string) $request->get_header( 'x-dt360-timestamp' );
+		$sig = (string) $request->get_header( 'x-dt360-signature' );
+		if ( '' === $key || ! ctype_digit( $ts ) || abs( time() - (int) $ts ) > 300 || '' === $sig ) {
+			return false;
+		}
+		return hash_equals( hash_hmac( 'sha256', $ts . '.report', $key ), $sig );
+	}
+
+	public static function rest_report() {
+		return rest_ensure_response( self::collect() );
 	}
 
 	/* ---------- Sending ---------- */
@@ -387,7 +415,7 @@ final class DT360_Monitor {
 				<?php submit_button( 'Send now', 'secondary' ); ?>
 			</form>
 			<p>Last send: <?php echo $last ? esc_html( $last['time'] . ' — ' . ( $last['ok'] ? 'OK' : 'FAILED' ) . ' (' . $last['message'] . ')' ) : 'never'; ?></p>
-			<p class="description">Sent hourly via WP-Cron. Request headers: X-DT360-Timestamp and X-DT360-Signature = HMAC-SHA256(key, timestamp + "." + body).</p>
+			<p class="description">Sent hourly via WP-Cron, and DeskTeam360 can also ask for it on request (GET /wp-json/dt360-monitor/v1/report) when it crawls the site. Both are signed with the key: X-DT360-Timestamp and X-DT360-Signature = HMAC-SHA256(key, timestamp + "." + body).</p>
 		</div>
 		<?php
 	}

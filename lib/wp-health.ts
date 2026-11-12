@@ -20,7 +20,7 @@ export type WpFacts = {
 const HOUR_MS = 3600000
 const DAY_MS = 86400000
 const NO_REPORT_HOURS = 3
-const BACKUP_MAX_DAYS = 7
+const BACKUP_MAX_DAYS = 30
 const SSL_WARN_DAYS = 14
 const PLUGIN_UPDATES_WARN = 5
 const FAILED_LOGINS_WARN = 50
@@ -79,9 +79,10 @@ export function evaluateWpSite(lastSeenAt: Date | string | null | undefined, rep
 
     if (facts.backup.installed) {
       const last = facts.backup.last_time ? new Date(facts.backup.last_time) : null
-      if (facts.backup.last_success === false) problems.push({ code: 'backup', level: 'red', text: 'The last backup failed' })
-      else if (!last) problems.push({ code: 'backup', level: 'red', text: 'No backup has been made yet' })
-      else if (now.getTime() - last.getTime() > BACKUP_MAX_DAYS * DAY_MS) problems.push({ code: 'backup', level: 'red', text: `Last backup is ${ago(now.getTime() - last.getTime())} old` })
+      // Real backups live in IDrive, so UpdraftPlus is for information only and never raises an alarm.
+      if (facts.backup.last_success === false) problems.push({ code: 'backup', level: 'info', text: 'The last UpdraftPlus backup failed' })
+      else if (!last) problems.push({ code: 'backup', level: 'info', text: 'No UpdraftPlus backup has been made yet' })
+      else if (now.getTime() - last.getTime() > BACKUP_MAX_DAYS * DAY_MS) problems.push({ code: 'backup', level: 'info', text: `Last UpdraftPlus backup is ${ago(now.getTime() - last.getTime())} old` })
     } else {
       problems.push({ code: 'no_updraft', level: 'info', text: 'UpdraftPlus is not installed (no backup information)' })
     }
