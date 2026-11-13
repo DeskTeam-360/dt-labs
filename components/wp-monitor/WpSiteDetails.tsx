@@ -46,6 +46,28 @@ export default function WpSiteDetails({ wp }: { wp: Pick<WpSiteSummary, 'site_ur
         <Descriptions.Item label="Last report">{fmtDate(f.last_seen_at)}</Descriptions.Item>
         <Descriptions.Item label="Registered address">{wp.site_url}</Descriptions.Item>
       </Descriptions>
+      {f.plugin_update_list.length + f.theme_update_list.length > 0 ? (
+        <div>
+          <Text strong>Updates available</Text>
+          <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+            {[...f.plugin_update_list.map((u) => ({ ...u, kind: 'Plugin' })), ...f.theme_update_list.map((u) => ({ ...u, kind: 'Theme' }))].map((u) => (
+              <li key={`${u.kind}-${u.name}`}>
+                {u.name} <Text type="secondary">({u.kind}) {u.version ?? '?'} → {u.new_version ?? '?'}</Text>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {f.wordfence.issues.length > 0 ? (
+        <div>
+          <Text strong>Wordfence issues</Text>
+          <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+            {f.wordfence.issues.map((i, idx) => (
+              <li key={idx}>{i.message}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {wp.registered_to_company === false ? <Text type="secondary" style={{ fontSize: 12 }}>This site is matched by its address; it is not yet linked to this company.</Text> : null}
     </Space>
   )

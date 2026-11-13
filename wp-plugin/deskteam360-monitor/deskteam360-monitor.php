@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DeskTeam360 Monitor
  * Description: Sends WordPress/PHP version, comments, Gravity Forms entry log and Wordfence log to an external endpoint, signed with a secret key (HMAC).
- * Version: 0.2.1
+ * Version: 0.2.2
  * Requires PHP: 7.4
  * Author: DeskTeam360
  *
@@ -170,13 +170,29 @@ final class DT360_Monitor {
 				}
 			}
 		}
-		$list = function ( $transient, $is_plugin ) {
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+		$installed_plugins = get_plugins();
+		$list = function ( $transient, $is_plugin ) use ( $installed_plugins ) {
 			$out = array();
 			if ( $transient && ! empty( $transient->response ) ) {
 				foreach ( (array) $transient->response as $slug => $u ) {
-					$u      = (object) $u;
+					$name    = null;
+					$current = null;
+					if ( $is_plugin && isset( $installed_plugins[ $slug ] ) ) {
+						$name    = $installed_plugins[ $slug ]['Name'];
+						$current = $installed_plugins[ $slug ]['Version'];
+					} elseif ( ! $is_plugin ) {
+						$theme   = wp_get_theme( $slug );
+						$name    = $theme->exists() ? $theme->get( 'Name' ) : null;
+						$current = $theme->exists() ? $theme->get( 'Version' ) : null;
+					}
+					$u     = (object) $u;
 					$out[] = array(
 						'slug'        => $is_plugin ? ( $u->slug ?? $slug ) : $slug,
+						'name'        => $name,
+						'version'     => $current,
 						'new_version' => $u->new_version ?? null,
 					);
 				}
