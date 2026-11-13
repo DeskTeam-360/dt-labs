@@ -24,6 +24,7 @@ import {
   ToolOutlined,
   UnorderedListOutlined,
   UserOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
 import { Col, Layout, Row, Typography } from 'antd'
 import type { CSSProperties, ReactNode } from 'react'
@@ -279,6 +280,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                       description="How the monitored WordPress sites are doing: updates, SSL, backups, security and uptime"
                       href="/wp-monitor"
                       icon={<CloudServerOutlined />}
+                    />
+                  </Col>
+                )}
+                {['admin', 'operations'].includes((role ?? '').toLowerCase()) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Inactive Assignees"
+                      description="Open tickets assigned to people who are no longer active, to hand over"
+                      href="/settings/inactive-assignees"
+                      icon={<WarningOutlined />}
                     />
                   </Col>
                 )}

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { isAdminOrOperations } from '@/lib/auth-utils'
 import { db, shifts, users } from '@/lib/db'
+import { applyDueShiftSchedules } from '@/lib/shift-schedule'
 import { parseShiftBody, shiftToDto } from '@/lib/shifts'
 
 /** GET /api/shifts - shift catalog with how many people are on each (admin, manager, staff). */
@@ -13,6 +14,7 @@ export async function GET() {
   const role = ((session.user as { role?: string }).role ?? '').toLowerCase()
   if (!['admin', 'operations', 'manager', 'staff'].includes(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  await applyDueShiftSchedules()
   const [rows, counts] = await Promise.all([
     db.select().from(shifts).orderBy(asc(shifts.startTime), asc(shifts.title)),
     db

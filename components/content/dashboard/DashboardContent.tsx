@@ -64,6 +64,8 @@ function formatTime(seconds: number) {
   return `${secs}s`
 }
 
+import InactiveAssigneesBanner from '@/components/content/dashboard/InactiveAssigneesBanner'
+
 export default function DashboardContent({ user }: DashboardContentProps) {
   const { message } = App.useApp()
   const [collapsed, setCollapsed] = useState(false)
@@ -292,6 +294,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
           </Text>
         </div>
 
+        <InactiveAssigneesBanner />
         <DashboardAnnouncementsSection />
 
         <Row gutter={[16, 16]}>

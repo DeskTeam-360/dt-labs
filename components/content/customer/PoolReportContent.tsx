@@ -1,13 +1,12 @@
 'use client'
 
-import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ReloadOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Col, Flex, Input, Layout, message, Row, Select, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useState } from 'react'
 
-import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 
@@ -227,10 +226,7 @@ export default function PoolReportContent({ user: currentUser }: { user: { id: s
         <Content className="settings-page" style={{ padding: 24, margin: '0 auto', width: '100%' }}>
           <Space orientation="vertical" size="large" style={{ width: '100%' }}>
             <div>
-              <SpaNavLink href="/settings">
-                <Button type="link" icon={<ArrowLeftOutlined />} style={{ paddingLeft: 0 }}>Back to Settings</Button>
-              </SpaNavLink>
-              <Title level={2} style={{ margin: '8px 0 0' }}>Pool Report</Title>
+              <Title level={2} style={{ margin: 0 }}>Pool Report</Title>
               <Text type="secondary">
                 Customers and the tickets still waiting or in work (Open, Received, Working Team), with the plan time left today and this week (WIB). The time counts down as it is spent and turns red with a minus when the plan is used up.
                 Daily is measured against the plan hours, weekly against 5 days of them.

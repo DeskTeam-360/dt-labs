@@ -29,7 +29,9 @@ function makeCompanySummary(
   byCompanyJob: Map<string, Map<string, JobAggCell>>,
   jobTitleBySlug: Map<string, string>,
   lastByCompany: Map<string, { ticket: string | null; worked: string | null }> = new Map(),
-  byCompanyPosition: Map<string, Map<string, number>> = new Map()
+  byCompanyPosition: Map<string, Map<string, number>> = new Map(),
+  /** Monday-Friday days in the period (no holidays removed); null when the period is open-ended. */
+  workingDays: number | null = null
 ) {
   return companyIds.map((id) => {
     const log = logAggMap.get(id) ?? { days: 0, hours: 0 }
@@ -41,6 +43,11 @@ function makeCompanySummary(
       log.hours > 0 ? Math.round((trHours / log.hours) * 10000) / 100 : null
     const avgHoursPerLogDay =
       log.days > 0 ? Math.round((log.hours / log.days) * 100) / 100 : null
+
+    // Plan is hours per day. Average spent per day = tracker hours / Monday-Friday days of the period.
+    const days = workingDays ?? (log.days > 0 ? log.days : null)
+    const avgSpentPerDay = days ? Math.round((trHours / days) * 100) / 100 : null
+    const usedPctOfPlan = avgSpentPerDay != null && planHours > 0 ? Math.round((avgSpentPerDay / planHours) * 10000) / 100 : null
 
     const jm = byCompanyJob.get(id) ?? new Map<string, JobAggCell>()
     const by_job_type = [...jm.entries()]
@@ -62,6 +69,10 @@ function makeCompanySummary(
       total_tracker_reported_seconds: trSec,
       avg_log_vs_tracker_percent: avgLogVsTrackerPct,
       avg_hours_per_log_day: avgHoursPerLogDay,
+      working_days: days,
+      plan_per_day_hours: planHours,
+      avg_spent_per_day_hours: avgSpentPerDay,
+      used_pct_of_plan: usedPctOfPlan,
       by_job_type,
       /** Newest ticket created for the company (any date, support tickets). */
       by_position: [...(byCompanyPosition.get(id)?.entries() ?? [])]
@@ -250,6 +261,17 @@ export async function GET(request: Request) {
     logConds.push(lte(companyDailyActiveAssignments.snapshotDate, logEndYmd))
   }
 
+  // Monday-Friday days between the two dates, holidays not removed.
+  let workingDays: number | null = null
+  if (logStartYmd && logEndYmd) {
+    workingDays = 0
+    const end = Date.parse(`${logEndYmd}T00:00:00Z`)
+    for (let t = Date.parse(`${logStartYmd}T00:00:00Z`), i = 0; t <= end && i < 3700; t += 86400000, i++) {
+      const dow = new Date(t).getUTCDay()
+      if (dow !== 0 && dow !== 6) workingDays++
+    }
+  }
+
   const [logAggRows, jobTypeRows, lastTicketRows, lastWorkedRows, statusRows] = await Promise.all([
     db
       .select({
@@ -321,7 +343,9 @@ export async function GET(request: Request) {
       new Map<string, number>(),
       new Map<string, Map<string, JobAggCell>>(),
       jobTitleBySlug,
-      lastByCompany
+      lastByCompany,
+      new Map(),
+      workingDays
     ),
     extra_time_sessions: [],
   })
@@ -532,7 +556,8 @@ export async function GET(request: Request) {
       byCompanyJob,
       jobTitleBySlug,
       lastByCompany,
-      byCompanyPosition
+      byCompanyPosition,
+      workingDays
     ),
     extra_time_sessions: extraTimeSessions,
   })

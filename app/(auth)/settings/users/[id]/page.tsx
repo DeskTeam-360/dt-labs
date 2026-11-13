@@ -7,6 +7,7 @@ import UserDetailContent from '@/components/content/user/UserDetailContent'
 import { canAccessUsers, isAdminOrManager } from '@/lib/auth-utils'
 import { getExtraCompanies } from '@/lib/customer-company'
 import { companies,db, users } from '@/lib/db'
+import { applyDueShiftSchedules } from '@/lib/shift-schedule'
 
 export async function generateMetadata({
   params,
@@ -41,6 +42,7 @@ export default async function SettingsUserDetailPage({
     redirect('/dashboard')
   }
 
+  await applyDueShiftSchedules()
   const [row] = await db
     .select({ user: users, company: companies })
     .from(users)
@@ -75,6 +77,7 @@ export default async function SettingsUserDetailPage({
     timezone: u.timezone,
     locale: u.locale,
     default_job_type: u.defaultJobType ?? null,
+    shift_id: u.shiftId ?? null,
     joined_at: u.joinedAt ?? null,
     left_at: u.leftAt ?? null,
     is_email_verified: u.isEmailVerified,

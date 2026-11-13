@@ -1178,6 +1178,22 @@ export const shifts = pgTable('shifts', {
   createdAt: ts('created_at').notNull().defaultNow(),
 })
 
+/** A person on a shift for a period (WIB calendar days). Applied to users.shift_id when the period starts. */
+export const shiftSchedules = pgTable(
+  'shift_schedules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shiftId: uuid('shift_id').notNull().references(() => shifts.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    startDate: date('start_date').notNull(),
+    endDate: date('end_date').notNull(),
+    appliedAt: ts('applied_at'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('shift_schedules_user_idx').on(t.userId, t.startDate)]
+)
+
 // ============ User company history ============
 /** Every change of a person's company, with where it came from (admin edit, email CC, company leader ...). */
 export const userCompanyChanges = pgTable(

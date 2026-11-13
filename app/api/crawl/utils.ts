@@ -335,14 +335,14 @@ export async function startCrawlProcess(
         let linkUrl = match[1].replace(/#.*$/, '')
         if (!linkUrl) continue
         // Convert relative URLs to absolute
-        if (linkUrl.startsWith('/')) {
-          try {
-            const baseUrl = new URL(currentUrl)
-            linkUrl = new URL(linkUrl, baseUrl.origin).href
-          } catch {
-            continue
-          }
-        } else if (!linkUrl.startsWith('http')) {
+        // Every kind of relative address is resolved against the page it is on ("/about", "./about", "../about", "about", "//host/x"),
+        // sites built with Framer, for example, write "./about". Addresses that are not web pages (mailto:, tel:, javascript:) are skipped.
+        if (/^(mailto|tel|sms|javascript|data|blob):/i.test(linkUrl.trim())) continue
+        try {
+          const resolved = new URL(linkUrl.trim(), currentUrl)
+          if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') continue
+          linkUrl = resolved.href
+        } catch {
           continue
         }
         

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { companies, companyUsers,db, users } from '@/lib/db'
+import { applyDueShiftSchedules } from '@/lib/shift-schedule'
 import { isUserInactive } from '@/lib/user-status'
 
 /** GET /api/users - List users with company. When customer: only users in same company */
@@ -13,6 +14,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    await applyDueShiftSchedules()
     const userId = session.user.id!
     const role = (session.user as { role?: string }).role?.toLowerCase()
 

@@ -7,6 +7,7 @@
 import { and, eq, inArray, isNotNull, lte } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 
+import { keepActiveUserIds } from '@/lib/active-users'
 import { runDueCrawlSchedules } from '@/lib/crawl-schedule-runner'
 import { db, recurringTicketRuns, recurringTickets, tags, ticketAssignees, tickets, ticketTags } from '@/lib/db'
 import { sendRecurringTicketCreatedEmail } from '@/lib/recurring-ticket-email'
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        const assigneeIds = Array.isArray(rule.assigneeIds) ? rule.assigneeIds as string[] : []
+        const assigneeIds = await keepActiveUserIds(Array.isArray(rule.assigneeIds) ? rule.assigneeIds as string[] : [])
         if (assigneeIds.length > 0) {
           await tx.insert(ticketAssignees).values(assigneeIds.map((userId) => ({ ticketId: row.id, userId })))
         }

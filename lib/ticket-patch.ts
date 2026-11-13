@@ -1,6 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
+import { inactiveAmong } from '@/lib/active-users'
 import { canDeleteTickets } from '@/lib/auth-utils'
 import { runAutomationRules } from '@/lib/automation-engine'
 import { assertCustomerMayAccessTicket } from '@/lib/customer-ticket-access'
@@ -482,6 +483,19 @@ export async function patchTicket(
 
   if (!beforeSnapshot) {
     return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  }
+
+  // Nobody inactive can be newly assigned (people already on the ticket may stay until someone takes them off).
+  if (assignees !== undefined && assignees.length > 0) {
+    const current = await db.select({ userId: ticketAssignees.userId }).from(ticketAssignees).where(eq(ticketAssignees.ticketId, ticketId))
+    const had = new Set(current.map((r) => r.userId))
+    const off = await inactiveAmong((assignees as string[]).filter((id) => !had.has(id)))
+    if (off.length > 0) {
+      return NextResponse.json(
+        { error: `${off.map((p) => p.name).join(', ')} ${off.length === 1 ? 'is' : 'are'} inactive and cannot be assigned. Pick an active person.` },
+        { status: 400 }
+      )
+    }
   }
 
   let companyIdUpdate: string | null | undefined = undefined

@@ -280,6 +280,10 @@ type CompanySummaryRow = {
   total_tracker_reported_seconds: number
   avg_log_vs_tracker_percent: number | null
   avg_hours_per_log_day: number | null
+  working_days?: number | null
+  plan_per_day_hours?: number | null
+  avg_spent_per_day_hours?: number | null
+  used_pct_of_plan?: number | null
   by_job_type: CompanySummaryByJobRow[]
   last_ticket_at?: string | null
   last_worked_at?: string | null
@@ -1034,12 +1038,32 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
           pct == null ? <Text type="secondary">—</Text> : <Text>{pct}%</Text>,
       },
       {
-        title: 'Average Time Spent (per days)',
-        dataIndex: 'avg_hours_per_log_day',
-        width: 150,
+        title: 'Plan / day',
+        dataIndex: 'plan_per_day_hours',
+        width: 100,
         align: 'center',
-        render: (h: number | null) =>
-          h == null ? <Text type="secondary">—</Text> : <Text>{h}</Text>,
+        render: (h: number | null) => (h == null ? <Text type="secondary">—</Text> : <Text>{h}h</Text>),
+      },
+      {
+        title: 'Avg spent / day',
+        dataIndex: 'avg_spent_per_day_hours',
+        width: 120,
+        align: 'center',
+        render: (h: number | null, r: CompanySummaryRow) =>
+          h == null ? (
+            <Text type="secondary">—</Text>
+          ) : (
+            <span title={`Total hours / ${r.working_days ?? '?'} working days (Mon-Fri, holidays not removed)`}>
+              <Text>{h}h</Text>
+            </span>
+          ),
+      },
+      {
+        title: '% used',
+        dataIndex: 'used_pct_of_plan',
+        width: 100,
+        align: 'center',
+        render: (pct: number | null) => (pct == null ? <Text type="secondary">—</Text> : <Text>{pct}%</Text>),
       },
       ...(isNew
         ? ([
@@ -1331,7 +1355,7 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
               <BarChartOutlined style={{ fontSize: 28, color: 'var(--ant-color-primary, #1677ff)' }} />
               
                 <Title level={2} className="settings-section-heading" style={{ margin: 0, fontSize: '1.5rem' }}>
-                  {isNew ? 'New Customer Report' : 'C Report'}
+                  {isNew ? 'New Customer Report' : 'Customer Report'}
                 </Title>
               
             </Flex>
@@ -1740,7 +1764,6 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                     columns={
                       isNew
                         ? companySummaryColumns
-                            .filter((c) => !('dataIndex' in c && c.dataIndex === 'avg_hours_per_log_day'))
                             .map((c) => {
                               // New report: company name always fully visible; numeric plan/day columns stay slim.
                               if (c.key === 'company') return { ...c, width: 240, ellipsis: false }

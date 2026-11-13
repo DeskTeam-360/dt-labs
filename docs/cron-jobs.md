@@ -11,6 +11,7 @@ Auth uses `Authorization: Bearer <secret>` read from `.env`.
 | `POST /api/cron/process-recurring-tickets` | Every 1 minute | Create tickets automatically from recurring rules that are due |
 | `POST /api/cron/company-daily-active` | Every day at 00:05 UTC | Daily snapshot of active ticket counts per company |
 | `POST /api/cron/customer-weekly-recap` | Every Sunday at 01:00 UTC | Materialize weekly recap data per team (heavy job, off-peak schedule) |
+| `POST /api/cron/shift-schedule` | Daily 17:05 UTC (00:05 WIB), OPTIONAL | Moves people onto the shift of the period running today (Settings > Shifts > Schedule by period). Without it this happens the first time someone opens a screen that reads shifts or users that day. Secret: `SHIFT_CRON_SECRET` (falls back to `SYNC_INBOX_CRON_SECRET`) |
 | `POST /api/cron/wp-monitor` | Every 5 minutes, OPTIONAL | WordPress monitoring on a timer: open each monitored site (uptime), update its alarms (red ones are emailed to the company PICs), trim old reports. Not needed for the checks that run when a crawl finishes or when someone presses Check now; add it only to be told about a site that is down between crawls |
 | `POST /api/cron/pic-daily-digest` | Weekdays at 01:00 UTC (08:00 WIB) | Morning email to each PIC: overdue, unassigned and stale tickets of their companies, and WordPress sites with open alarms (`?dry_run=1` only counts, no email) |
 

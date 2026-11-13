@@ -1,7 +1,7 @@
 'use client'
 
 import { ArrowLeftOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons'
-import { Alert, Button, Flex, Form, Input, Layout, message, Modal, Popconfirm, Select, Space, Table, Tag, TimePicker, Typography } from 'antd'
+import { Alert, Button, DatePicker, Flex, Form, Input, Layout, message, Modal, Popconfirm, Select, Space, Table, Tag, TimePicker, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -26,6 +26,24 @@ type Person = { id: string; name: string; position: string | null; shift_id: str
 
 type FormValues = { title: string; start: Dayjs; end: Dayjs; description?: string }
 
+type Period = {
+  key: string
+  shift_id: string
+  shift_title: string
+  start_date: string
+  end_date: string
+  status: 'upcoming' | 'active' | 'past'
+  people: { id: string; entry_id: string; name: string }[]
+}
+
+type PeriodForm = { shift_id: string; user_ids: string[]; range: [Dayjs, Dayjs] }
+
+const STATUS_TAG: Record<Period['status'], { color: string; label: string }> = {
+  active: { color: 'green', label: 'Running now' },
+  upcoming: { color: 'blue', label: 'Upcoming' },
+  past: { color: 'default', label: 'Finished' },
+}
+
 const toTime = (hhmm: string) => dayjs(`2000-01-01 ${hhmm}`)
 
 export default function ShiftsContent({ user }: { user: { id: string; email?: string | null; name?: string | null; role?: string | null } }) {
@@ -40,6 +58,61 @@ export default function ShiftsContent({ user }: { user: { id: string; email?: st
   const [addTo, setAddTo] = useState<Shift | null>(null)
   const [picked, setPicked] = useState<string[]>([])
   const [adding, setAdding] = useState(false)
+  const [periods, setPeriods] = useState<Period[]>([])
+  const [periodOpen, setPeriodOpen] = useState(false)
+  const [periodSaving, setPeriodSaving] = useState(false)
+  const [periodForm] = Form.useForm<PeriodForm>()
+
+  const loadPeriods = useCallback(async () => {
+    try {
+      const res = await fetch('/api/shifts/schedule', { credentials: 'include' })
+      setPeriods(res.ok ? ((await res.json()) as Period[]) : [])
+    } catch {
+      setPeriods([])
+    }
+  }, [])
+
+  /** Opens the form; with `from` it is the next period after it (same shift, same length, starting the day after). */
+  const openPeriod = (from?: Period) => {
+    periodForm.resetFields()
+    if (from) {
+      const s = dayjs(from.start_date)
+      const e = dayjs(from.end_date)
+      const len = e.diff(s, 'day')
+      const ns = e.add(1, 'day')
+      periodForm.setFieldsValue({ shift_id: from.shift_id, range: [ns, ns.add(len, 'day')] })
+    }
+    setPeriodOpen(true)
+  }
+
+  const savePeriod = async (v: PeriodForm) => {
+    setPeriodSaving(true)
+    try {
+      const data = (await call('/api/shifts/schedule', 'POST', {
+        shift_id: v.shift_id,
+        user_ids: v.user_ids,
+        start_date: v.range[0].format('YYYY-MM-DD'),
+        end_date: v.range[1].format('YYYY-MM-DD'),
+      })) as { added: number; applied_now: number }
+      message.success(data.applied_now > 0 ? `${data.added} scheduled; ${data.applied_now} moved to the shift now` : `${data.added} scheduled`)
+      setPeriodOpen(false)
+      await Promise.all([load(), loadPeople(), loadPeriods()])
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setPeriodSaving(false)
+    }
+  }
+
+  const removePeriod = async (p: Period) => {
+    try {
+      await call(`/api/shifts/schedule?ids=${p.people.map((x) => x.entry_id).join(',')}`, 'DELETE')
+      message.success('Period removed')
+      await loadPeriods()
+    } catch (e) {
+      message.error((e as Error).message)
+    }
+  }
 
   const loadPeople = useCallback(async () => {
     try {
@@ -107,9 +180,9 @@ export default function ShiftsContent({ user }: { user: { id: string; email?: st
   }, [])
 
   useEffect(() => {
-    void load()
-    void loadPeople()
-  }, [load, loadPeople])
+    // The periods are read first: reading them also puts people on the shift of a period that has started.
+    void loadPeriods().then(() => Promise.all([load(), loadPeople()]))
+  }, [load, loadPeople, loadPeriods])
 
   const call = async (url: string, method: string, body?: unknown) => {
     const res = await fetch(url, {
@@ -242,7 +315,100 @@ export default function ShiftsContent({ user }: { user: { id: string; email?: st
                 },
               ]}
             />
+
+            <div>
+              <Flex justify="space-between" align="center" wrap gap={12} style={{ marginBottom: 8 }}>
+                <div>
+                  <Title level={4} style={{ margin: 0 }}>Schedule by period</Title>
+                  <Text type="secondary">
+                    Put people on a shift from a start date to an end date. When a period starts they are moved automatically, and they stay on that shift until the next period covers them, so a rotation is one period after another.
+                  </Text>
+                </div>
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => openPeriod()}>Schedule a period</Button>
+              </Flex>
+              <Table<Period>
+                rowKey="key"
+                size="middle"
+                bordered
+                dataSource={periods}
+                pagination={periods.length > 10 ? { pageSize: 10 } : false}
+                locale={{ emptyText: 'No periods yet. Schedule the first one.' }}
+                columns={[
+                  {
+                    title: 'Period (WIB)',
+                    key: 'period',
+                    width: 230,
+                    render: (_: unknown, r) => `${dayjs(r.start_date).format('MMM D, YYYY')} - ${dayjs(r.end_date).format('MMM D, YYYY')}`,
+                  },
+                  { title: 'Shift', dataIndex: 'shift_title', width: 160, render: (v: string) => <Tag color="geekblue" style={{ margin: 0 }}>{v}</Tag> },
+                  {
+                    title: 'People',
+                    key: 'people',
+                    render: (_: unknown, r) => (
+                      <Flex gap={4} wrap>
+                        {r.people.map((p) => <Tag key={p.id} style={{ margin: 0 }}>{p.name}</Tag>)}
+                      </Flex>
+                    ),
+                  },
+                  {
+                    title: 'Status',
+                    dataIndex: 'status',
+                    width: 120,
+                    align: 'center',
+                    render: (v: Period['status']) => <Tag color={STATUS_TAG[v].color} style={{ margin: 0 }}>{STATUS_TAG[v].label}</Tag>,
+                  },
+                  {
+                    title: '',
+                    key: 'actions',
+                    width: 150,
+                    align: 'right',
+                    render: (_: unknown, r) => (
+                      <Space>
+                        <Button size="small" onClick={() => openPeriod(r)} title="Schedule the next period with the same shift and length">Next period</Button>
+                        <Popconfirm
+                          title="Remove this period?"
+                          description="People already moved by it stay on their shift."
+                          okText="Remove"
+                          onConfirm={() => void removePeriod(r)}
+                        >
+                          <Button size="small" danger icon={<DeleteOutlined />} />
+                        </Popconfirm>
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
+            </div>
           </Space>
+
+          <Modal
+            title="Schedule a period"
+            open={periodOpen}
+            onCancel={() => setPeriodOpen(false)}
+            onOk={() => periodForm.submit()}
+            okText="Schedule"
+            confirmLoading={periodSaving}
+            destroyOnHidden
+          >
+            <Form form={periodForm} layout="vertical" onFinish={savePeriod}>
+              <Form.Item name="shift_id" label="Shift" rules={[{ required: true, message: 'Pick a shift' }]}>
+                <Select placeholder="Pick a shift" options={rows.map((r) => ({ value: r.id, label: `${r.title} (${r.start} - ${r.end})` }))} />
+              </Form.Item>
+              <Form.Item name="range" label="Period (start date - end date)" rules={[{ required: true, message: 'Pick the dates' }]}>
+                <DatePicker.RangePicker style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="user_ids" label="People" rules={[{ required: true, message: 'Pick at least one person' }]}>
+                <Select
+                  mode="multiple"
+                  showSearch
+                  allowClear
+                  optionFilterProp="label"
+                  placeholder="Pick people"
+                  options={people.map((p) => ({ value: p.id, label: p.position ? `${p.name} - ${p.position}` : p.name }))}
+                />
+              </Form.Item>
+            </Form>
+          </Modal>
 
           <Modal
             title={addTo ? `Add people to ${addTo.title}` : 'Add people'}

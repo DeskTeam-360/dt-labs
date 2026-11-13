@@ -20,10 +20,10 @@ interface RoundRobinRow {
 }
 
 function fmtSeconds(s: number): string {
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  if (h === 0 && m === 0) return '0.00H'
-  return `${h}.${String(m).padStart(2, '0')}H`
+  // Same format as the Pool Report: "1h 28m", "45m".
+  const m = Math.round(Math.abs(s) / 60)
+  if (m < 60) return `${m}m`
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
 }
 
 interface TicketsRoundRobinViewProps {

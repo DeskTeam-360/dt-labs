@@ -5,6 +5,7 @@
 import bcrypt from 'bcryptjs'
 import { and, desc, eq, ilike, or } from 'drizzle-orm'
 
+import { keepActiveUserIds } from '@/lib/active-users'
 import { sendAutomationLog } from '@/lib/automation-log-webhook'
 import { db } from '@/lib/db'
 import {
@@ -625,7 +626,7 @@ export async function runAutomationRules(
         .from(ticketAssignees)
         .where(eq(ticketAssignees.ticketId, ctx.id))
       const existingIds = new Set(existing.map((r) => r.userId))
-      const toAdd = actions.assignee_ids.filter((id) => !existingIds.has(id))
+      const toAdd = await keepActiveUserIds(actions.assignee_ids.filter((id) => !existingIds.has(id)))
       if (toAdd.length > 0) {
         await db.insert(ticketAssignees).values(
           toAdd.map((userId) => ({ ticketId: ctx.id, userId }))

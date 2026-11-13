@@ -1,6 +1,7 @@
 import { and, asc, eq, or } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
+import { keepActiveUserIds } from '@/lib/active-users'
 import { loadAutomationTicketContext, runAutomationRules } from '@/lib/automation-engine'
 import { getCustomerCompanyIds } from '@/lib/customer-company'
 import { db } from '@/lib/db'
@@ -256,9 +257,11 @@ export async function createTicket(request: Request, session: TicketPatchSession
   }
   const ticket = newTicket
 
-  if (assignees.length > 0) {
+  // Inactive people are never given a new ticket (the form does not offer them, but the API and automations could).
+  const activeAssignees: string[] = await keepActiveUserIds(assignees)
+  if (activeAssignees.length > 0) {
     await db.insert(ticketAssignees).values(
-      assignees.map((userId: string) => ({
+      activeAssignees.map((userId: string) => ({
         ticketId: ticket.id,
         userId,
       }))
@@ -316,17 +319,17 @@ export async function createTicket(request: Request, session: TicketPatchSession
     metadata: {
       title: title || 'Untitled',
       created_via: createdVia,
-      assignee_count: Array.isArray(assignees) ? assignees.length : 0,
+      assignee_count: activeAssignees.length,
       tag_count: Array.isArray(tag_ids) ? tag_ids.length : 0,
       attachment_count: Array.isArray(attachments) ? attachments.length : 0,
     },
   })
 
-  if (Array.isArray(assignees) && assignees.length > 0) {
+  if (activeAssignees.length > 0) {
     try {
       const actorName = authUser.name || authUser.email || 'Someone'
       await notifyTicketUsers({
-        recipientUserIds: assignees,
+        recipientUserIds: activeAssignees,
         excludeUserId: userId,
         ticketId: ticket.id,
         ticketTitle: ticket.title,
