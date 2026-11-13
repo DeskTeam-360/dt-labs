@@ -40,6 +40,8 @@ interface CompanyRecord {
   color: string
   active_team_id?: string | null
   active_manager_id?: string | null
+  active_manager_name?: string | null
+  active_manager_inactive?: boolean
   active_time?: number
   display_order?: number | null
   is_customer?: boolean
@@ -337,8 +339,12 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       title: 'Active Manager',
       key: 'active_manager_id',
       render: (_: unknown, record: CompanyRecord) => {
+        if (record.active_manager_inactive && record.active_manager_name) {
+          return <Tag color="red">{record.active_manager_name} (inactive)</Tag>
+        }
         const mgr = managerOptions.find((m) => m.id === record.active_manager_id)
-        return mgr ? <Tag color="purple">{mgr.full_name || mgr.email}</Tag> : '—'
+        if (mgr) return <Tag color="purple">{mgr.full_name || mgr.email}</Tag>
+        return record.active_manager_name ? <Tag color="purple">{record.active_manager_name}</Tag> : '—'
       },
     },
     {

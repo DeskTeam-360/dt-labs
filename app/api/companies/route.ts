@@ -6,6 +6,7 @@ import { companies, companyUsers, db, teams, tickets, users } from '@/lib/db'
 import { revalidateTicketsLookupCatalog } from '@/lib/tickets-lookup-catalog-cache'
 import { upsertCompanyUserMembership } from '@/lib/upsert-company-user-membership'
 import { logUserCompanyChange } from '@/lib/user-company'
+import { isUserInactive } from '@/lib/user-status'
 
 function normalizeUuidBody(v: unknown): string | null {
   if (v === null || v === undefined || v === '') return null
@@ -86,8 +87,17 @@ export async function GET(request: Request) {
     filtered = rows.filter((r) => r.isActive !== false)
   }
 
+  // The Active Manager column shows the name even when that person is no longer active (the picker lists only active people).
+  const managerIds = [...new Set(filtered.map((r) => r.activeManagerId).filter((v): v is string => !!v))]
+  const managerRows = managerIds.length
+    ? await db.select({ id: users.id, fullName: users.fullName, email: users.email, status: users.status }).from(users).where(inArray(users.id, managerIds))
+    : []
+  const managerById = new Map(managerRows.map((m) => [m.id, m]))
+
   const data = filtered.map((r) => ({
     id: r.id,
+    active_manager_name: r.activeManagerId ? (managerById.get(r.activeManagerId)?.fullName || managerById.get(r.activeManagerId)?.email || null) : null,
+    active_manager_inactive: r.activeManagerId ? isUserInactive(managerById.get(r.activeManagerId)?.status) : false,
     name: r.name,
     email: r.email,
     created_by: leaderByCompany.get(r.id) ?? null,
