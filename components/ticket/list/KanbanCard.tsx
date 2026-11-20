@@ -312,7 +312,7 @@ export default function KanbanCard({
             <Tooltip title={<TrackerTooltipContent stat={trackerStat} />} placement="top" mouseEnterDelay={0.2}>
               <Flex align="center" gap={4} style={{ fontSize: 11, color: 'var(--kanban-card-muted)', cursor: 'default' }}>
                 <FieldTimeOutlined />
-                <span>{trackerStat && trackerStat.today_seconds > 0 ? fmtHours(trackerStat.today_seconds) : '0.0h'}</span>
+                <span>{trackerStat && trackerStat.today_seconds > 0 ? fmtHours(trackerStat.today_seconds) : '0m'}</span>
                 {trackerStat && trackerStat.active_trackers.length > 0 && (
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#52c41a', display: 'inline-block' }} />
                 )}

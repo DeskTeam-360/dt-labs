@@ -143,7 +143,7 @@ export default function CardViewCard({
               <FieldTimeOutlined style={{ fontSize: 12 }} />
               {trackerStat && (trackerStat.today_seconds > 0 || trackerStat.yesterday_seconds > 0)
                 ? fmtHours(trackerStat.today_seconds)
-                : '0.0h'}
+                : '0m'}
               {trackerStat && trackerStat.active_trackers.length > 0 && (
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#52c41a', display: 'inline-block' }} />
               )}

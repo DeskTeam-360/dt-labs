@@ -1,3 +1,5 @@
+import { formatDuration } from '@/lib/format-duration'
+
 /** Shared parsing & column helpers for recap snapshot payload tables (settings + customer time report preview). */
 
 export type RecapRoleBlock = {
@@ -27,8 +29,7 @@ export function recapFormatIntCount(v: unknown): string {
 
 export function recapFormatHoursFromSeconds(sec: unknown): string {
   const n = typeof sec === 'number' && Number.isFinite(sec) ? sec : 0
-  const h = n / 3600
-  return `${h.toFixed(2)} h`
+  return formatDuration(n)
 }
 
 export function recapParseRoles(payload: Record<string, unknown>): RecapRoleBlock[] {
