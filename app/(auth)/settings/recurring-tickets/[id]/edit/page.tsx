@@ -39,6 +39,8 @@ export default async function EditRecurringTicketPage({ params }: { params: Prom
     contactUserId: row.contactUserId ?? null,
     assigneeIds: row.assigneeIds as string[] ?? [],
     tagIds: (row.tagIds as string[] | null) ?? [],
+    skillIds: (row.skillIds as string[] | null) ?? [],
+    primarySkillId: row.primarySkillId ?? null,
   }
 
   return <RecurringTicketFormPage initialValues={initialValues} />

@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { isAdminOrManager } from '@/lib/auth-utils'
 import { db, recurringTicketRuns, recurringTickets } from '@/lib/db'
-import { computeNextRunAt, type Frequency, normalizeSpecificDates } from '@/lib/recurring-ticket-schedule'
+import { computeNextRunAt, type Frequency, normalizeSpecificDates, normalizeYearDates } from '@/lib/recurring-ticket-schedule'
+import { cleanPrimary, validSkillIds } from '@/lib/skills'
 import { isTicketVisibilityLevel } from '@/lib/ticket-visibility'
 
 function authError() {
@@ -65,7 +66,7 @@ export async function PATCH(
 
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const validFrequencies: Frequency[] = ['daily', 'weekdays', 'weekends', 'specific_days', 'specific_date', 'interval']
+  const validFrequencies: Frequency[] = ['daily', 'weekdays', 'weekends', 'specific_days', 'specific_date', 'specific_year_date', 'interval']
 
   const updates: Partial<typeof existing> = {}
 
@@ -79,12 +80,15 @@ export async function PATCH(
   }
   if (body.specific_days !== undefined) updates.specificDays = body.specific_days ?? null
   if (body.specific_date !== undefined) {
-    const dates = normalizeSpecificDates(body.specific_date)
     const nextFrequency = (body.frequency ?? existing.frequency) as Frequency
+    const dates = nextFrequency === 'specific_year_date' ? normalizeYearDates(body.specific_date) : normalizeSpecificDates(body.specific_date)
     if (nextFrequency === 'specific_date' && dates.length === 0) {
       return NextResponse.json({ error: 'Select at least one day of the month' }, { status: 400 })
     }
-    updates.specificDate = nextFrequency === 'specific_date' ? dates : null
+    if (nextFrequency === 'specific_year_date' && dates.length === 0) {
+      return NextResponse.json({ error: 'Select at least one date of the year' }, { status: 400 })
+    }
+    updates.specificDate = nextFrequency === 'specific_date' || nextFrequency === 'specific_year_date' ? dates : null
   }
   if (body.interval_days !== undefined) updates.intervalDays = body.interval_days ?? null
   if (body.time_of_day !== undefined) updates.timeOfDay = body.time_of_day
@@ -101,6 +105,11 @@ export async function PATCH(
   if (body.contact_user_id !== undefined) updates.contactUserId = body.contact_user_id ?? null
   if (body.assignee_ids !== undefined) updates.assigneeIds = Array.isArray(body.assignee_ids) ? body.assignee_ids : []
   if (body.tag_ids !== undefined) updates.tagIds = Array.isArray(body.tag_ids) ? body.tag_ids.map(String) : []
+  if (body.skill_ids !== undefined) {
+    const ids = await validSkillIds(body.skill_ids)
+    updates.skillIds = ids
+    updates.primarySkillId = cleanPrimary(ids, body.primary_skill_id)
+  }
   if (body.visibility !== undefined) {
     if (!isTicketVisibilityLevel(body.visibility)) {
       return NextResponse.json({ error: 'invalid visibility' }, { status: 400 })

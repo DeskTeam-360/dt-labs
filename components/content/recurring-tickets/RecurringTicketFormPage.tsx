@@ -29,7 +29,8 @@ import { useEffect, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
-import { normalizeSpecificDates } from '@/lib/recurring-ticket-schedule'
+import SkillsSelect, { PrimarySkillSelect } from '@/components/skills/SkillsSelect'
+import { normalizeSpecificDates, normalizeYearDates, YEAR_DATE_OPTIONS } from '@/lib/recurring-ticket-schedule'
 import { DEFAULT_RECURRING_VISIBILITY } from '@/lib/ticket-visibility'
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false })
@@ -138,6 +139,8 @@ export interface RecurringTicketFormValues {
   contactUserId: string | null
   assigneeIds: string[]
   tagIds?: string[]
+  skillIds?: string[]
+  primarySkillId?: string | null
 }
 
 interface Props {
@@ -196,6 +199,7 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
         frequency: initialValues.frequency,
         specific_days: initialValues.specificDays ?? [],
         specific_date: dates.length ? dates : [1],
+        specific_year_date: normalizeYearDates(initialValues.specificDate),
         interval_days: initialValues.intervalDays ?? 2,
         time_of_day: dayjs(initialValues.timeOfDay, 'HH:mm'),
         timezone: initialValues.timezone,
@@ -210,12 +214,15 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
         contact_user_id: initialValues.contactUserId ?? null,
         assignee_ids: Array.isArray(initialValues.assigneeIds) && initialValues.assigneeIds.length > 0 ? initialValues.assigneeIds[0] : null,
         tag_ids: initialValues.tagIds ?? [],
+        skill_ids: initialValues.skillIds ?? [],
+        primary_skill_id: initialValues.primarySkillId ?? null,
       })
     } else {
       form.setFieldsValue({
         frequency: 'daily',
         specific_days: [],
         specific_date: [1],
+        specific_year_date: [],
         interval_days: 2,
         time_of_day: dayjs('08:00', 'HH:mm'),
         timezone: 'Asia/Jakarta',
@@ -235,7 +242,12 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
         description: description || null,
         frequency: values.frequency,
         specific_days: values.frequency === 'specific_days' ? values.specific_days : null,
-        specific_date: values.frequency === 'specific_date' ? normalizeSpecificDates(values.specific_date) : null,
+        specific_date:
+          values.frequency === 'specific_date'
+            ? normalizeSpecificDates(values.specific_date)
+            : values.frequency === 'specific_year_date'
+              ? normalizeYearDates(values.specific_year_date)
+              : null,
         interval_days: values.frequency === 'interval' ? values.interval_days : null,
         time_of_day: (values.time_of_day as dayjs.Dayjs).format('HH:mm'),
         timezone: values.timezone,
@@ -250,6 +262,8 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
         contact_user_id: values.contact_user_id || null,
         assignee_ids: values.assignee_ids ? [values.assignee_ids] : [],
         tag_ids: Array.isArray(values.tag_ids) ? values.tag_ids : [],
+        skill_ids: Array.isArray(values.skill_ids) ? values.skill_ids : [],
+        primary_skill_id: values.primary_skill_id || null,
       }
 
       const url = isEdit ? `/api/recurring-tickets/${initialValues!.id}` : '/api/recurring-tickets'
@@ -329,6 +343,7 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
                   <Select.Option value="weekends">Weekends (Sat–Sun)</Select.Option>
                   <Select.Option value="specific_days">Specific days of the week</Select.Option>
                   <Select.Option value="specific_date">Specific dates each month</Select.Option>
+                  <Select.Option value="specific_year_date">Specific dates each year</Select.Option>
                   <Select.Option value="interval">Every N days</Select.Option>
                 </Select>
               </Form.Item>
@@ -344,6 +359,14 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
                   rules={[{ required: true, type: 'array', min: 1, message: 'Select at least one date' }]}>
                   <Select mode="multiple" placeholder="Select one or more days"
                     options={DATE_OPTIONS} optionFilterProp="label" maxTagCount="responsive" style={{ width: '100%' }} />
+                </Form.Item>
+              )}
+              {frequency === 'specific_year_date' && (
+                <Form.Item name="specific_year_date" label="Dates of the year"
+                  extra="Runs on these dates every year, starting with the first one on or after the start date. 29 Feb only runs in leap years."
+                  rules={[{ required: true, type: 'array', min: 1, message: 'Select at least one date' }]}>
+                  <Select mode="multiple" placeholder="e.g. 28 Nov"
+                    options={YEAR_DATE_OPTIONS} optionFilterProp="label" maxTagCount="responsive" style={{ width: '100%' }} />
                 </Form.Item>
               )}
               {frequency === 'interval' && (
@@ -422,6 +445,21 @@ export default function RecurringTicketFormPage({ initialValues }: Props) {
                   <Form.Item name="tag_ids" label="Tags">
                     <Select mode="multiple" allowClear showSearch placeholder="Select tags"
                       optionFilterProp="label" options={tagOptions} />
+                  </Form.Item>
+                </Col>
+                <Col span={24}>
+                  <Form.Item name="skill_ids" label="Skills" extra="Copied to every ticket this template creates. Left empty, the company + ticket type default skills are used.">
+                    <SkillsSelect placeholder="Skills needed" />
+                  </Form.Item>
+                  <Form.Item noStyle shouldUpdate={(a, b) => a.skill_ids !== b.skill_ids}>
+                    {({ getFieldValue }) => {
+                      const ids = (getFieldValue('skill_ids') as string[] | undefined) ?? []
+                      return ids.length > 1 ? (
+                        <Form.Item name="primary_skill_id" label="Primary skill">
+                          <PrimarySkillSelect skillIds={ids} />
+                        </Form.Item>
+                      ) : null
+                    }}
                   </Form.Item>
                 </Col>
                 <Col span={12}>

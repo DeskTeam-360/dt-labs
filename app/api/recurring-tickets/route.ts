@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { isAdminOrManager } from '@/lib/auth-utils'
 import { db, recurringTicketRuns, recurringTickets } from '@/lib/db'
-import { computeNextRunAt, type Frequency, normalizeSpecificDates } from '@/lib/recurring-ticket-schedule'
+import { computeNextRunAt, type Frequency, normalizeSpecificDates, normalizeYearDates } from '@/lib/recurring-ticket-schedule'
+import { cleanPrimary, validSkillIds } from '@/lib/skills'
 import {
   DEFAULT_RECURRING_VISIBILITY,
   isTicketVisibilityLevel,
@@ -76,20 +77,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid visibility' }, { status: 400 })
   }
 
-  const validFrequencies: Frequency[] = ['daily', 'weekdays', 'weekends', 'specific_days', 'specific_date', 'interval']
+  const validFrequencies: Frequency[] = ['daily', 'weekdays', 'weekends', 'specific_days', 'specific_date', 'specific_year_date', 'interval']
   if (!validFrequencies.includes(frequency)) {
     return NextResponse.json({ error: 'invalid frequency' }, { status: 400 })
   }
 
-  const specificDates = frequency === 'specific_date' ? normalizeSpecificDates(specific_date) : []
+  // Days of the month (1-31), or dates of the year (month*100+day) in the same column.
+  const specificDates =
+    frequency === 'specific_date' ? normalizeSpecificDates(specific_date) : frequency === 'specific_year_date' ? normalizeYearDates(specific_date) : []
   if (frequency === 'specific_date' && specificDates.length === 0) {
     return NextResponse.json({ error: 'Select at least one day of the month' }, { status: 400 })
   }
+  if (frequency === 'specific_year_date' && specificDates.length === 0) {
+    return NextResponse.json({ error: 'Select at least one date of the year' }, { status: 400 })
+  }
+  const storesDates = frequency === 'specific_date' || frequency === 'specific_year_date'
 
   const schedule = {
     frequency,
     specificDays: specific_days ?? null,
-    specificDate: frequency === 'specific_date' ? specificDates : null,
+    specificDate: storesDates ? specificDates : null,
     intervalDays: interval_days ?? null,
     timeOfDay: time_of_day,
     timezone,
@@ -97,6 +104,7 @@ export async function POST(req: NextRequest) {
     endDate: end_date ?? null,
   }
 
+  const ruleSkillIds = await validSkillIds(body.skill_ids)
   const nextRunAt = computeNextRunAt(schedule, new Date())
 
   const [row] = await db
@@ -106,7 +114,7 @@ export async function POST(req: NextRequest) {
       description: description ?? null,
       frequency,
       specificDays: specific_days ?? null,
-      specificDate: frequency === 'specific_date' ? specificDates : null,
+      specificDate: storesDates ? specificDates : null,
       intervalDays: interval_days ?? null,
       timeOfDay: time_of_day,
       timezone,
@@ -123,6 +131,8 @@ export async function POST(req: NextRequest) {
       contactUserId: contact_user_id ?? null,
       assigneeIds: Array.isArray(assignee_ids) ? assignee_ids : [],
       tagIds: Array.isArray(tag_ids) ? tag_ids.map(String) : [],
+      skillIds: ruleSkillIds,
+      primarySkillId: cleanPrimary(ruleSkillIds, body.primary_skill_id),
       visibility,
       createdBy: session.user.id,
     })

@@ -67,6 +67,13 @@ function formatDuration(seconds: number): string {
   return `${m}m`
 }
 
+/** Decimal hours as "2h 57m" (45 minutes as "45m"), the same format as the Pool Report. */
+function fmtHoursAsHm(hours: number): string {
+  const m = Math.round(Math.abs(hours) * 60)
+  if (m < 60) return `${m}m`
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
+}
+
 function hoursFromSeconds(seconds: number): number {
   return Math.round((seconds / 3600) * 100) / 100
 }
@@ -1054,7 +1061,7 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
             <Text type="secondary">—</Text>
           ) : (
             <span title={`Total hours / ${r.working_days ?? '?'} working days (Mon-Fri, holidays not removed)`}>
-              <Text>{h}h</Text>
+              <Text>{fmtHoursAsHm(h)}</Text>
             </span>
           ),
       },

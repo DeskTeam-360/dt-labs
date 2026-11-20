@@ -101,6 +101,23 @@ export async function applyDefaultSkillsToTicket(
   if (d.skill_ids.length) await setTicketSkills(ticketId, d.skill_ids, d.primary_skill_id)
 }
 
+/**
+ * Skills of a ticket made by a recurring template: the template's own skills (with its primary skill), otherwise the company + type defaults.
+ * Never throws: a skill problem must not undo the ticket that was just created.
+ */
+export async function applyRecurringRuleSkills(
+  ticketId: number,
+  rule: { skillIds?: unknown; primarySkillId?: string | null; companyId?: string | null; ticketTypeId?: number | null }
+): Promise<void> {
+  try {
+    const ids = await validSkillIds(rule.skillIds)
+    if (ids.length > 0) await setTicketSkills(ticketId, ids, rule.primarySkillId)
+    else await applyDefaultSkillsToTicket(ticketId, rule.companyId, rule.ticketTypeId)
+  } catch (e) {
+    console.error('[recurring ticket] skills for ticket', ticketId, e)
+  }
+}
+
 export { cleanPrimary }
 
 /** A person is only recommended when they cover at least this share of the ticket's skills. */

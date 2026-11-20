@@ -864,6 +864,9 @@ export const recurringTickets = pgTable('recurring_tickets', {
   companyId: uuid('company_id'),
   assigneeIds: jsonb('assignee_ids').$type<string[]>().default([]),
   tagIds: jsonb('tag_ids').$type<string[]>().notNull().default([]),
+  /** Skills copied onto every ticket this template creates, and the main one among them. */
+  skillIds: jsonb('skill_ids').$type<string[]>().notNull().default([]),
+  primarySkillId: uuid('primary_skill_id'),
   ticketTypeId: integer('ticket_type_id'),
   contactUserId: uuid('contact_user_id'),
   visibility: varchar('visibility', { length: 32 }).notNull().default('team'),

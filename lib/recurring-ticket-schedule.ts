@@ -3,7 +3,35 @@
  * Pure functions — no DB calls, no side effects.
  */
 
-export type Frequency = 'daily' | 'weekdays' | 'weekends' | 'specific_days' | 'specific_date' | 'interval'
+export type Frequency = 'daily' | 'weekdays' | 'weekends' | 'specific_days' | 'specific_date' | 'specific_year_date' | 'interval'
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+/**
+ * Dates of the year are stored as numbers month*100+day (28 November = 1128) in the same column as the monthly days.
+ * Keeps unique valid ones (29 February is allowed: it only fires in leap years), sorted by month then day.
+ */
+export function normalizeYearDates(value: unknown): number[] {
+  const raw = Array.isArray(value) ? value : value == null || value === '' ? [] : [value]
+  return [...new Set(
+    raw.map(Number).filter((n) => {
+      const m = Math.floor(n / 100)
+      const d = n % 100
+      return Number.isInteger(n) && m >= 1 && m <= 12 && d >= 1 && d <= DAYS_IN_MONTH[m - 1]
+    })
+  )].sort((a, b) => a - b)
+}
+
+/** "28 Nov" for 1128. */
+export function yearDateLabel(mmdd: number): string {
+  return `${mmdd % 100} ${MONTH_NAMES[Math.floor(mmdd / 100) - 1]}`
+}
+
+/** Every day of the year as a picker option (value 1128, label "28 Nov"). */
+export const YEAR_DATE_OPTIONS: { value: number; label: string }[] = DAYS_IN_MONTH.flatMap((days, mi) =>
+  Array.from({ length: days }, (_, di) => ({ value: (mi + 1) * 100 + di + 1, label: yearDateLabel((mi + 1) * 100 + di + 1) }))
+)
 
 export interface RecurringSchedule {
   frequency: Frequency
@@ -84,8 +112,12 @@ function dateMatchesFrequency(ymd: string, schedule: RecurringSchedule): boolean
       const [, , dd] = ymd.split('-').map(Number)
       return normalizeSpecificDates(schedule.specificDate).includes(dd)
     }
+    case 'specific_year_date': {
+      const [, mm, dd] = ymd.split('-').map(Number)
+      return normalizeYearDates(schedule.specificDate).includes(mm * 100 + dd)
+    }
     case 'interval':
-      return true // interval is handled externally via lastRunAt
+      return true // interval is handled in computeNextRunAt (every N days counted from the start date)
     default:
       return false
   }
@@ -102,20 +134,30 @@ export function computeNextRunAt(
 ): Date | null {
   const endDate = schedule.endDate ?? null
 
-  // For interval frequency, just add N days from `after`
+  // Every N days is counted from the start date: the start date is the first run (even when it is in the future),
+  // then start + N, start + 2N ... The next run is the first one of that series that is after `after`.
   if (schedule.frequency === 'interval') {
-    const n = schedule.intervalDays ?? 1
-    const nextYmd = addDays(after.toISOString().slice(0, 10), n)
-    if (endDate && nextYmd > endDate) return null
-    return localDayAtTime(nextYmd, schedule.timeOfDay, schedule.timezone)
+    const n = Math.max(1, schedule.intervalDays ?? 1)
+    const dayMs = 86400000
+    const afterYmd = after.toISOString().slice(0, 10)
+    const gap = Math.floor((Date.parse(`${afterYmd}T00:00:00Z`) - Date.parse(`${schedule.startDate}T00:00:00Z`)) / dayMs)
+    let k = Math.max(0, Math.floor(gap / n) - 1) // jump close to `after`, then step
+    for (let i = 0; i < 10; i++, k++) {
+      const ymd = addDays(schedule.startDate, k * n)
+      if (endDate && ymd > endDate) return null
+      const t = localDayAtTime(ymd, schedule.timeOfDay, schedule.timezone)
+      if (t > after) return t
+    }
+    return null
   }
 
-  // Walk forward day by day (max 400 days to avoid infinite loop)
+  // Walk forward day by day (max 400 days, or 4 years and a bit for dates of the year, to avoid an endless loop)
   // Start from today so a rule created/updated mid-day can still fire today
   let candidate = after.toISOString().slice(0, 10)
   if (candidate < schedule.startDate) candidate = schedule.startDate
 
-  for (let i = 0; i < 400; i++) {
+  const maxDays = schedule.frequency === 'specific_year_date' ? 1500 : 400
+  for (let i = 0; i < maxDays; i++) {
     if (endDate && candidate > endDate) return null
     if (dateMatchesFrequency(candidate, schedule)) {
       const t = localDayAtTime(candidate, schedule.timeOfDay, schedule.timezone)
@@ -142,6 +184,10 @@ export function frequencyLabel(schedule: RecurringSchedule): string {
       if (dates.length === 0) return 'Monthly'
       if (dates.length === 1) return `Monthly on day ${dates[0]}`
       return `Monthly on days ${dates.join(', ')}`
+    }
+    case 'specific_year_date': {
+      const dates = normalizeYearDates(schedule.specificDate)
+      return dates.length === 0 ? 'Yearly' : `Every year on ${dates.map(yearDateLabel).join(', ')}`
     }
     case 'interval':
       return `Every ${schedule.intervalDays ?? 1} day(s)`

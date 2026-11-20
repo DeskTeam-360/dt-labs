@@ -8,6 +8,7 @@ import { db, recurringTicketRuns, recurringTickets, tags, ticketAssignees, ticke
 import { sendRecurringTicketCreatedEmail } from '@/lib/recurring-ticket-email'
 import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
 import { applyRecurringTicketTemplate } from '@/lib/recurring-ticket-template'
+import { applyRecurringRuleSkills } from '@/lib/skills'
 import { assignCompanySupportTicketRank, assignCreatorSupportTicketRank, parseCompanyTicketDesiredRank, resolveSupportQueueScope } from '@/lib/ticket-company-priority-order'
 
 /**
@@ -86,6 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
 
     if (!newTicket) throw new Error('Failed to insert ticket')
+    await applyRecurringRuleSkills((newTicket as { id: number }).id, rule)
 
     const schedule = {
       frequency: rule.frequency as Frequency,

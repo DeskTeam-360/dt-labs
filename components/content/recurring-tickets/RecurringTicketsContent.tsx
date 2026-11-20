@@ -36,7 +36,7 @@ import { useCallback, useEffect, useState } from 'react'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
-import { normalizeSpecificDates } from '@/lib/recurring-ticket-schedule'
+import { normalizeSpecificDates, normalizeYearDates, yearDateLabel } from '@/lib/recurring-ticket-schedule'
 
 import RecurringTicketRunsDrawer from './RecurringTicketRunsDrawer'
 
@@ -77,6 +77,7 @@ const FREQ_LABELS: Record<string, string> = {
   weekends: 'Weekends (Sat–Sun)',
   specific_days: 'Specific days',
   specific_date: 'Monthly date',
+  specific_year_date: 'Yearly date',
   interval: 'Every N days',
 }
 
@@ -91,6 +92,10 @@ function freqLabel(row: RecurringTicketRow): string {
       if (dates.length === 0) return 'Monthly'
       if (dates.length === 1) return `Monthly on day ${dates[0]}`
       return `Monthly on days ${dates.join(', ')}`
+    }
+    case 'specific_year_date': {
+      const dates = normalizeYearDates(row.specificDate)
+      return dates.length === 0 ? 'Yearly' : `Every year on ${dates.map(yearDateLabel).join(', ')}`
     }
     case 'interval':
       return `Every ${row.intervalDays ?? 1} day(s)`

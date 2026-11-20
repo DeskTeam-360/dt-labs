@@ -22,7 +22,7 @@ import {
 import dayjs from 'dayjs'
 import { useEffect, useState } from 'react'
 
-import { normalizeSpecificDates } from '@/lib/recurring-ticket-schedule'
+import { normalizeSpecificDates, normalizeYearDates, YEAR_DATE_OPTIONS } from '@/lib/recurring-ticket-schedule'
 import {
   DEFAULT_RECURRING_VISIBILITY,
   TICKET_VISIBILITY_OPTIONS,
@@ -154,6 +154,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         frequency: initialValues.frequency,
         specific_days: initialValues.specificDays ?? [],
         specific_date: dates.length ? dates : [1],
+        specific_year_date: normalizeYearDates(initialValues.specificDate),
         interval_days: initialValues.intervalDays ?? 2,
         time_of_day: dayjs(initialValues.timeOfDay, 'HH:mm'),
         timezone: initialValues.timezone,
@@ -173,6 +174,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         frequency: 'daily',
         specific_days: [],
         specific_date: [1],
+        specific_year_date: [],
         interval_days: 2,
         time_of_day: dayjs('08:00', 'HH:mm'),
         timezone: 'Asia/Jakarta',
@@ -194,7 +196,9 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
         specific_days: values.frequency === 'specific_days' ? values.specific_days : null,
         specific_date: values.frequency === 'specific_date'
           ? normalizeSpecificDates(values.specific_date)
-          : null,
+          : values.frequency === 'specific_year_date'
+            ? normalizeYearDates(values.specific_year_date)
+            : null,
         interval_days: values.frequency === 'interval' ? values.interval_days : null,
         time_of_day: (values.time_of_day as dayjs.Dayjs).format('HH:mm'),
         timezone: values.timezone,
@@ -268,6 +272,7 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
             <Select.Option value="weekends">Weekends (Sat–Sun)</Select.Option>
             <Select.Option value="specific_days">Specific days of the week</Select.Option>
             <Select.Option value="specific_date">Specific dates each month</Select.Option>
+            <Select.Option value="specific_year_date">Specific dates each year</Select.Option>
             <Select.Option value="interval">Every N days</Select.Option>
           </Select>
         </Form.Item>
@@ -288,6 +293,23 @@ export default function RecurringTicketForm({ initialValues, onSaved, onCancel }
               mode="multiple"
               placeholder="Select one or more days"
               options={DATE_OPTIONS}
+              optionFilterProp="label"
+              maxTagCount="responsive"
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+        )}
+        {frequency === 'specific_year_date' && (
+          <Form.Item
+            name="specific_year_date"
+            label="Dates of the year"
+            extra="Runs on these dates every year, starting with the first one on or after the start date. 29 Feb only runs in leap years."
+            rules={[{ required: true, type: 'array', min: 1, message: 'Select at least one date' }]}
+          >
+            <Select
+              mode="multiple"
+              placeholder="e.g. 28 Nov"
+              options={YEAR_DATE_OPTIONS}
               optionFilterProp="label"
               maxTagCount="responsive"
               style={{ width: '100%' }}
