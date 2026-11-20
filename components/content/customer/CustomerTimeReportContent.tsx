@@ -50,6 +50,7 @@ import {
   normalizeDatePreset,
   resolveDatePresetToRange,
 } from '@/lib/customer-time-report-defaults'
+import { formatDuration, formatHours } from '@/lib/format-duration'
 import { recapTeamColumnLabelFromPayload } from '@/lib/recap-payload-grid'
 import { classifyRecapPeriodForStore, resolveReportRangeFromFormValues } from '@/lib/recap-snapshot-period'
 import { ticketStatusDisplayLabel } from '@/lib/ticket-status-kanban'
@@ -60,19 +61,6 @@ const { RangePicker } = DatePicker
 
 dayjs.extend(relativeTime)
 
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
-
-/** Decimal hours as "2h 57m" (45 minutes as "45m"), the same format as the Pool Report. */
-function fmtHoursAsHm(hours: number): string {
-  const m = Math.round(Math.abs(hours) * 60)
-  if (m < 60) return `${m}m`
-  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
-}
 
 function hoursFromSeconds(seconds: number): number {
   return Math.round((seconds / 3600) * 100) / 100
@@ -1006,7 +994,8 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
         dataIndex: 'plan_active_time_hours',
         width: 150,
         align: 'center',
-        render: (v: number) => (Number(v) || 0).toLocaleString(),
+        sorter: (a: CompanySummaryRow, b: CompanySummaryRow) => (a.plan_active_time_hours || 0) - (b.plan_active_time_hours || 0),
+        render: (v: number) => formatHours(v),
       },
       {
         title: 'Days work',
@@ -1020,7 +1009,8 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
         dataIndex: 'log_total_active_time_hours',
         width: 150,
         align: 'center',
-        render: (v: number) => (Number(v) || 0).toLocaleString(),
+        sorter: (a: CompanySummaryRow, b: CompanySummaryRow) => (a.log_total_active_time_hours || 0) - (b.log_total_active_time_hours || 0),
+        render: (v: number) => formatHours(v),
       },
       {
         title: 'Total Tickets',
@@ -1030,11 +1020,12 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
         render: (v: number) => (Number(v) || 0).toLocaleString(),
       },
       {
-        title: 'Total Time Spent (in hours)',
+        title: 'Total Time Spent',
         dataIndex: 'total_tracker_reported_seconds',
         width: 140,
         align: 'center',
-        render: (sec: number) => hoursFromSeconds(Number(sec) || 0),
+        sorter: (a: CompanySummaryRow, b: CompanySummaryRow) => (a.total_tracker_reported_seconds || 0) - (b.total_tracker_reported_seconds || 0),
+        render: (sec: number) => formatDuration(Number(sec) || 0),
       },
       {
         title: 'Average Time Spent (in percent)',
@@ -1049,7 +1040,7 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
         dataIndex: 'plan_per_day_hours',
         width: 100,
         align: 'center',
-        render: (h: number | null) => (h == null ? <Text type="secondary">—</Text> : <Text>{h}h</Text>),
+        render: (h: number | null) => (h == null ? <Text type="secondary">—</Text> : <Text>{formatHours(h)}</Text>),
       },
       {
         title: 'Avg spent / day',
@@ -1061,7 +1052,7 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
             <Text type="secondary">—</Text>
           ) : (
             <span title={`Total hours / ${r.working_days ?? '?'} working days (Mon-Fri, holidays not removed)`}>
-              <Text>{fmtHoursAsHm(h)}</Text>
+              <Text>{formatHours(h)}</Text>
             </span>
           ),
       },
@@ -1132,7 +1123,7 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                       align: 'center' as const,
                       render: (_: unknown, r: CompanySummaryRow) => {
                         const sec = r.by_position?.find((x) => x.position === pos)?.reported_seconds ?? 0
-                        return sec > 0 ? hoursFromSeconds(sec) : <Text type="secondary">—</Text>
+                        return sec > 0 ? formatDuration(sec) : <Text type="secondary">—</Text>
                       },
                     })),
                   },
@@ -1840,7 +1831,7 @@ export default function CustomerTimeReportContent({ user: currentUser, variant =
                               if (name === 'Used Hours (%)') {
                                 const realPct = props.payload?.usedPct ?? value
                                 const label = realPct >= 100 ? `Overtime ${realPct}%` : `${realPct}%`
-                                return [`${label} (${props.payload?.usedHours ?? 0}h / ${props.payload?.planHours ?? 0}h plan)`, 'Used']
+                                return [`${label} (${formatHours(props.payload?.usedHours ?? 0)} / ${formatHours(props.payload?.planHours ?? 0)} plan)`, 'Used']
                               }
                               return [`${value}%`, 'Remaining']
                             }}

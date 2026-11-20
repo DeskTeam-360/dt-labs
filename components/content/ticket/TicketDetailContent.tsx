@@ -39,6 +39,8 @@ import {
     Typography,
 } from 'antd'
 
+import { formatClock } from '@/lib/format-duration'
+
 const { useBreakpoint } = Grid
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef,useState } from 'react'
@@ -609,19 +611,7 @@ export default function TicketDetailContent({
     }
 
     // Format seconds to readable time
-    const formatTime = (seconds: number) => {
-        const hours = Math.floor(seconds / 3600)
-        const minutes = Math.floor((seconds % 3600) / 60)
-        const secs = seconds % 60
-
-        if (hours > 0) {
-            return `${hours}h ${minutes}m ${secs}s`
-        } else if (minutes > 0) {
-            return `${minutes}m ${secs}s`
-        } else {
-            return `${secs}s`
-        }
-    }
+    const formatTime = (seconds: number) => formatClock(seconds)
 
     const getStatusColor = (status: string) => {
         const fromDb = statusesFromDb.find((s) => s.slug === status)

@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 
 import type { TicketTrackerStat } from '@/app/api/tickets/ticket-time-stats/route'
 import DateDisplay from '@/components/common/DateDisplay'
+import { formatDuration } from '@/lib/format-duration'
 import { KANBAN_SEMANTIC_BLUE, KANBAN_SEMANTIC_GREEN, kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 import { isClosedLikeTicketStatus } from '@/lib/ticket-status-workflow'
 
@@ -17,14 +18,11 @@ import type { StatusColumn, TicketRecord } from './types'
 import { DEFAULT_ALL_STATUS_COLUMNS } from './types'
 
 function fmtSeconds(s: number): string {
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  if (h === 0 && m === 0) return '< 1m'
-  return m === 0 ? `${h}h` : `${h}h ${m}m`
+  return s < 60 ? '< 1m' : formatDuration(s)
 }
 
 function fmtHours(s: number): string {
-  return (s / 3600).toFixed(1) + 'h'
+  return formatDuration(s)
 }
 
 function TrackerTooltipContent({ stat }: { stat: TicketTrackerStat | undefined }): ReactNode {

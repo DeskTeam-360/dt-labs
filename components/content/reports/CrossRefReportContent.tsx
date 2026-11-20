@@ -34,17 +34,10 @@ import { useCallback, useRef, useState } from 'react'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
+import { formatDuration } from '@/lib/format-duration'
 
 const { Content } = Layout
 const { Title, Text } = Typography
-
-function formatDuration(seconds: number): string {
-  const s = Math.round(seconds)
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
 
 type ViewBy = 'customer' | 'user' | 'team'
 

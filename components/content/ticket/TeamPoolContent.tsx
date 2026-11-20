@@ -12,6 +12,7 @@ import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { DEFAULT_ALL_STATUS_COLUMNS, type TicketRecord } from '@/components/ticket/list/types'
+import { formatDuration, formatHours } from '@/lib/format-duration'
 import { loadLevel } from '@/lib/team-load-levels'
 
 dayjs.extend(relativeTime)
@@ -63,10 +64,7 @@ const DUTY: Record<string, { label: string; color: string }> = {
 const wibTime = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) : null
 
-const fmtDur = (sec: number) => {
-  const m = Math.round(sec / 60)
-  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
-}
+const fmtDur = formatDuration
 
 async function fetchTickets(params: Record<string, string>): Promise<TicketRecord[]> {
   const qs = new URLSearchParams({ limit: '200', ...params })
@@ -241,13 +239,13 @@ function PersonHeader({ lane, agent, shift, status, count }: { lane: Lane; agent
   const duty = status?.reason ? DUTY[status.reason] ?? { label: status.reason, color: 'default' } : null
   const active = status?.active ?? []
   const start = wibTime(status?.shift_start ?? null)
-  const trackerText = start ? `${start} – ${active.length ? 'now' : wibTime(status?.shift_end ?? null)}` : 'Not started yet'
+  const trackerText = start ? `${start} – ${active.length ? 'now' : wibTime(status?.shift_end ?? null)} WIB` : 'Not started yet'
   const shiftLabel = shift ? `${shift.title} (${shift.start} - ${shift.end}${shift.crosses_midnight ? ' +1' : ''})` : 'not set'
 
   const detail = (
     <Flex vertical gap={4} style={{ width: 280 }}>
       <Text strong>{lane.title}{agent?.position ? ` · ${agent.position}` : ''}</Text>
-      <Text>Today: {duty?.label ?? 'no availability data'}{status?.capacity_hours != null ? ` (${status.capacity_hours} h planned)` : ''}</Text>
+      <Text>Today: {duty?.label ?? 'no availability data'}{status?.capacity_hours != null ? ` (${formatHours(status.capacity_hours)} planned)` : ''}</Text>
       <Text>Shift: {shiftLabel} WIB</Text>
       <Text>Seen from the tracker today: {trackerText}</Text>
       <Text>Tracked today: {fmtDur(status?.tracked_seconds ?? 0)}</Text>
@@ -650,7 +648,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                     return (
                       <Flex justify="space-between" align="center" gap={8}>
                         <span>
-                          {c.name} <Text type="secondary">({c.spent_hours}H/{c.plan_hours}H)</Text>
+                          {c.name} <Text type="secondary">({formatHours(c.spent_hours)} / {formatHours(c.plan_hours)})</Text>
                           {c.is_customer === false ? <Text type="secondary" italic> · internal</Text> : null}
                         </span>
                         {c.has_active_timer ? <Badge color={GREEN} title="A timer is running" /> : null}
@@ -689,7 +687,7 @@ export default function TeamPoolContent({ user: currentUser }: { user: { id: str
                           {duty ? <Tag color={duty.color} style={{ margin: 0 }}>{duty.label}</Tag> : null}
                           {working ? (
                             started ? (
-                              <Text style={{ fontSize: 12, color: GREEN }}>in {started}</Text>
+                              <Text style={{ fontSize: 12, color: GREEN }}>in {started} WIB</Text>
                             ) : (
                               <Text type="secondary" style={{ fontSize: 12 }}>not in yet</Text>
                             )

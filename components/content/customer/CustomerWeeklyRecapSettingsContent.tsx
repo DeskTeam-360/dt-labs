@@ -9,6 +9,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { formatDuration } from '@/lib/format-duration'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -59,8 +60,7 @@ function cellBackground(embedded: boolean, pct: number | null | undefined): stri
 function formatTrackedTime(seconds: number | null | undefined): string {
   const total = Number(seconds) || 0
   if (total <= 0) return '—'
-  const hours = Math.round(total / 3600)
-  return `${hours}h`
+  return formatDuration(total)
 }
 
 function TeamWeeklyTable({ weeksDisplay, rows }: { weeksDisplay: WeekCol[]; rows: GridRow[] }) {

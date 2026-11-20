@@ -12,6 +12,7 @@ import { tagPreviewFillHex } from '@/components/common/KanbanTagPreview'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
+import { formatHours } from '@/lib/format-duration'
 import { kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
@@ -361,7 +362,7 @@ export default function CompaniesContent({ user: currentUser }: CompaniesContent
       width: 110,
       align: 'center',
       render: (_: unknown, record: CompanyRecord) =>
-        (record.active_time ?? 0) > 0 ? `${record.active_time}H` : '—',
+        (record.active_time ?? 0) > 0 ? formatHours(record.active_time) : '—',
     },
     {
       title: 'Last ticket update',

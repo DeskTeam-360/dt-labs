@@ -15,6 +15,7 @@ import UserCompanyHistory from '@/components/user/UserCompanyHistory'
 import ViewAsButton, { canViewAs } from '@/components/user/ViewAsButton'
 import { APP_TABLE_PAGE_SIZE_OPTIONS, appTableShowTotal } from '@/lib/app-table'
 import { canViewCustomerReports } from '@/lib/auth-utils'
+import { formatClock, formatDuration as formatDurationShared } from '@/lib/format-duration'
 import { TIMEZONE_OPTIONS } from '@/lib/timezones'
 import {
   getUserDepartmentAccentColor,
@@ -276,18 +277,8 @@ export default function UserDetailContent({ user: currentUser, userData: initial
     }
   }
 
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`
-    } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`
-    } else {
-      return `${secs}s`
-    }
-  }
+  // Under an hour the seconds still show (a short session); from one hour on it is hours and minutes.
+  const formatDuration = (seconds: number) => (seconds >= 3600 ? formatDurationShared(seconds) : formatClock(seconds))
 
   const formatEntryDateTime = (iso: string | null | undefined) =>
     iso
@@ -1551,16 +1542,7 @@ export default function UserDetailContent({ user: currentUser, userData: initial
                             key: 'duration_seconds',
                             render: (seconds: number | null) => {
                               if (!seconds) return <Tag color="processing">Active</Tag>
-                              const hours = Math.floor(seconds / 3600)
-                              const minutes = Math.floor((seconds % 3600) / 60)
-                              const secs = seconds % 60
-                              return (
-                                <Text>
-                                  {hours > 0 ? `${hours}h ` : ''}
-                                  {minutes > 0 ? `${minutes}m ` : ''}
-                                  {secs > 0 ? `${secs}s` : ''}
-                                </Text>
-                              )
+                              return <Text>{formatDuration(seconds)}</Text>
                             },
                           },
                           {

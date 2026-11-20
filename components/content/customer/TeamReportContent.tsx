@@ -33,6 +33,7 @@ import {
   type CustomerTimeReportDatePresetKey,
   resolveDatePresetToRange,
 } from '@/lib/customer-time-report-defaults'
+import { formatHoursOrDash } from '@/lib/format-duration'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -103,7 +104,7 @@ const REASON_LABEL: Record<string, string> = {
 const topCompanyOf = (p: Person): CompanyShare | undefined =>
   p.companies.reduce<CompanyShare | undefined>((best, c) => (!best || c.hours > best.hours ? c : best), undefined)
 
-export const fmtH = (n: number | null | undefined) => (n == null ? '—' : `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} h`)
+export const fmtH = (n: number | null | undefined) => formatHoursOrDash(n)
 export const pctColor = (p: number | null) => (p == null ? 'default' : p > 100 ? 'red' : p >= 80 ? 'green' : p >= 50 ? 'gold' : 'orange')
 
 export function PersonDetail({ p, minFree }: { p: Person; minFree: number }) {

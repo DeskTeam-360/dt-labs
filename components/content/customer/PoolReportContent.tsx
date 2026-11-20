@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { formatDuration } from '@/lib/format-duration'
 
 dayjs.extend(relativeTime)
 
@@ -48,12 +49,7 @@ const SORT_OPTIONS = [
   { value: 'daily', label: '% Used Today' },
 ]
 
-const fmtDur = (sec: number) => {
-  const m = Math.round(Math.abs(sec) / 60)
-  const sign = sec < 0 && m > 0 ? '-' : ''
-  if (m < 60) return `${sign}${m}m`
-  return `${sign}${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
-}
+const fmtDur = formatDuration
 
 /** Time left of the plan: counts down as time is spent, and turns negative (red) once the plan is used up. */
 const remainingTag = (budgetSeconds: number, spentSeconds: number) => {

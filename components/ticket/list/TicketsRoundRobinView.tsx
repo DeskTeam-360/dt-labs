@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 
 import type { CompanyTimeStat } from '@/app/api/tickets/company-time-stats/route'
 import type { TicketTrackerStat } from '@/app/api/tickets/ticket-time-stats/route'
+import { formatDuration } from '@/lib/format-duration'
 
 import type { StatusColumn, TicketRecord } from './types'
 import { DEFAULT_ALL_STATUS_COLUMNS, sortTickets, TICKETS_LIST_SORT_BY, TICKETS_LIST_SORT_ORDER } from './types'
@@ -20,10 +21,7 @@ interface RoundRobinRow {
 }
 
 function fmtSeconds(s: number): string {
-  // Same format as the Pool Report: "1h 28m", "45m".
-  const m = Math.round(Math.abs(s) / 60)
-  if (m < 60) return `${m}m`
-  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
+  return formatDuration(s)
 }
 
 interface TicketsRoundRobinViewProps {

@@ -36,6 +36,7 @@ import {
 import { SpaNavLink } from '@/components/common/SpaNavLink'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { formatDuration } from '@/lib/format-duration'
 import {
   isValidMyTeamsActivityDateYmd,
   localDayBoundsFromYmd,
@@ -47,14 +48,6 @@ dayjs.extend(customParseFormat)
 
 const { Content } = Layout
 const { Title, Text } = Typography
-
-function formatDuration(seconds: number): string {
-  const s = Math.round(seconds)
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
 
 type TeamRow = { id: string; name: string; type: string | null; member_count: number }
 

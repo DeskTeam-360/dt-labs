@@ -22,6 +22,7 @@ import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import StopTimerNoteModal from '@/components/ticket/StopTimerNoteModal'
 import type { StoppedTimeSession } from '@/lib/dashboard-hourly-activity'
+import { formatClock } from '@/lib/format-duration'
 
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...options, credentials: 'include' })
@@ -33,6 +34,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
 }
 import dayjs from 'dayjs'
 
+import InactiveAssigneesBanner from '@/components/content/dashboard/InactiveAssigneesBanner'
 import StaffDashboardCharts from '@/components/dashboard/DashboardStaffChartsLazy'
 
 const { Content } = Layout
@@ -56,15 +58,9 @@ interface DashboardContentProps {
 }
 
 function formatTime(seconds: number) {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
-  if (hours > 0) return `${hours}h ${minutes}m ${secs}s`
-  if (minutes > 0) return `${minutes}m ${secs}s`
-  return `${secs}s`
+  return formatClock(seconds)
 }
 
-import InactiveAssigneesBanner from '@/components/content/dashboard/InactiveAssigneesBanner'
 
 export default function DashboardContent({ user }: DashboardContentProps) {
   const { message } = App.useApp()

@@ -19,16 +19,13 @@ import DashboardAnnouncementsSection from '@/components/dashboard/DashboardAnnou
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import { canDeleteTickets } from '@/lib/auth-utils'
+import { formatDuration } from '@/lib/format-duration'
 import { kanbanTagStyle } from '@/lib/kanban-tag-chip-style'
 
 const { Title, Text } = Typography
 
 function formatTime(seconds: number) {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  if (hours > 0) return `${hours}h ${minutes}m`
-  if (minutes > 0) return `${minutes}m`
-  return '0m'
+  return formatDuration(seconds)
 }
 
 const DEFAULT_COLORS = ['#1890ff', '#eb2f96', '#faad14', '#52c41a', '#13c2c2', '#722ed1']

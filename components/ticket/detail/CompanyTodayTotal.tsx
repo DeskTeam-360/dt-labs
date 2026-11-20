@@ -4,6 +4,8 @@ import { Tooltip, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { formatDuration } from '@/lib/format-duration'
+
 const { Text } = Typography
 
 interface ActiveTrackerEntry {
@@ -22,9 +24,7 @@ interface CompanyTodayTotalProps {
 }
 
 function fmtTotal(totalSecs: number) {
-  const h = Math.floor(totalSecs / 3600)
-  const m = Math.floor((totalSecs % 3600) / 60)
-  return `${h}.${String(m).padStart(2, '0')}H`
+  return formatDuration(totalSecs)
 }
 
 function fmtElapsed(secs: number) {
