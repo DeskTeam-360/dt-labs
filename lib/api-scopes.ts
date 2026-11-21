@@ -90,6 +90,25 @@ const AI_MARKING_CREATE = `**You are an AI assistant, so everything you create m
 - Always send \`via\` with your own name as the user knows it (for example \`"Claude"\`, \`"ChatGPT"\`, \`"Gemini"\`). It is required; the call fails without it.
 - The description then ends with "Created via <your name> (API)", and the ticket's history shows it was created through the API by that assistant. Do not add that line yourself, and never write as if a person typed it.`
 
+const IMPORT_SKILL = `## Import tickets from Freshdesk or the FD Archive (scope \`tickets:import\`)
+
+\`\`\`
+POST /api/v1/freshdesk/import-tickets
+Content-Type: application/json
+
+{ "ticket_ids": [202963, 202964], "source": "archive" }
+\`\`\`
+
+Copies tickets with their conversation and attachments into DeskTeam360 under their Freshdesk number. A ticket that is already here is skipped, so repeating a call is safe. Imported tickets cannot be removed through the API.
+
+| Field | Required | Meaning |
+|---|---|---|
+| \`ticket_ids\` | yes | Freshdesk ticket numbers, up to 50 per call |
+| \`source\` | no | \`freshdesk\` (default) or \`archive\` (the FD Archive copy of old Freshdesk tickets) |
+
+The answer lists one result per ticket: \`imported\`, \`already_imported\`, \`not_found\`, \`id_conflict\` or \`error\`, with a message. Try \`archive\` when Freshdesk says \`not_found\` for an old ticket.
+`
+
 const CREATE_SKILL = `## Create a ticket (scope \`tickets:create\`)
 
 \`\`\`
@@ -464,6 +483,13 @@ export const API_SCOPES: ApiScope[] = [
     endpoints: [{ method: 'POST', path: '/api/v1/tickets', summary: 'Create a ticket' }],
     skill: CREATE_SKILL,
   },
+  {
+    key: 'tickets:import',
+    label: 'Import tickets from Freshdesk (write)',
+    description: 'Copy tickets, with conversation and attachments, from Freshdesk or the FD Archive into DeskTeam360 by their Freshdesk number. Already imported tickets are skipped.',
+    endpoints: [{ method: 'POST', path: '/api/v1/freshdesk/import-tickets', summary: 'Import tickets by Freshdesk number from Freshdesk or the FD Archive' }],
+    skill: IMPORT_SKILL,
+  },
 ]
 
 export const API_SCOPE_KEYS = API_SCOPES.map((s) => s.key)
@@ -485,7 +511,9 @@ export function isApiScope(v: unknown): v is string {
 const STAFF_SCOPES = ['tickets:read', 'ticket-detail:read', 'companies:read', 'calendar:read', 'notes:write']
 export function allowedScopesForRole(role: string | null | undefined): string[] {
   const r = (role ?? '').toLowerCase()
-  return ['admin', 'operations', 'manager'].includes(r) ? API_SCOPE_KEYS : STAFF_SCOPES
+  if (['admin', 'operations'].includes(r)) return API_SCOPE_KEYS
+  // Importing from Freshdesk is for admins and operations only.
+  return r === 'manager' ? API_SCOPE_KEYS.filter((k) => k !== 'tickets:import') : STAFF_SCOPES
 }
 
 /** Calls per hour a connection may make: agents 50, managers and operations 100, admins 200 (unknown roles 50). */

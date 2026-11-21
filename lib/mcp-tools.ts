@@ -270,6 +270,19 @@ export const MCP_TOOLS: McpTool[] = [
     },
     required: ['title'],
   },
+  {
+    name: 'import_freshdesk_tickets',
+    description:
+      'CHANGES DATA. Migrate tickets by their Freshdesk number from Freshdesk (source "freshdesk") or from the FD Archive (source "archive", old tickets) into DeskTeam360, with conversation and attachments. A ticket already here is skipped, so repeating is safe, and an import cannot be undone. Up to 50 per call. Show the user the numbers and the source first and wait for their yes. If Freshdesk answers not_found for an old ticket, offer to try the archive.',
+    scope: 'tickets:import',
+    method: 'POST',
+    path: '/api/v1/freshdesk/import-tickets',
+    props: {
+      ticket_ids: list('Freshdesk ticket numbers, for example ["202963", "202964"]'),
+      source: str('"freshdesk" (default) or "archive"'),
+    },
+    required: ['ticket_ids'],
+  },
 ]
 
 export const MCP_INSTRUCTIONS = [

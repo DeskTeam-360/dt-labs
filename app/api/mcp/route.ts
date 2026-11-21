@@ -4,6 +4,7 @@ import { GET as calendarEventsGet } from '@/app/api/calendar/events/route'
 import { GET as calendarStatusGet } from '@/app/api/calendar/user-status/route'
 import { GET as catalogGet } from '@/app/api/v1/catalog/route'
 import { GET as companiesGet } from '@/app/api/v1/companies/route'
+import { POST as fdImportPost } from '@/app/api/v1/freshdesk/import-tickets/route'
 import { GET as teamLoadGet } from '@/app/api/v1/team-load/route'
 import { GET as suggestGet } from '@/app/api/v1/team-load/suggest/route'
 import { GET as activityGet } from '@/app/api/v1/tickets/[id]/activity/route'
@@ -58,6 +59,7 @@ const HANDLERS: Record<string, Handler> = {
   add_note: notePost,
   update_ticket: ticketPatch,
   create_ticket: ticketsPost,
+  import_freshdesk_tickets: fdImportPost,
 }
 
 async function callTool(request: Request, params: Record<string, unknown> | undefined) {
