@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 const { Text } = Typography
 
 type Shot = { id: string; file_url: string; created_at: string; device: 'desktop' | 'mobile'; page_url: string }
-type PageLite = { url: string; depth: number }
+type PageLite = { url: string; depth: number; title?: string | null }
 
 const isHome = (url: string, pages: PageLite[]) => {
   const page = pages.find((p) => p.url === url)
@@ -43,9 +43,10 @@ export default function CrawlSessionScreenshotLinks({ sessionId, pages }: { sess
     const list = [...byPage.entries()].map(([url, list]) => {
       // The newest picture of each device is the one that counts.
       const newest = (d: 'desktop' | 'mobile') => [...list].reverse().find((x) => x.device === d)
-      return { url, home: isHome(url, pages), desktop: newest('desktop'), mobile: newest('mobile') }
+      return { url, home: isHome(url, pages), title: pages.find((p) => p.url === url)?.title?.trim() || '', desktop: newest('desktop'), mobile: newest('mobile') }
     })
-    return [...list.filter((x) => x.home), ...list.filter((x) => !x.home)].map((x, i) => ({ ...x, n: i + 1, label: x.home ? 'Homepage' : 'Inner page' }))
+    // The homepage is labelled "Homepage"; an inner page by its page title (or "Inner page" when it has none).
+    return [...list.filter((x) => x.home), ...list.filter((x) => !x.home)].map((x, i) => ({ ...x, n: i + 1, label: x.home ? 'Homepage' : x.title || 'Inner page' }))
   }, [shots, pages])
 
   const copyAll = () => {
