@@ -130,6 +130,8 @@ export async function GET(request: Request) {
     (ticketTypeFilter === 'spam' || ticketTypeFilter === 'trash')
   ) {
     conditions.push(eq(tickets.ticketType, ticketTypeFilter))
+  } else if (role !== 'customer' && url.searchParams.get('include_all_types') === '1') {
+    // Quick search (navbar): look in spam, trash and project tickets too, so a ticket is never "lost" from search.
   } else {
     conditions.push(eq(tickets.ticketType, DEFAULT_TICKET_TYPE))
   }

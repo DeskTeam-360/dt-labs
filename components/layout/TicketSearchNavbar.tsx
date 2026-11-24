@@ -61,6 +61,7 @@ type TicketPreview = {
   companyName: string | null
   priorityTitle: string | null
   priorityColor: string | null
+  ticketType: string | null
 }
 
 /**
@@ -178,7 +179,7 @@ export default function TicketSearchNavbar({
       try {
         const fields = getSearchFields(searchPrefs)
         const res = await fetch(
-          `/api/tickets?search=${encodeURIComponent(trimmed)}&search_fields=${encodeURIComponent(fields)}&limit=${PREVIEW_LIMIT}`,
+          `/api/tickets?search=${encodeURIComponent(trimmed)}&search_fields=${encodeURIComponent(fields)}&limit=${PREVIEW_LIMIT}&include_all_types=1`,
           { credentials: 'include', signal: ac.signal }
         )
         if (!res.ok) throw new Error('fetch failed')
@@ -192,6 +193,7 @@ export default function TicketSearchNavbar({
               title?: string | null
               company?: { name?: string | null } | null
               priority?: number
+              ticket_type?: string
             }
             const companyName = r.company?.name?.trim() || null
             const pr = typeof r.priority === 'number' ? r.priority : Number(r.priority)
@@ -202,6 +204,7 @@ export default function TicketSearchNavbar({
               companyName,
               priorityTitle,
               priorityColor: null,
+              ticketType: r.ticket_type && r.ticket_type !== 'support' ? r.ticket_type : null,
             }
           })
           .filter((r) => r.id > 0)
@@ -433,6 +436,11 @@ export default function TicketSearchNavbar({
                 >
                   <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, gap: 8 }}>
                     <span style={{ color: 'var(--ticket-nav-muted)', fontSize: 12, flexShrink: 0 }}>#{t.id}</span>
+                    {t.ticketType ? (
+                      <span style={{ color: t.ticketType === 'project' ? '#1677ff' : '#cf1322', fontSize: 11, fontWeight: 600, flexShrink: 0, textTransform: 'capitalize' }}>
+                        {t.ticketType}
+                      </span>
+                    ) : null}
                     <span
                       style={{
                         color: 'var(--ticket-nav-text)',
