@@ -9,6 +9,7 @@ import { useSession } from 'next-auth/react'
 import { useState } from 'react'
 
 import DateDisplay from '@/components/common/DateDisplay'
+import WebsiteMaintenanceModal from '@/components/company/WebsiteMaintenanceModal'
 import WpKeySetupModal from '@/components/wp-monitor/WpKeySetupModal'
 import WpSiteDetails, { HEALTH_COLOR, HEALTH_LABEL, type WpSiteSummary } from '@/components/wp-monitor/WpSiteDetails'
 
@@ -39,6 +40,7 @@ export default function TabWebsites({
   const isAdminUser = ((useSession().data?.user as { role?: string } | undefined)?.role ?? '').toLowerCase() === 'admin'
   const [registeringId, setRegisteringId] = useState<string | null>(null)
   const [setup, setSetup] = useState<{ label: string; key: string } | null>(null)
+  const [maintenanceFor, setMaintenanceFor] = useState<{ id: string; url: string } | null>(null)
 
   /** Looks at a monitored site now: opens it, asks the plugin for a fresh report, updates the alarms. */
   const checkNow = async (record: any) => {
@@ -156,6 +158,9 @@ export default function TabWebsites({
                 Last Crawl
               </Button>
             )}
+            <Button type="link" onClick={() => setMaintenanceFor({ id: record.id, url: record.url })}>
+              Maintenance
+            </Button>
             <Button type="link" icon={<EditOutlined />} onClick={() => onEditWebsite(record)}>
               Edit
             </Button>
@@ -209,6 +214,7 @@ export default function TabWebsites({
           </Space>
         </Card>
       )}
+      <WebsiteMaintenanceModal website={maintenanceFor} onClose={() => setMaintenanceFor(null)} />
       <WpKeySetupModal open={setup !== null} onClose={() => setSetup(null)} siteLabel={setup?.label ?? ''} secretKey={setup?.key ?? ''} />
     </div>
   )

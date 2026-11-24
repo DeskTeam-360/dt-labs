@@ -1197,6 +1197,71 @@ export const shiftSchedules = pgTable(
   (t) => [index('shift_schedules_user_idx').on(t.userId, t.startDate)]
 )
 
+// ============ Website maintenance reports (migration 099) ============
+export const maintenanceTemplates = pgTable('maintenance_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  key: varchar('key', { length: 30 }).notNull().unique(),
+  name: varchar('name', { length: 100 }).notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+})
+
+export const maintenanceTemplateItems = pgTable(
+  'maintenance_template_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    templateId: uuid('template_id').notNull().references(() => maintenanceTemplates.id, { onDelete: 'cascade' }),
+    pos: integer('pos').notNull(),
+    section: varchar('section', { length: 100 }).notNull(),
+    label: text('label').notNull(),
+    /** The first option is the good outcome; any other is a problem. */
+    options: text('options').array().notNull().default(['Done']),
+    /** How the system fills the item; null = by hand. */
+    source: varchar('source', { length: 40 }),
+  },
+  (t) => [index('maintenance_template_items_tpl_idx').on(t.templateId, t.pos)]
+)
+
+export const maintenanceReports = pgTable(
+  'maintenance_reports',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    websiteId: uuid('website_id').notNull().references(() => companyWebsites.id, { onDelete: 'cascade' }),
+    companyId: uuid('company_id').notNull(),
+    templateKey: varchar('template_key', { length: 30 }).notNull(),
+    templateName: varchar('template_name', { length: 100 }).notNull(),
+    periodDate: date('period_date').notNull().defaultNow(),
+    developerId: uuid('developer_id').references(() => users.id, { onDelete: 'set null' }),
+    status: varchar('status', { length: 20 }).notNull().default('draft'),
+    conclusion: text('conclusion'),
+    shareToken: varchar('share_token', { length: 64 }).unique(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: ts('created_at').notNull().defaultNow(),
+    finalizedAt: ts('finalized_at'),
+  },
+  (t) => [index('maintenance_reports_website_idx').on(t.websiteId, t.periodDate), index('maintenance_reports_company_idx').on(t.companyId, t.periodDate)]
+)
+
+export const maintenanceReportItems = pgTable(
+  'maintenance_report_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    reportId: uuid('report_id').notNull().references(() => maintenanceReports.id, { onDelete: 'cascade' }),
+    pos: integer('pos').notNull(),
+    section: varchar('section', { length: 100 }).notNull(),
+    label: text('label').notNull(),
+    options: text('options').array().notNull().default(['Done']),
+    source: varchar('source', { length: 40 }),
+    status: text('status'),
+    note: text('note'),
+    linkUrl: text('link_url'),
+    developerId: uuid('developer_id').references(() => users.id, { onDelete: 'set null' }),
+    checkedOn: date('checked_on'),
+    autoFilled: boolean('auto_filled').notNull().default(false),
+    edited: boolean('edited').notNull().default(false),
+  },
+  (t) => [index('maintenance_report_items_report_idx').on(t.reportId, t.pos)]
+)
+
 // ============ User company history ============
 /** Every change of a person's company, with where it came from (admin edit, email CC, company leader ...). */
 export const userCompanyChanges = pgTable(
