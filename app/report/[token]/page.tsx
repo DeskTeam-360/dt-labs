@@ -38,7 +38,8 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
         .report td:nth-child(3) { white-space: nowrap; }
         .report .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; margin: 16px 0 24px; font-size: 14px; }
         .report .meta b { display: inline-block; min-width: 120px; color: #5b6070; font-weight: 500; }
-        .report section { margin-bottom: 20px; border: 1px solid #d9d0ee; overflow: hidden; }
+        .report section { margin-bottom: 0; border: 1px solid #d9d0ee; overflow: hidden; }
+        .report section + section { border-top: 0; }
         .report h2 { margin: 0; padding: 8px 12px; font-size: 14px; font-weight: 700; background: #cdc1ee; color: #1f1f2e; }
         .report h2.magenta { background: #cc1068; color: #fff; }
         .report table { width: 100%; border-collapse: collapse; font-size: 13px; }
