@@ -1,35 +1,14 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
+import LinkedNote from '@/components/content/maintenance/LinkedNote'
 import PrintButton from '@/components/content/maintenance/PrintButton'
 import { isPrivateNote, loadSharedMaintenanceReport } from '@/lib/maintenance-report'
 
 export const dynamic = 'force-dynamic'
 
 // A shared report is for the customer only: keep it out of search engines.
-export const metadata: Metadata = { title: 'Website maintenance report', robots: { index: false, follow: false } }
-
-const urlPattern = /(https?:\/\/[^\s]+)/g
-
-function Linked({ text }: { text: string }) {
-  return (
-    <>
-      {text.split('\n').map((line, i) => (
-        <div key={i} style={{ wordBreak: 'break-all' }}>
-          {line.split(urlPattern).map((part, j) =>
-            /^https?:\/\//.test(part) ? (
-              <a key={j} href={part} target="_blank" rel="noopener noreferrer nofollow">
-                {part.length > 70 ? `${part.slice(0, 67)}...` : part}
-              </a>
-            ) : (
-              <span key={j}>{part}</span>
-            )
-          )}
-        </div>
-      ))}
-    </>
-  )
-}
+export const metadata: Metadata = { title: 'Website maintenance report', robots: { index: false, follow: false }, other: { 'color-scheme': 'light' } }
 
 export default async function SharedMaintenanceReportPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -45,10 +24,18 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
   }
 
   return (
+    <div className="report-page">
     <main className="report">
       <style>{`
-        .report { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1f2430; }
-        .report h1 { font-size: 22px; margin: 0 0 4px; }
+        .report { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1f2430; background: #fff; color-scheme: light; }
+        .report-page { min-height: 100vh; background: #fff; color-scheme: light; }
+        .report h1 { font-size: 22px; margin: 0; }
+        .report .brand { display: flex; align-items: center; gap: 12px; }
+        .report .brand img { width: 40px; height: 40px; object-fit: contain; }
+        .report td, .report th, .report .meta div { text-wrap: pretty; overflow-wrap: break-word; word-break: normal; }
+        .report td:nth-child(2) { min-width: 220px; }
+        .report td:nth-child(5) { min-width: 260px; }
+        .report td:nth-child(3) { white-space: nowrap; }
         .report .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; margin: 16px 0 24px; font-size: 14px; }
         .report .meta b { display: inline-block; min-width: 120px; color: #5b6070; font-weight: 500; }
         .report section { margin-bottom: 20px; border: 1px solid #e3e5ec; border-radius: 6px; overflow: hidden; }
@@ -63,22 +50,14 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
         .report .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
         .report footer { margin-top: 28px; text-align: center; color: #8a8fa0; font-size: 12px; }
         @media print { .no-print { display: none !important; } .report { padding: 0; } .report section { break-inside: avoid; } }
-        @media (prefers-color-scheme: dark) {
-          body { background: #14161c; }
-          .report { color: #e6e8ee; }
-          .report section { border-color: #2b2f3a; }
-          .report h2 { background: #2a2540; }
-          .report th { color: #a3a8b8; border-color: #2b2f3a; }
-          .report td { border-color: #232733; }
-          .report .meta b { color: #a3a8b8; }
-          .report .ok { color: #6fd08c; }
-          .report .issue { color: #ff8a80; }
-          .report a { color: #8ab4f8; }
-        }
       `}</style>
 
       <div className="bar">
-        <h1>{report.templateName}</h1>
+        <div className="brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.jpg" alt="DeskTeam360" />
+          <h1>{report.templateName}</h1>
+        </div>
         <span className="no-print">
           <PrintButton />
         </span>
@@ -111,7 +90,7 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
                       <td>{it.label}</td>
                       <td>{it.checkedOn ?? '—'}</td>
                       <td className={good ? 'ok' : issue ? 'issue' : undefined}>{it.status ?? '—'}</td>
-                      <td>{note ? <Linked text={note} /> : null}</td>
+                      <td>{note ? <LinkedNote text={note} fallbackLabel={it.source?.startsWith('shot_home') ? 'Homepage' : undefined} /> : null}</td>
                     </tr>
                   )
                 })}
@@ -128,5 +107,6 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
 
       <footer>DeskTeam360</footer>
     </main>
+    </div>
   )
 }

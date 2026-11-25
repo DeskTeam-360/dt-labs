@@ -5,6 +5,7 @@ import { Alert, Button, Card, Descriptions, Input, Layout, message, Select, Spac
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import LinkedNote from '@/components/content/maintenance/LinkedNote'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 
@@ -28,29 +29,6 @@ type Report = { id: string; website_id: string; template_name: string; template_
 type Header = { company_name: string; website_url: string; website_title: string; wp_version: string | null; php_version: string | null; developer: string | null }
 
 const NA = 'N/A'
-const urlPattern = /(https?:\/\/[^\s]+)/g
-
-/** Text with its web addresses as links (the notes hold picture and video addresses). */
-function LinkedText({ text }: { text: string }) {
-  return (
-    <>
-      {text.split('\n').map((line, i) => (
-        <div key={i} style={{ wordBreak: 'break-all' }}>
-          {line.split(urlPattern).map((part, j) =>
-            /^https?:\/\//.test(part) ? (
-              <a key={j} href={part} target="_blank" rel="noopener noreferrer">
-                {part.length > 60 ? `${part.slice(0, 57)}...` : part}
-              </a>
-            ) : (
-              <span key={j}>{part}</span>
-            )
-          )}
-        </div>
-      ))}
-    </>
-  )
-}
-
 export default function MaintenanceReportContent({ reportId, user }: { reportId: string; user: { id: string; email?: string | null; name?: string | null; role?: string | null } }) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
@@ -255,11 +233,11 @@ export default function MaintenanceReportContent({ reportId, user }: { reportId:
                                 </td>
                                 <td style={{ padding: '8px 12px' }}>
                                   {isFinal ? (
-                                    <LinkedText text={[it.note, it.link_url && !it.note.includes(it.link_url) ? it.link_url : ''].filter(Boolean).join('\n')} />
+                                    <LinkedNote text={[it.note, it.link_url && !it.note.includes(it.link_url) ? it.link_url : ''].filter(Boolean).join('\n')} fallbackLabel={it.source?.startsWith('shot_home') ? 'Homepage' : undefined} />
                                   ) : (
                                     <Space orientation="vertical" size={4} style={{ width: '100%' }}>
                                       <Input.TextArea autoSize={{ minRows: 1, maxRows: 6 }} value={it.note} onChange={(e) => change(it.id, { note: e.target.value })} placeholder="Note" />
-                                      {it.link_url ? <LinkedText text={it.link_url} /> : null}
+                                      {it.link_url ? <LinkedNote text={it.link_url} fallbackLabel={it.source?.startsWith('shot_home') ? 'Homepage' : 'Open link'} /> : null}
                                     </Space>
                                   )}
                                 </td>

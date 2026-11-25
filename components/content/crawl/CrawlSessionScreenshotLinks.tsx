@@ -4,6 +4,8 @@ import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, Flex, message, Space, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { cleanPageTitle } from '@/lib/page-title'
+
 const { Text } = Typography
 
 type Shot = { id: string; file_url: string; created_at: string; device: 'desktop' | 'mobile'; page_url: string }
@@ -46,7 +48,7 @@ export default function CrawlSessionScreenshotLinks({ sessionId, pages }: { sess
       return { url, home: isHome(url, pages), title: pages.find((p) => p.url === url)?.title?.trim() || '', desktop: newest('desktop'), mobile: newest('mobile') }
     })
     // The homepage is labelled "Homepage"; an inner page by its page title (or "Inner page" when it has none).
-    return [...list.filter((x) => x.home), ...list.filter((x) => !x.home)].map((x, i) => ({ ...x, n: i + 1, label: x.home ? 'Homepage' : x.title || 'Inner page' }))
+    return [...list.filter((x) => x.home), ...list.filter((x) => !x.home)].map((x, i) => ({ ...x, n: i + 1, label: x.home ? 'Homepage' : cleanPageTitle(x.title, x.url) }))
   }, [shots, pages])
 
   const copyAll = () => {

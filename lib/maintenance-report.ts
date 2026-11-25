@@ -17,6 +17,7 @@ import {
   users,
   wpSites,
 } from '@/lib/db'
+import { cleanPageTitle } from '@/lib/page-title'
 import { assertPublicUrl } from '@/lib/web-screenshot'
 import { evaluateWpSite } from '@/lib/wp-health'
 import { siteMatchKey } from '@/lib/wp-monitor'
@@ -175,7 +176,7 @@ export async function fillAutoItems(reportId: string): Promise<void> {
       case 'shot_home_mobile': {
         const device = item.source === 'shot_home_mobile' ? 'mobile' : 'desktop'
         const s = shots.find((x) => x.home && x.device === device)
-        return s ? { status: item.options[0], note: s.file, link: s.file } : { status: null, note: crawl?.fresh ? 'No homepage picture in the latest crawl' : 'Crawl with pictures needed' }
+        return s ? { status: item.options[0], note: `Homepage: ${s.file}`, link: s.file } : { status: null, note: crawl?.fresh ? 'No homepage picture in the latest crawl' : 'Crawl with pictures needed' }
       }
       case 'shot_inner_desktop':
       case 'shot_inner_mobile': {
@@ -184,7 +185,7 @@ export async function fillAutoItems(reportId: string): Promise<void> {
         const seen = new Set<string>()
         const picked = list.filter((x) => (seen.has(x.url) ? false : (seen.add(x.url), true))).slice(0, SAMPLE_PAGES)
         if (picked.length === 0) return { status: null, note: crawl?.fresh ? 'No inner page pictures in the latest crawl' : 'Crawl with pictures needed' }
-        return { status: item.options[0], note: picked.map((p) => `${p.title || 'Inner page'}: ${p.file}`).join('\n'), link: picked[0].file }
+        return { status: item.options[0], note: picked.map((p) => `${cleanPageTitle(p.title, p.url)}: ${p.file}`).join('\n'), link: picked[0].file }
       }
       default:
         return { status: null }
