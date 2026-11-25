@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { db, maintenanceReports } from '@/lib/db'
-import { createMaintenanceReport, MAINTENANCE_TEMPLATE_KEYS } from '@/lib/maintenance-report'
+import { createMaintenanceReport } from '@/lib/maintenance-report'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   })
 }
 
-/** POST /api/maintenance-reports { website_id, template: 'weekly' | 'monthly' } - starts a report and fills what the system can. */
+/** POST /api/maintenance-reports { website_id, template: the template key, for example 'weekly' } - starts a report and fills what the system can. */
 export async function POST(request: Request) {
   const s = await staff()
   if (s.error) return s.error
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   const websiteId = String(b.website_id ?? '')
   const template = String(b.template ?? '')
   if (!/^[0-9a-f-]{36}$/i.test(websiteId)) return NextResponse.json({ error: 'Invalid website' }, { status: 400 })
-  if (!(MAINTENANCE_TEMPLATE_KEYS as readonly string[]).includes(template)) return NextResponse.json({ error: 'template must be "weekly" or "monthly"' }, { status: 400 })
+  if (!/^[a-z0-9-]{1,30}$/.test(template)) return NextResponse.json({ error: 'Invalid template' }, { status: 400 })
   const res = await createMaintenanceReport({ websiteId, templateKey: template, userId: s.userId as string })
   if ('error' in res) return NextResponse.json({ error: res.error }, { status: 404 })
   return NextResponse.json({ ok: true, id: res.report.id })

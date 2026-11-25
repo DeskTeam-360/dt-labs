@@ -14,7 +14,7 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
   const { token } = await params
   const data = await loadSharedMaintenanceReport(token)
   if (!data) notFound()
-  const { report, header, items } = data
+  const { report, header, items, branding } = data
 
   const sections: { name: string; items: typeof items }[] = []
   for (const i of items) {
@@ -24,13 +24,15 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
   }
 
   return (
-    <div className="report-page">
+    <div className="report-page" style={{ ['--primary' as string]: branding.colorPrimary, ['--section' as string]: branding.colorSection }}>
     <main className="report">
       <style>{`
         .report { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1f2430; background: #fff; color-scheme: light; }
         .report-page { min-height: 100vh; background: #fff; color-scheme: light; }
         .report h1 { font-size: 22px; margin: 0; }
         .report .brand { display: flex; align-items: center; gap: 12px; }
+        .report .subtitle { font-size: 13px; color: #5b6070; margin-top: 2px; white-space: pre-wrap; }
+        .report .footer-img { display: block; max-width: 100%; max-height: 120px; margin: 0 auto 8px; object-fit: contain; }
         .report .brand img { width: 40px; height: 40px; object-fit: contain; }
         .report td, .report th, .report .meta div { text-wrap: pretty; overflow-wrap: break-word; word-break: normal; }
         .report td:nth-child(2) { min-width: 220px; }
@@ -40,17 +42,17 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
         .report .meta b { display: inline-block; min-width: 120px; color: #5b6070; font-weight: 500; }
         .report section { margin-bottom: 0; border: 1px solid #d9d0ee; overflow: hidden; }
         .report section + section { border-top: 0; }
-        .report h2 { margin: 0; padding: 8px 12px; font-size: 14px; font-weight: 700; background: #cdc1ee; color: #1f1f2e; }
-        .report h2.magenta { background: #cc1068; color: #fff; }
+        .report h2 { margin: 0; padding: 8px 12px; font-size: 14px; font-weight: 700; background: var(--section); color: #1f1f2e; }
+        .report h2.magenta { background: var(--primary); color: #fff; }
         .report table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .report th { text-align: center; padding: 9px 12px; color: #fff; background: #cc1068; font-weight: 700; }
+        .report th { text-align: center; padding: 9px 12px; color: #fff; background: var(--primary); font-weight: 700; }
         .report td { padding: 7px 12px; vertical-align: top; border-top: 1px solid #eef0f5; }
         .report .scroll { overflow-x: auto; }
         .report .ok { color: #1f2430; }
         .report .issue { color: #b3261e; font-weight: 500; }
         .report .conclusion { white-space: pre-wrap; padding: 12px; font-size: 14px; line-height: 1.5; }
         .report .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
-        .report-footer { margin-top: 28px; padding: 22px 16px; text-align: center; color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 0.02em; background: linear-gradient(90deg, #d4146e, #e2127f 50%, #d4146e); }
+        .report-footer { margin-top: 28px; padding: 22px 16px; text-align: center; color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 0.02em; background: var(--primary); }
         .report td:nth-child(4), .report td:nth-child(3), .report td:first-child { text-align: center; }
         @media print { .no-print { display: none !important; } .report { padding: 0; } .report section { break-inside: avoid; } }
       `}</style>
@@ -58,8 +60,11 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
       <div className="bar">
         <div className="brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.jpg" alt="DeskTeam360" />
-          <h1>{report.templateName}</h1>
+          <img src={branding.headerImageUrl} alt="" />
+          <div>
+            <h1>{branding.title}</h1>
+            {branding.subtitle ? <div className="subtitle">{branding.subtitle}</div> : null}
+          </div>
         </div>
         <span className="no-print">
           <PrintButton />
@@ -108,7 +113,15 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
         <div className="conclusion">{report.conclusion || '—'}</div>
       </section>
 
-      <div className="report-footer">www.DeskTeam360.com</div>
+      {branding.footerImageUrl || branding.footerText ? (
+        <div className="report-footer">
+          {branding.footerImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={branding.footerImageUrl} alt="" className="footer-img" />
+          ) : null}
+          {branding.footerText ? <div style={{ whiteSpace: 'pre-wrap' }}>{branding.footerText}</div> : null}
+        </div>
+      ) : null}
     </main>
     </div>
   )

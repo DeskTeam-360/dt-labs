@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 const { Text } = Typography
 
+type TemplateRow = { id: string; key: string; name: string }
 type ReportRow = { id: string; template_name: string; template_key: string; period_date: string; status: string }
 
 /** The maintenance reports of one website (newest first) and the buttons that start a weekly or monthly one. */
@@ -15,6 +16,15 @@ export default function WebsiteMaintenanceModal({ website, onClose }: { website:
   const [rows, setRows] = useState<ReportRow[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState<string | null>(null)
+  const [templates, setTemplates] = useState<TemplateRow[]>([])
+
+  useEffect(() => {
+    if (!website) return
+    fetch('/api/maintenance-templates', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((b) => setTemplates(b.data ?? []))
+      .catch(() => setTemplates([]))
+  }, [website])
 
   const load = useCallback(async () => {
     if (!website) return
@@ -33,7 +43,7 @@ export default function WebsiteMaintenanceModal({ website, onClose }: { website:
     void load()
   }, [load])
 
-  const create = async (template: 'weekly' | 'monthly') => {
+  const create = async (template: string) => {
     if (!website) return
     setCreating(template)
     try {
@@ -56,13 +66,12 @@ export default function WebsiteMaintenanceModal({ website, onClose }: { website:
     <Modal open={website !== null} onCancel={onClose} footer={null} title="Maintenance reports" width={640} destroyOnHidden>
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <Text type="secondary">{website?.url}</Text>
-        <Space>
-          <Button type="primary" icon={<PlusOutlined />} loading={creating === 'weekly'} disabled={creating !== null} onClick={() => void create('weekly')}>
-            New weekly report
-          </Button>
-          <Button icon={<PlusOutlined />} loading={creating === 'monthly'} disabled={creating !== null} onClick={() => void create('monthly')}>
-            New monthly report
-          </Button>
+        <Space wrap>
+          {templates.map((t, i) => (
+            <Button key={t.key} type={i === 0 ? 'primary' : 'default'} icon={<PlusOutlined />} loading={creating === t.key} disabled={creating !== null} onClick={() => void create(t.key)}>
+              New {t.name}
+            </Button>
+          ))}
         </Space>
         <Text type="secondary" style={{ fontSize: 12 }}>
           A new report fills in what the system can check (SSL, plugin updates, Wordfence, pictures, broken links, domain variants). Allow a moment.

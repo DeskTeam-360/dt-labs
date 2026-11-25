@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeftOutlined, CheckCircleOutlined, CopyOutlined, LinkOutlined, ReloadOutlined, SaveOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CheckCircleOutlined, CopyOutlined, DeleteOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SaveOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Descriptions, Input, Layout, message, Select, Space, Spin, Tag, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -41,6 +41,7 @@ export default function MaintenanceReportContent({ reportId, user }: { reportId:
   const [conclusion, setConclusion] = useState('')
   const [dirty, setDirty] = useState<Set<string>>(new Set())
   const [conclusionDirty, setConclusionDirty] = useState(false)
+  const [newItem, setNewItem] = useState<Record<string, string>>({})
 
   const apply = useCallback((body: { report: Report; header: Header; items: Item[] }) => {
     setReport(body.report)
@@ -107,6 +108,13 @@ export default function MaintenanceReportContent({ reportId, user }: { reportId:
     } finally {
       setSaving(false)
     }
+  }
+
+  const addItem = async (section: string) => {
+    const label = (newItem[section] ?? '').trim()
+    if (!label) return
+    await save({ add_item: { section, label } }, 'Item added')
+    setNewItem((prev) => ({ ...prev, [section]: '' }))
   }
 
   const refreshAuto = async () => {
@@ -212,6 +220,9 @@ export default function MaintenanceReportContent({ reportId, user }: { reportId:
                                 <td style={{ padding: '8px 12px' }}>{n + 1}</td>
                                 <td style={{ padding: '8px 12px' }}>
                                   {it.label}
+                                  {!isFinal ? (
+                                    <Button type="text" size="small" danger icon={<DeleteOutlined />} title="Remove this item from the report" style={{ marginLeft: 4 }} onClick={() => void save({ delete_item: it.id }, 'Item removed')} />
+                                  ) : null}
                                   {it.source ? (
                                     <Tag style={{ marginLeft: 8 }} color={it.auto_filled && !it.edited ? 'blue' : 'default'}>
                                       {it.auto_filled && !it.edited ? 'auto' : it.edited ? 'edited' : 'no data'}
@@ -247,6 +258,12 @@ export default function MaintenanceReportContent({ reportId, user }: { reportId:
                         </tbody>
                       </table>
                     </div>
+                    {!isFinal ? (
+                      <Space.Compact style={{ width: '100%', padding: 12 }}>
+                        <Input placeholder="Add an item to this section (only for this report)" value={newItem[sec.name] ?? ''} onChange={(e) => setNewItem((prev) => ({ ...prev, [sec.name]: e.target.value }))} onPressEnter={() => void addItem(sec.name)} />
+                        <Button icon={<PlusOutlined />} loading={saving} onClick={() => void addItem(sec.name)}>Add</Button>
+                      </Space.Compact>
+                    ) : null}
                   </Card>
                 ))}
 

@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, gt, inArray, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
@@ -29,6 +29,7 @@ const out = (d: NonNullable<Awaited<ReturnType<typeof loadMaintenanceReport>>>) 
     share_token: d.report.shareToken,
   },
   header: d.header,
+  branding: d.branding,
   items: d.items.map((i) => ({
     id: i.id,
     section: i.section,
@@ -70,6 +71,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
     conclusion?: unknown
     status?: unknown
     action?: unknown
+    add_item?: { section?: unknown; label?: unknown; options?: unknown }
+    delete_item?: unknown
   }
   const today = new Date().toISOString().slice(0, 10)
 
@@ -89,6 +92,23 @@ export async function PATCH(request: Request, ctx: Ctx) {
       if (i.link_url !== undefined) set.linkUrl = String(i.link_url ?? '').slice(0, 2000) || null
       await db.update(maintenanceReportItems).set(set).where(eq(maintenanceReportItems.id, itemId))
     }
+  }
+
+  // An item only this report has (or one taken off it), while it is still a draft.
+  if ((b.add_item || b.delete_item) && report.status === 'final') return NextResponse.json({ error: 'Reopen the report to change its items' }, { status: 400 })
+  if (b.add_item) {
+    const section = String(b.add_item.section ?? '').trim().slice(0, 100)
+    const label = String(b.add_item.label ?? '').trim().slice(0, 300)
+    if (!section || !label) return NextResponse.json({ error: 'An item needs a section and a name' }, { status: 400 })
+    const options = (Array.isArray(b.add_item.options) ? b.add_item.options : []).map((o) => String(o).trim().slice(0, 100)).filter(Boolean).slice(0, 8)
+    const rows = await db.select({ pos: maintenanceReportItems.pos, section: maintenanceReportItems.section }).from(maintenanceReportItems).where(eq(maintenanceReportItems.reportId, id))
+    const sameSection = rows.filter((r) => r.section === section).map((r) => r.pos)
+    const after = sameSection.length ? Math.max(...sameSection) : Math.max(0, ...rows.map((r) => r.pos))
+    await db.update(maintenanceReportItems).set({ pos: sql`${maintenanceReportItems.pos} + 1` }).where(and(eq(maintenanceReportItems.reportId, id), gt(maintenanceReportItems.pos, after)))
+    await db.insert(maintenanceReportItems).values({ reportId: id, pos: after + 1, section, label, options: options.length ? options : ['Done'], source: null })
+  }
+  if (b.delete_item && /^[0-9a-f-]{36}$/i.test(String(b.delete_item))) {
+    await db.delete(maintenanceReportItems).where(and(eq(maintenanceReportItems.id, String(b.delete_item)), eq(maintenanceReportItems.reportId, id)))
   }
 
   const set: Partial<typeof maintenanceReports.$inferInsert> = {}

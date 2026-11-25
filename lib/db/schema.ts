@@ -1202,6 +1202,15 @@ export const maintenanceTemplates = pgTable('maintenance_templates', {
   id: uuid('id').primaryKey().defaultRandom(),
   key: varchar('key', { length: 30 }).notNull().unique(),
   name: varchar('name', { length: 100 }).notNull(),
+  headerTitle: text('header_title'),
+  headerSubtitle: text('header_subtitle'),
+  headerImageUrl: text('header_image_url'),
+  footerText: text('footer_text'),
+  footerImageUrl: text('footer_image_url'),
+  colorPrimary: varchar('color_primary', { length: 9 }),
+  colorSection: varchar('color_section', { length: 9 }),
+  isActive: boolean('is_active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
   createdAt: ts('created_at').notNull().defaultNow(),
 })
 

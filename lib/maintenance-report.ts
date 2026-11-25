@@ -17,6 +17,7 @@ import {
   users,
   wpSites,
 } from '@/lib/db'
+import { resolveBranding } from '@/lib/maintenance-sources'
 import { cleanPageTitle } from '@/lib/page-title'
 import { assertPublicUrl } from '@/lib/web-screenshot'
 import { evaluateWpSite } from '@/lib/wp-health'
@@ -37,7 +38,7 @@ export async function createMaintenanceReport(params: { websiteId: string; templ
   const [website] = await db.select().from(companyWebsites).where(eq(companyWebsites.id, params.websiteId)).limit(1)
   if (!website) return { error: 'Website not found' as const }
   const [tpl] = await db.select().from(maintenanceTemplates).where(eq(maintenanceTemplates.key, params.templateKey)).limit(1)
-  if (!tpl) return { error: 'Template not found' as const }
+  if (!tpl || !tpl.isActive) return { error: 'Template not found' as const }
   const items = await db.select().from(maintenanceTemplateItems).where(eq(maintenanceTemplateItems.templateId, tpl.id)).orderBy(maintenanceTemplateItems.pos)
 
   const [report] = await db
@@ -216,12 +217,15 @@ export async function loadMaintenanceReport(reportId: string) {
   if (!report) return null
   const [website] = await db.select().from(companyWebsites).where(eq(companyWebsites.id, report.websiteId)).limit(1)
   const [company] = await db.select({ id: companies.id, name: companies.name }).from(companies).where(eq(companies.id, report.companyId)).limit(1)
+  const [tpl] = await db.select().from(maintenanceTemplates).where(eq(maintenanceTemplates.key, report.templateKey)).limit(1)
+  const branding = resolveBranding(tpl ?? { name: report.templateName })
   const [dev] = report.developerId ? await db.select({ first: users.firstName, last: users.lastName, email: users.email }).from(users).where(eq(users.id, report.developerId)).limit(1) : []
   const wpRows = website ? await db.select().from(wpSites) : []
   const wp = website ? wpRows.find((w) => siteMatchKey(w.siteUrl) === siteMatchKey(website.url)) : undefined
   const items = await db.select().from(maintenanceReportItems).where(eq(maintenanceReportItems.reportId, reportId)).orderBy(maintenanceReportItems.pos)
   return {
     report,
+    branding,
     header: {
       company_name: company?.name ?? '',
       website_url: website?.url ?? '',

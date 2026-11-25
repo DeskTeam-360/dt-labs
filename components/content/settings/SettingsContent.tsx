@@ -293,6 +293,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
+                {['admin', 'operations'].includes((role ?? '').toLowerCase()) && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Maintenance Report Templates"
+                      description="The checklist, header and footer of the weekly and monthly website maintenance reports"
+                      href="/settings/maintenance-templates"
+                      icon={<FileTextOutlined />}
+                    />
+                  </Col>
+                )}
                 {canAccessRecurringTickets(role) && (
                   <Col xs={24} sm={12} md={8}>
                     <HubTile
