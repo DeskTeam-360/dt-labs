@@ -38,17 +38,19 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
         .report td:nth-child(3) { white-space: nowrap; }
         .report .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; margin: 16px 0 24px; font-size: 14px; }
         .report .meta b { display: inline-block; min-width: 120px; color: #5b6070; font-weight: 500; }
-        .report section { margin-bottom: 20px; border: 1px solid #e3e5ec; border-radius: 6px; overflow: hidden; }
-        .report h2 { margin: 0; padding: 8px 12px; font-size: 14px; background: #ece9f7; }
+        .report section { margin-bottom: 20px; border: 1px solid #d9d0ee; overflow: hidden; }
+        .report h2 { margin: 0; padding: 8px 12px; font-size: 14px; font-weight: 700; background: #cdc1ee; color: #1f1f2e; }
+        .report h2.magenta { background: #cc1068; color: #fff; }
         .report table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .report th { text-align: left; padding: 6px 12px; color: #5b6070; font-weight: 500; border-bottom: 1px solid #e3e5ec; }
+        .report th { text-align: center; padding: 9px 12px; color: #fff; background: #cc1068; font-weight: 700; }
         .report td { padding: 7px 12px; vertical-align: top; border-top: 1px solid #eef0f5; }
         .report .scroll { overflow-x: auto; }
-        .report .ok { color: #137333; font-weight: 500; }
+        .report .ok { color: #1f2430; }
         .report .issue { color: #b3261e; font-weight: 500; }
         .report .conclusion { white-space: pre-wrap; padding: 12px; font-size: 14px; line-height: 1.5; }
         .report .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
-        .report footer { margin-top: 28px; text-align: center; color: #8a8fa0; font-size: 12px; }
+        .report-footer { margin-top: 28px; padding: 22px 16px; text-align: center; color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 0.02em; background: linear-gradient(90deg, #d4146e, #e2127f 50%, #d4146e); }
+        .report td:nth-child(4), .report td:nth-child(3), .report td:first-child { text-align: center; }
         @media print { .no-print { display: none !important; } .report { padding: 0; } .report section { break-inside: avoid; } }
       `}</style>
 
@@ -101,11 +103,11 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
       ))}
 
       <section>
-        <h2>Comments from developer</h2>
+        <h2 className="magenta">Comments from the developer</h2>
         <div className="conclusion">{report.conclusion || '—'}</div>
       </section>
 
-      <footer>DeskTeam360</footer>
+      <div className="report-footer">www.DeskTeam360.com</div>
     </main>
     </div>
   )
