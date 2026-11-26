@@ -4,6 +4,7 @@ import { startCrawlProcess } from '@/app/api/crawl/utils'
 import { formatFromHeader, getAppSettings } from '@/lib/app-settings'
 import { db } from '@/lib/db'
 import { companyWebsites, crawlPages, crawlSchedules, crawlSessions } from '@/lib/db/schema'
+import { createMaintenanceReport } from '@/lib/maintenance-report'
 import { computeNextRunAt, type Frequency } from '@/lib/recurring-ticket-schedule'
 import { getGmailSender, sendRawEmail } from '@/lib/ticket-notification-emails'
 
@@ -85,6 +86,15 @@ async function notifyNewBroken(rule: ScheduleRow, sessionId: string): Promise<vo
   }
 }
 
+/** After the crawl and its pictures: a draft maintenance report from this crawl, for a person to check and finish. */
+async function prepareScheduledReport(rule: ScheduleRow, sessionId: string): Promise<void> {
+  if (!rule.maintenanceTemplateKey || !rule.createdBy) return
+  const [finished] = await db.select({ status: crawlSessions.status }).from(crawlSessions).where(eq(crawlSessions.id, sessionId)).limit(1)
+  if (finished?.status !== 'completed') return
+  const made = await createMaintenanceReport({ websiteId: rule.companyWebsiteId, templateKey: rule.maintenanceTemplateKey, userId: rule.createdBy, crawlSessionId: sessionId })
+  if ('error' in made) console.error(`[crawl-schedule] Maintenance report for schedule ${rule.id} not made: ${made.error}`)
+}
+
 /** Starts every active schedule that is due. The crawls run in the background; this returns once they are started. */
 export async function runDueCrawlSchedules(now = new Date()): Promise<{ started: number; failed: number }> {
   const due = await db
@@ -104,12 +114,22 @@ export async function runDueCrawlSchedules(now = new Date()): Promise<{ started:
     try {
       const [session] = await db
         .insert(crawlSessions)
-        .values({ companyWebsiteId: rule.companyWebsiteId, status: 'crawling', maxDepth: rule.maxDepth, maxPages: rule.maxPages, startedAt: now })
+        .values({
+          companyWebsiteId: rule.companyWebsiteId,
+          status: 'crawling',
+          maxDepth: rule.maxDepth,
+          maxPages: rule.maxPages,
+          startedAt: now,
+          startedBy: rule.createdBy,
+          screenshotHomepage: rule.screenshotHomepage,
+          screenshotRandomCount: rule.screenshotRandomCount,
+        })
         .returning({ id: crawlSessions.id })
       if (!session) throw new Error('Failed to create crawl session')
       await db.update(crawlSchedules).set({ lastSessionId: session.id }).where(eq(crawlSchedules.id, rule.id))
       void startCrawlProcess(db, session.id, rule.companyWebsiteId, rule.maxDepth, rule.maxPages)
         .then(() => notifyNewBroken(rule, session.id))
+        .then(() => prepareScheduledReport(rule, session.id))
         .catch((e) => console.error(`[crawl-schedule] Crawl ${session.id} failed:`, e))
       started++
     } catch (e) {

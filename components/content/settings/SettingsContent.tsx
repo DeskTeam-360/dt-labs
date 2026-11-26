@@ -293,6 +293,16 @@ export default function SettingsContent({ user: currentUser }: SettingsContentPr
                     />
                   </Col>
                 )}
+                {role !== 'customer' && (
+                  <Col xs={24} sm={12} md={8}>
+                    <HubTile
+                      title="Website Maintenance"
+                      description="Every website with its last report and crawl, and which ones are due"
+                      href="/maintenance-reports"
+                      icon={<FileTextOutlined />}
+                    />
+                  </Col>
+                )}
                 {['admin', 'operations'].includes((role ?? '').toLowerCase()) && (
                   <Col xs={24} sm={12} md={8}>
                     <HubTile

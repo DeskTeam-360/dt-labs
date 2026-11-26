@@ -639,6 +639,7 @@ export async function startCrawlProcess(
   }
 
   // Pictures the person asked for when starting the crawl run on their own, after the crawl is already finished.
-  void captureAfterCrawl(sessionId).catch((shotError) => console.error('[Crawl] Could not take the screenshots after the crawl:', shotError))
+  // Awaited, so whatever follows a crawl (a scheduled maintenance report) finds the pictures already there. The crawl is already 'completed'.
+  await captureAfterCrawl(sessionId).catch((shotError) => console.error('[Crawl] Could not take the screenshots after the crawl:', shotError))
 }
 

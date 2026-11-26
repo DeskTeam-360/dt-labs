@@ -1,7 +1,7 @@
 'use client'
 
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, DatePicker, Flex, Form, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography } from 'antd'
+import { Button, Checkbox, DatePicker, Flex, Form, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -26,6 +26,9 @@ type Schedule = {
   maxDepth: number
   maxPages: number
   notifyEmails: string[]
+  screenshotHomepage: boolean
+  screenshotRandomCount: number
+  maintenanceTemplateKey: string | null
   isActive: boolean
   lastRunAt: string | null
   nextRunAt: string | null
@@ -66,6 +69,9 @@ type FormValues = {
   max_depth: number
   max_pages: number
   notify_emails: string[]
+  screenshot_homepage: boolean
+  screenshot_random_count: number
+  maintenance_template_key?: string
 }
 
 /** Scheduled crawls: pick a website and when it should be crawled again. Admins and agents get an email when new broken pages appear. */
@@ -82,6 +88,7 @@ export default function CrawlSchedulesModal({
 }) {
   const [rows, setRows] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(false)
+  const [templates, setTemplates] = useState<{ key: string; name: string }[]>([])
   const [editing, setEditing] = useState<Schedule | 'new' | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm<FormValues>()
@@ -105,6 +112,14 @@ export default function CrawlSchedulesModal({
     if (open) void load()
   }, [open, load])
 
+  useEffect(() => {
+    if (!open) return
+    fetch('/api/maintenance-templates', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j) => setTemplates(((j.data ?? j.templates ?? []) as { key: string; name: string; is_active?: boolean }[]).filter((t) => t.is_active !== false).map((t) => ({ key: t.key, name: t.name }))))
+      .catch(() => setTemplates([]))
+  }, [open])
+
   const openForm = (row: Schedule | 'new') => {
     setEditing(row)
     if (row === 'new') {
@@ -120,6 +135,9 @@ export default function CrawlSchedulesModal({
         max_depth: 3,
         max_pages: 100,
         notify_emails: defaultEmail ? [defaultEmail] : [],
+        screenshot_homepage: true,
+        screenshot_random_count: 2,
+        maintenance_template_key: undefined,
       })
     } else {
       form.setFieldsValue({
@@ -134,6 +152,9 @@ export default function CrawlSchedulesModal({
         max_depth: row.maxDepth,
         max_pages: row.maxPages,
         notify_emails: row.notifyEmails ?? [],
+        screenshot_homepage: row.screenshotHomepage,
+        screenshot_random_count: row.screenshotRandomCount,
+        maintenance_template_key: row.maintenanceTemplateKey ?? undefined,
       })
     }
   }
@@ -155,6 +176,9 @@ export default function CrawlSchedulesModal({
         max_depth: v.max_depth,
         max_pages: v.max_pages,
         notify_emails: v.notify_emails ?? [],
+        screenshot_homepage: v.screenshot_homepage === true,
+        screenshot_random_count: v.screenshot_random_count || 0,
+        maintenance_template_key: v.maintenance_template_key || null,
       }
       const isNew = editing === 'new'
       const res = await fetch(isNew ? '/api/crawl-schedules' : `/api/crawl-schedules/${(editing as Schedule).id}`, {
@@ -309,6 +333,22 @@ export default function CrawlSchedulesModal({
               <InputNumber min={1} max={1000} />
             </Form.Item>
           </Flex>
+          <Form.Item label="Screenshots when each crawl finishes" tooltip="Taken after the crawl is done, whole page, desktop and mobile, saved under the name of whoever made the schedule.">
+            <Space orientation="vertical" size={8}>
+              <Form.Item name="screenshot_homepage" valuePropName="checked" noStyle>
+                <Checkbox>Homepage</Checkbox>
+              </Form.Item>
+              <Space>
+                <Text>Random inner pages:</Text>
+                <Form.Item name="screenshot_random_count" noStyle>
+                  <InputNumber min={0} max={10} precision={0} />
+                </Form.Item>
+              </Space>
+            </Space>
+          </Form.Item>
+          <Form.Item name="maintenance_template_key" label="Prepare a maintenance report" tooltip="After the crawl and its pictures, a draft report is made from that crawl. A person checks the manual items and finishes it.">
+            <Select allowClear placeholder="No report" options={templates.map((t) => ({ value: t.key, label: t.name }))} />
+          </Form.Item>
           <Form.Item name="notify_emails" label="Email new broken pages to">
             <Select mode="tags" tokenSeparators={[',', ' ']} placeholder="Type an email and press Enter" open={false} />
           </Form.Item>

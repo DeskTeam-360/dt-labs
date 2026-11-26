@@ -33,6 +33,9 @@ export function parseScheduleBody(b: Record<string, unknown>): { error: string }
   if (b.notify_emails !== undefined) {
     v.notifyEmails = (Array.isArray(b.notify_emails) ? b.notify_emails : []).map((e) => String(e).trim()).filter((e) => /^\S+@\S+\.\S+$/.test(e))
   }
+  if (b.screenshot_homepage !== undefined) v.screenshotHomepage = b.screenshot_homepage === true
+  if (b.screenshot_random_count !== undefined) v.screenshotRandomCount = Math.min(10, Math.max(0, Math.round(Number(b.screenshot_random_count)) || 0))
+  if (b.maintenance_template_key !== undefined) v.maintenanceTemplateKey = b.maintenance_template_key ? String(b.maintenance_template_key).slice(0, 30) : null
   if (b.is_active !== undefined) v.isActive = Boolean(b.is_active)
   return { values: v }
 }
