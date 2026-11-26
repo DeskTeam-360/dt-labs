@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { companies,companyWebsites, crawlSessions } from '@/lib/db'
+import { companies,companyWebsites, crawlSessions, maintenanceReports } from '@/lib/db'
 
 /** GET /api/crawl-sessions/[id] - Get single crawl session with company_websites */
 export async function GET(
@@ -79,6 +79,11 @@ export async function DELETE(
   }
 
   const { id } = await params
+  // A crawl that a maintenance report is made from stays, so the report keeps its source.
+  const used = await db.select({ date: maintenanceReports.periodDate, name: maintenanceReports.templateName }).from(maintenanceReports).where(eq(maintenanceReports.crawlSessionId, id)).limit(3)
+  if (used.length > 0) {
+    return NextResponse.json({ error: `This crawl is used by a maintenance report (${used.map((u) => `${u.name} ${u.date}`).join(', ')}). Delete or move that report first.` }, { status: 409 })
+  }
   await db.delete(crawlSessions).where(eq(crawlSessions.id, id))
   return NextResponse.json({ success: true })
 }

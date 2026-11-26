@@ -34,16 +34,23 @@ type Fill = { status: string | null; note?: string | null; link?: string | null 
 const today = () => new Date().toISOString().slice(0, 10)
 const fmtDate = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Jakarta' })
 
-export async function createMaintenanceReport(params: { websiteId: string; templateKey: string; userId: string }) {
+export async function createMaintenanceReport(params: { websiteId: string; templateKey: string; userId: string; crawlSessionId?: string }) {
   const [website] = await db.select().from(companyWebsites).where(eq(companyWebsites.id, params.websiteId)).limit(1)
   if (!website) return { error: 'Website not found' as const }
+  const [doneCrawl] = await db
+    .select({ id: crawlSessions.id })
+    .from(crawlSessions)
+    .where(and(eq(crawlSessions.companyWebsiteId, website.id), eq(crawlSessions.status, 'completed'), ...(params.crawlSessionId ? [eq(crawlSessions.id, params.crawlSessionId)] : [])))
+    .orderBy(desc(crawlSessions.createdAt))
+    .limit(1)
+  if (!doneCrawl) return { error: 'Crawl this website first, a maintenance report needs a finished crawl' as const }
   const [tpl] = await db.select().from(maintenanceTemplates).where(eq(maintenanceTemplates.key, params.templateKey)).limit(1)
   if (!tpl || !tpl.isActive) return { error: 'Template not found' as const }
   const items = await db.select().from(maintenanceTemplateItems).where(eq(maintenanceTemplateItems.templateId, tpl.id)).orderBy(maintenanceTemplateItems.pos)
 
   const [report] = await db
     .insert(maintenanceReports)
-    .values({ websiteId: website.id, companyId: website.companyId, templateKey: tpl.key, templateName: tpl.name, developerId: params.userId, createdBy: params.userId })
+    .values({ websiteId: website.id, companyId: website.companyId, crawlSessionId: doneCrawl.id, templateKey: tpl.key, templateName: tpl.name, developerId: params.userId, createdBy: params.userId })
     .returning()
   if (items.length > 0) {
     await db.insert(maintenanceReportItems).values(items.map((i) => ({ reportId: report.id, pos: i.pos, section: i.section, label: i.label, options: i.options, source: i.source })))
@@ -95,6 +102,15 @@ async function domainVariants(siteUrl: string, kind: 'www' | 'https'): Promise<F
   return bad.length === 0 ? { status: 'Done', note: 'All variants open (redirects count)' } : { status: 'Problem found', note: `Does not open: ${bad.map((b) => b.v).join(', ')}` }
 }
 
+/** The crawl a report is tied to; reports made before the tie was added use the latest crawl of the website. */
+async function reportCrawl(report: { crawlSessionId: string | null }, websiteId: string) {
+  if (report.crawlSessionId) {
+    const [s] = await db.select().from(crawlSessions).where(eq(crawlSessions.id, report.crawlSessionId)).limit(1)
+    if (s) return { session: s, ageDays: 0, fresh: true }
+  }
+  return latestCrawl(websiteId)
+}
+
 async function latestCrawl(websiteId: string) {
   const [s] = await db
     .select()
@@ -132,7 +148,7 @@ export async function fillAutoItems(reportId: string): Promise<void> {
   const wpRows = await db.select().from(wpSites)
   const wp = wpRows.find((w) => siteMatchKey(w.siteUrl) === siteMatchKey(website.url))
   const facts = wp ? evaluateWpSite(wp.lastSeenAt, wp.lastReport as Record<string, unknown> | null).facts : null
-  const crawl = todo.some((i) => i.source === 'broken_links' || i.source?.startsWith('shot_')) ? await latestCrawl(website.id) : null
+  const crawl = todo.some((i) => i.source === 'broken_links' || i.source?.startsWith('shot_')) ? await reportCrawl(report, website.id) : null
   const shots = crawl?.fresh ? await crawlShots(crawl.session.id) : []
 
   let host = ''
@@ -223,8 +239,15 @@ export async function loadMaintenanceReport(reportId: string) {
   const wpRows = website ? await db.select().from(wpSites) : []
   const wp = website ? wpRows.find((w) => siteMatchKey(w.siteUrl) === siteMatchKey(website.url)) : undefined
   const items = await db.select().from(maintenanceReportItems).where(eq(maintenanceReportItems.reportId, reportId)).orderBy(maintenanceReportItems.pos)
+  const crawlRows = await db
+    .select({ id: crawlSessions.id, createdAt: crawlSessions.createdAt, totalPages: crawlSessions.totalPages, brokenPages: crawlSessions.brokenPages })
+    .from(crawlSessions)
+    .where(and(eq(crawlSessions.companyWebsiteId, report.websiteId), eq(crawlSessions.status, 'completed')))
+    .orderBy(desc(crawlSessions.createdAt))
+  const crawls = crawlRows.map((c) => ({ id: c.id, created_at: c.createdAt ? new Date(c.createdAt).toISOString() : '', total_pages: c.totalPages ?? 0, broken_pages: c.brokenPages ?? 0 }))
   return {
     report,
+    crawls,
     branding,
     header: {
       company_name: company?.name ?? '',

@@ -2,7 +2,7 @@ import { and, eq, gt, inArray, sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
-import { db, maintenanceReportItems, maintenanceReports } from '@/lib/db'
+import { crawlSessions, db, maintenanceReportItems, maintenanceReports } from '@/lib/db'
 import { fillAutoItems, loadMaintenanceReport, newShareToken } from '@/lib/maintenance-report'
 
 export const dynamic = 'force-dynamic'
@@ -27,7 +27,9 @@ const out = (d: NonNullable<Awaited<ReturnType<typeof loadMaintenanceReport>>>) 
     status: d.report.status,
     conclusion: d.report.conclusion ?? '',
     share_token: d.report.shareToken,
+    crawl_session_id: d.report.crawlSessionId,
   },
+  crawls: d.crawls,
   header: d.header,
   branding: d.branding,
   items: d.items.map((i) => ({
@@ -73,6 +75,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     action?: unknown
     add_item?: { section?: unknown; label?: unknown; options?: unknown }
     delete_item?: unknown
+    crawl_session_id?: unknown
   }
   const today = new Date().toISOString().slice(0, 10)
 
@@ -127,9 +130,18 @@ export async function PATCH(request: Request, ctx: Ctx) {
     set.shareToken = newShareToken()
   }
   if (b.action === 'unshare') set.shareToken = null
+  // Move the report to another finished crawl of the same website (draft only), then its automatic items follow it.
+  let recheck = false
+  if (b.crawl_session_id !== undefined) {
+    if (report.status === 'final') return NextResponse.json({ error: 'Reopen the report to change its crawl' }, { status: 400 })
+    const [c] = await db.select({ id: crawlSessions.id }).from(crawlSessions).where(and(eq(crawlSessions.id, String(b.crawl_session_id)), eq(crawlSessions.companyWebsiteId, report.websiteId), eq(crawlSessions.status, 'completed'))).limit(1)
+    if (!c) return NextResponse.json({ error: 'Choose a finished crawl of this website' }, { status: 400 })
+    set.crawlSessionId = c.id
+    recheck = true
+  }
   if (Object.keys(set).length > 0) await db.update(maintenanceReports).set(set).where(eq(maintenanceReports.id, id))
 
-  if (b.action === 'refresh') await fillAutoItems(id)
+  if (b.action === 'refresh' || recheck) await fillAutoItems(id)
 
   const d = await loadMaintenanceReport(id)
   return NextResponse.json(d ? out(d) : { ok: true })

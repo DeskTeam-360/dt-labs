@@ -1,6 +1,6 @@
 'use client'
 
-import { DeleteOutlined, EditOutlined, EyeOutlined,GlobalOutlined, PlusOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, EyeOutlined,GlobalOutlined, PlayCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Card, message, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd'
 import { Popconfirm } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -9,6 +9,7 @@ import { useSession } from 'next-auth/react'
 import { useState } from 'react'
 
 import DateDisplay from '@/components/common/DateDisplay'
+import TabCrawling from '@/components/company/TabCrawling'
 import WebsiteMaintenanceModal from '@/components/company/WebsiteMaintenanceModal'
 import WpKeySetupModal from '@/components/wp-monitor/WpKeySetupModal'
 import WpSiteDetails, { HEALTH_COLOR, HEALTH_LABEL, type WpSiteSummary } from '@/components/wp-monitor/WpSiteDetails'
@@ -25,6 +26,10 @@ interface TabWebsitesProps {
   onDeleteWebsite: (id: string) => void
   /** Called after something changed here (a site was registered for monitoring), so the list can reload. */
   onChanged?: () => void
+  crawlSessions: any[]
+  loadingCrawlSessions: boolean
+  onStartCrawl: (websiteId: string) => void
+  onCrawlDelete: (id: string) => void
 }
 
 export default function TabWebsites({
@@ -35,6 +40,10 @@ export default function TabWebsites({
   onEditWebsite,
   onDeleteWebsite,
   onChanged,
+  crawlSessions,
+  loadingCrawlSessions,
+  onStartCrawl,
+  onCrawlDelete,
 }: TabWebsitesProps) {
   const router = useRouter()
   const isAdminUser = ((useSession().data?.user as { role?: string } | undefined)?.role ?? '').toLowerCase() === 'admin'
@@ -79,6 +88,9 @@ export default function TabWebsites({
       setRegisteringId(null)
     }
   }
+
+  /** A maintenance report needs a finished crawl of the website. */
+  const hasDoneCrawl = (websiteId: string) => crawlSessions.some((c) => c.company_website_id === websiteId && c.status === 'completed')
 
   const columns: ColumnsType<any> = [
     {
@@ -158,9 +170,14 @@ export default function TabWebsites({
                 Last Crawl
               </Button>
             )}
-            <Button type="link" onClick={() => setMaintenanceFor({ id: record.id, url: record.url })}>
-              Maintenance
+            <Button type="link" icon={<PlayCircleOutlined />} onClick={() => onStartCrawl(record.id)}>
+              Crawl
             </Button>
+            <Tooltip title={hasDoneCrawl(record.id) ? '' : 'Crawl this website first'}>
+              <Button type="link" disabled={!hasDoneCrawl(record.id)} onClick={() => setMaintenanceFor({ id: record.id, url: record.url })}>
+                Maintenance
+              </Button>
+            </Tooltip>
             <Button type="link" icon={<EditOutlined />} onClick={() => onEditWebsite(record)}>
               Edit
             </Button>
@@ -199,8 +216,20 @@ export default function TabWebsites({
           columns={columns}
           pagination={false}
           expandable={{
-            rowExpandable: (record: any) => !!record.wp_site,
-            expandedRowRender: (record: any) => <WpSiteDetails wp={record.wp_site as WpSiteSummary} />,
+            expandedRowRender: (record: any) => (
+              <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+                {record.wp_site ? <WpSiteDetails wp={record.wp_site as WpSiteSummary} /> : null}
+                <TabCrawling
+                  embedded
+                  crawlSessions={crawlSessions.filter((c) => c.company_website_id === record.id)}
+                  loadingCrawlSessions={loadingCrawlSessions}
+                  websites={websites}
+                  websitesLength={websites.length}
+                  onStartCrawl={() => onStartCrawl(record.id)}
+                  onCrawlDelete={onCrawlDelete}
+                />
+              </Space>
+            ),
           }}
         />
       ) : (

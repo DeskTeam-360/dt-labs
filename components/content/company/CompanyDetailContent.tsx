@@ -12,14 +12,13 @@ import {
   SyncOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Col, DatePicker, Divider, Flex, Form, Input, InputNumber, Layout, message, Modal, Row, Select, Space, Switch, Tabs, Tag, Typography } from 'antd'
+import { Button, Card, Checkbox, Col, DatePicker, Divider, Flex, Form, Input, InputNumber, Layout, message, Modal, Row, Select, Space, Switch, Tabs, Tag, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useRouter } from 'next/navigation'
 import { useEffect,useState } from 'react'
 
 import {
   TabCompanyLog,
-  TabCrawling,
   TabInfo,
   TabTickets,
   TabUsers,
@@ -271,7 +270,7 @@ export default function CompanyDetailContent({
       message.success('Crawl session deleted successfully')
       fetchCrawlSessions()
     } catch (error: any) {
-      message.error('Failed to delete crawl session')
+      message.error(error?.message && error.message !== 'Failed to fetch' ? error.message : 'Failed to delete crawl session')
       console.error('Error deleting crawl session:', error)
     } finally {
       setLoadingCrawlSessions(false)
@@ -400,7 +399,7 @@ export default function CompanyDetailContent({
     }
   }
 
-  const handleStartCrawl = () => {
+  const handleStartCrawl = (websiteId?: string) => {
     if (websites.length === 0) {
       message.warning('Please add at least one website first')
       return
@@ -409,6 +408,9 @@ export default function CompanyDetailContent({
     crawlForm.setFieldsValue({
       max_depth: 3,
       max_pages: 100,
+      company_website_id: websiteId,
+      screenshot_homepage: true,
+      screenshot_random_count: 2,
     })
     setCrawlModalVisible(true)
   }
@@ -420,6 +422,8 @@ export default function CompanyDetailContent({
         company_website_id: values.company_website_id,
         max_depth: values.max_depth || 3,
         max_pages: values.max_pages || 100,
+        screenshot_homepage: values.screenshot_homepage === true,
+        screenshot_random_count: values.screenshot_random_count || 0,
       })
 
       if (result.error) {
@@ -513,22 +517,8 @@ export default function CompanyDetailContent({
           onAddWebsite={handleWebsiteCreate}
           onEditWebsite={handleWebsiteEdit}
           onDeleteWebsite={handleWebsiteDelete}
-        />
-      ),
-    },
-    {
-      key: 'crawling',
-      label: (
-        <span>
-          <GlobalOutlined /> Crawling ({crawlSessions.length})
-        </span>
-      ),
-      children: (
-        <TabCrawling
           crawlSessions={crawlSessions}
           loadingCrawlSessions={loadingCrawlSessions}
-          websites={websites}
-          websitesLength={websites.length}
           onStartCrawl={handleStartCrawl}
           onCrawlDelete={handleCrawlDelete}
         />
@@ -935,6 +925,23 @@ export default function CompanyDetailContent({
                   tooltip="Maximum number of pages to crawl"
                 >
                   <Input type="number" min={1} max={1000} />
+                </Form.Item>
+
+                <Form.Item
+                  label="Screenshots when the crawl finishes"
+                  tooltip="Taken after the crawl is done (not during it): whole page, desktop and mobile. A maintenance report uses them."
+                >
+                  <Space orientation="vertical" size={8}>
+                    <Form.Item name="screenshot_homepage" valuePropName="checked" noStyle>
+                      <Checkbox>Homepage</Checkbox>
+                    </Form.Item>
+                    <Space>
+                      <Text>Random inner pages:</Text>
+                      <Form.Item name="screenshot_random_count" noStyle>
+                        <InputNumber min={0} max={10} precision={0} />
+                      </Form.Item>
+                    </Space>
+                  </Space>
                 </Form.Item>
 
                 <Form.Item>

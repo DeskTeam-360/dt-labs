@@ -36,6 +36,8 @@ interface TabCrawlingProps {
   websitesLength: number
   onStartCrawl: () => void
   onCrawlDelete: (id: string) => void
+  /** Used inside a website row: the "start" header and the empty card are left out. */
+  embedded?: boolean
 }
 
 export default function TabCrawling({
@@ -45,6 +47,7 @@ export default function TabCrawling({
   websitesLength,
   onStartCrawl,
   onCrawlDelete,
+  embedded,
 }: TabCrawlingProps) {
   const router = useRouter()
 
@@ -151,18 +154,20 @@ export default function TabCrawling({
 
   return (
     <div>
-      <Space style={{ marginBottom: 16 }}>
-        <Button
-          type="primary"
-          icon={<PlayCircleOutlined />}
-          onClick={onStartCrawl}
-          disabled={websitesLength === 0}
-          size="large"
-        >
-          Start New Crawl
-        </Button>
-        {websitesLength === 0 && <Text type="secondary">Please add a website first</Text>}
-      </Space>
+      {embedded ? null : (
+        <Space style={{ marginBottom: 16 }}>
+          <Button
+            type="primary"
+            icon={<PlayCircleOutlined />}
+            onClick={onStartCrawl}
+            disabled={websitesLength === 0}
+            size="large"
+          >
+            Start New Crawl
+          </Button>
+          {websitesLength === 0 && <Text type="secondary">Please add a website first</Text>}
+        </Space>
+      )}
 
       {loadingCrawlSessions ? (
         <Spin tip="Loading crawl sessions..." />
@@ -178,6 +183,8 @@ export default function TabCrawling({
             showTotal: (total) => `Total ${total} crawl sessions`,
           }}
         />
+      ) : embedded ? (
+        <Text type="secondary">No crawl yet. Start one to be able to make a maintenance report.</Text>
       ) : (
         <Card>
           <Space orientation="vertical" align="center" style={{ width: '100%', padding: '40px 0' }}>

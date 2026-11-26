@@ -25,7 +25,8 @@ type Item = {
   auto_filled: boolean
   edited: boolean
 }
-type Report = { id: string; website_id: string; template_name: string; template_key: string; period_date: string; status: string; conclusion: string; share_token: string | null }
+type Report = { id: string; website_id: string; template_name: string; template_key: string; period_date: string; status: string; conclusion: string; share_token: string | null; crawl_session_id: string | null }
+type Crawl = { id: string; created_at: string; total_pages: number; broken_pages: number }
 type Header = { company_name: string; website_url: string; website_title: string; wp_version: string | null; php_version: string | null; developer: string | null }
 
 const NA = 'N/A'
@@ -38,13 +39,15 @@ export default function MaintenanceReportContent({ reportId, user }: { reportId:
   const [report, setReport] = useState<Report | null>(null)
   const [header, setHeader] = useState<Header | null>(null)
   const [items, setItems] = useState<Item[]>([])
+  const [crawls, setCrawls] = useState<Crawl[]>([])
   const [conclusion, setConclusion] = useState('')
   const [dirty, setDirty] = useState<Set<string>>(new Set())
   const [conclusionDirty, setConclusionDirty] = useState(false)
   const [newItem, setNewItem] = useState<Record<string, string>>({})
 
-  const apply = useCallback((body: { report: Report; header: Header; items: Item[] }) => {
+  const apply = useCallback((body: { report: Report; header: Header; items: Item[]; crawls: Crawl[] }) => {
     setReport(body.report)
+    setCrawls(body.crawls ?? [])
     setHeader(body.header)
     setItems(body.items)
     setConclusion(body.report.conclusion)
@@ -166,6 +169,17 @@ export default function MaintenanceReportContent({ reportId, user }: { reportId:
                     <Descriptions.Item label="WordPress version">{header.wp_version ?? '—'}</Descriptions.Item>
                     <Descriptions.Item label="PHP version">{header.php_version ?? '—'}</Descriptions.Item>
                   </Descriptions>
+                  <Space wrap style={{ marginTop: 12 }}>
+                    <Text type="secondary">Crawl:</Text>
+                    <Select
+                      style={{ minWidth: 280 }}
+                      disabled={isFinal}
+                      value={report.crawl_session_id ?? undefined}
+                      placeholder="Latest crawl"
+                      options={crawls.map((c) => ({ value: c.id, label: `${new Date(c.created_at).toLocaleString()} · ${c.total_pages} pages · ${c.broken_pages} broken` }))}
+                      onChange={(v) => void save({ crawl_session_id: v }, 'Crawl changed, automatic checks updated')}
+                    />
+                  </Space>
                   <Space wrap style={{ marginTop: 12 }}>
                     <Tag color={isFinal ? 'green' : 'default'}>{isFinal ? 'Final' : 'Draft'}</Tag>
                     <Button icon={<ReloadOutlined />} loading={refreshing} disabled={isFinal} onClick={() => void refreshAuto()}>
