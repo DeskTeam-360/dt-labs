@@ -3,7 +3,9 @@ import { notFound } from 'next/navigation'
 
 import LinkedNote from '@/components/content/maintenance/LinkedNote'
 import PrintButton from '@/components/content/maintenance/PrintButton'
+import SharedReportView, { type ViewData, type ViewShot } from '@/components/content/maintenance/SharedReportView'
 import { isPrivateNote, loadSharedMaintenanceReport } from '@/lib/maintenance-report'
+import { cleanPageTitle } from '@/lib/page-title'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +25,48 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
     else sections.push({ name: i.section, items: [i] })
   }
 
+  // The web view: pictures are shown in the page itself, so their addresses leave the notes.
+  const shotMap = new Map<string, ViewShot>()
+  for (const it of items) {
+    const m = /^shot_(home|inner)_(desktop|mobile)$/.exec(it.source ?? '')
+    if (!m) continue
+    const home = m[1] === 'home'
+    for (const line of [it.note ?? '', it.linkUrl ?? ''].join('\n').split('\n')) {
+      const x = /^(.*?):?\s*(https?:\/\/\S+)\s*$/.exec(line.trim())
+      if (!x) continue
+      const title = home ? 'Homepage' : cleanPageTitle(x[1] || '', x[2])
+      const key = home ? '__home' : title
+      const cur = shotMap.get(key) ?? { title, home, desktop: null, mobile: null }
+      cur[m[2] as 'desktop' | 'mobile'] = cur[m[2] as 'desktop' | 'mobile'] ?? x[2]
+      shotMap.set(key, cur)
+    }
+  }
+  const shots = [...shotMap.values()].sort((a, b) => Number(b.home) - Number(a.home))
+  const view: ViewData = {
+    branding,
+    meta: { company: header.company_name, website: header.website_url, date: report.periodDate, developer: header.developer, wp: header.wp_version, php: header.php_version },
+    sections: sections.map((sec) => ({
+      name: sec.name,
+      items: sec.items.map((it) => ({
+        id: it.id,
+        label: it.label,
+        status: it.status,
+        kind: it.status === null ? 'none' : it.status === 'N/A' ? 'na' : it.status === it.options[0] ? 'ok' : it.options.slice(1).includes(it.status) ? 'issue' : 'ok',
+        note: /^shot_/.test(it.source ?? '') || isPrivateNote(it) ? '' : [it.note ?? '', it.linkUrl && !(it.note ?? '').includes(it.linkUrl) ? it.linkUrl : ''].filter(Boolean).join('\n'),
+        checkedOn: it.checkedOn,
+      })),
+    })),
+    shots,
+    conclusion: report.conclusion ?? '',
+  }
+
   return (
+    <>
+    <style>{`@media screen { .print-only { display: none !important; } } @media print { .web-only { display: none !important; } }`}</style>
+    <div className="web-only">
+      <SharedReportView data={view} />
+    </div>
+    <div className="print-only">
     <div className="report-page" style={{ ['--primary' as string]: branding.colorPrimary, ['--section' as string]: branding.colorSection }}>
     <main className="report">
       <style>{`
@@ -124,5 +167,7 @@ export default async function SharedMaintenanceReportPage({ params }: { params: 
       ) : null}
     </main>
     </div>
+    </div>
+    </>
   )
 }
