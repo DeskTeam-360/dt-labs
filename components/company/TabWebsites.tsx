@@ -211,10 +211,9 @@ export default function TabWebsites({
           rowKey="id"
           columns={columns}
           pagination={false}
-          scroll={{ x: 'max-content' }}
           expandable={{
             expandedRowRender: (record: any) => (
-              <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+              <Space orientation="vertical" size={16} style={{ width: '100%', minWidth: 0 }}>
                 {record.wp_site ? <WpSiteDetails wp={record.wp_site as WpSiteSummary} /> : null}
                 <TabCrawling
                   embedded

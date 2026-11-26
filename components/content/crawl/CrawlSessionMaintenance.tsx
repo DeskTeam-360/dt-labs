@@ -1,7 +1,7 @@
 'use client'
 
 import { PlusOutlined } from '@ant-design/icons'
-import { Alert, Button, List, message, Space, Tag, Typography } from 'antd'
+import { Alert, Button, List, message, Select, Space, Tag, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -17,6 +17,7 @@ export default function CrawlSessionMaintenance({ sessionId, websiteId, status }
   const [rows, setRows] = useState<ReportRow[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState<string | null>(null)
+  const [chosen, setChosen] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -60,11 +61,19 @@ export default function CrawlSessionMaintenance({ sessionId, websiteId, status }
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       {done ? null : <Alert type="info" showIcon title="A maintenance report can be made once this crawl has finished." />}
       <Space wrap>
-        {templates.map((t, i) => (
-          <Button key={t.key} type={i === 0 ? 'primary' : 'default'} icon={<PlusOutlined />} loading={creating === t.key} disabled={!done || creating !== null} onClick={() => void create(t.key)}>
-            New {t.name}
-          </Button>
-        ))}
+        <Select
+          showSearch
+          optionFilterProp="label"
+          style={{ minWidth: 320 }}
+          placeholder="Choose a template"
+          value={chosen ?? templates[0]?.key}
+          onChange={setChosen}
+          disabled={!done}
+          options={templates.map((t) => ({ value: t.key, label: t.name }))}
+        />
+        <Button type="primary" icon={<PlusOutlined />} loading={creating !== null} disabled={!done || !(chosen ?? templates[0]?.key)} onClick={() => void create((chosen ?? templates[0]?.key) as string)}>
+          Create report
+        </Button>
       </Space>
       <Text type="secondary" style={{ fontSize: 12 }}>
         The report uses this crawl for broken links and pictures, and fills in SSL, plugin updates, Wordfence and domain variants. Allow a moment.
