@@ -1,7 +1,7 @@
 'use client'
 
 import { PlusOutlined } from '@ant-design/icons'
-import { Alert, Button, List, message, Select, Space, Tag, Typography } from 'antd'
+import { Alert, Button, Card, List, message, Select, Space, Tag, Typography } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -60,6 +60,8 @@ export default function CrawlSessionMaintenance({ sessionId, websiteId, status }
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       {done ? null : <Alert type="info" showIcon title="A maintenance report can be made once this crawl has finished." />}
+      <Card size="small" title="Make a maintenance report">
+      <Space orientation="vertical" size="small" style={{ width: '100%' }}>
       <Space wrap>
         <Select
           showSearch
@@ -78,9 +80,11 @@ export default function CrawlSessionMaintenance({ sessionId, websiteId, status }
       <Text type="secondary" style={{ fontSize: 12 }}>
         The report uses this crawl for broken links and pictures, and fills in SSL, plugin updates, Wordfence and domain variants. Allow a moment.
       </Text>
+      </Space>
+      </Card>
+      <Card size="small" title={`Reports from this crawl (${rows.length})`} styles={{ body: { padding: 0 } }}>
       <List
         size="small"
-        bordered
         loading={loading}
         locale={{ emptyText: 'No reports from this crawl yet' }}
         dataSource={rows}
@@ -94,6 +98,7 @@ export default function CrawlSessionMaintenance({ sessionId, websiteId, status }
           </List.Item>
         )}
       />
+      </Card>
     </Space>
   )
 }

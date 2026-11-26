@@ -191,7 +191,7 @@ export default function MaintenanceTemplatesContent({ user }: { user: { id: stri
     <Layout style={{ minHeight: '100vh' }}>
       <AdminSidebar user={{ ...user, role: user.role ?? undefined }} collapsed={collapsed} onCollapse={setCollapsed} />
       <AdminMainColumn collapsed={collapsed} user={user}>
-        <Content style={{ padding: 24, margin: '0 auto', width: '100%', maxWidth: 1200 }}>
+        <Content style={{ padding: 24, width: '100%' }}>
           <Space orientation="vertical" size="large" style={{ width: '100%' }}>
             <div>
               <SpaNavLink href="/settings">
@@ -280,7 +280,7 @@ export default function MaintenanceTemplatesContent({ user }: { user: { id: stri
                       An automatic source fills the item by itself; leave it empty for a manual check.
                     </Text>
                     {items.map((it, i) => (
-                      <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,1fr) minmax(200px,2fr) minmax(160px,1.4fr) minmax(160px,1.2fr) auto', gap: 8, alignItems: 'center' }}>
+                      <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(160px,1.2fr) minmax(240px,2.4fr) minmax(200px,1.6fr) minmax(180px,1fr) auto', gap: 8, alignItems: 'center' }}>
                         <Input placeholder="Section" value={it.section} onChange={(e) => setItem(i, { section: e.target.value })} />
                         <Input placeholder="Item" value={it.label} onChange={(e) => setItem(i, { label: e.target.value })} />
                         <Input placeholder="Done, Problem found" value={it.options} onChange={(e) => setItem(i, { options: e.target.value })} />
