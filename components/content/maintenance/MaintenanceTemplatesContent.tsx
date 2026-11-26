@@ -1,7 +1,7 @@
 'use client'
 
-import { ArrowDownOutlined, ArrowLeftOutlined, ArrowUpOutlined, CopyOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, UploadOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Input, Layout, message, Modal, Select, Space, Spin, Switch, Typography, Upload } from 'antd'
+import { ArrowDownOutlined, ArrowLeftOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, SearchOutlined, UploadOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Col, Flex, Input, Layout, Menu, message, Modal, Radio, Row, Select, Space, Spin, Switch, Tag, Typography, Upload } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
 import { SpaNavLink } from '@/components/common/SpaNavLink'
@@ -73,6 +73,10 @@ export default function MaintenanceTemplatesContent({ user }: { user: { id: stri
   const [dirty, setDirty] = useState(false)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [newOpen, setNewOpen] = useState(false)
+  const [newMode, setNewMode] = useState<'empty' | 'copy'>('empty')
+  const [search, setSearch] = useState('')
+  const shownList = list.filter((t) => t.name.toLowerCase().includes(search.trim().toLowerCase()))
 
   const loadList = useCallback(async () => {
     const res = await fetch('/api/maintenance-templates?all=1', { credentials: 'include' })
@@ -168,6 +172,7 @@ export default function MaintenanceTemplatesContent({ user }: { user: { id: stri
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body?.error || res.statusText)
       setNewName('')
+      setNewOpen(false)
       await loadList()
       setSelected(body.id)
     } catch (e) {
@@ -196,25 +201,40 @@ export default function MaintenanceTemplatesContent({ user }: { user: { id: stri
               <Text type="secondary">The checklist and the header and footer of the website maintenance reports. Changes apply to new reports; items of a report that was already made stay as they were.</Text>
             </div>
 
-            <Card size="small" title="Templates">
-              <Space wrap>
-                {list.map((t) => (
-                  <Button key={t.id} type={t.id === selected ? 'primary' : 'default'} onClick={() => choose(t.id)}>
-                    {t.name}{!t.is_active ? ' (hidden)' : ''} · {t.item_count}
-                  </Button>
-                ))}
-                <Input style={{ width: 220 }} placeholder="New template name" value={newName} onChange={(e) => setNewName(e.target.value)} />
-                <Button icon={<PlusOutlined />} loading={creating} onClick={() => void create()}>Add empty</Button>
-                <Button icon={<CopyOutlined />} loading={creating} disabled={!selected} onClick={() => void create(selected ?? undefined)}>Add as copy of selected</Button>
-              </Space>
-            </Card>
-
+            <Row gutter={[16, 16]} align="top">
+              <Col xs={24} lg={7} xl={6}>
+                <Card size="small" title={`Templates (${list.length})`} extra={<Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => setNewOpen(true)}>New</Button>} style={{ position: 'sticky', top: 16 }}>
+                  <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+                    {list.length > 5 ? <Input allowClear prefix={<SearchOutlined />} placeholder="Search templates" value={search} onChange={(e) => setSearch(e.target.value)} /> : null}
+                    <Menu
+                      mode="inline"
+                      selectedKeys={selected ? [selected] : []}
+                      onClick={(e) => choose(e.key)}
+                      style={{ border: 0, maxHeight: '60vh', overflowY: 'auto' }}
+                      items={shownList.map((t) => ({
+                        key: t.id,
+                        label: (
+                          <Flex justify="space-between" align="center" gap={8}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
+                            <Space size={4}>
+                              {!t.is_active ? <Tag style={{ margin: 0 }}>Hidden</Tag> : null}
+                              <Tag color={t.item_count ? 'blue' : 'default'} style={{ margin: 0 }}>{t.item_count}</Tag>
+                            </Space>
+                          </Flex>
+                        ),
+                      }))}
+                    />
+                    {shownList.length === 0 ? <Text type="secondary">No template matches.</Text> : null}
+                  </Space>
+                </Card>
+              </Col>
+              <Col xs={24} lg={17} xl={18}>
             {loading ? (
               <Spin />
             ) : !tpl ? (
-              <Alert type="info" showIcon title="No template yet. Add one above." />
+              <Alert type="info" showIcon title="No template yet. Use New to add one." />
             ) : (
-              <>
+              <Space orientation="vertical" size="large" style={{ width: '100%' }}>
                 <Card size="small" title="Name and look">
                   <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
                     <Space wrap>
@@ -280,8 +300,30 @@ export default function MaintenanceTemplatesContent({ user }: { user: { id: stri
                   <Button type="primary" icon={<SaveOutlined />} loading={saving} disabled={!dirty} onClick={() => void save()}>Save template</Button>
                   {dirty ? <Text type="warning">Unsaved changes</Text> : null}
                 </Space>
-              </>
+              </Space>
             )}
+              </Col>
+            </Row>
+
+            <Modal
+              title="New template"
+              open={newOpen}
+              onCancel={() => setNewOpen(false)}
+              onOk={() => void create(newMode === 'copy' ? (selected ?? undefined) : undefined)}
+              okText="Create"
+              confirmLoading={creating}
+              destroyOnHidden
+            >
+              <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+                <Input autoFocus placeholder="Template name, for example Quarterly Website Check" value={newName} onChange={(e) => setNewName(e.target.value)} onPressEnter={() => void create(newMode === 'copy' ? (selected ?? undefined) : undefined)} />
+                <Radio.Group value={newMode} onChange={(e) => setNewMode(e.target.value)}>
+                  <Space orientation="vertical">
+                    <Radio value="empty">Start empty</Radio>
+                    <Radio value="copy" disabled={!selected}>Copy the checklist and look of &quot;{list.find((t) => t.id === selected)?.name ?? '...'}&quot;</Radio>
+                  </Space>
+                </Radio.Group>
+              </Space>
+            </Modal>
           </Space>
         </Content>
       </AdminMainColumn>

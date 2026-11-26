@@ -9,6 +9,7 @@ import { useEffect,useState } from 'react'
 import { getCrawlPages } from '@/app/actions/crawl'
 import DateDisplay from '@/components/common/DateDisplay'
 import CrawlGenerateModal from '@/components/content/crawl/CrawlGenerateModal'
+import CrawlSessionMaintenance from '@/components/content/crawl/CrawlSessionMaintenance'
 import CrawlSessionScreenshotLinks from '@/components/content/crawl/CrawlSessionScreenshotLinks'
 import CrawlSessionScreenshots from '@/components/content/crawl/CrawlSessionScreenshots'
 import CrawlSessionWordPress from '@/components/content/crawl/CrawlSessionWordPress'
@@ -1835,6 +1836,11 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
       key: 'screenshots',
       label: 'Screenshots',
       children: <CrawlSessionScreenshots sessionId={crawlSession.id} pages={crawlPages} />,
+    },
+    {
+      key: 'maintenance',
+      label: 'Maintenance',
+      children: <CrawlSessionMaintenance sessionId={crawlSession.id} websiteId={crawlSession.company_website_id} status={crawlSession.status} />,
     },
     ...(wpSite
       ? [

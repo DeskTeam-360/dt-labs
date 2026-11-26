@@ -21,8 +21,9 @@ export async function GET(request: Request) {
   const q = new URL(request.url).searchParams
   const websiteId = q.get('website_id')
   const companyId = q.get('company_id')
-  if (!websiteId && !companyId) return NextResponse.json({ error: 'website_id or company_id is required' }, { status: 400 })
-  const where: SQL = websiteId ? eq(maintenanceReports.websiteId, websiteId) : eq(maintenanceReports.companyId, companyId as string)
+  const crawlId = q.get('crawl_session_id')
+  if (!websiteId && !companyId && !crawlId) return NextResponse.json({ error: 'website_id, company_id or crawl_session_id is required' }, { status: 400 })
+  const where: SQL = crawlId ? eq(maintenanceReports.crawlSessionId, crawlId) : websiteId ? eq(maintenanceReports.websiteId, websiteId) : eq(maintenanceReports.companyId, companyId as string)
   const rows = await db.select().from(maintenanceReports).where(where).orderBy(desc(maintenanceReports.periodDate), desc(maintenanceReports.createdAt)).limit(200)
   return NextResponse.json({
     data: rows.map((r) => ({
@@ -42,12 +43,14 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const s = await staff()
   if (s.error) return s.error
-  const b = (await request.json().catch(() => ({}))) as { website_id?: unknown; template?: unknown }
+  const b = (await request.json().catch(() => ({}))) as { website_id?: unknown; template?: unknown; crawl_session_id?: unknown }
   const websiteId = String(b.website_id ?? '')
   const template = String(b.template ?? '')
   if (!/^[0-9a-f-]{36}$/i.test(websiteId)) return NextResponse.json({ error: 'Invalid website' }, { status: 400 })
   if (!/^[a-z0-9-]{1,30}$/.test(template)) return NextResponse.json({ error: 'Invalid template' }, { status: 400 })
-  const res = await createMaintenanceReport({ websiteId, templateKey: template, userId: s.userId as string })
+  const crawl = String(b.crawl_session_id ?? '')
+  if (crawl && !/^[0-9a-f-]{36}$/i.test(crawl)) return NextResponse.json({ error: 'Invalid crawl' }, { status: 400 })
+  const res = await createMaintenanceReport({ websiteId, templateKey: template, userId: s.userId as string, crawlSessionId: crawl || undefined })
   if ('error' in res) return NextResponse.json({ error: res.error }, { status: 404 })
   return NextResponse.json({ ok: true, id: res.report.id })
 }

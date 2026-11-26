@@ -89,9 +89,6 @@ export default function TabWebsites({
     }
   }
 
-  /** A maintenance report needs a finished crawl of the website. */
-  const hasDoneCrawl = (websiteId: string) => crawlSessions.some((c) => c.company_website_id === websiteId && c.status === 'completed')
-
   const columns: ColumnsType<any> = [
     {
       title: 'Primary',
@@ -145,10 +142,11 @@ export default function TabWebsites({
     {
       title: 'Actions',
       key: 'actions',
+      width: 340,
       render: (_: unknown, record: any) => {
         const lastCrawlSession = getLastCrawlSession(record.id)
         return (
-          <Space>
+          <Space wrap size={0}>
             {record.wp_site ? (
               <Button type="link" loading={registeringId === record.id} onClick={() => void checkNow(record)}>
                 Check now
@@ -173,11 +171,9 @@ export default function TabWebsites({
             <Button type="link" icon={<PlayCircleOutlined />} onClick={() => onStartCrawl(record.id)}>
               Crawl
             </Button>
-            <Tooltip title={hasDoneCrawl(record.id) ? '' : 'Crawl this website first'}>
-              <Button type="link" disabled={!hasDoneCrawl(record.id)} onClick={() => setMaintenanceFor({ id: record.id, url: record.url })}>
-                Maintenance
-              </Button>
-            </Tooltip>
+            <Button type="link" onClick={() => setMaintenanceFor({ id: record.id, url: record.url })}>
+              Maintenance
+            </Button>
             <Button type="link" icon={<EditOutlined />} onClick={() => onEditWebsite(record)}>
               Edit
             </Button>
@@ -215,6 +211,7 @@ export default function TabWebsites({
           rowKey="id"
           columns={columns}
           pagination={false}
+          scroll={{ x: 'max-content' }}
           expandable={{
             expandedRowRender: (record: any) => (
               <Space orientation="vertical" size={16} style={{ width: '100%' }}>

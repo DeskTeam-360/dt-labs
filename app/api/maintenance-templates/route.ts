@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   if (s.error) return s.error
   const all = new URL(request.url).searchParams.get('all') === '1' && canEdit(s.role as string)
   const rows = await db
-    .select({ id: maintenanceTemplates.id, key: maintenanceTemplates.key, name: maintenanceTemplates.name, isActive: maintenanceTemplates.isActive, items: sql<number>`(SELECT count(*)::int FROM maintenance_template_items i WHERE i.template_id = ${maintenanceTemplates.id})` })
+    .select({ id: maintenanceTemplates.id, key: maintenanceTemplates.key, name: maintenanceTemplates.name, isActive: maintenanceTemplates.isActive, items: sql<number>`(SELECT count(*)::int FROM maintenance_template_items i WHERE i.template_id = maintenance_templates.id)` })
     .from(maintenanceTemplates)
     .where(all ? undefined : eq(maintenanceTemplates.isActive, true))
     .orderBy(asc(maintenanceTemplates.sortOrder), asc(maintenanceTemplates.name))
