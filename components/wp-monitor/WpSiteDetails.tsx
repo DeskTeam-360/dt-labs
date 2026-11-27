@@ -52,6 +52,13 @@ export default function WpSiteDetails({ wp }: { wp: Pick<WpSiteSummary, 'site_ur
                   {f.wordfence.status_counts && Object.keys(f.wordfence.status_counts).length > 0 ? (
                     <Text type="secondary" style={{ fontSize: 12 }}> (in the database: {Object.entries(f.wordfence.status_counts).map(([s, n]) => `${s} ${n}`).join(', ')}{f.wordfence.pending_issues ? `, pending ${f.wordfence.pending_issues}` : ''})</Text>
                   ) : null}
+                  {f.wordfence.issues_debug ? (
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        read table {f.wordfence.issues_debug.table ?? '?'} (site prefix {f.wordfence.issues_debug.prefix ?? '?'}); tables like it: {Object.entries(f.wordfence.issues_debug.candidates).map(([t, n]) => `${t} ${n} rows`).join(', ') || 'none'}
+                      </Text>
+                    </div>
+                  ) : null}
                 </span>
               )
               : f.wordfence.tables === null

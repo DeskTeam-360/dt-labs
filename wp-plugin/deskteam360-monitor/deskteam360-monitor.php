@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DeskTeam360 Monitor
  * Description: Sends WordPress/PHP version, comments, Gravity Forms entry log and Wordfence log to an external endpoint, signed with a secret key (HMAC).
- * Version: 0.3.2
+ * Version: 0.3.3
  * Requires PHP: 7.4
  * Author: DeskTeam360
  *
@@ -63,7 +63,7 @@ final class DT360_Monitor {
 			'sent_at'     => gmdate( 'c' ),
 			'wp_version'  => $wp_version,
 			'php_version' => PHP_VERSION,
-			'plugin_version' => '0.3.2',
+			'plugin_version' => '0.3.3',
 			'updates'     => self::updates(),
 			'comments'    => self::comments(),
 			'gravityforms' => self::gravity_forms(),
@@ -357,6 +357,14 @@ final class DT360_Monitor {
 				$counts[ (string) $c['status'] ] = (int) $c['n'];
 			}
 			$out['status_counts'] = $counts;
+			// Which table was read, and every table that looks like it with its rows (a database can hold copies, e.g. a backup with another prefix).
+			$candidates = array();
+			foreach ( self::all_tables() as $name ) {
+				if ( 0 === strcasecmp( substr( $name, -8 ), 'wfissues' ) ) {
+					$candidates[ $name ] = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `$name`" );
+				}
+			}
+			$out['issues_debug'] = array( 'table' => $issues, 'prefix' => $wpdb->prefix, 'base_prefix' => $wpdb->base_prefix, 'candidates' => $candidates );
 			$pending              = self::find_wf_table( 'wfPendingIssues' );
 			if ( $pending ) {
 				$out['pending_issues'] = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `$pending`" );

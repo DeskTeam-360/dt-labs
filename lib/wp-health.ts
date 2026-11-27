@@ -24,7 +24,7 @@ export type WpFacts = {
   ssl: { https: boolean; days_left: number | null; expired: boolean; valid_to: string | null; error: string | null }
   backup: { installed: boolean; last_time: string | null; last_success: boolean | null }
   failed_logins_24h: number | null
-  wordfence: { active: boolean; open_issues: number | null; version: string | null; uploads_exec_disabled: boolean | null; status_counts: Record<string, number> | null; pending_issues: number | null; tables: string[] | null; issues: { type: string; severity: number; message: string }[] }
+  wordfence: { active: boolean; open_issues: number | null; version: string | null; uploads_exec_disabled: boolean | null; status_counts: Record<string, number> | null; pending_issues: number | null; issues_debug: { table: string | null; prefix: string | null; candidates: Record<string, number> } | null; tables: string[] | null; issues: { type: string; severity: number; message: string }[] }
   plugin_update_list: WpUpdateItem[]
   theme_update_list: WpUpdateItem[]
   /** Comments waiting in the spam folder and Gravity Forms spam entries; null = the plugin did not say. */
@@ -95,6 +95,15 @@ export function evaluateWpSite(lastSeenAt: Date | string | null | undefined, rep
       uploads_exec_disabled: typeof wf.code_exec_uploads_disabled === 'boolean' ? wf.code_exec_uploads_disabled : null,
       status_counts: wf.status_counts && typeof wf.status_counts === 'object' && !Array.isArray(wf.status_counts) ? Object.fromEntries(Object.entries(wf.status_counts).map(([k, v]) => [String(k).slice(0, 30), Number(v) || 0])) : null,
       pending_issues: num(wf.pending_issues),
+      issues_debug: wf.issues_debug && typeof wf.issues_debug === 'object' && !Array.isArray(wf.issues_debug)
+        ? {
+            table: typeof wf.issues_debug.table === 'string' ? wf.issues_debug.table.slice(0, 80) : null,
+            prefix: typeof wf.issues_debug.prefix === 'string' ? wf.issues_debug.prefix.slice(0, 40) : null,
+            candidates: wf.issues_debug.candidates && typeof wf.issues_debug.candidates === 'object' && !Array.isArray(wf.issues_debug.candidates)
+              ? Object.fromEntries(Object.entries(wf.issues_debug.candidates).slice(0, 10).map(([k, v]) => [String(k).slice(0, 80), Number(v) || 0]))
+              : {},
+          }
+        : null,
       tables: Array.isArray(wf.tables) ? wf.tables.map((t: unknown) => String(t)).slice(0, 40) : null,
       issues: Array.isArray(wf.issues)
         ? wf.issues.map((i: any) => ({ type: String(i?.type ?? ''), severity: Number(i?.severity ?? 0), message: String(i?.message ?? '').slice(0, 300) }))
