@@ -24,7 +24,7 @@ export type WpFacts = {
   ssl: { https: boolean; days_left: number | null; expired: boolean; valid_to: string | null; error: string | null }
   backup: { installed: boolean; last_time: string | null; last_success: boolean | null }
   failed_logins_24h: number | null
-  wordfence: { active: boolean; open_issues: number | null; issues: { type: string; severity: number; message: string }[] }
+  wordfence: { active: boolean; open_issues: number | null; version: string | null; tables: string[] | null; issues: { type: string; severity: number; message: string }[] }
   plugin_update_list: WpUpdateItem[]
   theme_update_list: WpUpdateItem[]
   last_seen_at: string | null
@@ -82,6 +82,8 @@ export function evaluateWpSite(lastSeenAt: Date | string | null | undefined, rep
     wordfence: {
       active: wf.active === true,
       open_issues: num(wf.open_issues),
+      version: typeof wf.version === 'string' ? wf.version : null,
+      tables: Array.isArray(wf.tables) ? wf.tables.map((t: unknown) => String(t)).slice(0, 40) : null,
       issues: Array.isArray(wf.issues)
         ? wf.issues.map((i: any) => ({ type: String(i?.type ?? ''), severity: Number(i?.severity ?? 0), message: String(i?.message ?? '').slice(0, 300) }))
         : [],

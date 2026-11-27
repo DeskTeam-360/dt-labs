@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DeskTeam360 Monitor
  * Description: Sends WordPress/PHP version, comments, Gravity Forms entry log and Wordfence log to an external endpoint, signed with a secret key (HMAC).
- * Version: 0.2.2
+ * Version: 0.2.3
  * Requires PHP: 7.4
  * Author: DeskTeam360
  *
@@ -121,7 +121,7 @@ final class DT360_Monitor {
 			);
 		}
 		$out   = array( 'administrators' => $admins, 'failed_logins_24h' => null );
-		$table = self::find_table( $wpdb->prefix . 'wfLogins' );
+		$table = self::find_wf_table( 'wfLogins' );
 		if ( $table ) {
 			$since                      = time() - DAY_IN_SECONDS;
 			$out['failed_logins_24h']   = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `$table` WHERE fail = 1 AND ctime >= %d", $since ) );
@@ -264,9 +264,42 @@ final class DT360_Monitor {
 
 	/** The real name of a table, found without regard to upper or lower case (some servers store table names in lower case), or null. */
 	private static function find_table( $table ) {
+		foreach ( self::all_tables() as $name ) {
+			if ( 0 === strcasecmp( $name, $table ) ) {
+				return $name;
+			}
+		}
+		return null;
+	}
+
+	/** Every table of the database. Compared in PHP: SHOW TABLES LIKE is case sensitive on some servers, and Wordfence's tables can be stored in lower case. */
+	private static function all_tables() {
+		static $all = null;
+		if ( null === $all ) {
+			global $wpdb;
+			$all = array_map( 'strval', (array) $wpdb->get_col( 'SHOW TABLES' ) );
+		}
+		return $all;
+	}
+
+	/**
+	 * A Wordfence table by its short name (wfIssues, wfLogins ...). Wordfence uses the network prefix on multisite and some hosts change
+	 * the case of table names, so: this site's prefix, then the network prefix, then any prefix. Returns the real table name or null.
+	 */
+	private static function find_wf_table( $short ) {
 		global $wpdb;
-		$found = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
-		return $found && 0 === strcasecmp( $found, $table ) ? $found : null;
+		foreach ( array_unique( array( $wpdb->prefix, $wpdb->base_prefix ) ) as $prefix ) {
+			$found = self::find_table( $prefix . $short );
+			if ( $found ) {
+				return $found;
+			}
+		}
+		foreach ( self::all_tables() as $name ) {
+			if ( 0 === strcasecmp( substr( $name, -strlen( $short ) ), $short ) ) {
+				return $name;
+			}
+		}
+		return null;
 	}
 
 	private static function wordfence() {
@@ -275,8 +308,12 @@ final class DT360_Monitor {
 			return array( 'active' => false );
 		}
 		$out = array( 'active' => true, 'version' => WORDFENCE_VERSION );
+		// What was found, so a missing number can be explained (shown in the report, not on the customer's page).
+		$out['tables'] = array_slice( array_values( array_filter( self::all_tables(), function ( $n ) {
+			return false !== stripos( $n, 'wf' );
+		} ) ), 0, 40 );
 
-		$issues = self::find_table( $wpdb->prefix . 'wfIssues' );
+		$issues = self::find_wf_table( 'wfIssues' );
 		if ( $issues ) {
 			$out['open_issues'] = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `$issues` WHERE status = %s", 'new' ) );
 			$rows               = $wpdb->get_results( $wpdb->prepare( "SELECT type, severity, shortMsg, time FROM `$issues` WHERE status = %s ORDER BY severity ASC, time DESC LIMIT 20", 'new' ), ARRAY_A );
@@ -288,13 +325,13 @@ final class DT360_Monitor {
 			}, (array) $rows );
 		}
 
-		$blocked = self::find_table( $wpdb->prefix . 'wfBlockedIPLog' );
+		$blocked = self::find_wf_table( 'wfBlockedIPLog' );
 		if ( $blocked ) {
 			$day                 = (int) floor( time() / 86400 ) - 1;
 			$out['blocked_24h']  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(SUM(blockCount),0) FROM `$blocked` WHERE unixday >= %d", $day ) );
 		}
 
-		$status = self::find_table( $wpdb->prefix . 'wfStatus' );
+		$status = self::find_wf_table( 'wfStatus' );
 		if ( $status ) {
 			$rows       = $wpdb->get_results( "SELECT ctime, level, type, msg FROM `$status` WHERE level <= 2 ORDER BY ctime DESC LIMIT 30", ARRAY_A );
 			$out['log'] = array_map( function ( $r ) {

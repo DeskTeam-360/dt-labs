@@ -41,8 +41,16 @@ export default function WpSiteDetails({ wp }: { wp: Pick<WpSiteSummary, 'site_ur
         <Descriptions.Item label="Last backup">
           {!f.backup.installed ? 'UpdraftPlus not installed' : `${fmtDate(f.backup.last_time)}${f.backup.last_success === false ? ' (failed)' : f.backup.last_success ? ' (ok)' : ''}`}
         </Descriptions.Item>
-        <Descriptions.Item label="Failed logins (24h)">{f.failed_logins_24h ?? 'n/a (needs Wordfence)'}</Descriptions.Item>
-        <Descriptions.Item label="Wordfence open issues">{!f.wordfence.active ? 'Not installed' : (f.wordfence.open_issues ?? '—')}</Descriptions.Item>
+        <Descriptions.Item label="Failed logins (24h)">{f.failed_logins_24h ?? (f.wordfence.active ? 'n/a (Wordfence login table not found)' : 'n/a (needs Wordfence)')}</Descriptions.Item>
+        <Descriptions.Item label="Wordfence open issues">
+          {!f.wordfence.active
+            ? 'Not installed'
+            : f.wordfence.open_issues !== null
+              ? f.wordfence.open_issues
+              : f.wordfence.tables === null
+                ? `Active${f.wordfence.version ? ` (${f.wordfence.version})` : ''}, but the plugin on the site is too old to read it. Update the DeskTeam360 Monitor plugin.`
+                : `Active${f.wordfence.version ? ` (${f.wordfence.version})` : ''}, but its scan table was not found. Tables seen: ${f.wordfence.tables.length ? f.wordfence.tables.slice(0, 6).join(', ') : 'none'}`}
+        </Descriptions.Item>
         <Descriptions.Item label="Last report">{fmtDate(f.last_seen_at)}</Descriptions.Item>
         <Descriptions.Item label="Registered address">{wp.site_url}</Descriptions.Item>
       </Descriptions>
