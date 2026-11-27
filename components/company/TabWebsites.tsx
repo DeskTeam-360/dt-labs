@@ -48,7 +48,7 @@ export default function TabWebsites({
   const router = useRouter()
   const isAdminUser = ((useSession().data?.user as { role?: string } | undefined)?.role ?? '').toLowerCase() === 'admin'
   const [registeringId, setRegisteringId] = useState<string | null>(null)
-  const [setup, setSetup] = useState<{ label: string; key: string } | null>(null)
+  const [setup, setSetup] = useState<{ label: string; key: string; rotated?: boolean } | null>(null)
   const [maintenanceFor, setMaintenanceFor] = useState<{ id: string; url: string } | null>(null)
 
   /** Looks at a monitored site now: opens it, asks the plugin for a fresh report, updates the alarms. */
@@ -82,6 +82,21 @@ export default function TabWebsites({
       if (!res.ok || !j.secret_key) throw new Error(j.error || 'Could not register the site')
       setSetup({ label: record.title || record.url, key: j.secret_key })
       onChanged?.()
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setRegisteringId(null)
+    }
+  }
+
+  /** A new secret key for a monitored site, shown once. The old key stops working. */
+  const rotateKey = async (record: any) => {
+    setRegisteringId(record.id)
+    try {
+      const res = await fetch(`/api/wp-monitor/sites/${record.wp_site.id}/rotate`, { method: 'POST', credentials: 'include' })
+      const j = (await res.json().catch(() => ({}))) as { secret_key?: string; error?: string }
+      if (!res.ok || !j.secret_key) throw new Error(j.error || 'Could not make a new key')
+      setSetup({ label: record.title || record.url, key: j.secret_key, rotated: true })
     } catch (e) {
       message.error((e as Error).message)
     } finally {
@@ -152,13 +167,28 @@ export default function TabWebsites({
                 Check now
               </Button>
             ) : null}
-            {isAdminUser && !record.wp_site ? (
-              <Tooltip title="Watch this site with the DeskTeam360 Monitor plugin">
-                <Button type="link" loading={registeringId === record.id} onClick={() => void registerForMonitoring(record)}>
-                  Monitor WordPress
+            {record.wp_site ? (
+              <Popconfirm
+                title="Make a new key?"
+                description="The old key stops working. Put the new one in the site's wp-config.php."
+                okText="Make new key"
+                cancelText="Cancel"
+                disabled={!isAdminUser}
+                onConfirm={() => void rotateKey(record)}
+              >
+                <Tooltip title={isAdminUser ? 'Show a new key for this site' : 'Only an admin can change the key'}>
+                  <Button type="link" disabled={!isAdminUser} loading={registeringId === record.id}>
+                    Key
+                  </Button>
+                </Tooltip>
+              </Popconfirm>
+            ) : (
+              <Tooltip title={isAdminUser ? 'Watch this site with the DeskTeam360 Monitor plugin and get its key' : 'Only an admin can connect a site'}>
+                <Button type="link" disabled={!isAdminUser} loading={registeringId === record.id} onClick={() => void registerForMonitoring(record)}>
+                  Connect WordPress
                 </Button>
               </Tooltip>
-            ) : null}
+            )}
             {lastCrawlSession && (
               <Button
                 type="link"
@@ -240,7 +270,7 @@ export default function TabWebsites({
         </Card>
       )}
       <WebsiteMaintenanceModal website={maintenanceFor} onClose={() => setMaintenanceFor(null)} />
-      <WpKeySetupModal open={setup !== null} onClose={() => setSetup(null)} siteLabel={setup?.label ?? ''} secretKey={setup?.key ?? ''} />
+      <WpKeySetupModal open={setup !== null} onClose={() => setSetup(null)} siteLabel={setup?.label ?? ''} secretKey={setup?.key ?? ''} rotated={setup?.rotated} />
     </div>
   )
 }
