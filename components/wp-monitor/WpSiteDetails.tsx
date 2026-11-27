@@ -46,7 +46,14 @@ export default function WpSiteDetails({ wp }: { wp: Pick<WpSiteSummary, 'site_ur
           {!f.wordfence.active
             ? 'Not installed'
             : f.wordfence.open_issues !== null
-              ? f.wordfence.open_issues
+              ? (
+                <span>
+                  {f.wordfence.open_issues}
+                  {f.wordfence.status_counts && Object.keys(f.wordfence.status_counts).length > 0 ? (
+                    <Text type="secondary" style={{ fontSize: 12 }}> (in the database: {Object.entries(f.wordfence.status_counts).map(([s, n]) => `${s} ${n}`).join(', ')}{f.wordfence.pending_issues ? `, pending ${f.wordfence.pending_issues}` : ''})</Text>
+                  ) : null}
+                </span>
+              )
               : f.wordfence.tables === null
                 ? `Active${f.wordfence.version ? ` (${f.wordfence.version})` : ''}, but the plugin on the site is too old to read it. Update the DeskTeam360 Monitor plugin.`
                 : `Active${f.wordfence.version ? ` (${f.wordfence.version})` : ''}, but its scan table was not found. Tables seen: ${f.wordfence.tables.length ? f.wordfence.tables.slice(0, 6).join(', ') : 'none'}`}

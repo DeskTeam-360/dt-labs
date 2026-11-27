@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DeskTeam360 Monitor
  * Description: Sends WordPress/PHP version, comments, Gravity Forms entry log and Wordfence log to an external endpoint, signed with a secret key (HMAC).
- * Version: 0.3.0
+ * Version: 0.3.1
  * Requires PHP: 7.4
  * Author: DeskTeam360
  *
@@ -347,8 +347,20 @@ final class DT360_Monitor {
 
 		$issues = self::find_wf_table( 'wfIssues' );
 		if ( $issues ) {
-			$out['open_issues'] = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `$issues` WHERE status = %s", 'new' ) );
-			$rows               = $wpdb->get_results( $wpdb->prepare( "SELECT type, severity, shortMsg, time FROM `$issues` WHERE status = %s ORDER BY severity ASC, time DESC LIMIT 20", 'new' ), ARRAY_A );
+			// Open = everything Wordfence has not been told to ignore (ignoreP / ignoreC). Counting only status "new" missed results on newer versions.
+			$ignored            = $wpdb->esc_like( 'ignore' ) . '%';
+			$out['open_issues'] = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `$issues` WHERE status NOT LIKE %s", $ignored ) );
+			// What the table holds, by status, so a difference with Wordfence's own results page can be explained.
+			$counts = array();
+			foreach ( (array) $wpdb->get_results( "SELECT status, COUNT(*) AS n FROM `$issues` GROUP BY status", ARRAY_A ) as $c ) {
+				$counts[ (string) $c['status'] ] = (int) $c['n'];
+			}
+			$out['status_counts'] = $counts;
+			$pending              = self::find_wf_table( 'wfPendingIssues' );
+			if ( $pending ) {
+				$out['pending_issues'] = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `$pending`" );
+			}
+			$rows               = $wpdb->get_results( $wpdb->prepare( "SELECT type, severity, shortMsg, time FROM `$issues` WHERE status NOT LIKE %s ORDER BY severity ASC, time DESC LIMIT 20", $ignored ), ARRAY_A );
 			$out['issues']      = array_map( function ( $r ) {
 				return array(
 					'type' => $r['type'], 'severity' => (int) $r['severity'],

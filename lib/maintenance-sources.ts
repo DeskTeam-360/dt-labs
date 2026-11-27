@@ -19,6 +19,9 @@ export const MAINTENANCE_SOURCES: { value: string; label: string }[] = [
   { value: 'shot_inner_mobile', label: '3 inner page pictures, mobile' },
 ]
 
+/** Set by the system on a checklist item it filled with facts but that a person must still look at (pictures, form entries). */
+export const NEED_CHECK = 'Need check'
+
 export const MAINTENANCE_SOURCE_VALUES = MAINTENANCE_SOURCES.map((s) => s.value)
 
 export const DEFAULT_BRANDING = {

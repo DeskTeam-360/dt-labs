@@ -24,12 +24,12 @@ export type WpFacts = {
   ssl: { https: boolean; days_left: number | null; expired: boolean; valid_to: string | null; error: string | null }
   backup: { installed: boolean; last_time: string | null; last_success: boolean | null }
   failed_logins_24h: number | null
-  wordfence: { active: boolean; open_issues: number | null; version: string | null; uploads_exec_disabled: boolean | null; tables: string[] | null; issues: { type: string; severity: number; message: string }[] }
+  wordfence: { active: boolean; open_issues: number | null; version: string | null; uploads_exec_disabled: boolean | null; status_counts: Record<string, number> | null; pending_issues: number | null; tables: string[] | null; issues: { type: string; severity: number; message: string }[] }
   plugin_update_list: WpUpdateItem[]
   theme_update_list: WpUpdateItem[]
   /** Comments waiting in the spam folder and Gravity Forms spam entries; null = the plugin did not say. */
   comments_spam: number | null
-  forms: { active: boolean; spam: number | null }
+  forms: { active: boolean; spam: number | null; total: number | null; last_24h: number | null }
   /** Shown avatars (Gravatar) and the installed plugins; null = the plugin on the site is too old to say. */
   avatars_enabled: boolean | null
   installed_plugins: { slug: string; name: string; active: boolean }[] | null
@@ -91,6 +91,8 @@ export function evaluateWpSite(lastSeenAt: Date | string | null | undefined, rep
       open_issues: num(wf.open_issues),
       version: typeof wf.version === 'string' ? wf.version : null,
       uploads_exec_disabled: typeof wf.code_exec_uploads_disabled === 'boolean' ? wf.code_exec_uploads_disabled : null,
+      status_counts: wf.status_counts && typeof wf.status_counts === 'object' && !Array.isArray(wf.status_counts) ? Object.fromEntries(Object.entries(wf.status_counts).map(([k, v]) => [String(k).slice(0, 30), Number(v) || 0])) : null,
+      pending_issues: num(wf.pending_issues),
       tables: Array.isArray(wf.tables) ? wf.tables.map((t: unknown) => String(t)).slice(0, 40) : null,
       issues: Array.isArray(wf.issues)
         ? wf.issues.map((i: any) => ({ type: String(i?.type ?? ''), severity: Number(i?.severity ?? 0), message: String(i?.message ?? '').slice(0, 300) }))
@@ -102,6 +104,8 @@ export function evaluateWpSite(lastSeenAt: Date | string | null | undefined, rep
     forms: {
       active: r.gravityforms?.active !== false && Array.isArray(r.gravityforms?.forms),
       spam: Array.isArray(r.gravityforms?.forms) ? r.gravityforms.forms.reduce((n: number, f: any) => n + (Number(f?.spam) || 0), 0) : null,
+      total: Array.isArray(r.gravityforms?.forms) ? r.gravityforms.forms.reduce((n: number, f: any) => n + (Number(f?.total) || 0), 0) : null,
+      last_24h: Array.isArray(r.gravityforms?.forms) ? r.gravityforms.forms.reduce((n: number, f: any) => n + (Number(f?.last_24h) || 0), 0) : null,
     },
     avatars_enabled: typeof r.site?.avatars_enabled === 'boolean' ? r.site.avatars_enabled : null,
     installed_plugins: Array.isArray(r.site?.installed_plugins)

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import LinkedNote from '@/components/content/maintenance/LinkedNote'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
+import { NEED_CHECK } from '@/lib/maintenance-sources'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -228,7 +229,8 @@ export default function MaintenanceReportContent({ reportId, user }: { reportId:
                         <tbody>
                           {sec.items.map((it, n) => {
                             const good = it.status !== null && it.status === it.options[0]
-                            const problem = it.status !== null && it.status !== NA && !good && it.options.length > 1 && it.options.slice(1).includes(it.status)
+                            const needCheck = it.status === NEED_CHECK
+                            const problem = needCheck || (it.status !== null && it.status !== NA && !good && it.options.length > 1 && it.options.slice(1).includes(it.status))
                             return (
                               <tr key={it.id} style={{ borderTop: '1px solid var(--ant-color-border-secondary, #f0f0f0)', verticalAlign: 'top' }}>
                                 <td style={{ padding: '8px 12px' }}>{n + 1}</td>
@@ -252,7 +254,7 @@ export default function MaintenanceReportContent({ reportId, user }: { reportId:
                                     disabled={isFinal}
                                     status={problem ? 'warning' : undefined}
                                     value={it.status ?? undefined}
-                                    options={[...it.options, NA].map((o) => ({ value: o, label: o }))}
+                                    options={[...it.options, ...(it.source ? [NEED_CHECK] : []), NA].map((o) => ({ value: o, label: o }))}
                                     onChange={(v) => change(it.id, { status: v ?? null })}
                                   />
                                 </td>

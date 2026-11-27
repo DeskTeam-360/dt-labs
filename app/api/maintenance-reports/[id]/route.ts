@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { crawlSessions, db, maintenanceReportItems, maintenanceReports } from '@/lib/db'
 import { fillAutoItems, loadMaintenanceReport, newShareToken } from '@/lib/maintenance-report'
+import { NEED_CHECK } from '@/lib/maintenance-sources'
 
 export const dynamic = 'force-dynamic'
 
@@ -117,6 +118,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
   const set: Partial<typeof maintenanceReports.$inferInsert> = {}
   if (b.conclusion !== undefined) set.conclusion = String(b.conclusion ?? '').slice(0, 20000) || null
   if (b.status === 'final') {
+    // What the system could only prepare (pictures, form entries) must be looked at by a person before the report is final.
+    const open = await db.select({ label: maintenanceReportItems.label }).from(maintenanceReportItems).where(and(eq(maintenanceReportItems.reportId, id), eq(maintenanceReportItems.status, NEED_CHECK)))
+    if (open.length > 0) return NextResponse.json({ error: `${open.length} item(s) still need a check: ${open.slice(0, 3).map((o) => o.label).join(', ')}${open.length > 3 ? ', ...' : ''}. Set their status first.` }, { status: 400 })
     set.status = 'final'
     set.finalizedAt = new Date()
   } else if (b.status === 'draft') {

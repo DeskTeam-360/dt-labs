@@ -17,7 +17,7 @@ import {
   users,
   wpSites,
 } from '@/lib/db'
-import { resolveBranding } from '@/lib/maintenance-sources'
+import { NEED_CHECK, resolveBranding } from '@/lib/maintenance-sources'
 import { cleanPageTitle } from '@/lib/page-title'
 import { assertPublicUrl } from '@/lib/web-screenshot'
 import { evaluateWpSite } from '@/lib/wp-health'
@@ -207,7 +207,12 @@ export async function fillAutoItems(reportId: string): Promise<void> {
       case 'spam_forms': {
         if (!facts || !facts.last_seen_at) return { status: null, note: 'This site is not reporting to WordPress Monitor' }
         if (!facts.forms?.active || facts.forms.spam == null) return { status: 'N/A', note: 'Gravity Forms is not used on this site' }
-        return facts.forms.spam === 0 ? { status: item.options[0] } : { status: item.options[1] ?? item.options[0], note: `${facts.forms.spam} spam form entr${facts.forms.spam === 1 ? 'y' : 'ies'} to remove` }
+        // Whether a submission is fake needs a person's eyes (the plugin does not send what people typed), so only the counts are given
+        // and the status stays for the person. Nothing waiting at all is the one case that can be called Done.
+        const waiting = facts.forms.total ?? 0
+        if (waiting === 0 && facts.forms.spam === 0) return { status: item.options[0], note: 'No form entries waiting' }
+        const parts = [`${waiting} entr${waiting === 1 ? 'y' : 'ies'} in Gravity Forms`, `${facts.forms.last_24h ?? 0} in the last 24 hours`, `${facts.forms.spam} in the spam folder`]
+        return { status: NEED_CHECK, note: `Check for fake submissions: ${parts.join(', ')}` }
       }
       case 'uploads_code_exec': {
         if (!facts || !facts.last_seen_at || !facts.wordfence.active) return { status: null, note: 'Wordfence is not reporting for this site' }
@@ -242,7 +247,7 @@ export async function fillAutoItems(reportId: string): Promise<void> {
       case 'shot_home_mobile': {
         const device = item.source === 'shot_home_mobile' ? 'mobile' : 'desktop'
         const s = shots.find((x) => x.home && x.device === device)
-        return s ? { status: item.options[0], note: `Homepage: ${s.file}`, link: s.file } : { status: null, note: crawl?.fresh ? 'No homepage picture in the latest crawl' : 'Crawl with pictures needed' }
+        return s ? { status: NEED_CHECK, note: `Homepage: ${s.file}`, link: s.file } : { status: null, note: crawl?.fresh ? 'No homepage picture in the latest crawl' : 'Crawl with pictures needed' }
       }
       case 'shot_inner_desktop':
       case 'shot_inner_mobile': {
@@ -251,7 +256,7 @@ export async function fillAutoItems(reportId: string): Promise<void> {
         const seen = new Set<string>()
         const picked = list.filter((x) => (seen.has(x.url) ? false : (seen.add(x.url), true))).slice(0, SAMPLE_PAGES)
         if (picked.length === 0) return { status: null, note: crawl?.fresh ? 'No inner page pictures in the latest crawl' : 'Crawl with pictures needed' }
-        return { status: item.options[0], note: picked.map((p) => `${cleanPageTitle(p.title, p.url)}: ${p.file}`).join('\n'), link: picked[0].file }
+        return { status: NEED_CHECK, note: picked.map((p) => `${cleanPageTitle(p.title, p.url)}: ${p.file}`).join('\n'), link: picked[0].file }
       }
       default:
         return { status: null }
