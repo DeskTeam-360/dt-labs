@@ -16,8 +16,9 @@ export async function pullWpReport(site: typeof wpSites.$inferSelect): Promise<{
     const base = (await assertPublicUrl(site.siteUrl)).origin + new URL(site.siteUrl).pathname.replace(/\/+$/, '')
     const ts = String(Math.floor(Date.now() / 1000))
     const sig = createHmac('sha256', site.secretKey).update(`${ts}.report`).digest('hex')
-    const res = await fetch(`${base}/wp-json/dt360-monitor/v1/report`, {
-      headers: { 'X-DT360-Timestamp': ts, 'X-DT360-Signature': sig, Accept: 'application/json', 'User-Agent': 'DeskTeam360-Monitor/1.0' },
+    // A changing query string keeps page caches (W3 Total Cache, CDNs) from answering with an old copy of the report.
+    const res = await fetch(`${base}/wp-json/dt360-monitor/v1/report?nocache=${ts}`, {
+      headers: { 'X-DT360-Timestamp': ts, 'X-DT360-Signature': sig, Accept: 'application/json', 'User-Agent': 'DeskTeam360-Monitor/1.0', 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
       signal: AbortSignal.timeout(TIMEOUT_MS),
       cache: 'no-store',
     })
