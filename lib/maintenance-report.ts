@@ -140,7 +140,22 @@ export async function fillAutoItems(reportId: string): Promise<void> {
   if (!report) return
   const [website] = await db.select().from(companyWebsites).where(eq(companyWebsites.id, report.websiteId)).limit(1)
   if (!website) return
-  const items = await db.select().from(maintenanceReportItems).where(eq(maintenanceReportItems.reportId, reportId))
+  let items = await db.select().from(maintenanceReportItems).where(eq(maintenanceReportItems.reportId, reportId))
+
+  // A report keeps a copy of its template's items. Items nobody has touched take the automatic source the template has now (matched by name),
+  // so a source chosen in the template after the report was made still applies.
+  const [tpl] = await db.select().from(maintenanceTemplates).where(eq(maintenanceTemplates.key, report.templateKey)).limit(1)
+  if (tpl) {
+    const tplItems = await db.select().from(maintenanceTemplateItems).where(eq(maintenanceTemplateItems.templateId, tpl.id))
+    const byLabel = new Map(tplItems.map((t) => [t.label.trim().toLowerCase(), t]))
+    for (const it of items) {
+      const t = byLabel.get(it.label.trim().toLowerCase())
+      if (t && t.source && !it.edited && it.source !== t.source) {
+        await db.update(maintenanceReportItems).set({ source: t.source, options: t.options }).where(eq(maintenanceReportItems.id, it.id))
+      }
+    }
+    items = await db.select().from(maintenanceReportItems).where(eq(maintenanceReportItems.reportId, reportId))
+  }
   const todo = items.filter((i) => i.source && !i.edited)
   if (todo.length === 0) return
 
