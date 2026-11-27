@@ -576,6 +576,9 @@ export const crawlSessions = pgTable('crawl_sessions', {
   startedBy: uuid('started_by'),
   screenshotHomepage: boolean('screenshot_homepage').notNull().default(false),
   screenshotRandomCount: integer('screenshot_random_count').notNull().default(0),
+  /** What the WordPress site reported when this crawl was checked (Check now); see migration 103. */
+  wpSnapshot: jsonb('wp_snapshot').$type<Record<string, unknown> | null>(),
+  wpSnapshotAt: ts('wp_snapshot_at'),
   startedAt: ts('started_at'),
   completedAt: ts('completed_at'),
   createdAt: ts('created_at').notNull().defaultNow(),

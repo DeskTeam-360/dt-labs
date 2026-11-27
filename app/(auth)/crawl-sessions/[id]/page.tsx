@@ -25,6 +25,7 @@ export default async function CrawlSessionDetailPage({ params }: { params: Promi
   const crawlSession = {
     id: s.id,
     company_website_id: s.companyWebsiteId,
+    wp_snapshot_at: s.wpSnapshotAt?.toISOString() ?? null,
     status: s.status,
     total_pages: s.totalPages,
     crawled_pages: s.crawledPages,

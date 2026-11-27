@@ -1847,7 +1847,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
           {
             key: 'wordpress',
             label: 'WordPress',
-            children: <CrawlSessionWordPress wp={wpSite} onChanged={() => setWpTick((n) => n + 1)} />,
+            children: <CrawlSessionWordPress wp={wpSite} crawlId={crawlSession.id} snapshotAt={crawlSession.wp_snapshot_at ?? null} onChanged={() => setWpTick((n) => n + 1)} />,
           },
         ]
       : []),

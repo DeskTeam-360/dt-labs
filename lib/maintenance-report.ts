@@ -147,8 +147,10 @@ export async function fillAutoItems(reportId: string): Promise<void> {
   // The monitored WordPress site for this address, if there is one.
   const wpRows = await db.select().from(wpSites)
   const wp = wpRows.find((w) => siteMatchKey(w.siteUrl) === siteMatchKey(website.url))
-  const facts = wp ? evaluateWpSite(wp.lastSeenAt, wp.lastReport as Record<string, unknown> | null).facts : null
-  const crawl = todo.some((i) => i.source === 'broken_links' || i.source?.startsWith('shot_')) ? await reportCrawl(report, website.id) : null
+  const crawl = await reportCrawl(report, website.id)
+  // What the site reported when the crawl was checked; reports made before that, or crawls never checked, use the latest data.
+  const snap = (crawl?.session.wpSnapshot as { facts?: ReturnType<typeof evaluateWpSite>['facts'] } | null | undefined)?.facts ?? null
+  const facts = snap ?? (wp ? evaluateWpSite(wp.lastSeenAt, wp.lastReport as Record<string, unknown> | null).facts : null)
   const shots = crawl?.fresh ? await crawlShots(crawl.session.id) : []
 
   let host = ''
@@ -239,6 +241,8 @@ export async function loadMaintenanceReport(reportId: string) {
   const wpRows = website ? await db.select().from(wpSites) : []
   const wp = website ? wpRows.find((w) => siteMatchKey(w.siteUrl) === siteMatchKey(website.url)) : undefined
   const items = await db.select().from(maintenanceReportItems).where(eq(maintenanceReportItems.reportId, reportId)).orderBy(maintenanceReportItems.pos)
+  const [bound] = report.crawlSessionId ? await db.select({ snap: crawlSessions.wpSnapshot }).from(crawlSessions).where(eq(crawlSessions.id, report.crawlSessionId)).limit(1) : []
+  const snapFacts = (bound?.snap as { facts?: { wp_version?: string | null; php_version?: string | null } } | null | undefined)?.facts ?? null
   const crawlRows = await db
     .select({ id: crawlSessions.id, createdAt: crawlSessions.createdAt, totalPages: crawlSessions.totalPages, brokenPages: crawlSessions.brokenPages })
     .from(crawlSessions)
@@ -253,8 +257,8 @@ export async function loadMaintenanceReport(reportId: string) {
       company_name: company?.name ?? '',
       website_url: website?.url ?? '',
       website_title: website?.title ?? '',
-      wp_version: wp?.wpVersion ?? null,
-      php_version: wp?.phpVersion ?? null,
+      wp_version: snapFacts?.wp_version ?? wp?.wpVersion ?? null,
+      php_version: snapFacts?.php_version ?? wp?.phpVersion ?? null,
       developer: dev ? [dev.first, dev.last].filter(Boolean).join(' ') || dev.email : null,
     },
     items,

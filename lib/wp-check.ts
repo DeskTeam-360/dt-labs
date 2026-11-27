@@ -2,6 +2,7 @@ import { eq, isNull, or } from 'drizzle-orm'
 
 import { companyWebsites, crawlSessions, db, wpSites } from '@/lib/db'
 import { syncSiteAlarms } from '@/lib/wp-alarms'
+import { evaluateWpSite } from '@/lib/wp-health'
 import { siteMatchKey } from '@/lib/wp-monitor'
 import { pullWpReport } from '@/lib/wp-pull'
 import { probeAndStore } from '@/lib/wp-uptime'
@@ -12,13 +13,21 @@ export type WpCheckResult = { site: string; uptime_ok: boolean; report: 'fresh' 
  * One full look at a monitored site, on request: open its address, ask the plugin for a fresh report, bring its alarms up to date.
  * Used when a crawl finishes and by "Check now"; nothing here runs on a timer.
  */
-export async function checkWpSite(site: typeof wpSites.$inferSelect): Promise<WpCheckResult> {
+export async function checkWpSite(site: typeof wpSites.$inferSelect, crawlSessionId?: string | null): Promise<WpCheckResult> {
   let current = await probeAndStore(site)
   // A single failed visit is not an outage: look once more before the site counts as down.
   if (!current.uptimeOk) current = await probeAndStore(current)
   const pulled = await pullWpReport(current)
   if (pulled.ok) current = { ...pulled.site, uptimeOk: current.uptimeOk, uptimeStatus: current.uptimeStatus, uptimeMs: current.uptimeMs, uptimeCheckedAt: current.uptimeCheckedAt, uptimeFailCount: current.uptimeFailCount, uptimeDownSince: current.uptimeDownSince }
   const alarms = await syncSiteAlarms(current)
+  // Kept with the crawl, so a maintenance report made from that crawl reads what the site said at that time.
+  if (crawlSessionId) {
+    const ev = evaluateWpSite(current.lastSeenAt, current.lastReport as Record<string, unknown> | null)
+    await db
+      .update(crawlSessions)
+      .set({ wpSnapshot: { site_url: current.siteUrl, uptime_ok: current.uptimeOk === true, level: ev.level, problems: ev.problems, facts: ev.facts }, wpSnapshotAt: new Date() })
+      .where(eq(crawlSessions.id, crawlSessionId))
+  }
   return {
     site: site.name || site.siteUrl,
     uptime_ok: current.uptimeOk === true,
@@ -41,5 +50,5 @@ export async function checkWpAfterCrawl(sessionId: string): Promise<WpCheckResul
   const candidates = await db.select().from(wpSites).where(or(eq(wpSites.companyId, row.companyId), isNull(wpSites.companyId)))
   const key = siteMatchKey(row.url)
   const site = candidates.find((s) => siteMatchKey(s.siteUrl) === key)
-  return site ? checkWpSite(site) : null
+  return site ? checkWpSite(site, sessionId) : null
 }
