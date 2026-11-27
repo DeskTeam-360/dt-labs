@@ -1840,7 +1840,7 @@ export default function CrawlSessionDetailContent({ user: currentUser, crawlSess
     {
       key: 'maintenance',
       label: 'Maintenance',
-      children: <CrawlSessionMaintenance sessionId={crawlSession.id} websiteId={crawlSession.company_website_id} status={crawlSession.status} />,
+      children: <CrawlSessionMaintenance sessionId={crawlSession.id} websiteId={crawlSession.company_websites?.id ?? crawlSession.company_website_id} status={crawlSession.status} />,
     },
     ...(wpSite
       ? [

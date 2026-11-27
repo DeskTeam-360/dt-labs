@@ -24,6 +24,7 @@ export default async function CrawlSessionDetailPage({ params }: { params: Promi
   const s = row.session
   const crawlSession = {
     id: s.id,
+    company_website_id: s.companyWebsiteId,
     status: s.status,
     total_pages: s.totalPages,
     crawled_pages: s.crawledPages,

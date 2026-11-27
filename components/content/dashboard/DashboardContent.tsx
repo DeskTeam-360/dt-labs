@@ -18,6 +18,7 @@ import type { UserTimeSummary } from '@/app/api/users/time-summary/route'
 import DashboardAnnouncementsSection from '@/components/dashboard/DashboardAnnouncementsSection'
 import DashboardHourlyActivityCard from '@/components/dashboard/DashboardHourlyActivityCard'
 import DashboardTeamClocks from '@/components/dashboard/DashboardTeamClocks'
+import DashboardTeamLeave from '@/components/dashboard/DashboardTeamLeave'
 import AdminMainColumn from '@/components/layout/AdminMainColumn'
 import AdminSidebar from '@/components/layout/AdminSidebar'
 import StopTimerNoteModal from '@/components/ticket/StopTimerNoteModal'
@@ -292,6 +293,7 @@ export default function DashboardContent({ user }: DashboardContentProps) {
 
         <InactiveAssigneesBanner />
         <DashboardAnnouncementsSection />
+        <DashboardTeamLeave />
 
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} lg={6}>
