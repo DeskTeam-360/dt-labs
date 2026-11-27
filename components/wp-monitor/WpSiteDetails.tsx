@@ -58,7 +58,10 @@ export default function WpSiteDetails({ wp }: { wp: Pick<WpSiteSummary, 'site_ur
                 ? `Active${f.wordfence.version ? ` (${f.wordfence.version})` : ''}, but the plugin on the site is too old to read it. Update the DeskTeam360 Monitor plugin.`
                 : `Active${f.wordfence.version ? ` (${f.wordfence.version})` : ''}, but its scan table was not found. Tables seen: ${f.wordfence.tables.length ? f.wordfence.tables.slice(0, 6).join(', ') : 'none'}`}
         </Descriptions.Item>
-        <Descriptions.Item label="Last report">{fmtDate(f.last_seen_at)}</Descriptions.Item>
+        <Descriptions.Item label="Last report">
+          {fmtDate(f.last_seen_at)}
+          <Text type="secondary" style={{ fontSize: 12 }}> · plugin {f.plugin_version ?? 'older than 0.3.2'}</Text>
+        </Descriptions.Item>
         <Descriptions.Item label="Registered address">{wp.site_url}</Descriptions.Item>
       </Descriptions>
       {f.plugin_update_list.length + f.theme_update_list.length > 0 ? (

@@ -34,6 +34,8 @@ export type WpFacts = {
   avatars_enabled: boolean | null
   installed_plugins: { slug: string; name: string; active: boolean }[] | null
   administrators: { login: string; email: string }[] | null
+  /** The version of the DeskTeam360 Monitor plugin on the site; null = a version that does not say (before 0.3.2). */
+  plugin_version: string | null
   last_seen_at: string | null
 }
 
@@ -112,6 +114,7 @@ export function evaluateWpSite(lastSeenAt: Date | string | null | undefined, rep
       ? r.site.installed_plugins.map((p: any) => ({ slug: String(p?.slug ?? '').slice(0, 100), name: String(p?.name ?? '').slice(0, 100), active: p?.active === true }))
       : null,
     administrators: Array.isArray(users.administrators) ? users.administrators.map((a: any) => ({ login: String(a?.login ?? '').slice(0, 100), email: String(a?.email ?? '').slice(0, 150) })) : null,
+    plugin_version: typeof r.plugin_version === 'string' ? r.plugin_version.slice(0, 20) : null,
     last_seen_at: seen ? seen.toISOString() : null,
   }
 

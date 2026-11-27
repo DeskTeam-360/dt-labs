@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DeskTeam360 Monitor
  * Description: Sends WordPress/PHP version, comments, Gravity Forms entry log and Wordfence log to an external endpoint, signed with a secret key (HMAC).
- * Version: 0.3.1
+ * Version: 0.3.2
  * Requires PHP: 7.4
  * Author: DeskTeam360
  *
@@ -63,6 +63,7 @@ final class DT360_Monitor {
 			'sent_at'     => gmdate( 'c' ),
 			'wp_version'  => $wp_version,
 			'php_version' => PHP_VERSION,
+			'plugin_version' => '0.3.2',
 			'updates'     => self::updates(),
 			'comments'    => self::comments(),
 			'gravityforms' => self::gravity_forms(),
