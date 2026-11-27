@@ -165,7 +165,10 @@ export async function fillAutoItems(reportId: string): Promise<void> {
   const crawl = await reportCrawl(report, website.id)
   // What the site reported when the crawl was checked; reports made before that, or crawls never checked, use the latest data.
   const snap = (crawl?.session.wpSnapshot as { facts?: ReturnType<typeof evaluateWpSite>['facts'] } | null | undefined)?.facts ?? null
-  const facts = snap ?? (wp ? evaluateWpSite(wp.lastSeenAt, wp.lastReport as Record<string, unknown> | null).facts : null)
+  const live = wp ? evaluateWpSite(wp.lastSeenAt, wp.lastReport as Record<string, unknown> | null).facts : null
+  // A snapshot kept before a field existed does not have it: that field then comes from the latest data instead of being missing.
+  type Facts = ReturnType<typeof evaluateWpSite>['facts']
+  const facts: Facts | null = snap && live ? ({ ...live, ...snap, wordfence: { ...live.wordfence, ...snap.wordfence }, forms: { ...live.forms, ...(snap.forms ?? {}) } } as Facts) : (snap ?? live)
   const shots = crawl?.fresh ? await crawlShots(crawl.session.id) : []
 
   let host = ''
@@ -198,30 +201,30 @@ export async function fillAutoItems(reportId: string): Promise<void> {
         return { status: item.options[1] ?? item.options[0], note: `${facts.wordfence.open_issues} Wordfence issue(s): ${facts.wordfence.issues.slice(0, 5).map((i) => i.message).join(' | ')}` }
       }
       case 'spam_comments': {
-        if (!facts || !facts.last_seen_at || facts.comments_spam === null) return { status: null, note: 'This site is not reporting comments to WordPress Monitor' }
+        if (!facts || !facts.last_seen_at || facts.comments_spam == null) return { status: null, note: 'This site is not reporting comments to WordPress Monitor' }
         return facts.comments_spam === 0 ? { status: item.options[0] } : { status: item.options[1] ?? item.options[0], note: `${facts.comments_spam} spam comment(s) to remove` }
       }
       case 'spam_forms': {
         if (!facts || !facts.last_seen_at) return { status: null, note: 'This site is not reporting to WordPress Monitor' }
-        if (!facts.forms.active || facts.forms.spam === null) return { status: 'N/A', note: 'Gravity Forms is not used on this site' }
+        if (!facts.forms?.active || facts.forms.spam == null) return { status: 'N/A', note: 'Gravity Forms is not used on this site' }
         return facts.forms.spam === 0 ? { status: item.options[0] } : { status: item.options[1] ?? item.options[0], note: `${facts.forms.spam} spam form entr${facts.forms.spam === 1 ? 'y' : 'ies'} to remove` }
       }
       case 'uploads_code_exec': {
         if (!facts || !facts.last_seen_at || !facts.wordfence.active) return { status: null, note: 'Wordfence is not reporting for this site' }
-        if (facts.wordfence.uploads_exec_disabled === null) return { status: null, note: 'The plugin on the site cannot read this Wordfence setting yet, update it' }
+        if (facts.wordfence.uploads_exec_disabled == null) return { status: null, note: 'The plugin on the site cannot read this Wordfence setting yet, update it' }
         return facts.wordfence.uploads_exec_disabled ? { status: item.options[0] } : { status: item.options[1] ?? item.options[0], note: 'Code execution in the Uploads directory is still allowed. Turn it off in Wordfence, All Options.' }
       }
       case 'file_manager': {
-        if (!facts || !facts.last_seen_at || facts.installed_plugins === null) return { status: null, note: 'The plugin on the site cannot list the installed plugins yet, update it' }
+        if (!facts || !facts.last_seen_at || facts.installed_plugins == null) return { status: null, note: 'The plugin on the site cannot list the installed plugins yet, update it' }
         const found = facts.installed_plugins.filter((p) => /file[\s_-]?manager|filemanager/i.test(`${p.slug} ${p.name}`))
         return found.length === 0 ? { status: item.options[0] } : { status: item.options[1] ?? item.options[0], note: `Still installed: ${found.map((p) => `${p.name}${p.active ? ' (active)' : ''}`).join(', ')}` }
       }
       case 'gravatar_off': {
-        if (!facts || !facts.last_seen_at || facts.avatars_enabled === null) return { status: null, note: 'The plugin on the site cannot read this setting yet, update it' }
+        if (!facts || !facts.last_seen_at || facts.avatars_enabled == null) return { status: null, note: 'The plugin on the site cannot read this setting yet, update it' }
         return facts.avatars_enabled ? { status: item.options[1] ?? item.options[0], note: 'Avatars (Gravatar) are still shown. Turn them off in Settings, Discussion.' } : { status: item.options[0] }
       }
       case 'dummy_user': {
-        if (!facts || !facts.last_seen_at || facts.administrators === null) return { status: null, note: 'This site is not reporting its administrators to WordPress Monitor' }
+        if (!facts || !facts.last_seen_at || facts.administrators == null) return { status: null, note: 'This site is not reporting its administrators to WordPress Monitor' }
         // A warning only: names that look like a leftover test account. A person decides whether it is one.
         const odd = facts.administrators.filter((a) => /^(admin|administrator|test|tester|demo|dummy|temp|user|root|support)\d*$/i.test(a.login) || /(dummy|test|demo|temp)/i.test(a.login) || /@(example|test|dummy|mailinator)\./i.test(a.email))
         return odd.length === 0 ? { status: item.options[0] } : { status: item.options[1] ?? item.options[0], note: `Check these administrators: ${odd.map((a) => `${a.login}${a.email ? ` (${a.email})` : ''}`).join(', ')}` }
@@ -255,7 +258,7 @@ export async function fillAutoItems(reportId: string): Promise<void> {
     }
   }
 
-  const results = await Promise.all(todo.map(async (i) => [i, await fill(i).catch((): Fill => ({ status: null }))] as const))
+  const results = await Promise.all(todo.map(async (i) => [i, await fill(i).catch((e): Fill => ({ status: null, note: `Could not check this item: ${e instanceof Error ? e.message : 'unknown error'}` }))] as const))
   for (const [item, r] of results) {
     await db
       .update(maintenanceReportItems)
