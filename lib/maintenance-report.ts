@@ -182,6 +182,35 @@ export async function fillAutoItems(reportId: string): Promise<void> {
         if (facts.wordfence.open_issues === 0) return { status: item.options[0] }
         return { status: item.options[1] ?? item.options[0], note: `${facts.wordfence.open_issues} Wordfence issue(s): ${facts.wordfence.issues.slice(0, 5).map((i) => i.message).join(' | ')}` }
       }
+      case 'spam_comments': {
+        if (!facts || !facts.last_seen_at || facts.comments_spam === null) return { status: null, note: 'This site is not reporting comments to WordPress Monitor' }
+        return facts.comments_spam === 0 ? { status: item.options[0] } : { status: item.options[1] ?? item.options[0], note: `${facts.comments_spam} spam comment(s) to remove` }
+      }
+      case 'spam_forms': {
+        if (!facts || !facts.last_seen_at) return { status: null, note: 'This site is not reporting to WordPress Monitor' }
+        if (!facts.forms.active || facts.forms.spam === null) return { status: 'N/A', note: 'Gravity Forms is not used on this site' }
+        return facts.forms.spam === 0 ? { status: item.options[0] } : { status: item.options[1] ?? item.options[0], note: `${facts.forms.spam} spam form entr${facts.forms.spam === 1 ? 'y' : 'ies'} to remove` }
+      }
+      case 'uploads_code_exec': {
+        if (!facts || !facts.last_seen_at || !facts.wordfence.active) return { status: null, note: 'Wordfence is not reporting for this site' }
+        if (facts.wordfence.uploads_exec_disabled === null) return { status: null, note: 'The plugin on the site cannot read this Wordfence setting yet, update it' }
+        return facts.wordfence.uploads_exec_disabled ? { status: item.options[0] } : { status: item.options[1] ?? item.options[0], note: 'Code execution in the Uploads directory is still allowed. Turn it off in Wordfence, All Options.' }
+      }
+      case 'file_manager': {
+        if (!facts || !facts.last_seen_at || facts.installed_plugins === null) return { status: null, note: 'The plugin on the site cannot list the installed plugins yet, update it' }
+        const found = facts.installed_plugins.filter((p) => /file[\s_-]?manager|filemanager/i.test(`${p.slug} ${p.name}`))
+        return found.length === 0 ? { status: item.options[0] } : { status: item.options[1] ?? item.options[0], note: `Still installed: ${found.map((p) => `${p.name}${p.active ? ' (active)' : ''}`).join(', ')}` }
+      }
+      case 'gravatar_off': {
+        if (!facts || !facts.last_seen_at || facts.avatars_enabled === null) return { status: null, note: 'The plugin on the site cannot read this setting yet, update it' }
+        return facts.avatars_enabled ? { status: item.options[1] ?? item.options[0], note: 'Avatars (Gravatar) are still shown. Turn them off in Settings, Discussion.' } : { status: item.options[0] }
+      }
+      case 'dummy_user': {
+        if (!facts || !facts.last_seen_at || facts.administrators === null) return { status: null, note: 'This site is not reporting its administrators to WordPress Monitor' }
+        // A warning only: names that look like a leftover test account. A person decides whether it is one.
+        const odd = facts.administrators.filter((a) => /^(admin|administrator|test|tester|demo|dummy|temp|user|root|support)\d*$/i.test(a.login) || /(dummy|test|demo|temp)/i.test(a.login) || /@(example|test|dummy|mailinator)\./i.test(a.email))
+        return odd.length === 0 ? { status: item.options[0] } : { status: item.options[1] ?? item.options[0], note: `Check these administrators: ${odd.map((a) => `${a.login}${a.email ? ` (${a.email})` : ''}`).join(', ')}` }
+      }
       case 'broken_links': {
         if (!crawl || !crawl.fresh) return { status: null, note: crawl ? `Last crawl is ${Math.floor(crawl.ageDays)} days old, crawl again` : 'No crawl yet' }
         const n = crawl.session.brokenPages ?? 0
@@ -278,5 +307,5 @@ export async function loadSharedMaintenanceReport(token: string) {
 }
 
 /** Notes the system wrote from plugin and security scans stay inside the team: they name plugins and weaknesses. */
-const PRIVATE_NOTE_SOURCES = new Set(['plugin_updates', 'malware'])
+const PRIVATE_NOTE_SOURCES = new Set(['plugin_updates', 'malware', 'uploads_code_exec', 'file_manager', 'dummy_user'])
 export const isPrivateNote = (item: { source: string | null; autoFilled: boolean; edited: boolean }) => !!item.source && PRIVATE_NOTE_SOURCES.has(item.source) && item.autoFilled && !item.edited

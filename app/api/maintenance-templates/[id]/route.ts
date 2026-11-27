@@ -83,6 +83,9 @@ export async function PUT(request: Request, ctx: Ctx) {
     const options = (Array.isArray(r.options) ? r.options : []).map((o) => String(o).trim().slice(0, 100)).filter(Boolean).slice(0, 8)
     const source = r.source ? String(r.source) : null
     if (source && !MAINTENANCE_SOURCE_VALUES.includes(source)) return NextResponse.json({ error: `Unknown automatic source "${source}"` }, { status: 400 })
+    // A check that can find a problem needs a second status for it, or the problem would be shown as Done.
+    const canFail = !!source && !source.startsWith('shot_') && !source.startsWith('domain_')
+    if (canFail && options.length === 1) options.push('Problem found')
     items.push({ section, label, options: options.length ? options : ['Done'], source })
   }
 

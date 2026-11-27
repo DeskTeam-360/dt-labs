@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DeskTeam360 Monitor
  * Description: Sends WordPress/PHP version, comments, Gravity Forms entry log and Wordfence log to an external endpoint, signed with a secret key (HMAC).
- * Version: 0.2.3
+ * Version: 0.3.0
  * Requires PHP: 7.4
  * Author: DeskTeam360
  *
@@ -70,6 +70,26 @@ final class DT360_Monitor {
 			'ssl'         => self::ssl(),
 			'users'       => self::users(),
 			'backup'      => self::backup(),
+			'site'        => self::site_settings(),
+		);
+	}
+
+	/** Settings the maintenance checklist looks at: whether avatars (Gravatar) are shown, and which plugins are installed. */
+	private static function site_settings() {
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+		$plugins = array();
+		foreach ( get_plugins() as $file => $p ) {
+			$plugins[] = array(
+				'slug'   => dirname( $file ) === '.' ? basename( $file, '.php' ) : dirname( $file ),
+				'name'   => $p['Name'],
+				'active' => is_plugin_active( $file ),
+			);
+		}
+		return array(
+			'avatars_enabled'   => (bool) get_option( 'show_avatars' ),
+			'installed_plugins' => array_slice( $plugins, 0, 200 ),
 		);
 	}
 
@@ -312,6 +332,18 @@ final class DT360_Monitor {
 		$out['tables'] = array_slice( array_values( array_filter( self::all_tables(), function ( $n ) {
 			return false !== stripos( $n, 'wf' );
 		} ) ), 0, 40 );
+
+		// "Disable Code Execution for Uploads directory": Wordfence's own setting (class first, its table as the fallback).
+		$exec_off = null;
+		if ( class_exists( 'wfConfig' ) && method_exists( 'wfConfig', 'get' ) ) {
+			$exec_off = '1' === (string) wfConfig::get( 'disableCodeExecutionUploads' );
+		} else {
+			$cfg = self::find_wf_table( 'wfConfig' );
+			if ( $cfg ) {
+				$exec_off = '1' === (string) $wpdb->get_var( $wpdb->prepare( "SELECT val FROM `$cfg` WHERE name = %s", 'disableCodeExecutionUploads' ) );
+			}
+		}
+		$out['code_exec_uploads_disabled'] = $exec_off;
 
 		$issues = self::find_wf_table( 'wfIssues' );
 		if ( $issues ) {
